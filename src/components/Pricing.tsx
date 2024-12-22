@@ -159,13 +159,18 @@ function Pricing() {
         </div>
       </main>
 
+      {/* Footer */}
       <footer className="bg-gray-900 border-t border-gray-800">
         <div className="container mx-auto px-4 py-6">
           <div className="flex flex-col md:flex-row items-center justify-between">
             <div className="flex items-center space-x-4">
-              <a href="/privacy-policy" className="text-sm text-gray-400 hover:text-indigo-400">Privacy Policy</a>
+              <a href="/privacy-policy" className="text-sm text-gray-400 hover:text-indigo-400">
+                Privacy Policy
+              </a>
               <span className="text-gray-600">|</span>
-              <a href="/terms" className="text-sm text-gray-400 hover:text-indigo-400">Terms & Conditions</a>
+              <a href="/terms" className="text-sm text-gray-400 hover:text-indigo-400">
+                Terms & Conditions
+              </a>
             </div>
             <p className="text-sm text-gray-400 mt-4 md:mt-0">
               © 2024 TaskMaster AI. All rights reserved.
@@ -176,5 +181,6 @@ function Pricing() {
     </div>
   );
 }
+
 
 export default Pricing;

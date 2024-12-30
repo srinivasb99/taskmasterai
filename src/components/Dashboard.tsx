@@ -9,36 +9,52 @@ import { Logo } from './Logo';
 import {
   onFirebaseAuthStateChanged,
   onCollectionSnapshot,
-  // e.g. onEventsSnapshot, etc.
-  // Possibly other CRUD functions if you want to create tasks, etc.
+  createTask,
+  createGoal,
+  createProject,
+  createPlan,
 } from '../lib/dashboard-firebase';
 
 export function Dashboard() {
-  // -- State for user, userName, tasks, etc. --
+  // ---------------------
+  // 1. USER & GENERAL STATE
+  // ---------------------
   const [user, setUser] = useState<firebase.default.User | null>(null);
   const [userName, setUserName] = useState("Loading...");
 
-  // Example: tasks, goals, projects, plans
+  // ---------------------
+  // 2. COLLECTION STATE
+  // ---------------------
   const [tasks, setTasks] = useState<Array<{ id: string; data: any }>>([]);
   const [goals, setGoals] = useState<Array<{ id: string; data: any }>>([]);
   const [projects, setProjects] = useState<Array<{ id: string; data: any }>>([]);
   const [plans, setPlans] = useState<Array<{ id: string; data: any }>>([]);
 
-  // For Weather (if loaded via external API or stored in Firestore)
-  // This is just a placeholder showing how you might handle it
+  // ---------------------
+  // 3. WEATHER STATE
+  // ---------------------
   const [weatherData, setWeatherData] = useState<any>(null);
 
-  // Listen to Auth State
+  // ---------------------
+  // 4. UI STATES
+  // ---------------------
+  // "activeTab" controls which collection we’re viewing: "tasks" | "goals" | "projects" | "plans"
+  const [activeTab, setActiveTab] = useState<"tasks" | "goals" | "projects" | "plans">("tasks");
+
+  // New item form states
+  const [newItemText, setNewItemText] = useState("");
+  const [newItemDate, setNewItemDate] = useState(""); // empty means no date
+
+  // ---------------------
+  // 5. AUTH LISTENER
+  // ---------------------
   useEffect(() => {
     const unsubscribe = onFirebaseAuthStateChanged((firebaseUser) => {
       setUser(firebaseUser);
 
-      // If we have a user, prefer their displayName; otherwise "Loading..."
       if (firebaseUser && firebaseUser.displayName) {
         setUserName(firebaseUser.displayName);
       } else if (firebaseUser) {
-        // if the user object exists but has no displayName,
-        // you might have your own logic to fetch it from Firestore:
         setUserName("Loading...");
       } else {
         setUserName("Loading...");
@@ -47,24 +63,16 @@ export function Dashboard() {
     return () => unsubscribe();
   }, []);
 
-  // Listen to “tasks” collection changes
+  // ---------------------
+  // 6. COLLECTION SNAPSHOTS
+  // ---------------------
   useEffect(() => {
-    if (!user) return; // Only load if user is signed in
+    if (!user) return;
 
-    const unsubTasks = onCollectionSnapshot('tasks', user.uid, (items) => {
-      setTasks(items);
-    });
-    
-    // You could do the same for “goals”, “projects”, “plans”:
-    const unsubGoals = onCollectionSnapshot('goals', user.uid, (items) => {
-      setGoals(items);
-    });
-    const unsubProjects = onCollectionSnapshot('projects', user.uid, (items) => {
-      setProjects(items);
-    });
-    const unsubPlans = onCollectionSnapshot('plans', user.uid, (items) => {
-      setPlans(items);
-    });
+    const unsubTasks = onCollectionSnapshot('tasks', user.uid, (items) => setTasks(items));
+    const unsubGoals = onCollectionSnapshot('goals', user.uid, (items) => setGoals(items));
+    const unsubProjects = onCollectionSnapshot('projects', user.uid, (items) => setProjects(items));
+    const unsubPlans = onCollectionSnapshot('plans', user.uid, (items) => setPlans(items));
 
     return () => {
       unsubTasks();
@@ -74,26 +82,32 @@ export function Dashboard() {
     };
   }, [user]);
 
-  // Example: fetch weather from an external API
+  // ---------------------
+  // 7. WEATHER FETCH
+  // ---------------------
   useEffect(() => {
     async function fetchWeather() {
-      // If you store location in Firestore, or get user’s lat/lon, do that here.
-      // For demonstration, we’ll just do a mock fetch or skip if no user.
       if (!user) {
         setWeatherData(null);
         return;
       }
       try {
-        // Replace with your real fetch:
-        const mockWeather = {
-          location: "Frisco, Texas",
-          condition: "Sunny",
-          temp_f: 79,
-          feelslike_f: 78.5,
-          wind_mph: 15.9,
-          humidity: 18,
-        };
-        setWeatherData(mockWeather);
+        // Example of a real API call to openweathermap for "Frisco"
+        // Replace "YOUR_API_KEY" with your real key
+        const weatherUrl = `https://api.openweathermap.org/data/2.5/weather?q=Frisco&appid=YOUR_API_KEY&units=imperial`;
+        
+        const response = await fetch(weatherUrl);
+        if (!response.ok) throw new Error("Weather fetch failed");
+        const data = await response.json();
+
+        setWeatherData({
+          location: data.name,
+          condition: data.weather[0].main,
+          temp_f: Math.round(data.main.temp),
+          feelslike_f: Math.round(data.main.feels_like),
+          wind_mph: Math.round(data.wind.speed),
+          humidity: data.main.humidity,
+        });
       } catch (error) {
         console.error("Failed to fetch weather:", error);
         setWeatherData(null);
@@ -102,12 +116,70 @@ export function Dashboard() {
     fetchWeather();
   }, [user]);
 
-  // Simple helper to see if tasks are loaded:
-  const isTasksLoaded = tasks.length > 0;
+  // ---------------------
+  // 8. HELPER & HANDLERS
+  // ---------------------
+  const handleTabChange = (tabName: "tasks" | "goals" | "projects" | "plans") => {
+    setActiveTab(tabName);
+  };
 
-  // If the user is not logged in at all, you might want to handle that:
+  // Create new item in the active collection
+  const handleCreate = async () => {
+    if (!user) return;
+    if (!newItemText.trim()) {
+      alert("Please enter a name or description before creating.");
+      return;
+    }
+
+    // If user provided a date, parse it; else null
+    let dateValue: Date | null = null;
+    if (newItemDate) {
+      dateValue = new Date(newItemDate);
+      // optional: you could do time normalization or checks here
+    }
+
+    // Call the appropriate create function
+    try {
+      if (activeTab === "tasks") {
+        await createTask(user.uid, newItemText, dateValue);
+      } else if (activeTab === "goals") {
+        await createGoal(user.uid, newItemText, dateValue);
+      } else if (activeTab === "projects") {
+        await createProject(user.uid, newItemText, dateValue);
+      } else if (activeTab === "plans") {
+        await createPlan(user.uid, newItemText, dateValue);
+      }
+      // Clear input fields
+      setNewItemText("");
+      setNewItemDate("");
+    } catch (error) {
+      console.error("Error creating item:", error);
+    }
+  };
+
+  // Determine which array of data to display based on the active tab
+  let currentItems: Array<{ id: string; data: any }> = [];
+  let titleField = ""; // e.g., 'task', 'goal', 'project', 'plan'
+  if (activeTab === "tasks") {
+    currentItems = tasks;
+    titleField = "task";
+  } else if (activeTab === "goals") {
+    currentItems = goals;
+    titleField = "goal";
+  } else if (activeTab === "projects") {
+    currentItems = projects;
+    titleField = "project";
+  } else if (activeTab === "plans") {
+    currentItems = plans;
+    titleField = "plan";
+  }
+
+  const isTasksLoaded = tasks.length > 0 || goals.length > 0 || projects.length > 0 || plans.length > 0;
+
+  // ---------------------
+  // 9. RENDER
+  // ---------------------
   if (user === null) {
-    // E.g. show a loading screen or redirect to login
     return (
       <div className="flex items-center justify-center h-screen bg-gray-900 text-white">
         <p>Loading dashboard...</p>
@@ -115,7 +187,6 @@ export function Dashboard() {
     );
   }
 
-  // We'll pass `userName || "Loading..."` to the UI in case userName is empty.
   return (
     <div className="bg-gray-900 text-white min-h-screen w-full overflow-hidden">
       {/* SIDEBAR */}
@@ -132,47 +203,38 @@ export function Dashboard() {
             <Home className="w-5 h-5" />
             <span>Dashboard</span>
           </div>
-
           <div className="menu-item flex items-center gap-2 cursor-pointer text-base hover:bg-gray-800 p-2 rounded">
             <Settings className="w-5 h-5" />
             <span>Settings</span>
           </div>
-
           <div className="menu-item flex items-center gap-2 cursor-pointer text-base hover:bg-gray-800 p-2 rounded">
             <Palette className="w-5 h-5" />
             <span>Theme</span>
           </div>
-
           <div className="menu-item flex items-center gap-2 cursor-pointer text-base hover:bg-gray-800 p-2 rounded">
             <StickyNote className="w-5 h-5" />
             <span>Notes</span>
           </div>
-
           <div className="menu-item flex items-center gap-2 cursor-pointer text-base hover:bg-gray-800 p-2 rounded">
             <Calendar className="w-5 h-5" />
             <span>Calendar</span>
           </div>
-
           <div className="menu-item flex items-center gap-2 cursor-pointer text-base hover:bg-gray-800 p-2 rounded">
             <Users className="w-5 h-5" />
             <span>Friends</span>
           </div>
-
           <div className="menu-item flex items-center gap-2 cursor-pointer text-base hover:bg-gray-800 p-2 rounded">
             <Globe className="w-5 h-5" />
             <span>Community</span>
           </div>
-
           <div className="menu-item flex items-center gap-2 cursor-pointer text-base hover:bg-gray-800 p-2 rounded">
             <Zap className="w-5 h-5" />
             <span>Distraction Control</span>
           </div>
-
           <div className="menu-item flex items-center gap-2 cursor-pointer text-base hover:bg-gray-800 p-2 rounded">
             <Cpu className="w-5 h-5" />
             <span>AI Chat Bot</span>
           </div>
-
           <button className="upgrade-btn bg-gradient-to-r from-pink-500 to-pink-600 text-white border-none py-2 px-4 rounded-full cursor-pointer font-semibold flex items-center gap-2 whitespace-nowrap mt-4 hover:from-pink-600 hover:to-pink-700 transition-colors">
             <Gem className="w-5 h-5" />
             <span>Upgrade to Premium</span>
@@ -201,7 +263,7 @@ export function Dashboard() {
           </p>
         </header>
 
-        {/* 2-column layout (stack on mobile) */}
+        {/* 2-column layout */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* LEFT COLUMN */}
           <div className="flex flex-col gap-6">
@@ -218,7 +280,6 @@ export function Dashboard() {
               <p className="text-green-400 font-bold mb-1">Welcome!</p>
               <p className="text-blue-400">
                 TaskMaster is ready to generate your Smart Overview. 
-                {` `}
                 To get started, create a task, goal, project, or plan.
               </p>
               <small className="block mt-2 text-gray-500">
@@ -231,8 +292,7 @@ export function Dashboard() {
               <h2 className="text-xl font-semibold text-purple-400 mb-2">
                 Your Productivity
               </h2>
-              {/* Simple condition: if we have no tasks, goals, etc. */}
-              {(!isTasksLoaded && goals.length === 0 && projects.length === 0 && plans.length === 0) ? (
+              {(!isTasksLoaded) ? (
                 <p>
                   ✨ Nothing productive scheduled—why not get started? 
                   Create a task, goal, project, or plan to make the most 
@@ -251,59 +311,81 @@ export function Dashboard() {
               <h2 className="text-xl font-semibold text-blue-400 mb-2">
                 Upcoming Deadlines
               </h2>
-              {/* Replace with real logic from tasks/goals/projects/plans if they have a dueDate. */}
+              {/* Example logic: you can filter tasks/goals with near dueDates */}
               <p>No upcoming deadlines</p>
             </div>
 
             {/* Tasks / Goals / Projects / Plans Tabs */}
             <div className="bg-gray-800 rounded-xl p-5">
+              {/* TAB SWITCHER */}
               <div className="flex space-x-3 mb-4">
-                <button className="px-4 py-2 rounded bg-indigo-500 text-white">
+                <button
+                  className={`px-4 py-2 rounded ${
+                    activeTab === 'tasks' ? 'bg-indigo-500 text-white' : 'bg-gray-700 text-gray-200'
+                  }`}
+                  onClick={() => handleTabChange('tasks')}
+                >
                   Tasks
                 </button>
-                <button className="px-4 py-2 rounded bg-gray-700 text-gray-200">
+                <button
+                  className={`px-4 py-2 rounded ${
+                    activeTab === 'goals' ? 'bg-indigo-500 text-white' : 'bg-gray-700 text-gray-200'
+                  }`}
+                  onClick={() => handleTabChange('goals')}
+                >
                   Goals
                 </button>
-                <button className="px-4 py-2 rounded bg-gray-700 text-gray-200">
+                <button
+                  className={`px-4 py-2 rounded ${
+                    activeTab === 'projects' ? 'bg-indigo-500 text-white' : 'bg-gray-700 text-gray-200'
+                  }`}
+                  onClick={() => handleTabChange('projects')}
+                >
                   Projects
                 </button>
-                <button className="px-4 py-2 rounded bg-gray-700 text-gray-200">
+                <button
+                  className={`px-4 py-2 rounded ${
+                    activeTab === 'plans' ? 'bg-indigo-500 text-white' : 'bg-gray-700 text-gray-200'
+                  }`}
+                  onClick={() => handleTabChange('plans')}
+                >
                   Plans
                 </button>
               </div>
-              {/* Example "Tasks" tab content */}
-              <div>
-                <h3 className="text-lg font-semibold mb-2">Tasks</h3>
-                <div className="flex gap-2 mb-4">
-                  <input
-                    type="text"
-                    className="flex-grow bg-gray-900 border border-gray-700 rounded p-2"
-                    placeholder="Enter new task"
-                  />
-                  <input
-                    type="date"
-                    className="bg-gray-900 border border-gray-700 rounded p-2"
-                  />
-                  <button className="bg-indigo-600 text-white px-4 py-2 rounded">
-                    Create Task
-                  </button>
-                </div>
-                {/* Show loaded tasks */}
-                <ul className="space-y-2">
-                  {tasks.length === 0 ? (
-                    <li className="text-gray-400">No tasks yet...</li>
-                  ) : (
-                    tasks.map((item) => (
-                      <li 
-                        key={item.id} 
-                        className="bg-gray-700 p-2 rounded"
-                      >
-                        {item.data.task || "Untitled Task"}
-                      </li>
-                    ))
-                  )}
-                </ul>
+
+              {/* NEW ITEM FORM */}
+              <h3 className="text-lg font-semibold mb-2 capitalize">{activeTab}</h3>
+              <div className="flex gap-2 mb-4">
+                <input
+                  type="text"
+                  className="flex-grow bg-gray-900 border border-gray-700 rounded p-2"
+                  placeholder={`Enter new ${activeTab}...`}
+                  value={newItemText}
+                  onChange={(e) => setNewItemText(e.target.value)}
+                />
+                <input
+                  type="date"
+                  className="bg-gray-900 border border-gray-700 rounded p-2"
+                  value={newItemDate}
+                  onChange={(e) => setNewItemDate(e.target.value)}
+                />
+                <button className="bg-indigo-600 text-white px-4 py-2 rounded" onClick={handleCreate}>
+                  Create {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
+                </button>
               </div>
+
+              {/* SHOW LOADED ITEMS */}
+              <ul className="space-y-2">
+                {currentItems.length === 0 ? (
+                  <li className="text-gray-400">No {activeTab} yet...</li>
+                ) : (
+                  currentItems.map((item) => (
+                    <li key={item.id} className="bg-gray-700 p-2 rounded">
+                      {item.data[titleField] || "Untitled"}
+                    </li>
+                  ))
+                )}
+              </ul>
             </div>
           </div>
 

@@ -1,354 +1,334 @@
-// src/lib/dashboard-firebase.ts
-import { auth, db } from './firebase';
+/* ------------------------------------------------------------------
+   dashboard-firebase.ts
+   ------------------------------------------------------------------ */
+
+// 1. IMPORT THE MODULAR FIREBASE SDK
+import { initializeApp } from 'firebase/app';
 import {
-  User,
+  getAuth,
   onAuthStateChanged,
   createUserWithEmailAndPassword,
+  updateProfile,
+  User,
 } from 'firebase/auth';
+
 import {
-  collection,
+  getFirestore,
   doc,
   setDoc,
-  updateDoc,
-  deleteDoc,
   getDoc,
-  getDocs,
+  updateDoc,
   addDoc,
+  deleteDoc,
+  collection,
+  serverTimestamp,
   query,
   where,
   orderBy,
-  serverTimestamp,
   onSnapshot,
-  DocumentReference,
   DocumentData,
 } from 'firebase/firestore';
 
-interface TaskData {
-  task: string;
-  dueDate?: Date | null;
-  userId: string;
-  completed?: boolean;
-  createdAt?: any;
+// 2. YOUR FIREBASE CONFIG
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_AUTH_DOMAIN",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_BUCKET",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID",
+};
+
+// 3. INITIALIZE FIREBASE APP, AUTH, AND FIRESTORE
+const app = initializeApp(firebaseConfig);
+export const auth = getAuth(app);
+export const db = getFirestore(app);
+
+/* ------------------------------------------------------------------
+   4. AUTH LISTENERS
+   ------------------------------------------------------------------ */
+
+/**
+ * Subscribes to Firebase Auth state changes.
+ * @param callback A function that receives the current user or null.
+ * @returns An unsubscribe function you can call if needed.
+ */
+export function onFirebaseAuthStateChanged(
+  callback: (user: User | null) => void
+) {
+  return onAuthStateChanged(auth, (user) => {
+    callback(user);
+  });
 }
 
-interface ProjectData {
-  project: string;
-  dueDate?: Date | null;
-  userId: string;
-  completed?: boolean;
-  createdAt?: any;
-}
-
-interface GoalData {
-  goal: string;
-  dueDate?: Date | null;
-  userId: string;
-  completed?: boolean;
-  createdAt?: any;
-}
-
-interface PlanData {
-  plan: string;
-  dueDate?: Date | null;
-  userId: string;
-  completed?: boolean;
-  createdAt?: any;
-}
-
-interface TimerData {
-  name: string;
-  time: number;
-  userId: string;
-  createdAt: any;
-  updatedAt?: any;
-}
-
-interface EventData {
-  title: string;
-  description: string;
-  day: number;
-  month: number;
-  year: number;
-  uid: string;
-  linkedTaskId?: string;
-  linkedGoalId?: string;
-  linkedPlanId?: string;
-  linkedProjectId?: string;
-  startTime?: string;
-  endTime?: string;
-}
-
-interface UserData {
-  splashScreenShown?: boolean;
-  nightMode?: 'enabled' | 'disabled';
-  displayName?: string;
-  profilePicture?: string;
-  firstName?: string;
-  lastName?: string;
-}
-
-// ----------------- Authentication -----------------
-export function subscribeToAuthState(callback: (user: User | null) => void) {
-  return onAuthStateChanged(auth, callback);
-}
-
-export async function signUp(email: string, password: string): Promise<User> {
+/**
+ * Create a new user with email & password.
+ * If the user is truly new, we set `splashScreenShown` to false.
+ */
+export async function signUp(email: string, password: string) {
   const userCredential = await createUserWithEmailAndPassword(auth, email, password);
   const user = userCredential.user;
-  // Initialize user data
-  await setDoc(doc(db, 'users', user.uid), { splashScreenShown: false }, { merge: true });
-  return user;
+
+  // If brand-new user, mark that in Firestore:
+  await setDoc(doc(db, "users", user.uid), {
+    splashScreenShown: false,
+    createdAt: serverTimestamp(),
+  });
 }
 
-// ----------------- User Data -----------------
-export async function updateUserOnlineStatus(
-  userId: string,
-  online: boolean
-): Promise<void> {
+/**
+ * Update a user’s displayName in Firebase Auth
+ * (useful for changing "Anonymous" to "FirstName LastName").
+ */
+export async function updateUserDisplayName(newDisplayName: string) {
+  if (!auth.currentUser) return;
+  await updateProfile(auth.currentUser, { displayName: newDisplayName });
+  await updateDoc(doc(db, "users", auth.currentUser.uid), {
+    displayName: newDisplayName,
+  });
+}
+
+/* ------------------------------------------------------------------
+   5. USER STATUS (ONLINE/OFFLINE) + LAST SEEN
+   ------------------------------------------------------------------ */
+
+/**
+ * Sets the user's `online` field to true and updates `lastSeen` to server time.
+ */
+export async function setUserOnline(userId: string) {
   await setDoc(
-    doc(db, 'users', userId),
+    doc(db, "users", userId),
     {
-      online,
+      online: true,
       lastSeen: serverTimestamp(),
     },
     { merge: true }
   );
 }
 
-export async function updateUserDisplayName(userId: string, displayName: string) {
-  await updateDoc(doc(db, 'users', userId), { displayName });
+/**
+ * Example: track user’s visibility changes (in a React effect or similar).
+ * If `excludedPages` logic is needed, pass that in or handle in your component.
+ */
+export async function handleVisibilityChange(userId: string, excludedPages: string[] = []) {
+  // For now, we only handle the 'visible' case:
+  if (document.visibilityState === 'visible') {
+    await setUserOnline(userId);
+  }
 }
 
-export async function setUserNightMode(userId: string, enabled: boolean) {
-  await setDoc(
-    doc(db, 'users', userId),
-    {
-      nightMode: enabled ? 'enabled' : 'disabled',
-    },
-    { merge: true }
-  );
-}
+/* ------------------------------------------------------------------
+   6. CUSTOM TIMERS (CRUD)
+   ------------------------------------------------------------------ */
 
-export async function getUserData(userId: string): Promise<UserData | null> {
-  const userDoc = await getDoc(doc(db, 'users', userId));
-  return userDoc.exists() ? (userDoc.data() as UserData) : null;
-}
-
-export async function markSplashScreenShown(userId: string): Promise<void> {
-  await updateDoc(doc(db, 'users', userId), { splashScreenShown: true });
-}
-
-// ----------------- Tasks -----------------
-export async function createTask(task: string, dueDate: Date | null, userId: string): Promise<DocumentReference<DocumentData>> {
-  return addDoc(collection(db, 'tasks'), {
-    task,
-    dueDate: dueDate || null,
-    userId,
-    createdAt: serverTimestamp(),
-  });
-}
-
-export async function updateTask(taskId: string, data: Partial<TaskData>) {
-  await updateDoc(doc(db, 'tasks', taskId), data);
-}
-
-export async function deleteTask(taskId: string) {
-  await deleteDoc(doc(db, 'tasks', taskId));
-}
-
-export function onTasksSnapshot(userId: string, callback: (tasks: DocumentData[]) => void) {
-  const q = query(collection(db, 'tasks'), where('userId', '==', userId), orderBy('dueDate'), orderBy('createdAt'));
-  return onSnapshot(q, (snapshot) => {
-    const tasks = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-    callback(tasks);
-  });
-}
-
-// ----------------- Projects -----------------
-export async function createProject(project: string, dueDate: Date | null, userId: string): Promise<DocumentReference<DocumentData>> {
-  return addDoc(collection(db, 'projects'), {
-    project,
-    dueDate: dueDate || null,
-    userId,
-    createdAt: serverTimestamp(),
-  });
-}
-
-export async function updateProject(projectId: string, data: Partial<ProjectData>) {
-  await updateDoc(doc(db, 'projects', projectId), data);
-}
-
-export async function deleteProject(projectId: string) {
-  await deleteDoc(doc(db, 'projects', projectId));
-}
-
-export function onProjectsSnapshot(userId: string, callback: (projects: DocumentData[]) => void) {
-  const q = query(collection(db, 'projects'), where('userId', '==', userId), orderBy('dueDate'), orderBy('createdAt'));
-  return onSnapshot(q, (snapshot) => {
-    const projects = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-    callback(projects);
-  });
-}
-
-// ----------------- Goals -----------------
-export async function createGoal(goal: string, dueDate: Date | null, userId: string): Promise<DocumentReference<DocumentData>> {
-  return addDoc(collection(db, 'goals'), {
-    goal,
-    dueDate: dueDate || null,
-    userId,
-    createdAt: serverTimestamp(),
-  });
-}
-
-export async function updateGoal(goalId: string, data: Partial<GoalData>) {
-  await updateDoc(doc(db, 'goals', goalId), data);
-}
-
-export async function deleteGoal(goalId: string) {
-  await deleteDoc(doc(db, 'goals', goalId));
-}
-
-export function onGoalsSnapshot(userId: string, callback: (goals: DocumentData[]) => void) {
-  const q = query(collection(db, 'goals'), where('userId', '==', userId), orderBy('dueDate'), orderBy('createdAt'));
-  return onSnapshot(q, (snapshot) => {
-    const goals = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-    callback(goals);
-  });
-}
-
-// ----------------- Plans -----------------
-export async function createPlan(plan: string, dueDate: Date | null, userId: string): Promise<DocumentReference<DocumentData>> {
-  return addDoc(collection(db, 'plans'), {
-    plan,
-    dueDate: dueDate || null,
-    userId,
-    createdAt: serverTimestamp(),
-  });
-}
-
-export async function updatePlan(planId: string, data: Partial<PlanData>) {
-  await updateDoc(doc(db, 'plans', planId), data);
-}
-
-export async function deletePlan(planId: string) {
-  await deleteDoc(doc(db, 'plans', planId));
-}
-
-export function onPlansSnapshot(userId: string, callback: (plans: DocumentData[]) => void) {
-  const q = query(collection(db, 'plans'), where('userId', '==', userId), orderBy('dueDate'), orderBy('createdAt'));
-  return onSnapshot(q, (snapshot) => {
-    const plans = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-    callback(plans);
-  });
-}
-
-// ----------------- Events -----------------
-export async function createEvent(eventData: EventData): Promise<DocumentReference<DocumentData>> {
-  return addDoc(collection(db, 'events'), {
-    ...eventData,
-  });
-}
-
-export async function deleteEvent(eventId: string) {
-  await deleteDoc(doc(db, 'events', eventId));
-}
-
-export function onEventsSnapshot(userId: string, callback: (events: DocumentData[]) => void) {
-  const q = query(collection(db, 'events'), where('uid', '==', userId));
-  return onSnapshot(q, (snapshot) => {
-    const events = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-    callback(events);
-  });
-}
-
-// ----------------- Timers -----------------
-export async function saveCustomTimerToFirestore(name: string, time: number, userId: string): Promise<string> {
-  const docRef = await addDoc(collection(db, 'timers'), {
+/** Creates a timer in the 'timers' collection. */
+export async function addCustomTimer(name: string, timeInSeconds: number, userId: string) {
+  const docRef = await addDoc(collection(db, "timers"), {
     name,
-    time,
+    time: timeInSeconds,
     userId,
     createdAt: serverTimestamp(),
   });
   return docRef.id;
 }
 
-export async function updateCustomTimerInFirestore(timerId: string, name: string, time: number) {
-  await updateDoc(doc(db, 'timers', timerId), {
+/** Updates an existing custom timer (by docId). */
+export async function updateCustomTimer(timerId: string, name: string, timeInSeconds: number) {
+  await updateDoc(doc(db, "timers", timerId), {
     name,
-    time,
+    time: timeInSeconds,
     updatedAt: serverTimestamp(),
   });
 }
 
-export async function deleteCustomTimerFromFirestore(timerId: string) {
-  await deleteDoc(doc(db, 'timers', timerId));
+/** Deletes an existing custom timer. */
+export async function deleteCustomTimer(timerId: string) {
+  await deleteDoc(doc(db, "timers", timerId));
 }
 
-export function onCustomTimersSnapshot(userId: string, callback: (timers: DocumentData[]) => void) {
-  const q = query(collection(db, 'timers'), where('userId', '==', userId), orderBy('createdAt'));
-  return onSnapshot(q, (snapshot) => {
-    const timers = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-    callback(timers);
+/**
+ * Real-time listener for all timers belonging to a user.
+ * Usage (in React):
+ * 
+ *   useEffect(() => {
+ *     const unsub = onCustomTimersSnapshot(user.uid, (timers) => setMyTimers(timers));
+ *     return () => unsub();
+ *   }, [user.uid]);
+ */
+export function onCustomTimersSnapshot(
+  userId: string,
+  callback: (timers: Array<{ id: string; data: DocumentData }>) => void
+) {
+  const q = query(
+    collection(db, "timers"),
+    where("userId", "==", userId),
+    orderBy("createdAt", "asc")
+  );
+
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const results: Array<{ id: string; data: DocumentData }> = [];
+      snapshot.forEach((docSnap) => {
+        results.push({ id: docSnap.id, data: docSnap.data() });
+      });
+      callback(results);
+    },
+    (error) => {
+      console.error("Error listening to custom timers:", error);
+    }
+  );
+}
+
+/* ------------------------------------------------------------------
+   7. TASKS / PROJECTS / GOALS / PLANS (CRUD + LISTENERS)
+   ------------------------------------------------------------------ */
+
+/**
+ * Creates a new task (with optional dueDate).
+ * The same pattern can be used for goals, projects, or plans.
+ */
+export async function createTask(
+  userId: string,
+  taskText: string,
+  dueDate?: Date | null
+) {
+  await addDoc(collection(db, "tasks"), {
+    task: taskText,
+    userId,
+    dueDate: dueDate || null,
+    createdAt: serverTimestamp(),
   });
 }
 
-// ----------------- Linked Items (Task Events, etc.) -----------------
-export async function createTaskEvent(taskId: string, taskTitle: string, dueDate: Date, userId: string) {
-  const eventData: EventData = {
-    title: taskTitle,
-    description: "task converted to event",
-    day: dueDate.getDate(),
-    month: dueDate.getMonth() + 1,
-    year: dueDate.getFullYear(),
-    uid: userId,
-    linkedTaskId: taskId,
-    startTime: "",
-    endTime: "",
-  };
-  await createEvent(eventData);
+/**
+ * Generic function to mark a document in [tasks, goals, projects, plans] as completed.
+ */
+export async function markItemComplete(collectionName: string, docId: string) {
+  await updateDoc(doc(db, collectionName, docId), {
+    completed: true,
+  });
 }
 
-export async function createProjectEvent(projectId: string, projectTitle: string, dueDate: Date, userId: string) {
-  const eventData: EventData = {
-    title: projectTitle,
-    description: "project converted to event",
-    day: dueDate.getDate(),
-    month: dueDate.getMonth() + 1,
-    year: dueDate.getFullYear(),
-    uid: userId,
-    linkedProjectId: projectId,
-    startTime: "",
-    endTime: "",
-  };
-  await createEvent(eventData);
+/**
+ * Generic function to delete an item from the specified collection by docId.
+ */
+export async function deleteItem(collectionName: string, docId: string) {
+  await deleteDoc(doc(db, collectionName, docId));
 }
 
-export async function createGoalEvent(goalId: string, goalTitle: string, dueDate: Date, userId: string) {
-  const eventData: EventData = {
-    title: goalTitle,
-    description: "goal converted to event",
-    day: dueDate.getDate(),
-    month: dueDate.getMonth() + 1,
-    year: dueDate.getFullYear(),
-    uid: userId,
-    linkedGoalId: goalId,
-    startTime: "",
-    endTime: "",
-  };
-  await createEvent(eventData);
+/**
+ * Listen for real-time snapshot changes in a specific collection
+ * (e.g., "tasks", "goals", "projects", "plans").
+ */
+export function onCollectionSnapshot(
+  collectionName: string,
+  userId: string,
+  callback: (items: Array<{ id: string; data: DocumentData }>) => void
+) {
+  const q = query(
+    collection(db, collectionName),
+    where("userId", "==", userId),
+    // Potential note: If you do NOT always have `dueDate`, you may need
+    // a different approach or a Firestore index that can handle `null`.
+    orderBy("dueDate", "asc"),
+    orderBy("createdAt", "asc")
+  );
+
+  return onSnapshot(q, (snapshot) => {
+    const results: Array<{ id: string; data: DocumentData }> = [];
+    snapshot.forEach((docSnap) => {
+      results.push({ id: docSnap.id, data: docSnap.data() });
+    });
+    callback(results);
+  });
 }
 
-export async function createPlanEvent(planId: string, planTitle: string, dueDate: Date, userId: string) {
-  const eventData: EventData = {
-    title: planTitle,
-    description: "plan converted to event",
+/* ------------------------------------------------------------------
+   8. EVENTS (LINKED TO TASKS, GOALS, PROJECTS, PLANS)
+   ------------------------------------------------------------------ */
+
+/** 
+ * Example: create an event linked to a task, project, goal, or plan docId.
+ * For example, `linkedFieldName` could be "linkedTaskId".
+ */
+export async function createLinkedEvent(
+  userId: string,
+  linkedId: string,
+  linkedFieldName: string, // e.g. "linkedTaskId"
+  title: string,
+  dueDate: Date
+) {
+  const eventData = {
+    title,
+    description: `${linkedFieldName.replace("linked", "").toLowerCase()} converted to event`,
     day: dueDate.getDate(),
-    month: dueDate.getMonth() + 1,
+    month: dueDate.getMonth(), // 0-based in JS
     year: dueDate.getFullYear(),
     uid: userId,
-    linkedPlanId: planId,
+    [linkedFieldName]: linkedId,
     startTime: "",
     endTime: "",
   };
-  await createEvent(eventData);
+
+  await addDoc(collection(db, "events"), eventData);
+}
+
+/**
+ * Example: Real-time snapshot for events that belong to `userId`.
+ */
+export function onEventsSnapshot(
+  userId: string,
+  callback: (events: Array<{ id: string; data: DocumentData }>) => void
+) {
+  const q = query(collection(db, "events"), where("uid", "==", userId));
+  
+  return onSnapshot(q, (snapshot) => {
+    const results: Array<{ id: string; data: DocumentData }> = [];
+    snapshot.forEach((docSnap) => {
+      results.push({ id: docSnap.id, data: docSnap.data() });
+    });
+    callback(results);
+  });
+}
+
+/* ------------------------------------------------------------------
+   9. NIGHT MODE & THEME PREFERENCES
+   ------------------------------------------------------------------ */
+
+/** Save night mode preference (enabled/disabled) to the user’s doc. */
+export async function setNightMode(userId: string, isEnabled: boolean) {
+  await setDoc(
+    doc(db, "users", userId),
+    { nightMode: isEnabled ? "enabled" : "disabled" },
+    { merge: true }
+  );
+}
+
+/* ------------------------------------------------------------------
+   10. SPLASH SCREEN CHECK
+   ------------------------------------------------------------------ */
+
+/**
+ * Checks if a user has seen the splash screen. If not, sets `splashScreenShown = true`.
+ * @returns `true` if the splash screen was already shown, `false` if newly set.
+ */
+export async function checkSplashScreen(userId: string) {
+  const userRef = doc(db, "users", userId);
+  const snapshot = await getDoc(userRef);
+
+  if (!snapshot.exists()) {
+    // Create if user doc doesn’t exist
+    await setDoc(userRef, { splashScreenShown: false });
+    return false;
+  }
+
+  const userData = snapshot.data();
+  if (!userData.splashScreenShown) {
+    // They have NOT seen the splash screen yet, so set it:
+    await updateDoc(userRef, { splashScreenShown: true });
+    return false;
+  }
+
+  return true;
 }

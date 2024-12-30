@@ -317,7 +317,9 @@ export function Dashboard() {
       if (timerState.intervalRef) clearInterval(timerState.intervalRef);
       timerState.isRunning = false;
       // Reset to original Firestore time or optional default
-      timerState.timeLeft = defaultTime ?? customTimers.find((t) => t.id === timerId)?.data.time || 25 * 60;
+      timerState.timeLeft = defaultTime
+  ?? (customTimers.find((t) => t.id === timerId)?.data.time || 25 * 60);
+
       timerState.intervalRef = null;
       return { ...prev, [timerId]: timerState };
     });

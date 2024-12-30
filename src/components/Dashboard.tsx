@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { 
   Home, Settings, Palette, StickyNote, Calendar, Users, 
-  Globe, Zap, Cpu, Gem, User, PlusCircle 
+  Globe, Zap, Cpu, Gem, User, PlusCircle, Edit, Trash 
 } from 'lucide-react';
 import { Logo } from './Logo';
 
@@ -15,6 +15,11 @@ import {
   createPlan,
   addCustomTimer,
   onCustomTimersSnapshot,
+  // NEW functions (example names):
+  updateItem,         // For tasks/goals/projects/plans
+  deleteItem,         // For tasks/goals/projects/plans
+  updateCustomTimer,  // For custom timers
+  deleteCustomTimer,  // For custom timers
 } from '../lib/dashboard-firebase';
 
 export function Dashboard() {
@@ -48,7 +53,12 @@ export function Dashboard() {
 
   // New item form states
   const [newItemText, setNewItemText] = useState("");
-  const [newItemDate, setNewItemDate] = useState(""); // empty => no date
+  const [newItemDate, setNewItemDate] = useState("");
+
+  // Edit form states
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState("");
+  const [editingDate, setEditingDate] = useState("");
 
   // ---------------------
   // 5. MAIN POMODORO TIMER (LOCAL)
@@ -146,7 +156,6 @@ export function Dashboard() {
         return;
       }
       try {
-        // Example: OpenWeatherMap for "Frisco"
         // Replace with your own city & API key
         const response = await fetch(
           `https://api.openweathermap.org/data/2.5/weather?q=Frisco&appid=YOUR_API_KEY&units=imperial`
@@ -171,10 +180,12 @@ export function Dashboard() {
   }, [user]);
 
   // ---------------------
-  // 9. HELPER & HANDLERS
+  // 9. CREATE & EDIT & DELETE
   // ---------------------
+
   const handleTabChange = (tabName: "tasks" | "goals" | "projects" | "plans") => {
     setActiveTab(tabName);
+    setEditingItemId(null); // reset editing if we switch tabs
   };
 
   // Create new item in the active collection
@@ -211,6 +222,7 @@ export function Dashboard() {
   // Determine which array of data to display based on the active tab
   let currentItems: Array<{ id: string; data: any }> = [];
   let titleField = ""; // e.g., 'task', 'goal', 'project', 'plan'
+  let collectionName = activeTab;
   if (activeTab === "tasks") {
     currentItems = tasks;
     titleField = "task";
@@ -225,47 +237,92 @@ export function Dashboard() {
     titleField = "plan";
   }
 
-  // If ANY of these arrays have data, it's loaded
-  const isAnyLoaded =
-    tasks.length > 0 ||
-    goals.length > 0 ||
-    projects.length > 0 ||
-    plans.length > 0;
+  // Start editing an item
+  const handleEditClick = (itemId: string, oldText: string, oldDueDate?: any) => {
+    setEditingItemId(itemId);
+    setEditingText(oldText || "");
+    if (oldDueDate) {
+      const dueDateObj = oldDueDate.toDate ? oldDueDate.toDate() : new Date(oldDueDate);
+      setEditingDate(dueDateObj.toISOString().split('T')[0]);
+    } else {
+      setEditingDate("");
+    }
+  };
+
+  // Save an edited item
+  const handleEditSave = async (itemId: string) => {
+    if (!user || !editingText.trim()) {
+      alert("Please enter a valid name for the item.");
+      return;
+    }
+
+    let dateValue: Date | null = null;
+    if (editingDate) {
+      dateValue = new Date(editingDate);
+    }
+
+    try {
+      await updateItem(collectionName, itemId, {
+        [titleField]: editingText,
+        dueDate: dateValue || null,
+      });
+      setEditingItemId(null);
+      setEditingText("");
+      setEditingDate("");
+    } catch (error) {
+      console.error("Error updating item:", error);
+    }
+  };
+
+  // Delete an item
+  const handleDelete = async (itemId: string) => {
+    if (!user) return;
+    const confirmDel = window.confirm("Are you sure you want to delete this item?");
+    if (!confirmDel) return;
+    try {
+      await deleteItem(collectionName, itemId);
+    } catch (error) {
+      console.error("Error deleting item:", error);
+    }
+  };
 
   // ---------------------
   // 10. CUSTOM TIMERS (POMODORO +)
   // ---------------------
-  const handleAddCustomTimer = async () => {
-    if (!user) return;
-    // default is 1500 seconds (25 minutes)
-    const defaultTimeSeconds = 25 * 60;
-    try {
-      await addCustomTimer("My Custom Timer", defaultTimeSeconds, user.uid);
-    } catch (error) {
-      console.error("Error adding custom timer:", error);
-    }
-  };
 
-  // We’ll store each custom timer’s local running state in a separate local piece of state
-  // For a small demo, we’ll keep them ephemeral in an object
   const [runningTimers, setRunningTimers] = useState<{ [id: string]: {
     isRunning: boolean;
     timeLeft: number;
     intervalRef: NodeJS.Timer | null;
   } }>({});
 
+  const handleAddCustomTimer = async () => {
+    if (!user) return;
+    // default is 1500 seconds (25 minutes)
+    try {
+      await addCustomTimer("My Custom Timer", 25 * 60, user.uid);
+    } catch (error) {
+      console.error("Error adding custom timer:", error);
+    }
+  };
+
   // Initialize local running state when new timers come in
   useEffect(() => {
-    // We'll create local states for each timer if not already existing
     setRunningTimers((prev) => {
       const nextState = { ...prev };
       customTimers.forEach((timer) => {
         if (!nextState[timer.id]) {
           nextState[timer.id] = {
             isRunning: false,
-            timeLeft: timer.data.time, // from Firestore
+            timeLeft: timer.data.time,
             intervalRef: null,
           };
+        }
+      });
+      // Also remove old local states if the timer no longer exists
+      Object.keys(nextState).forEach((id) => {
+        if (!customTimers.some((t) => t.id === id)) {
+          delete nextState[id];
         }
       });
       return nextState;
@@ -316,13 +373,35 @@ export function Dashboard() {
       const timerState = { ...prev[timerId] };
       if (timerState.intervalRef) clearInterval(timerState.intervalRef);
       timerState.isRunning = false;
-      // Reset to original Firestore time or optional default
+      // use parentheses if mixing ?? and ||
       timerState.timeLeft = defaultTime
-  ?? (customTimers.find((t) => t.id === timerId)?.data.time || 25 * 60);
-
+        ?? (customTimers.find((t) => t.id === timerId)?.data.time || 25 * 60);
       timerState.intervalRef = null;
       return { ...prev, [timerId]: timerState };
     });
+  };
+
+  // Edit timer name
+  const handleEditTimerName = async (timerId: string) => {
+    const newName = prompt("Enter new timer name:");
+    if (!newName) return;
+    try {
+      await updateCustomTimer(timerId, newName, undefined); 
+      // or update your existing function to allow partial updates
+    } catch (error) {
+      console.error("Error editing custom timer name:", error);
+    }
+  };
+
+  // Delete custom timer
+  const handleDeleteTimer = async (timerId: string) => {
+    const confirmDel = window.confirm("Are you sure you want to delete this timer?");
+    if (!confirmDel) return;
+    try {
+      await deleteCustomTimer(timerId);
+    } catch (error) {
+      console.error("Error deleting custom timer:", error);
+    }
   };
 
   const formatCustomTime = (timeInSeconds: number) => {
@@ -330,6 +409,26 @@ export function Dashboard() {
     const secs = timeInSeconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
+
+  // ---------------------
+  // 11. PRODUCTIVITY PROGRESS BARS
+  // ---------------------
+  // For each category, we can see how many are completed
+  const totalTasks = tasks.length;
+  const completedTasks = tasks.filter((t) => t.data.completed).length;
+  const tasksProgress = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
+
+  const totalGoals = goals.length;
+  const completedGoals = goals.filter((g) => g.data.completed).length;
+  const goalsProgress = totalGoals > 0 ? (completedGoals / totalGoals) * 100 : 0;
+
+  const totalProjects = projects.length;
+  const completedProjects = projects.filter((p) => p.data.completed).length;
+  const projectsProgress = totalProjects > 0 ? (completedProjects / totalProjects) * 100 : 0;
+
+  const totalPlans = plans.length;
+  const completedPlans = plans.filter((pl) => pl.data.completed).length;
+  const plansProgress = totalPlans > 0 ? (completedPlans / totalPlans) * 100 : 0;
 
   // If the user is not logged in at all
   if (user === null) {
@@ -440,23 +539,63 @@ export function Dashboard() {
               </small>
             </div>
 
-            {/* Productivity Card */}
+            {/* Productivity Card (Progress Bars) */}
             <div className="bg-gray-800 rounded-xl p-5">
               <h2 className="text-xl font-semibold text-purple-400 mb-2">
                 Your Productivity
               </h2>
-              {(!isAnyLoaded) ? (
-                <p>
-                  ✨ Nothing productive scheduled—why not get started? 
-                  Create a task, goal, project, or plan to make the most 
-                  of your time &amp; stay productive! ✨
+
+              {/* Tasks progress */}
+              <div className="mb-2">
+                <p className="mb-1">
+                  Tasks: {completedTasks}/{totalTasks} completed
                 </p>
-              ) : (
-                <p>
-                  You have {tasks.length} tasks, {goals.length} goals, 
-                  {projects.length} projects, and {plans.length} plans in progress!
+                <div className="w-full bg-gray-700 h-2 rounded">
+                  <div
+                    className="bg-green-500 h-2 rounded"
+                    style={{ width: `${tasksProgress}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Goals progress */}
+              <div className="mb-2">
+                <p className="mb-1">
+                  Goals: {completedGoals}/{totalGoals} completed
                 </p>
-              )}
+                <div className="w-full bg-gray-700 h-2 rounded">
+                  <div
+                    className="bg-pink-500 h-2 rounded"
+                    style={{ width: `${goalsProgress}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Projects progress */}
+              <div className="mb-2">
+                <p className="mb-1">
+                  Projects: {completedProjects}/{totalProjects} completed
+                </p>
+                <div className="w-full bg-gray-700 h-2 rounded">
+                  <div
+                    className="bg-blue-500 h-2 rounded"
+                    style={{ width: `${projectsProgress}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Plans progress */}
+              <div className="mb-2">
+                <p className="mb-1">
+                  Plans: {completedPlans}/{totalPlans} completed
+                </p>
+                <div className="w-full bg-gray-700 h-2 rounded">
+                  <div
+                    className="bg-yellow-500 h-2 rounded"
+                    style={{ width: `${plansProgress}%` }}
+                  />
+                </div>
+              </div>
             </div>
 
             {/* Upcoming Deadlines Card */}
@@ -532,31 +671,95 @@ export function Dashboard() {
                   <li className="text-gray-400">No {activeTab} yet...</li>
                 ) : (
                   currentItems.map((item) => {
+                    const itemId = item.id;
                     const textValue = item.data[titleField] || "Untitled";
+
                     // If there's a dueDate, check if overdue
                     let overdue = false;
                     let dueDateStr = "";
                     if (item.data.dueDate) {
-                      const dueDateObj = item.data.dueDate.toDate 
-                        ? item.data.dueDate.toDate() 
-                        : new Date(item.data.dueDate); // fallback
+                      const dueDateObj = item.data.dueDate.toDate
+                        ? item.data.dueDate.toDate()
+                        : new Date(item.data.dueDate); 
                       dueDateStr = dueDateObj.toLocaleDateString();
                       overdue = dueDateObj < new Date();
                     }
 
+                    const isEditing = editingItemId === itemId;
+                    
                     return (
                       <li
                         key={item.id}
-                        className={`p-2 rounded ${
+                        className={`p-2 rounded flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 ${
                           overdue ? 'bg-red-600' : 'bg-gray-700'
                         }`}
                       >
-                        {textValue}
-                        {dueDateStr && (
-                          <span className="ml-2 text-sm font-bold">
-                            (Due: {dueDateStr})
-                          </span>
+                        {/* Item Content */}
+                        {!isEditing ? (
+                          <div>
+                            <span className="font-bold">{textValue}</span>
+                            {dueDateStr && (
+                              <span className="ml-2 text-sm font-bold">
+                                (Due: {dueDateStr})
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="flex flex-col sm:flex-row gap-2">
+                            <input
+                              className="bg-gray-800 border border-gray-600 rounded p-1"
+                              value={editingText}
+                              onChange={(e) => setEditingText(e.target.value)}
+                            />
+                            <input
+                              type="date"
+                              className="bg-gray-800 border border-gray-600 rounded p-1"
+                              value={editingDate}
+                              onChange={(e) => setEditingDate(e.target.value)}
+                            />
+                          </div>
                         )}
+                        
+                        {/* Action Buttons */}
+                        <div className="flex gap-2">
+                          {!isEditing ? (
+                            <>
+                              <button
+                                className="bg-blue-500 hover:bg-blue-600 px-2 py-1 rounded text-white flex items-center gap-1"
+                                onClick={() => handleEditClick(itemId, textValue, item.data.dueDate)}
+                              >
+                                <Edit className="w-4 h-4" />
+                                Edit
+                              </button>
+                              <button
+                                className="bg-red-500 hover:bg-red-600 px-2 py-1 rounded text-white flex items-center gap-1"
+                                onClick={() => handleDelete(itemId)}
+                              >
+                                <Trash className="w-4 h-4" />
+                                Delete
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                className="bg-green-500 hover:bg-green-600 px-2 py-1 rounded text-white"
+                                onClick={() => handleEditSave(itemId)}
+                              >
+                                Save
+                              </button>
+                              <button
+                                className="bg-gray-500 hover:bg-gray-600 px-2 py-1 rounded text-white"
+                                onClick={() => {
+                                  setEditingItemId(null);
+                                  setEditingText("");
+                                  setEditingDate("");
+                                }}
+                              >
+                                Cancel
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </li>
                     );
                   })
@@ -623,11 +826,14 @@ export function Dashboard() {
                   Reset
                 </button>
               </div>
-              <p className="text-sm text-gray-400 mt-3">
-                🍎 Looks like you have no current custom timers. To get started,
-                just press the '+' button next to the Pomodoro timer and 
-                create your own! 🍎
-              </p>
+              {/* Hide message if there is at least one custom timer */}
+              {!customTimers.length && (
+                <p className="text-sm text-gray-400 mt-3">
+                  🍎 Looks like you have no current custom timers. To get started,
+                  just press the '+' button next to the Pomodoro timer and 
+                  create your own! 🍎
+                </p>
+              )}
             </div>
 
             {/* CUSTOM TIMERS LIST */}
@@ -649,7 +855,23 @@ export function Dashboard() {
                         className="bg-gray-700 p-3 rounded flex items-center justify-between"
                       >
                         <div className="flex flex-col">
-                          <span className="font-bold text-lg">{timer.data.name}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-lg">{timer.data.name}</span>
+                            {/* Edit timer name */}
+                            <button
+                              className="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded flex items-center gap-1"
+                              onClick={() => handleEditTimerName(timerId)}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            {/* Delete timer */}
+                            <button
+                              className="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded flex items-center gap-1"
+                              onClick={() => handleDeleteTimer(timerId)}
+                            >
+                              <Trash className="w-4 h-4" />
+                            </button>
+                          </div>
                           <span className="text-2xl font-semibold">
                             {formatCustomTime(timeLeft)}
                           </span>
@@ -672,7 +894,7 @@ export function Dashboard() {
                             </button>
                           )}
                           <button
-                            className="bg-red-500 px-3 py-1 rounded font-semibold"
+                            className="bg-gray-500 px-3 py-1 rounded font-semibold"
                             onClick={() => resetCustomTimer(timerId)}
                           >
                             Reset

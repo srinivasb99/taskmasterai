@@ -143,7 +143,6 @@ export async function deleteCustomTimer(timerId: string) {
 /**
  * Real-time listener for all timers belonging to a user.
  * Usage (in React):
- * 
  *   useEffect(() => {
  *     const unsub = onCustomTimersSnapshot(user.uid, (timers) => setMyTimers(timers));
  *     return () => unsub();
@@ -175,12 +174,11 @@ export function onCustomTimersSnapshot(
 }
 
 /* ------------------------------------------------------------------
-   5. TASKS / PROJECTS / GOALS / PLANS (CRUD + LISTENERS)
+   5. TASKS / GOALS / PROJECTS / PLANS (CRUD + LISTENERS)
    ------------------------------------------------------------------ */
 
 /**
  * Creates a new task (with optional dueDate).
- * The same pattern can be used for goals, projects, or plans.
  */
 export async function createTask(
   userId: string,
@@ -189,6 +187,54 @@ export async function createTask(
 ) {
   await addDoc(collection(db, 'tasks'), {
     task: taskText,
+    userId,
+    dueDate: dueDate || null,
+    createdAt: serverTimestamp(),
+  });
+}
+
+/**
+ * Creates a new goal (with optional dueDate).
+ */
+export async function createGoal(
+  userId: string,
+  goalText: string,
+  dueDate?: Date | null
+) {
+  await addDoc(collection(db, 'goals'), {
+    goal: goalText,
+    userId,
+    dueDate: dueDate || null,
+    createdAt: serverTimestamp(),
+  });
+}
+
+/**
+ * Creates a new project (with optional dueDate).
+ */
+export async function createProject(
+  userId: string,
+  projectText: string,
+  dueDate?: Date | null
+) {
+  await addDoc(collection(db, 'projects'), {
+    project: projectText,
+    userId,
+    dueDate: dueDate || null,
+    createdAt: serverTimestamp(),
+  });
+}
+
+/**
+ * Creates a new plan (with optional dueDate).
+ */
+export async function createPlan(
+  userId: string,
+  planText: string,
+  dueDate?: Date | null
+) {
+  await addDoc(collection(db, 'plans'), {
+    plan: planText,
     userId,
     dueDate: dueDate || null,
     createdAt: serverTimestamp(),

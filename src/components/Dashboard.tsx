@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { 
   Home, Settings, Palette, StickyNote, Calendar, Users, 
-  Globe, Zap, Cpu, Gem, User 
+  Globe, Zap, Cpu, Gem, User, PlusCircle 
 } from 'lucide-react';
 import { Logo } from './Logo';
 
@@ -13,6 +13,8 @@ import {
   createGoal,
   createProject,
   createPlan,
+  addCustomTimer,
+  onCustomTimersSnapshot,
 } from '../lib/dashboard-firebase';
 
 export function Dashboard() {
@@ -23,12 +25,15 @@ export function Dashboard() {
   const [userName, setUserName] = useState("Loading...");
 
   // ---------------------
-  // 2. COLLECTION STATE
+  // 2. COLLECTION STATES
   // ---------------------
   const [tasks, setTasks] = useState<Array<{ id: string; data: any }>>([]);
   const [goals, setGoals] = useState<Array<{ id: string; data: any }>>([]);
   const [projects, setProjects] = useState<Array<{ id: string; data: any }>>([]);
   const [plans, setPlans] = useState<Array<{ id: string; data: any }>>([]);
+
+  // Custom timers from Firestore
+  const [customTimers, setCustomTimers] = useState<Array<{ id: string; data: any }>>([]);
 
   // ---------------------
   // 3. WEATHER STATE
@@ -43,10 +48,53 @@ export function Dashboard() {
 
   // New item form states
   const [newItemText, setNewItemText] = useState("");
-  const [newItemDate, setNewItemDate] = useState(""); // empty means no date
+  const [newItemDate, setNewItemDate] = useState(""); // empty => no date
 
   // ---------------------
-  // 5. AUTH LISTENER
+  // 5. MAIN POMODORO TIMER (LOCAL)
+  // ---------------------
+  const [pomodoroTimeLeft, setPomodoroTimeLeft] = useState(25 * 60); // 25 min default
+  const [pomodoroRunning, setPomodoroRunning] = useState(false);
+  const pomodoroRef = useRef<NodeJS.Timer | null>(null);
+
+  // Start Pomodoro
+  const handlePomodoroStart = () => {
+    if (pomodoroRunning) return; // Already running
+    setPomodoroRunning(true);
+    pomodoroRef.current = setInterval(() => {
+      setPomodoroTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(pomodoroRef.current as NodeJS.Timer);
+          setPomodoroRunning(false);
+          return 0; // End
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  // Pause Pomodoro
+  const handlePomodoroPause = () => {
+    setPomodoroRunning(false);
+    if (pomodoroRef.current) clearInterval(pomodoroRef.current);
+  };
+
+  // Reset Pomodoro
+  const handlePomodoroReset = () => {
+    setPomodoroRunning(false);
+    if (pomodoroRef.current) clearInterval(pomodoroRef.current);
+    setPomodoroTimeLeft(25 * 60);
+  };
+
+  // Format pomodoro time as MM:SS
+  const formatPomodoroTime = (timeInSeconds: number) => {
+    const mins = Math.floor(timeInSeconds / 60);
+    const secs = timeInSeconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // ---------------------
+  // 6. AUTH LISTENER
   // ---------------------
   useEffect(() => {
     const unsubscribe = onFirebaseAuthStateChanged((firebaseUser) => {
@@ -64,7 +112,7 @@ export function Dashboard() {
   }, []);
 
   // ---------------------
-  // 6. COLLECTION SNAPSHOTS
+  // 7. COLLECTION SNAPSHOTS
   // ---------------------
   useEffect(() => {
     if (!user) return;
@@ -74,16 +122,22 @@ export function Dashboard() {
     const unsubProjects = onCollectionSnapshot('projects', user.uid, (items) => setProjects(items));
     const unsubPlans = onCollectionSnapshot('plans', user.uid, (items) => setPlans(items));
 
+    // Listen for custom timers
+    const unsubTimers = onCustomTimersSnapshot(user.uid, (timers) => {
+      setCustomTimers(timers);
+    });
+
     return () => {
       unsubTasks();
       unsubGoals();
       unsubProjects();
       unsubPlans();
+      unsubTimers();
     };
   }, [user]);
 
   // ---------------------
-  // 7. WEATHER FETCH
+  // 8. WEATHER FETCH
   // ---------------------
   useEffect(() => {
     async function fetchWeather() {
@@ -92,11 +146,11 @@ export function Dashboard() {
         return;
       }
       try {
-        // Example of a real API call to openweathermap for "Frisco"
-        // Replace "YOUR_API_KEY" with your real key
-        const weatherUrl = `https://api.openweathermap.org/data/2.5/weather?q=Frisco&appid=YOUR_API_KEY&units=imperial`;
-        
-        const response = await fetch(weatherUrl);
+        // Example: OpenWeatherMap for "Frisco"
+        // Replace with your own city & API key
+        const response = await fetch(
+          `https://api.openweathermap.org/data/2.5/weather?q=Frisco&appid=YOUR_API_KEY&units=imperial`
+        );
         if (!response.ok) throw new Error("Weather fetch failed");
         const data = await response.json();
 
@@ -117,7 +171,7 @@ export function Dashboard() {
   }, [user]);
 
   // ---------------------
-  // 8. HELPER & HANDLERS
+  // 9. HELPER & HANDLERS
   // ---------------------
   const handleTabChange = (tabName: "tasks" | "goals" | "projects" | "plans") => {
     setActiveTab(tabName);
@@ -131,14 +185,11 @@ export function Dashboard() {
       return;
     }
 
-    // If user provided a date, parse it; else null
     let dateValue: Date | null = null;
     if (newItemDate) {
       dateValue = new Date(newItemDate);
-      // optional: you could do time normalization or checks here
     }
 
-    // Call the appropriate create function
     try {
       if (activeTab === "tasks") {
         await createTask(user.uid, newItemText, dateValue);
@@ -174,11 +225,111 @@ export function Dashboard() {
     titleField = "plan";
   }
 
-  const isTasksLoaded = tasks.length > 0 || goals.length > 0 || projects.length > 0 || plans.length > 0;
+  // If ANY of these arrays have data, it's loaded
+  const isAnyLoaded =
+    tasks.length > 0 ||
+    goals.length > 0 ||
+    projects.length > 0 ||
+    plans.length > 0;
 
   // ---------------------
-  // 9. RENDER
+  // 10. CUSTOM TIMERS (POMODORO +)
   // ---------------------
+  const handleAddCustomTimer = async () => {
+    if (!user) return;
+    // default is 1500 seconds (25 minutes)
+    const defaultTimeSeconds = 25 * 60;
+    try {
+      await addCustomTimer("My Custom Timer", defaultTimeSeconds, user.uid);
+    } catch (error) {
+      console.error("Error adding custom timer:", error);
+    }
+  };
+
+  // We’ll store each custom timer’s local running state in a separate local piece of state
+  // For a small demo, we’ll keep them ephemeral in an object
+  const [runningTimers, setRunningTimers] = useState<{ [id: string]: {
+    isRunning: boolean;
+    timeLeft: number;
+    intervalRef: NodeJS.Timer | null;
+  } }>({});
+
+  // Initialize local running state when new timers come in
+  useEffect(() => {
+    // We'll create local states for each timer if not already existing
+    setRunningTimers((prev) => {
+      const nextState = { ...prev };
+      customTimers.forEach((timer) => {
+        if (!nextState[timer.id]) {
+          nextState[timer.id] = {
+            isRunning: false,
+            timeLeft: timer.data.time, // from Firestore
+            intervalRef: null,
+          };
+        }
+      });
+      return nextState;
+    });
+  }, [customTimers]);
+
+  // Start a custom timer
+  const startCustomTimer = (timerId: string) => {
+    setRunningTimers((prev) => {
+      const timerState = { ...prev[timerId] };
+      if (timerState.isRunning) return prev; // already running
+      timerState.isRunning = true;
+
+      const intervalId = setInterval(() => {
+        setRunningTimers((old) => {
+          const copy = { ...old };
+          const tState = { ...copy[timerId] };
+          if (tState.timeLeft <= 1) {
+            clearInterval(tState.intervalRef as NodeJS.Timer);
+            tState.isRunning = false;
+            tState.timeLeft = 0;
+          } else {
+            tState.timeLeft -= 1;
+          }
+          copy[timerId] = tState;
+          return copy;
+        });
+      }, 1000);
+      timerState.intervalRef = intervalId as unknown as NodeJS.Timer;
+      return { ...prev, [timerId]: timerState };
+    });
+  };
+
+  // Pause a custom timer
+  const pauseCustomTimer = (timerId: string) => {
+    setRunningTimers((prev) => {
+      const timerState = { ...prev[timerId] };
+      if (timerState.intervalRef) clearInterval(timerState.intervalRef);
+      timerState.isRunning = false;
+      timerState.intervalRef = null;
+      return { ...prev, [timerId]: timerState };
+    });
+  };
+
+  // Reset a custom timer
+  const resetCustomTimer = (timerId: string, defaultTime?: number) => {
+    setRunningTimers((prev) => {
+      const timerState = { ...prev[timerId] };
+      if (timerState.intervalRef) clearInterval(timerState.intervalRef);
+      timerState.isRunning = false;
+      // Reset to original Firestore time or optional default
+      timerState.timeLeft = defaultTime ?? customTimers.find((t) => t.id === timerId)?.data.time || 25 * 60;
+      timerState.intervalRef = null;
+      return { ...prev, [timerId]: timerState };
+    });
+  };
+
+  const formatCustomTime = (timeInSeconds: number) => {
+    const mins = Math.floor(timeInSeconds / 60);
+    const secs = timeInSeconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // If the user is not logged in at all
   if (user === null) {
     return (
       <div className="flex items-center justify-center h-screen bg-gray-900 text-white">
@@ -292,7 +443,7 @@ export function Dashboard() {
               <h2 className="text-xl font-semibold text-purple-400 mb-2">
                 Your Productivity
               </h2>
-              {(!isTasksLoaded) ? (
+              {(!isAnyLoaded) ? (
                 <p>
                   ✨ Nothing productive scheduled—why not get started? 
                   Create a task, goal, project, or plan to make the most 
@@ -311,8 +462,7 @@ export function Dashboard() {
               <h2 className="text-xl font-semibold text-blue-400 mb-2">
                 Upcoming Deadlines
               </h2>
-              {/* Example logic: you can filter tasks/goals with near dueDates */}
-              <p>No upcoming deadlines</p>
+              <p>No upcoming deadlines (example placeholder)</p>
             </div>
 
             {/* Tasks / Goals / Projects / Plans Tabs */}
@@ -379,11 +529,35 @@ export function Dashboard() {
                 {currentItems.length === 0 ? (
                   <li className="text-gray-400">No {activeTab} yet...</li>
                 ) : (
-                  currentItems.map((item) => (
-                    <li key={item.id} className="bg-gray-700 p-2 rounded">
-                      {item.data[titleField] || "Untitled"}
-                    </li>
-                  ))
+                  currentItems.map((item) => {
+                    const textValue = item.data[titleField] || "Untitled";
+                    // If there's a dueDate, check if overdue
+                    let overdue = false;
+                    let dueDateStr = "";
+                    if (item.data.dueDate) {
+                      const dueDateObj = item.data.dueDate.toDate 
+                        ? item.data.dueDate.toDate() 
+                        : new Date(item.data.dueDate); // fallback
+                      dueDateStr = dueDateObj.toLocaleDateString();
+                      overdue = dueDateObj < new Date();
+                    }
+
+                    return (
+                      <li
+                        key={item.id}
+                        className={`p-2 rounded ${
+                          overdue ? 'bg-red-600' : 'bg-gray-700'
+                        }`}
+                      >
+                        {textValue}
+                        {dueDateStr && (
+                          <span className="ml-2 text-sm font-bold">
+                            (Due: {dueDateStr})
+                          </span>
+                        )}
+                      </li>
+                    );
+                  })
                 )}
               </ul>
             </div>
@@ -411,24 +585,39 @@ export function Dashboard() {
               )}
             </div>
 
-            {/* Pomodoro Timer Card */}
+            {/* Main Pomodoro Timer */}
             <div className="bg-gray-800 rounded-xl p-5">
               <div className="flex items-center justify-between mb-2">
                 <h2 className="text-xl font-semibold">Pomodoro Timer</h2>
                 {/* '+' Button for custom timers */}
-                <button className="bg-gray-700 text-white px-2 py-1 rounded-full font-bold">
-                  +
+                <button
+                  className="bg-gray-700 text-white px-2 py-1 rounded-full font-bold flex items-center gap-1"
+                  onClick={handleAddCustomTimer}
+                >
+                  <PlusCircle className="w-4 h-4" />
+                  New Timer
                 </button>
               </div>
-              <div className="text-4xl font-bold mb-4">25:00</div>
+              <div className="text-4xl font-bold mb-4">
+                {formatPomodoroTime(pomodoroTimeLeft)}
+              </div>
               <div className="flex space-x-3">
-                <button className="bg-green-500 px-4 py-2 rounded font-semibold">
+                <button
+                  className="bg-green-500 px-4 py-2 rounded font-semibold"
+                  onClick={handlePomodoroStart}
+                >
                   Start
                 </button>
-                <button className="bg-yellow-500 px-4 py-2 rounded font-semibold">
+                <button
+                  className="bg-yellow-500 px-4 py-2 rounded font-semibold"
+                  onClick={handlePomodoroPause}
+                >
                   Pause
                 </button>
-                <button className="bg-red-500 px-4 py-2 rounded font-semibold">
+                <button
+                  className="bg-red-500 px-4 py-2 rounded font-semibold"
+                  onClick={handlePomodoroReset}
+                >
                   Reset
                 </button>
               </div>
@@ -437,6 +626,61 @@ export function Dashboard() {
                 just press the '+' button next to the Pomodoro timer and 
                 create your own! 🍎
               </p>
+            </div>
+
+            {/* CUSTOM TIMERS LIST */}
+            <div className="bg-gray-800 rounded-xl p-5">
+              <h2 className="text-xl font-semibold mb-4">Custom Timers</h2>
+              {customTimers.length === 0 ? (
+                <p className="text-gray-400">No custom timers yet...</p>
+              ) : (
+                <ul className="space-y-2">
+                  {customTimers.map((timer) => {
+                    const timerId = timer.id;
+                    const runningState = runningTimers[timerId];
+                    const timeLeft = runningState ? runningState.timeLeft : timer.data.time;
+                    const isRunning = runningState ? runningState.isRunning : false;
+
+                    return (
+                      <li
+                        key={timerId}
+                        className="bg-gray-700 p-3 rounded flex items-center justify-between"
+                      >
+                        <div className="flex flex-col">
+                          <span className="font-bold text-lg">{timer.data.name}</span>
+                          <span className="text-2xl font-semibold">
+                            {formatCustomTime(timeLeft)}
+                          </span>
+                        </div>
+                        <div className="flex gap-2">
+                          {!isRunning && (
+                            <button
+                              className="bg-green-500 px-3 py-1 rounded font-semibold"
+                              onClick={() => startCustomTimer(timerId)}
+                            >
+                              Start
+                            </button>
+                          )}
+                          {isRunning && (
+                            <button
+                              className="bg-yellow-500 px-3 py-1 rounded font-semibold"
+                              onClick={() => pauseCustomTimer(timerId)}
+                            >
+                              Pause
+                            </button>
+                          )}
+                          <button
+                            className="bg-red-500 px-3 py-1 rounded font-semibold"
+                            onClick={() => resetCustomTimer(timerId)}
+                          >
+                            Reset
+                          </button>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
             </div>
           </div>
         </div>

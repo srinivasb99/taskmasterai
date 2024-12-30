@@ -2,18 +2,17 @@
    dashboard-firebase.ts
    ------------------------------------------------------------------ */
 
-// 1. IMPORT THE MODULAR FIREBASE SDK
-import { initializeApp } from 'firebase/app';
+// 1. IMPORT YOUR ALREADY-INITIALIZED APP & SERVICES FROM `firebase.ts`
+import { auth, db } from './firebase';
+
 import {
-  getAuth,
+  User,
   onAuthStateChanged,
   createUserWithEmailAndPassword,
   updateProfile,
-  User,
 } from 'firebase/auth';
 
 import {
-  getFirestore,
   doc,
   setDoc,
   getDoc,
@@ -29,23 +28,8 @@ import {
   DocumentData,
 } from 'firebase/firestore';
 
-// 2. YOUR FIREBASE CONFIG
-const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_AUTH_DOMAIN",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_BUCKET",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID",
-};
-
-// 3. INITIALIZE FIREBASE APP, AUTH, AND FIRESTORE
-const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
-export const db = getFirestore(app);
-
 /* ------------------------------------------------------------------
-   4. AUTH LISTENERS
+   2. AUTH LISTENERS
    ------------------------------------------------------------------ */
 
 /**
@@ -70,7 +54,7 @@ export async function signUp(email: string, password: string) {
   const user = userCredential.user;
 
   // If brand-new user, mark that in Firestore:
-  await setDoc(doc(db, "users", user.uid), {
+  await setDoc(doc(db, 'users', user.uid), {
     splashScreenShown: false,
     createdAt: serverTimestamp(),
   });
@@ -83,13 +67,13 @@ export async function signUp(email: string, password: string) {
 export async function updateUserDisplayName(newDisplayName: string) {
   if (!auth.currentUser) return;
   await updateProfile(auth.currentUser, { displayName: newDisplayName });
-  await updateDoc(doc(db, "users", auth.currentUser.uid), {
+  await updateDoc(doc(db, 'users', auth.currentUser.uid), {
     displayName: newDisplayName,
   });
 }
 
 /* ------------------------------------------------------------------
-   5. USER STATUS (ONLINE/OFFLINE) + LAST SEEN
+   3. USER STATUS (ONLINE/OFFLINE) + LAST SEEN
    ------------------------------------------------------------------ */
 
 /**
@@ -97,7 +81,7 @@ export async function updateUserDisplayName(newDisplayName: string) {
  */
 export async function setUserOnline(userId: string) {
   await setDoc(
-    doc(db, "users", userId),
+    doc(db, 'users', userId),
     {
       online: true,
       lastSeen: serverTimestamp(),
@@ -110,20 +94,26 @@ export async function setUserOnline(userId: string) {
  * Example: track user’s visibility changes (in a React effect or similar).
  * If `excludedPages` logic is needed, pass that in or handle in your component.
  */
-export async function handleVisibilityChange(userId: string, excludedPages: string[] = []) {
-  // For now, we only handle the 'visible' case:
+export async function handleVisibilityChange(
+  userId: string,
+  excludedPages: string[] = []
+) {
   if (document.visibilityState === 'visible') {
     await setUserOnline(userId);
   }
 }
 
 /* ------------------------------------------------------------------
-   6. CUSTOM TIMERS (CRUD)
+   4. CUSTOM TIMERS (CRUD)
    ------------------------------------------------------------------ */
 
 /** Creates a timer in the 'timers' collection. */
-export async function addCustomTimer(name: string, timeInSeconds: number, userId: string) {
-  const docRef = await addDoc(collection(db, "timers"), {
+export async function addCustomTimer(
+  name: string,
+  timeInSeconds: number,
+  userId: string
+) {
+  const docRef = await addDoc(collection(db, 'timers'), {
     name,
     time: timeInSeconds,
     userId,
@@ -133,8 +123,12 @@ export async function addCustomTimer(name: string, timeInSeconds: number, userId
 }
 
 /** Updates an existing custom timer (by docId). */
-export async function updateCustomTimer(timerId: string, name: string, timeInSeconds: number) {
-  await updateDoc(doc(db, "timers", timerId), {
+export async function updateCustomTimer(
+  timerId: string,
+  name: string,
+  timeInSeconds: number
+) {
+  await updateDoc(doc(db, 'timers', timerId), {
     name,
     time: timeInSeconds,
     updatedAt: serverTimestamp(),
@@ -143,7 +137,7 @@ export async function updateCustomTimer(timerId: string, name: string, timeInSec
 
 /** Deletes an existing custom timer. */
 export async function deleteCustomTimer(timerId: string) {
-  await deleteDoc(doc(db, "timers", timerId));
+  await deleteDoc(doc(db, 'timers', timerId));
 }
 
 /**
@@ -160,9 +154,9 @@ export function onCustomTimersSnapshot(
   callback: (timers: Array<{ id: string; data: DocumentData }>) => void
 ) {
   const q = query(
-    collection(db, "timers"),
-    where("userId", "==", userId),
-    orderBy("createdAt", "asc")
+    collection(db, 'timers'),
+    where('userId', '==', userId),
+    orderBy('createdAt', 'asc')
   );
 
   return onSnapshot(
@@ -175,13 +169,13 @@ export function onCustomTimersSnapshot(
       callback(results);
     },
     (error) => {
-      console.error("Error listening to custom timers:", error);
+      console.error('Error listening to custom timers:', error);
     }
   );
 }
 
 /* ------------------------------------------------------------------
-   7. TASKS / PROJECTS / GOALS / PLANS (CRUD + LISTENERS)
+   5. TASKS / PROJECTS / GOALS / PLANS (CRUD + LISTENERS)
    ------------------------------------------------------------------ */
 
 /**
@@ -193,7 +187,7 @@ export async function createTask(
   taskText: string,
   dueDate?: Date | null
 ) {
-  await addDoc(collection(db, "tasks"), {
+  await addDoc(collection(db, 'tasks'), {
     task: taskText,
     userId,
     dueDate: dueDate || null,
@@ -204,7 +198,10 @@ export async function createTask(
 /**
  * Generic function to mark a document in [tasks, goals, projects, plans] as completed.
  */
-export async function markItemComplete(collectionName: string, docId: string) {
+export async function markItemComplete(
+  collectionName: string,
+  docId: string
+) {
   await updateDoc(doc(db, collectionName, docId), {
     completed: true,
   });
@@ -228,11 +225,11 @@ export function onCollectionSnapshot(
 ) {
   const q = query(
     collection(db, collectionName),
-    where("userId", "==", userId),
+    where('userId', '==', userId),
     // Potential note: If you do NOT always have `dueDate`, you may need
     // a different approach or a Firestore index that can handle `null`.
-    orderBy("dueDate", "asc"),
-    orderBy("createdAt", "asc")
+    orderBy('dueDate', 'asc'),
+    orderBy('createdAt', 'asc')
   );
 
   return onSnapshot(q, (snapshot) => {
@@ -245,7 +242,7 @@ export function onCollectionSnapshot(
 }
 
 /* ------------------------------------------------------------------
-   8. EVENTS (LINKED TO TASKS, GOALS, PROJECTS, PLANS)
+   6. EVENTS (LINKED TO TASKS, GOALS, PROJECTS, PLANS)
    ------------------------------------------------------------------ */
 
 /** 
@@ -261,17 +258,17 @@ export async function createLinkedEvent(
 ) {
   const eventData = {
     title,
-    description: `${linkedFieldName.replace("linked", "").toLowerCase()} converted to event`,
+    description: `${linkedFieldName.replace('linked', '').toLowerCase()} converted to event`,
     day: dueDate.getDate(),
     month: dueDate.getMonth(), // 0-based in JS
     year: dueDate.getFullYear(),
     uid: userId,
     [linkedFieldName]: linkedId,
-    startTime: "",
-    endTime: "",
+    startTime: '',
+    endTime: '',
   };
 
-  await addDoc(collection(db, "events"), eventData);
+  await addDoc(collection(db, 'events'), eventData);
 }
 
 /**
@@ -281,7 +278,7 @@ export function onEventsSnapshot(
   userId: string,
   callback: (events: Array<{ id: string; data: DocumentData }>) => void
 ) {
-  const q = query(collection(db, "events"), where("uid", "==", userId));
+  const q = query(collection(db, 'events'), where('uid', '==', userId));
   
   return onSnapshot(q, (snapshot) => {
     const results: Array<{ id: string; data: DocumentData }> = [];
@@ -293,20 +290,23 @@ export function onEventsSnapshot(
 }
 
 /* ------------------------------------------------------------------
-   9. NIGHT MODE & THEME PREFERENCES
+   7. NIGHT MODE & THEME PREFERENCES
    ------------------------------------------------------------------ */
 
 /** Save night mode preference (enabled/disabled) to the user’s doc. */
-export async function setNightMode(userId: string, isEnabled: boolean) {
+export async function setNightMode(
+  userId: string,
+  isEnabled: boolean
+) {
   await setDoc(
-    doc(db, "users", userId),
-    { nightMode: isEnabled ? "enabled" : "disabled" },
+    doc(db, 'users', userId),
+    { nightMode: isEnabled ? 'enabled' : 'disabled' },
     { merge: true }
   );
 }
 
 /* ------------------------------------------------------------------
-   10. SPLASH SCREEN CHECK
+   8. SPLASH SCREEN CHECK
    ------------------------------------------------------------------ */
 
 /**
@@ -314,7 +314,7 @@ export async function setNightMode(userId: string, isEnabled: boolean) {
  * @returns `true` if the splash screen was already shown, `false` if newly set.
  */
 export async function checkSplashScreen(userId: string) {
-  const userRef = doc(db, "users", userId);
+  const userRef = doc(db, 'users', userId);
   const snapshot = await getDoc(userRef);
 
   if (!snapshot.exists()) {

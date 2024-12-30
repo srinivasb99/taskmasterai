@@ -6,7 +6,7 @@ import { Logo } from './Logo';
 
 function Pricing() {
   const { loading } = useAuth();
-  const [user, setUser] = useState<any>(null); // Replace 'any' with proper user type if needed
+  const [user, setUser] = useState<any>(null);
   const [isYearly, setIsYearly] = useState(true);
 
   useEffect(() => {
@@ -41,11 +41,11 @@ function Pricing() {
   const proCtaHref = user ? '/payment.html' : '/signup';
 
   return (
-    {/* 
-        Make this parent container flex, column direction, and full screen height 
-        so the footer naturally sits at the bottom.
-    */}
     <div className="flex flex-col min-h-screen bg-gray-900 font-poppins">
+      {/* 
+        Make this parent container flex, column direction, 
+        and full screen height so the footer sits at the bottom 
+      */}
       <header className="fixed w-full bg-gray-900/80 backdrop-blur-lg border-b border-gray-800 z-50">
         <div className="container mx-auto px-4 py-4">
           <nav className="flex items-center justify-between">
@@ -75,10 +75,6 @@ function Pricing() {
         </div>
       </header>
 
-      {/* 
-          Use flex-grow on the <main> so that it takes up remaining space,
-          pushing the footer to the bottom.
-      */}
       <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-8 text-white">
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-indigo-400 mb-2">Choose Your Perfect Plan</h1>
@@ -167,7 +163,6 @@ function Pricing() {
         </div>
       </main>
 
-      {/* Footer stays at the bottom of the page */}
       <footer className="bg-gray-900 border-t border-gray-800">
         <div className="container mx-auto px-4 py-6">
           <div className="flex flex-col md:flex-row items-center justify-between">

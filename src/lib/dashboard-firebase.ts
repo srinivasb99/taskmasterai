@@ -122,17 +122,31 @@ export async function addCustomTimer(
   return docRef.id;
 }
 
-/** Updates an existing custom timer (by docId). */
+/**
+ * Updates an existing custom timer (by docId).
+ * This version optionally updates the name or the time (or both).
+ *
+ * Usage Examples:
+ *   - updateCustomTimer('xyz123', 'New Timer Name', undefined)
+ *   - updateCustomTimer('xyz123', undefined, 3600)
+ *   - updateCustomTimer('xyz123', 'My Timer', 900)
+ */
 export async function updateCustomTimer(
   timerId: string,
-  name: string,
-  timeInSeconds: number
+  newName?: string,
+  newTimeInSeconds?: number
 ) {
-  await updateDoc(doc(db, 'timers', timerId), {
-    name,
-    time: timeInSeconds,
+  const updates: any = {
     updatedAt: serverTimestamp(),
-  });
+  };
+  if (newName !== undefined) {
+    updates.name = newName;
+  }
+  if (newTimeInSeconds !== undefined) {
+    updates.time = newTimeInSeconds;
+  }
+
+  await updateDoc(doc(db, 'timers', timerId), updates);
 }
 
 /** Deletes an existing custom timer. */
@@ -251,6 +265,21 @@ export async function markItemComplete(
   await updateDoc(doc(db, collectionName, docId), {
     completed: true,
   });
+}
+
+/**
+ * Generic function to update an item in [tasks, goals, projects, plans].
+ * Pass in an object of fields to update (e.g. { task: "New Name", dueDate: ... }).
+ */
+export async function updateItem(
+  collectionName: string,
+  docId: string,
+  updates: Record<string, any>
+) {
+  // You can also add serverTimestamp() if desired:
+  updates.updatedAt = serverTimestamp();
+
+  await updateDoc(doc(db, collectionName, docId), updates);
 }
 
 /**

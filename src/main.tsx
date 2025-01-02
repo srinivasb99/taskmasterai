@@ -7,6 +7,7 @@ import { SignUpPage } from './pages/signup-page';
 import { AuthProvider } from './contexts/AuthContext';
 import Pricing from './components/Pricing'; // The Pricing component
 import { Dashboard } from './components/Dashboard'; // Import the Dashboard component
+import { ContactPage } from './pages/contact-page';
 import './index.css';
 
 createRoot(document.getElementById('root')!).render(

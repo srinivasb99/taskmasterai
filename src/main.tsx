@@ -18,6 +18,7 @@ createRoot(document.getElementById('root')!).render(
           <Route path="/signup" element={<SignUpPage />} />
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/dashboard" element={<Dashboard />} /> {/* New Dashboard route */}
+          <Route path="/contact" element={<ContactPage />} />
           <Route path="/" element={<App />} />
         </Routes>
       </AuthProvider>

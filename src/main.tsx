@@ -7,7 +7,7 @@ import { SignUpPage } from './pages/signup-page';
 import { AuthProvider } from './contexts/AuthContext';
 import Pricing from './components/Pricing'; // The Pricing component
 import { Dashboard } from './components/Dashboard'; // Import the Dashboard component
-import { ContactPage } from './pages/contact-page';
+import Contact from './components/Contact';
 import './index.css';
 
 createRoot(document.getElementById('root')!).render(
@@ -19,7 +19,7 @@ createRoot(document.getElementById('root')!).render(
           <Route path="/signup" element={<SignUpPage />} />
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/dashboard" element={<Dashboard />} /> {/* New Dashboard route */}
-          <Route path="/contact" element={<ContactPage />} />
+          <Route path="/contact" element={<Contact />} />
           <Route path="/" element={<App />} />
         </Routes>
       </AuthProvider>

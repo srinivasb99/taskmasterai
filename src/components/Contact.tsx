@@ -1,15 +1,17 @@
+// src/components/Contact.tsx
 import React, { useEffect, useState } from 'react';
-import { useAuth } from '../contexts/AuthContext'; // If you have an AuthContext
+import { useAuth } from '../contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
-import { subscribeToAuthState } from '../lib/pricing-firebase'; // Or wherever your auth state is tracked
+import { subscribeToAuthState } from '../lib/pricing-firebase';
 import { Logo } from './Logo';
 
 function Contact() {
+  // 1) AUTH LOADING + USER
   const { loading } = useAuth();
   const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
-    // Subscribe to auth state (similar to pricing.tsx)
+    // Subscribe to Firebase auth state
     const unsubscribe = subscribeToAuthState((firebaseUser) => {
       setUser(firebaseUser);
     });
@@ -24,20 +26,21 @@ function Contact() {
     );
   }
 
-  // Adjust CTA text based on user
+  // 2) CTA TEXT / LINK
   const ctaText = user ? 'Dashboard' : 'Get Started Today';
-  const ctaHref = user ? '/dashboard.html' : '/signup';
+  const ctaHref = user ? '/dashboard' : '/signup';
 
-  // Example form submit handler
+  // 3) FORM SUBMISSION (DEMO)
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Actually handle sending the message
+    // TODO: actually handle sending the contact message
     alert('Message sent! (This is just a demo.)');
   };
 
+  // 4) RENDER
   return (
     <div className="flex flex-col min-h-screen bg-gray-900 font-poppins">
-      {/* Header */}
+      {/* Header (similar to Pricing.tsx) */}
       <header className="fixed w-full bg-gray-900/80 backdrop-blur-lg border-b border-gray-800 z-50">
         <div className="container mx-auto px-4 py-4">
           <nav className="flex items-center justify-between">
@@ -45,15 +48,15 @@ function Contact() {
             <a href="/">
               <Logo />
             </a>
-            
+
             <div className="hidden md:flex items-center space-x-8">
               <a href="#features" className="text-gray-300 hover:text-indigo-400 transition-colors">
                 Features
               </a>
-              <a href="pricing" className="text-gray-300 hover:text-indigo-400 transition-colors">
+              <a href="/pricing" className="text-gray-300 hover:text-indigo-400 transition-colors">
                 Pricing
               </a>
-              <a href="contact.html" className="text-gray-300 hover:text-indigo-400 transition-colors">
+              <a href="/contact" className="text-gray-300 hover:text-indigo-400 transition-colors">
                 Contact
               </a>
               <a
@@ -119,7 +122,7 @@ function Contact() {
 
             <button
               type="submit"
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-full font-semibold text-white transition-colors w-full"
+              className="w-full px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-full font-semibold text-white transition-colors"
             >
               Send
             </button>
@@ -127,7 +130,7 @@ function Contact() {
         </div>
       </main>
 
-      {/* Footer */}
+      {/* Footer (similar to Pricing.tsx) */}
       <footer className="bg-gray-900 border-t border-gray-800">
         <div className="container mx-auto px-4 py-6">
           <div className="flex flex-col md:flex-row items-center justify-between">

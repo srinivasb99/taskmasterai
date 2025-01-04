@@ -2805,7 +2805,7 @@ Important:
         while (attempt < maxRetries && !successful) {
             try {
                 console.log(`Sending prompt to Hugging Face API for random key point...`);
-                const response = await fetch("https://api-inference.huggingface.co/models/meta-llama/Llama-3.2-11B-Vision-Instruct", {
+                const response = await fetch("https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct", {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${huggingFaceApiKey}`,

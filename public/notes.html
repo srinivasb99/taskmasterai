@@ -2554,21 +2554,20 @@ async function simulateRealTimeUploadProgress2() {
     });
 }
 
-/// Hugging Face API setup
-const huggingFaceApiKey = "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";
-const modelEndpoint = "https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct";
+// Hugging Face API setup
+const huggingFaceApiKey = "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";
+const modelEndpoint = "https://api-inference.huggingface.co/models/facebook/bart-large-cnn";
 
 // File input and progress bar elements
 const pdfFileInput = document.getElementById('pdfFileInput');
 const pdfDragArea = document.getElementById('pdfDragArea');
 const progressBar = document.getElementById('progressBar2');
+const progressContainer = document.querySelector('.upload-progress');
 const summaryContainer = document.getElementById('summaryContainer');
 const pdfSummary = document.getElementById('pdfSummary');
-
 // Get modal and elements
 const pdfModal = document.getElementById("pdfUploadModal");
 const closeButton = document.querySelector(".close-button");
-
 // Function to open the modal
 function openPdfUploadModal() {
     pdfModal.style.display = "flex";
@@ -2591,12 +2590,14 @@ closeButton.onclick = closePdfUploadModal;
 
 // File input click handler
 pdfDragArea.addEventListener('click', () => {
+    console.log('File input clicked.');
     pdfFileInput.click();
 });
 
 // Handle file selection
 pdfFileInput.addEventListener('change', () => {
     if (pdfFileInput.files.length > 0) {
+        console.log('File selected: ' + pdfFileInput.files[0].name);
         handleFileUpload(pdfFileInput.files[0]);
     } else {
         console.warn('No file selected.');
@@ -2607,163 +2608,348 @@ pdfFileInput.addEventListener('change', () => {
 pdfDragArea.addEventListener('dragover', (e) => {
     e.preventDefault();
     pdfDragArea.classList.add('dragover');
+    console.log('File is being dragged over the area.');
 });
 
 pdfDragArea.addEventListener('dragleave', () => {
     pdfDragArea.classList.remove('dragover');
+    console.log('File drag left the area.');
 });
 
 pdfDragArea.addEventListener('drop', (e) => {
     e.preventDefault();
     pdfDragArea.classList.remove('dragover');
+    console.log('File dropped onto the area.');
 
     if (e.dataTransfer.files.length > 0) {
+        console.log('File selected via drag-and-drop: ' + e.dataTransfer.files[0].name);
         handleFileUpload(e.dataTransfer.files[0]);
     } else {
         console.warn('No file dropped.');
     }
 });
 
-// Function to process text using the model
-async function generateSummaryAndQuestions(text, fileName, maxRetries = 5, delayInterval = 5000) {
-    console.log('Generating summary and questions...');
-
-    let attempt = 0;
-    const prompt = `You are an advanced AI designed to process and understand detailed information. 
-
-Task: 
-1. Generate a high-quality, detailed summary from the input text. Ensure the summary captures key points, main ideas, and important context in a structured and concise format.
-2. Generate thought-provoking, well-structured questions based on the summary. These questions should test understanding, critical thinking, and analysis of the summarized content.
-
-The output should be structured as follows:
-- Summary: Provide a clear and concise summary.
-- Questions: List each question in the following format:
-  - Question: (The question text)
-  - Choices:
-    A. (First choice)
-    B. (Second choice)
-    C. (Third choice)
-    D. (Fourth choice)
-  - Correct Answer: (Indicate the correct answer by its letter, e.g., A, B, C, or D)
-
-Input Text:
-"${text}"`;
-
-    while (attempt < maxRetries) {
-        try {
-            console.log('Sending text to Hugging Face API with prompt...');
-            const response = await fetch(modelEndpoint, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${huggingFaceApiKey}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ inputs: prompt })
-            });
-
-            if (response.ok) {
-                const result = await response.json();
-
-                // Extract summary and questions from the result
-                const summary = result[0]?.generated_text.split("- Summary:")[1]?.split("- Questions:")[0]?.trim() || "No summary generated.";
-                const rawQuestions = result[0]?.generated_text.split("- Questions:")[1]?.trim() || "";
-                const questions = parseQuestions(rawQuestions);
-
-                console.log('Summary and questions generated successfully.');
-
-                // Save to Firestore
-                await saveToFirestore2(fileName, summary, rawQuestions);
-
-                return { summary, questions };
-            } else {
-                const errorDetails = await response.json();
-
-                if (errorDetails.error && errorDetails.error.includes('loading')) {
-                    console.log(`Model is still loading. Retrying in ${delayInterval / 1000} seconds...`);
-                    await delay(delayInterval);
-                    attempt++;
-                } else {
-                    throw new Error(`Error generating response: ${errorDetails.error}`);
-                }
-            }
-        } catch (error) {
-            console.error(`Attempt ${attempt + 1} failed: ${error.message}`);
-            if (attempt < maxRetries - 1) {
-                await delay(delayInterval);
-                attempt++;
-            } else {
-                throw error;
-            }
-        }
-    }
-}
-
-// Function to parse questions from raw generated text
-function parseQuestions(rawQuestions) {
-    console.log('Parsing raw questions...');
-    const questions = [];
-    const questionBlocks = rawQuestions.split(/\n\n/).filter(block => block.includes('Question:'));
-
-    questionBlocks.forEach(block => {
-        const questionMatch = block.match(/Question:\s*(.*?)(?=\n|$)/);
-        const choicesMatch = block.match(/Choices:\n((?:\s*[A-D]\..*\n?)+)/);
-        const correctAnswerMatch = block.match(/Correct Answer:\s*([A-D])/);
-
-        if (questionMatch && choicesMatch && correctAnswerMatch) {
-            const question = questionMatch[1].trim();
-            const choices = choicesMatch[1].trim().split('\n').map(choice => choice.trim());
-            const correctAnswer = correctAnswerMatch[1].trim();
-
-            questions.push({ question, choices, correctAnswer });
-        }
-    });
-
-    return questions;
-}
+// Set PDF.js worker source
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.worker.min.js';
 
 // Helper function to wait for a certain amount of time (in ms)
 function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// Function to process uploaded PDF
-async function handleFileUpload(file) {
-    try {
-        const text = await extractTextFromPdf(file);
-        const { summary, questions } = await generateSummaryAndQuestions(text, file.name);
-
-        // Display summary and questions
-        pdfSummary.innerText = summary;
-        summaryContainer.innerHTML = questions.map(q => `<li>${q.question}</li>`).join('');
-        console.log('Summary and questions displayed successfully.');
-
-        // Save questions to Firestore as an additional step
-        await saveToFirestore3(file.name, questions);
-
-    } catch (error) {
-        console.error('Error handling file upload:', error);
+// Helper function to split text into chunks by character limit
+function splitTextIntoChunks(text, maxLength = 2000) {
+    console.log('Splitting text into chunks...');
+    const chunks = [];
+    let start = 0;
+    while (start < text.length) {
+        const end = start + maxLength;
+        chunks.push(text.slice(start, end));
+        start = end;
     }
+    console.log(`Text split into ${chunks.length} chunk(s).`);
+    return chunks;
 }
 
-// Function to extract text from PDF
-async function extractTextFromPdf(file) {
-    console.log('Extracting text from PDF...');
-    const pdfjsLib = window['pdfjs-dist/build/pdf'];
-    const pdf = await pdfjsLib.getDocument(URL.createObjectURL(file)).promise;
+async function generateSummary(text, maxRetries = 5, delayInterval = 5000) {
+    console.log('Generating summary and key points...');
+    const chunks = splitTextIntoChunks(text);
+    const summaries = [];
+    const keyPoints = [];
+    const totalChunks = chunks.length; // Total number of chunks
+    const startTime = Date.now(); // Capture the start time
 
-    let text = '';
-    for (let i = 0; i < pdf.numPages; i++) {
-        const page = await pdf.getPage(i + 1);
-        const content = await page.getTextContent();
-        text += content.items.map(item => item.str).join(' ');
+    // Ensure this is defined before the loop
+    const estimatedTimeDisplay = document.getElementById('estimated-time'); // Get the element for estimated time
+    const progressBar = document.getElementById('progressBar2'); // Get the progress bar element
+    const percentageDisplay = document.querySelector('.progress-percentage'); // Get the percentage display element
+
+    const uploadingText = document.getElementById('uploading-text');
+    uploadingText.innerHTML = 'Generating Note<span id="ellipsis2"></span>';
+
+    // Start simulating progress
+    await simulateRealTimeUploadProgress();
+
+    for (let i = 0; i < totalChunks; i++) {
+        let chunk = chunks[i];
+        let attempt = 0;
+
+        while (attempt < maxRetries) {
+            try {
+                console.log('Sending chunk to Hugging Face API...');
+                const response = await fetch(modelEndpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${huggingFaceApiKey}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ inputs: chunk })
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    const summary = result[0].summary_text;
+                    summaries.push(summary);
+
+                    // Generate key points based on the summary
+                    const sentences = summary.split('. ');
+                    keyPoints.push(...sentences.map(sentence => sentence.trim() + '.')); // Ensure full sentences
+
+                    console.log('Received summary for chunk.');
+
+                    // Update the estimated time and progress after processing each chunk
+                    const currentProgress = (i + 1) / totalChunks * 100; // Calculate percentage based on chunks processed
+                    const elapsedTime = Date.now() - startTime;
+                    const estimatedTotalTime = (elapsedTime / (i + 1)) * totalChunks; // Recalculate estimated total time
+                    const remainingTime = estimatedTotalTime - elapsedTime;
+
+                    // Update progress bar and percentage display
+                    progressBar.value = currentProgress;
+                    percentageDisplay.innerText = `${Math.floor(currentProgress)}%`;
+
+// Update the display for estimated time remaining
+if (estimatedTimeDisplay) {
+    const minutes = Math.floor(remainingTime / 60000); // Get minutes
+    const seconds = Math.floor((remainingTime % 60000) / 1000); // Get remaining seconds
+
+    const formattedRemainingTime = `${minutes}m ${seconds}s`; // Format as "Xm Ys"
+    estimatedTimeDisplay.innerText = `Estimated time remaining: ${formattedRemainingTime}`;
+}
+
+
+                    break; // Exit retry loop after successful response
+
+                } else {
+                    const errorDetails = await response.json();
+
+                    if (errorDetails.error && errorDetails.error.includes('loading')) {
+                        console.log(`Attempt ${attempt + 1}: Model is still loading. Retrying in ${delayInterval / 1000} seconds...`);
+                        await delay(delayInterval); // Wait and retry
+                        attempt++;
+                    } else {
+                        console.error(`Error from Hugging Face API: ${errorDetails.error}`);
+                        throw new Error(`Error generating summary: ${errorDetails.error}`);
+                    }
+                }
+            } catch (error) {
+                console.error(`Failed to generate summary: ${error.message}`);
+                if (attempt < maxRetries - 1) {
+                    console.log(`Retrying in ${delayInterval / 1000} seconds...`);
+                    await delay(delayInterval);
+                    attempt++;
+                } else {
+                    throw error;
+                }
+            }
+        }
     }
 
-    console.log('Text extracted successfully.');
-    return text;
+    console.log('Summary generation complete.');
+
+    // Combine summaries and limit overview to a maximum of 4 sentences
+    const combinedOverview = summaries.join(' ');
+    const overviewSentences = combinedOverview.split('. ').slice(0, 4).join('. '); // Limit to 4 sentences
+
+    return {
+        overview: overviewSentences, // Final overview limited to 4 sentences
+        keyPoints
+    };
+}
+
+
+
+
+async function generateQuestions(keyPoints, maxRetries = 5, delayInterval = 5000) {
+    console.log('Generating questions...');
+    const maxQuestions = Math.min(keyPoints.length, 15); // Limit to max 15 questions
+    const questions = []; // To store the final questions
+    const rawResponses = []; // To store the full raw API responses
+    const usedIndices = new Set(); // Track used indices to avoid duplicates
+
+    while (questions.length < maxQuestions) {
+        let index;
+        // Pick a random index that hasn't been used yet
+        do {
+            index = Math.floor(Math.random() * keyPoints.length);
+        } while (usedIndices.has(index));
+
+        usedIndices.add(index);
+        const keyPoint = keyPoints[index];
+        let attempt = 0;
+        let successful = false; // Track if we successfully parsed the question
+
+        const prompt = `
+Create a multiple-choice question based on the following key point:
+
+Key Point: "${keyPoint}"
+
+Please generate the output in this exact format:
+
+Question: (Provide a clear, complete question based on the key point)
+
+Answer Choices:
+A. (Provide the first answer choice)
+B. (Provide the second answer choice)
+C. (Provide the third answer choice)
+D. (Provide the fourth answer choice)
+
+Correct Answer: (Indicate the correct answer by its letter: A, B, C, or D)
+
+Important:
+- Ensure there is exactly one correct answer.
+- The question and answer choices should be clearly written and directly related to the key point.
+- Each choice should be on its own line with a newline separating "Answer Choices" and "Correct Answer".
+- Avoid any incomplete or malformed responses. Do not include any additional text or explanations outside the specified format.
+`;
+
+        while (attempt < maxRetries && !successful) {
+            try {
+                console.log(`Sending prompt to Hugging Face API for random key point...`);
+                const response = await fetch("https://api-inference.huggingface.co/models/meta-llama/Llama-3.2-11B-Vision-Instruct", {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${huggingFaceApiKey}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ inputs: prompt })
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    rawResponses.push(result); // Save the raw response
+
+                    const generatedText = result[0]?.generated_text || ""; // Ensure result[0] exists
+                    console.log(`Generated text for key point:`, generatedText); // Log the generated text
+
+                    // Handle the case where the response is incomplete or incorrectly formatted
+                    if (!generatedText.includes('Question:') || !generatedText.includes('Answer Choices:') || !generatedText.includes('Correct Answer:')) {
+                        console.error(`Malformed response for key point:`, generatedText);
+                        break; // Skip this key point if it's malformed
+                    }
+
+                    // Extract question and answer choices parts
+                    const questionPart = generatedText.split("Answer Choices:")[0].replace("Question:", "").trim();
+                    const choicesPart = generatedText.split("Answer Choices:")[1].split("Correct Answer:")[0].trim();
+                    const correctAnswerText = generatedText.split("Correct Answer:")[1]?.trim();
+
+                    // Parse the question
+                    const question = questionPart.trim();
+
+                    // Split and clean up choices, ensuring no extra text
+                    const choicesArray = choicesPart.split(/^[A-D]\./m).slice(1).map(choice => choice.trim());
+
+                    // Ensure choices array has exactly 4 options
+                    if (choicesArray.length !== 4) {
+                        console.error(`Failed to parse exactly 4 choices for key point`);
+                        break; // Skip if we do not have exactly 4 choices
+                    }
+
+                    // Parse the correct answer letter, tolerate extra whitespace or unexpected text
+                    const correctAnswerMatch = correctAnswerText && /^[A-D]/.exec(correctAnswerText);
+                    const correctAnswer = correctAnswerMatch ? correctAnswerMatch[0] : null;
+
+                    if (!correctAnswer) {
+                        console.error(`Failed to parse correct answer for key point:`, correctAnswerText);
+                        break; // Skip this key point if the correct answer is malformed
+                    }
+
+                    // Save the successfully generated question
+                    const generatedQuestion = {
+                        keyPoint: keyPoint,
+                        question: question,
+                        choices: choicesArray,
+                        correctAnswer: correctAnswer
+                    };
+
+                    questions.push(generatedQuestion); // Add the generated question to the list
+                    console.log(`Successfully generated question for key point.`);
+                    successful = true; // Mark this key point as successfully processed
+
+                } else {
+                    const errorDetails = await response.json();
+                    console.error(`Error generating question for key point:`, errorDetails);
+
+                    if (errorDetails.error && errorDetails.error.includes('loading')) {
+                        console.log(`Attempt ${attempt + 1}: Model is still loading. Retrying in ${delayInterval / 1000} seconds...`);
+                        await delay(delayInterval); // Wait and retry
+                        attempt++;
+                    } else {
+                        throw new Error(`Error generating question: ${errorDetails.error}`);
+                    }
+                }
+            } catch (error) {
+                console.error(`Failed to generate question for key point: ${error.message}`);
+                if (attempt < maxRetries - 1) {
+                    console.log(`Retrying in ${delayInterval / 1000} seconds...`);
+                    await delay(delayInterval);
+                    attempt++;
+                } else {
+                    break; // Skip this key point if all retries fail
+                }
+            }
+        }
+    }
+
+    // Return the successfully generated questions and the raw API responses
+    console.log('Question generation complete.');
+    return {
+        questions,    // List of successfully generated questions
+        rawResponses  // Raw API responses (including failed ones)
+    };
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// Clean up and flatten questions array
+function flattenQuestions(questions) {
+    return questions.map(q => {
+        const generatedText = q.generatedText || ""; // Access raw generated text
+
+        // Extracting question and choices from generatedText
+        const questionMatch = generatedText.match(/Question:\s*(.*?)\n\s*- Choices:/);
+        const choicesMatch = generatedText.match(/- Choices:\s*((?:\s*\d+\.\s.*?)+)/);
+        const correctAnswerMatch = generatedText.match(/The required format of the answer is:\s*(\d)/);
+
+        // Clean and assign values
+        const question = questionMatch ? questionMatch[1].trim() : "No question provided";
+
+        const choicesText = choicesMatch ? choicesMatch[1].trim() : "";
+        const choicesArray = choicesText.split('\n').map(choice => choice.trim()).slice(0, 4);
+
+        // Ensure choices array has exactly 4 elements
+        const finalChoices = choicesArray.length >= 4 ? choicesArray : Array(4).fill("No option");
+
+        // Get the correct answer
+        const correctAnswer = correctAnswerMatch ? parseInt(correctAnswerMatch[1]) : 1; // Default to 1 if not found
+
+        // Ensure correct answer is between 1 and 4
+        const validCorrectAnswer = (correctAnswer >= 1 && correctAnswer <= 4) ? correctAnswer : 1;
+
+        return {
+            question: question,
+            choices: finalChoices,
+            correctAnswer: validCorrectAnswer
+        };
+    });
 }
 
 // Function to save overview, key points, and raw questions to Firestore
-async function saveToFirestore2(fileName, overview, rawQuestions) {
+async function saveToFirestore2(fileName, overview, keyPoints, rawGeneratedTexts) {
     const userId = firebase.auth().currentUser?.uid;
     if (!userId) {
         console.error("User not authenticated yet");
@@ -2776,7 +2962,8 @@ async function saveToFirestore2(fileName, overview, rawQuestions) {
             userId: userId,
             fileName: fileName,             // Store the file name
             overview: overview,             // Store the generated overview
-            rawQuestions: rawQuestions, // Store the array of raw generated texts (full responses)
+            keyPoints: keyPoints,           // Store the array of key points
+            rawQuestions: rawGeneratedTexts, // Store the array of raw generated texts (full responses)
             timestamp: firebase.firestore.FieldValue.serverTimestamp() // Add timestamp
         });
         console.log(`Overview, key points, and questions for ${fileName} saved successfully.`);
@@ -2804,8 +2991,6 @@ async function saveToFirestore3(pdfId, questions) {
         console.error("Error saving questions to Firestore: ", error);
     }
 }
-
-
 
 
 

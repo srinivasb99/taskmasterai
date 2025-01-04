@@ -2554,9 +2554,9 @@ async function simulateRealTimeUploadProgress2() {
     });
 }
 
-// Hugging Face API setup
+/// Hugging Face API setup
 const huggingFaceApiKey = "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";
-const modelEndpoint = "https://api-inference.huggingface.co/models/meta-llama/Llama-2-70B-instruct";
+const modelEndpoint = "https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct";
 
 // File input and progress bar elements
 const pdfFileInput = document.getElementById('pdfFileInput');
@@ -2629,29 +2629,50 @@ async function generateSummaryAndQuestions(text, fileName, maxRetries = 5, delay
     console.log('Generating summary and questions...');
 
     let attempt = 0;
+    const prompt = `You are an advanced AI designed to process and understand detailed information. 
+
+Task: 
+1. Generate a high-quality, detailed summary from the input text. Ensure the summary captures key points, main ideas, and important context in a structured and concise format.
+2. Generate thought-provoking, well-structured questions based on the summary. These questions should test understanding, critical thinking, and analysis of the summarized content.
+
+The output should be structured as follows:
+- Summary: Provide a clear and concise summary.
+- Questions: List each question in the following format:
+  - Question: (The question text)
+  - Choices:
+    A. (First choice)
+    B. (Second choice)
+    C. (Third choice)
+    D. (Fourth choice)
+  - Correct Answer: (Indicate the correct answer by its letter, e.g., A, B, C, or D)
+
+Input Text:
+"${text}"`;
+
     while (attempt < maxRetries) {
         try {
-            console.log('Sending text to Hugging Face API...');
+            console.log('Sending text to Hugging Face API with prompt...');
             const response = await fetch(modelEndpoint, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${huggingFaceApiKey}`,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ inputs: text })
+                body: JSON.stringify({ inputs: prompt })
             });
 
             if (response.ok) {
                 const result = await response.json();
 
                 // Extract summary and questions from the result
-                const summary = result[0]?.generated_text || "No summary generated.";
-                const questions = generateQuestionsFromSummary(summary);
+                const summary = result[0]?.generated_text.split("- Summary:")[1]?.split("- Questions:")[0]?.trim() || "No summary generated.";
+                const rawQuestions = result[0]?.generated_text.split("- Questions:")[1]?.trim() || "";
+                const questions = parseQuestions(rawQuestions);
 
                 console.log('Summary and questions generated successfully.');
 
                 // Save to Firestore
-                await saveToFirestore2(fileName, summary, generateRawResponses(questions));
+                await saveToFirestore2(fileName, summary, rawQuestions);
 
                 return { summary, questions };
             } else {
@@ -2677,19 +2698,27 @@ async function generateSummaryAndQuestions(text, fileName, maxRetries = 5, delay
     }
 }
 
-// Function to generate questions from summary
-function generateQuestionsFromSummary(summary) {
-    console.log('Generating questions from summary...');
-    const sentences = summary.split('. ');
-    return sentences.map((sentence, index) => ({
-        question: `What is the significance of: "${sentence.trim()}"?`,
-        id: index + 1
-    }));
-}
+// Function to parse questions from raw generated text
+function parseQuestions(rawQuestions) {
+    console.log('Parsing raw questions...');
+    const questions = [];
+    const questionBlocks = rawQuestions.split(/\n\n/).filter(block => block.includes('Question:'));
 
-// Helper function to generate raw responses from questions
-function generateRawResponses(questions) {
-    return questions.map(q => q.question);
+    questionBlocks.forEach(block => {
+        const questionMatch = block.match(/Question:\s*(.*?)(?=\n|$)/);
+        const choicesMatch = block.match(/Choices:\n((?:\s*[A-D]\..*\n?)+)/);
+        const correctAnswerMatch = block.match(/Correct Answer:\s*([A-D])/);
+
+        if (questionMatch && choicesMatch && correctAnswerMatch) {
+            const question = questionMatch[1].trim();
+            const choices = choicesMatch[1].trim().split('\n').map(choice => choice.trim());
+            const correctAnswer = correctAnswerMatch[1].trim();
+
+            questions.push({ question, choices, correctAnswer });
+        }
+    });
+
+    return questions;
 }
 
 // Helper function to wait for a certain amount of time (in ms)
@@ -2775,6 +2804,7 @@ async function saveToFirestore3(pdfId, questions) {
         console.error("Error saving questions to Firestore: ", error);
     }
 }
+
 
 
 

@@ -4,9 +4,12 @@ import { Loader2 } from 'lucide-react';
 import { subscribeToAuthState } from '../lib/pricing-firebase';
 import { Logo } from './Logo';
 
+// Load Stripe.js
+const stripePromise = import('stripe').then((module) => module.loadStripe('your-publishable-key'));
+
 function Pricing() {
   const { loading } = useAuth();
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState(null);
   const [isYearly, setIsYearly] = useState(true);
 
   useEffect(() => {
@@ -16,6 +19,23 @@ function Pricing() {
     });
     return () => unsubscribe();
   }, []);
+
+  const handleSubscribe = async (priceId) => {
+    const stripe = await stripePromise;
+    const response = await fetch('/create-checkout-session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ priceId }),
+    });
+
+    const session = await response.json();
+
+    if (response.ok) {
+      stripe.redirectToCheckout({ sessionId: session.id });
+    } else {
+      alert(session.error || 'Failed to create checkout session.');
+    }
+  };
 
   if (loading) {
     return (
@@ -31,29 +51,14 @@ function Pricing() {
   const standardBillingText = isYearly ? 'Billed yearly' : 'Billed monthly';
   const proBillingText = isYearly ? 'Billed yearly' : 'Billed monthly';
 
-  // Adjust CTA text and href based on user state
-  const basicCtaText = user ? 'Subscribe Now' : 'Get Started for Free';
-  const standardCtaText = user ? 'Subscribe Now' : 'Get Started Now';
-  const proCtaText = user ? 'Subscribe Now' : 'Get Started Now';
-
-  const basicCtaHref = user ? '/dashboard.html' : '/signup';
-  const standardCtaHref = user ? '/payment.html' : '/signup';
-  const proCtaHref = user ? '/payment.html' : '/signup';
-
   return (
     <div className="flex flex-col min-h-screen bg-gray-900 font-poppins">
-      {/* 
-        Make this parent container flex, column direction, 
-        and full screen height so the footer sits at the bottom 
-      */}
       <header className="fixed w-full bg-gray-900/80 backdrop-blur-lg border-b border-gray-800 z-50">
         <div className="container mx-auto px-4 py-4">
           <nav className="flex items-center justify-between">
-            {/* Logo link to home */}
             <a href="/">
               <Logo />
             </a>
-            
             <div className="hidden md:flex items-center space-x-8">
               <a href="#features" className="text-gray-300 hover:text-indigo-400 transition-colors">
                 Features
@@ -81,46 +86,8 @@ function Pricing() {
           <p className="text-gray-300">Select a plan that works best for you.</p>
         </div>
 
-        {/* Pricing Toggle */}
-        <div className="flex justify-center mb-8">
-          <div className="bg-gray-800 rounded-full flex">
-            <button 
-              className={`px-4 py-2 rounded-full transition-colors duration-300 ${isYearly ? 'bg-indigo-500 text-white' : 'text-gray-300'}`}
-              onClick={() => setIsYearly(true)}
-            >
-              Yearly
-            </button>
-            <button 
-              className={`px-4 py-2 rounded-full transition-colors duration-300 ${!isYearly ? 'bg-indigo-500 text-white' : 'text-gray-300'}`}
-              onClick={() => setIsYearly(false)}
-            >
-              Monthly
-            </button>
-          </div>
-        </div>
-
         {/* Pricing Plans */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
-          {/* Basic Plan */}
-          <div className="bg-gray-800 rounded-xl p-6 w-full sm:w-1/3">
-            <h2 className="text-2xl font-bold mb-4">Basic</h2>
-            <p className="text-3xl font-extrabold text-indigo-400 mb-1">Free</p>
-            <p className="text-sm text-gray-400 mb-4">Billed yearly</p>
-            <ul className="mb-6 space-y-2 text-gray-300">
-              <li>2 PDF Uploads & 2 AI-Generated Text Outputs</li>
-              <li>10 AI Chat Interactions per Month</li>
-              <li>1 AI-Generated Note from Audio & YouTube Links</li>
-              <li>500 Tokens Included</li>
-              <li>Add Up to 3 Friends</li>
-            </ul>
-            <a 
-              href={basicCtaHref}
-              className="inline-block w-full text-center py-3 rounded-full font-semibold bg-indigo-500 text-white hover:scale-105 transition-transform"
-            >
-              {basicCtaText}
-            </a>
-          </div>
-
           {/* Premium Plan */}
           <div className="bg-gray-800 rounded-xl p-6 w-full sm:w-1/3 border-2 border-indigo-500 transform scale-105">
             <h2 className="text-2xl font-bold mb-4">Premium</h2>
@@ -133,12 +100,12 @@ function Pricing() {
               <li>1,500 Tokens Included</li>
               <li>Add Unlimited Friends</li>
             </ul>
-            <a 
-              href={standardCtaHref}
+            <button
+              onClick={() => handleSubscribe('price_premium_id')}
               className="inline-block w-full text-center py-3 rounded-full font-semibold bg-white text-indigo-600 hover:scale-105 transition-transform"
             >
-              {standardCtaText}
-            </a>
+              Subscribe Now
+            </button>
           </div>
 
           {/* Pro Plan */}
@@ -153,34 +120,15 @@ function Pricing() {
               <li>750 Tokens Included</li>
               <li>Add Up to 10 Friends</li>
             </ul>
-            <a 
-              href={proCtaHref}
+            <button
+              onClick={() => handleSubscribe('price_pro_id')}
               className="inline-block w-full text-center py-3 rounded-full font-semibold bg-indigo-500 text-white hover:scale-105 transition-transform"
             >
-              {proCtaText}
-            </a>
+              Subscribe Now
+            </button>
           </div>
         </div>
       </main>
-
-      <footer className="bg-gray-900 border-t border-gray-800">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex flex-col md:flex-row items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <a href="/privacy-policy" className="text-sm text-gray-400 hover:text-indigo-400">
-                Privacy Policy
-              </a>
-              <span className="text-gray-600">|</span>
-              <a href="/terms" className="text-sm text-gray-400 hover:text-indigo-400">
-                Terms & Conditions
-              </a>
-            </div>
-            <p className="text-sm text-gray-400 mt-4 md:mt-0">
-              © 2024 TaskMaster AI. All rights reserved.
-            </p>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }

@@ -3,9 +3,10 @@ import { useAuth } from '../contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
 import { subscribeToAuthState } from '../lib/pricing-firebase';
 import { Logo } from './Logo';
+import { loadStripe } from '@stripe/stripe-js';
 
 // Load Stripe.js
-const stripePromise = import('stripe').then((module) => module.loadStripe('your-publishable-key'));
+const stripePromise = import('stripe').then((module) => module.loadStripe('pk_test_51QdhwmIRJ3QWO5bN7Xgqfd9Xxd0BvGXTn415fqJq0r8MsaHdTTwt4spqaBDZ5PIdiwuUOALw2YpFFbPaoZh23iWe00KJZdtoVg'));
 
 function Pricing() {
   const { loading } = useAuth();

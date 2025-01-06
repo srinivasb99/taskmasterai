@@ -1,18 +1,27 @@
 import { stripePromise } from './stripe';
-import { fetchApi } from './api';
 
 export async function createCheckoutSession(priceId: string, userId: string) {
   try {
     const stripe = await stripePromise;
     if (!stripe) throw new Error('Stripe failed to load');
 
-    const { sessionId } = await fetchApi('/api/stripe/create-checkout-session', {
+    const response = await fetch('/api/stripe/create-checkout-session', {
       method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({
         priceId,
         userId,
       }),
     });
+
+    if (!response.ok) {
+      const errorData = await response.text();
+      throw new Error(`HTTP error! status: ${response.status}, message: ${errorData}`);
+    }
+
+    const { sessionId } = await response.json();
     
     const { error } = await stripe.redirectToCheckout({ sessionId });
 

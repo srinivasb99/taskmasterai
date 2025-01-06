@@ -1,6 +1,6 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import Stripe from 'stripe';
-import { CheckoutSessionRequest, CheckoutSessionResponse } from '../../src/types/stripe';
+import { CheckoutSessionRequest } from '../../src/types/stripe';
 
 if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error('STRIPE_SECRET_KEY is not set');
@@ -12,14 +12,13 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
 
 export default async function handler(
   req: VercelRequest, 
-  res: VercelResponse<CheckoutSessionResponse>
+  res: VercelResponse
 ) {
   if (req.method === 'OPTIONS') {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-    res.status(200).end();
-    return;
+    return res.status(200).end();
   }
 
   if (req.method !== 'POST') {

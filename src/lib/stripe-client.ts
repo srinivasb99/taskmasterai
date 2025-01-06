@@ -1,4 +1,7 @@
-import { stripePromise } from './stripe';
+import { loadStripe } from '@stripe/stripe-js';
+import type { CheckoutSessionRequest, CheckoutSessionResponse } from '../types/stripe';
+
+export const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
 
 export async function createCheckoutSession(priceId: string, userId: string) {
   try {
@@ -13,7 +16,7 @@ export async function createCheckoutSession(priceId: string, userId: string) {
       body: JSON.stringify({
         priceId,
         userId,
-      }),
+      } as CheckoutSessionRequest),
     });
 
     if (!response.ok) {
@@ -21,8 +24,7 @@ export async function createCheckoutSession(priceId: string, userId: string) {
       throw new Error(`HTTP error! status: ${response.status}, message: ${errorData}`);
     }
 
-    const { sessionId } = await response.json();
-    
+    const { sessionId } = await response.json() as CheckoutSessionResponse;
     const { error } = await stripe.redirectToCheckout({ sessionId });
 
     if (error) {

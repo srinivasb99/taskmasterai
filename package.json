@@ -11,9 +11,6 @@
     "server": "node server/index.js"
   },
   "dependencies": {
-    "@firebase/app": "^0.9.28",
-    "@firebase/auth": "^1.6.1",
-    "@firebase/firestore": "^4.4.3",
     "@stripe/stripe-js": "^2.4.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",

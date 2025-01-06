@@ -3,6 +3,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
 import { subscribeToAuthState } from '../lib/pricing-firebase';
 import { Logo } from './Logo';
+import { createCheckoutSession } from '../lib/stripe-client';
+import { STRIPE_CONFIG } from '../lib/stripe-config';
 
 function Pricing() {
   const { loading } = useAuth();
@@ -10,12 +12,25 @@ function Pricing() {
   const [isYearly, setIsYearly] = useState(true);
 
   useEffect(() => {
-    // Subscribe to auth state to track user
     const unsubscribe = subscribeToAuthState((firebaseUser) => {
       setUser(firebaseUser);
     });
     return () => unsubscribe();
   }, []);
+
+  const handleSubscribe = async (priceId: string) => {
+    if (!user) {
+      alert('Please login to subscribe');
+      return;
+    }
+
+    try {
+      await createCheckoutSession(priceId, user.uid);
+    } catch (error) {
+      console.error('Subscription error:', error);
+      alert('Failed to start subscription process. Please try again.');
+    }
+  };
 
   if (loading) {
     return (
@@ -31,25 +46,11 @@ function Pricing() {
   const standardBillingText = isYearly ? 'Billed yearly' : 'Billed monthly';
   const proBillingText = isYearly ? 'Billed yearly' : 'Billed monthly';
 
-  // Adjust CTA text and href based on user state
-  const basicCtaText = user ? 'Subscribe Now' : 'Get Started for Free';
-  const standardCtaText = user ? 'Subscribe Now' : 'Get Started Now';
-  const proCtaText = user ? 'Subscribe Now' : 'Get Started Now';
-
-  const basicCtaHref = user ? '/dashboard.html' : '/signup';
-  const standardCtaHref = user ? '/payment.html' : '/signup';
-  const proCtaHref = user ? '/payment.html' : '/signup';
-
   return (
     <div className="flex flex-col min-h-screen bg-gray-900 font-poppins">
-      {/* 
-        Make this parent container flex, column direction, 
-        and full screen height so the footer sits at the bottom 
-      */}
       <header className="fixed w-full bg-gray-900/80 backdrop-blur-lg border-b border-gray-800 z-50">
         <div className="container mx-auto px-4 py-4">
           <nav className="flex items-center justify-between">
-            {/* Logo link to home */}
             <a href="/">
               <Logo />
             </a>
@@ -81,7 +82,6 @@ function Pricing() {
           <p className="text-gray-300">Select a plan that works best for you.</p>
         </div>
 
-        {/* Pricing Toggle */}
         <div className="flex justify-center mb-8">
           <div className="bg-gray-800 rounded-full flex">
             <button 
@@ -99,13 +99,12 @@ function Pricing() {
           </div>
         </div>
 
-        {/* Pricing Plans */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
           {/* Basic Plan */}
           <div className="bg-gray-800 rounded-xl p-6 w-full sm:w-1/3">
             <h2 className="text-2xl font-bold mb-4">Basic</h2>
             <p className="text-3xl font-extrabold text-indigo-400 mb-1">Free</p>
-            <p className="text-sm text-gray-400 mb-4">Billed yearly</p>
+            <p className="text-sm text-gray-400 mb-4">Forever free</p>
             <ul className="mb-6 space-y-2 text-gray-300">
               <li>2 PDF Uploads & 2 AI-Generated Text Outputs</li>
               <li>10 AI Chat Interactions per Month</li>
@@ -114,10 +113,10 @@ function Pricing() {
               <li>Add Up to 3 Friends</li>
             </ul>
             <a 
-              href={basicCtaHref}
+              href={user ? "/dashboard" : "/signup"}
               className="inline-block w-full text-center py-3 rounded-full font-semibold bg-indigo-500 text-white hover:scale-105 transition-transform"
             >
-              {basicCtaText}
+              {user ? 'Access Dashboard' : 'Sign Up Free'}
             </a>
           </div>
 
@@ -133,12 +132,21 @@ function Pricing() {
               <li>1,500 Tokens Included</li>
               <li>Add Unlimited Friends</li>
             </ul>
-            <a 
-              href={standardCtaHref}
-              className="inline-block w-full text-center py-3 rounded-full font-semibold bg-white text-indigo-600 hover:scale-105 transition-transform"
-            >
-              {standardCtaText}
-            </a>
+            {user ? (
+              <button 
+                onClick={() => handleSubscribe(STRIPE_CONFIG.PREMIUM[isYearly ? 'yearly' : 'monthly'])}
+                className="w-full text-center py-3 rounded-full font-semibold bg-white text-indigo-600 hover:scale-105 transition-transform"
+              >
+                Subscribe Now
+              </button>
+            ) : (
+              <a 
+                href="/signup"
+                className="inline-block w-full text-center py-3 rounded-full font-semibold bg-white text-indigo-600 hover:scale-105 transition-transform"
+              >
+                Sign Up to Subscribe
+              </a>
+            )}
           </div>
 
           {/* Pro Plan */}
@@ -153,12 +161,21 @@ function Pricing() {
               <li>750 Tokens Included</li>
               <li>Add Up to 10 Friends</li>
             </ul>
-            <a 
-              href={proCtaHref}
-              className="inline-block w-full text-center py-3 rounded-full font-semibold bg-indigo-500 text-white hover:scale-105 transition-transform"
-            >
-              {proCtaText}
-            </a>
+            {user ? (
+              <button 
+                onClick={() => handleSubscribe(STRIPE_CONFIG.PRO[isYearly ? 'yearly' : 'monthly'])}
+                className="w-full text-center py-3 rounded-full font-semibold bg-indigo-500 text-white hover:scale-105 transition-transform"
+              >
+                Subscribe Now
+              </button>
+            ) : (
+              <a 
+                href="/signup"
+                className="inline-block w-full text-center py-3 rounded-full font-semibold bg-indigo-500 text-white hover:scale-105 transition-transform"
+              >
+                Sign Up to Subscribe
+              </a>
+            )}
           </div>
         </div>
       </main>

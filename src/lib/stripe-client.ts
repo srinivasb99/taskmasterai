@@ -5,7 +5,8 @@ export async function createCheckoutSession(priceId: string, userId: string) {
     const stripe = await stripePromise;
     if (!stripe) throw new Error('Stripe failed to load');
 
-    const response = await fetch('/api/create-checkout-session', {
+    // Update the API endpoint URL to match your server
+    const response = await fetch('/api/stripe/create-checkout-session', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -15,6 +16,11 @@ export async function createCheckoutSession(priceId: string, userId: string) {
         userId,
       }),
     });
+
+    if (!response.ok) {
+      const errorData = await response.text();
+      throw new Error(`HTTP error! status: ${response.status}, message: ${errorData}`);
+    }
 
     const { sessionId } = await response.json();
     

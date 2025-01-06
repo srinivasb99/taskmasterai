@@ -1,23 +1,33 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import Stripe from 'stripe';
+import { CheckoutSessionRequest, CheckoutSessionResponse } from '../../src/types/stripe';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+if (!process.env.STRIPE_SECRET_KEY) {
+  throw new Error('STRIPE_SECRET_KEY is not set');
+}
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: '2023-10-16',
 });
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(
+  req: VercelRequest, 
+  res: VercelResponse<CheckoutSessionResponse>
+) {
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.status(200).end();
+    return;
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Set CORS headers
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Origin', process.env.CLIENT_URL || '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
   try {
-    const { priceId, userId } = req.body;
+    const { priceId, userId } = req.body as CheckoutSessionRequest;
 
     if (!priceId || !userId) {
       return res.status(400).json({ error: 'Missing required parameters' });
@@ -37,9 +47,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       client_reference_id: userId,
     });
 
-    res.status(200).json({ sessionId: session.id });
+    return res.status(200).json({ sessionId: session.id });
   } catch (error) {
     console.error('Stripe error:', error);
-    res.status(500).json({ error: 'Failed to create checkout session' });
+    return res.status(500).json({ error: 'Failed to create checkout session' });
   }
 }

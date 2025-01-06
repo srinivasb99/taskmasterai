@@ -14,6 +14,12 @@ export default async function handler(
   req: VercelRequest, 
   res: VercelResponse
 ) {
+  console.log('Request received:', {
+    method: req.method,
+    body: req.body,
+    headers: req.headers,
+  });
+
   if (req.method === 'OPTIONS') {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST');
@@ -29,8 +35,11 @@ export default async function handler(
     const { priceId, userId } = req.body as CheckoutSessionRequest;
 
     if (!priceId || !userId) {
+      console.error('Missing parameters:', { priceId, userId });
       return res.status(400).json({ error: 'Missing required parameters' });
     }
+
+    console.log('Creating checkout session with:', { priceId, userId });
 
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
@@ -46,9 +55,13 @@ export default async function handler(
       client_reference_id: userId,
     });
 
+    console.log('Checkout session created:', session.id);
     return res.status(200).json({ sessionId: session.id });
   } catch (error) {
     console.error('Stripe error:', error);
-    return res.status(500).json({ error: 'Failed to create checkout session' });
+    return res.status(500).json({ 
+      error: 'Failed to create checkout session',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
 }

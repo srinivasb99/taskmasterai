@@ -1,6 +1,10 @@
 import { loadStripe } from '@stripe/stripe-js';
 import type { CheckoutSessionRequest, CheckoutSessionResponse } from '../types/stripe';
 
+if (!import.meta.env.VITE_STRIPE_PUBLIC_KEY) {
+  throw new Error('VITE_STRIPE_PUBLIC_KEY is not set');
+}
+
 export const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
 
 export async function createCheckoutSession(priceId: string, userId: string) {

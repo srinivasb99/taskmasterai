@@ -268,7 +268,7 @@ function Contact() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 flex flex-col">
+    <div className="flex flex-col min-h-screen bg-gray-900 font-poppins">
       <header className="fixed w-full bg-gray-900/80 backdrop-blur-lg border-b border-gray-800 z-50">
         <div className="container mx-auto px-4 py-4">
           <nav className="flex items-center justify-between">
@@ -306,7 +306,7 @@ function Contact() {
           {isSuccess ? (
             <div className="bg-gray-800 rounded-2xl p-8 text-center">
               <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-              <h2 className="text-2xl font-bold text-white mb-2">Message Sent Successfully!</h2>
+              <h2 className="text-2xl font-semibold text-white mb-2">Message Sent Successfully!</h2>
               <p className="text-gray-300 mb-6">We'll get back to you as soon as possible.</p>
               <button
                 onClick={() => setIsSuccess(false)}

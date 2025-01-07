@@ -69,7 +69,7 @@ function Pricing() {
               <a href="pricing" className="text-gray-300 hover:text-indigo-400 transition-colors">
                 Pricing
               </a>
-              <a href="contact.html" className="text-gray-300 hover:text-indigo-400 transition-colors">
+              <a href="contact" className="text-gray-300 hover:text-indigo-400 transition-colors">
                 Contact
               </a>
               <a

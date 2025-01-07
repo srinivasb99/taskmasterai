@@ -5,15 +5,15 @@ import { subscribeToAuthState } from '../lib/pricing-firebase';
 import { Logo } from './Logo';
 import { createCheckoutSession } from '../lib/stripe-client';
 
-// Direct Stripe price IDs
+// Direct Stripe checkout URLs
 const STRIPE_PRICES = {
   PREMIUM: {
-    yearly: 'price_1Qe2OnIdgEonJvEbSDwoNCuH',
-    monthly: 'price_1Qe2JWIdgEonJvEbGUYEkTu6'
+    yearly: 'https://buy.stripe.com/eVa6q71vu9UMghydQS',
+    monthly: 'https://buy.stripe.com/dR68yf6POc2U6GY8wA'
   },
   PRO: {
-    yearly: 'price_1Qe2QaIdgEonJvEbaq1M4CQs',
-    monthly: 'price_1Qe2NXIdgEonJvEbxSUK8dMB'
+    yearly: 'https://buy.stripe.com/5kA8yfca8gja7L26oo',
+    monthly: 'https://buy.stripe.com/8wM01Jca89UM4yQ6or'
   }
 };
 
@@ -29,14 +29,13 @@ function Pricing() {
     return () => unsubscribe();
   }, []);
 
-  const handleSubscribe = async (priceId: string) => {
+  const handleSubscribe = async (checkoutUrl: string) => {
     if (!user) {
       alert('Please login to subscribe');
       return;
     }
 
-    // Direct URL to Stripe checkout
-    const checkoutUrl = `https://checkout.stripe.com/c/pay/${priceId}`;
+    // Open Stripe checkout in new tab
     window.open(checkoutUrl, '_blank');
   };
 

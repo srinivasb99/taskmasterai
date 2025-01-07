@@ -276,7 +276,7 @@ function Contact() {
               <Logo />
             </a>
             <div className="hidden md:flex items-center space-x-8">
-              <a href="/features" className="text-gray-300 hover:text-indigo-400 transition-colors">
+              <a href="/#features" className="text-gray-300 hover:text-indigo-400 transition-colors">
                 Features
               </a>
               <a href="/pricing" className="text-gray-300 hover:text-indigo-400 transition-colors">
@@ -289,7 +289,7 @@ function Contact() {
                 href={user ? "/dashboard" : "/signup"}
                 className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-full transition-all transform hover:scale-105"
               >
-                {user ? "Dashboard" : "Get Started"}
+                {user ? "Dashboard" : "Get Started Today"}
               </a>
             </div>
           </nav>
@@ -300,7 +300,7 @@ function Contact() {
         <div className="max-w-3xl mx-auto">
           <div className="text-center mb-12">
             <h1 className="text-4xl font-bold text-indigo-400 mb-2">Contact Us</h1>
-            <p className="text-gray-300">We're here to help with any questions or concerns</p>
+            <p className="text-gray-300">We're here to help with any questions or concerns.</p>
           </div>
 
           {isSuccess ? (

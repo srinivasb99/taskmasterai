@@ -268,15 +268,18 @@ function Contact() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 flex flex-col">
+    <div className="flex flex-col min-h-screen bg-gray-900 font-poppins">
+      {/* Header (similar to Pricing.tsx) */}
       <header className="fixed w-full bg-gray-900/80 backdrop-blur-lg border-b border-gray-800 z-50">
         <div className="container mx-auto px-4 py-4">
           <nav className="flex items-center justify-between">
-            <a href="/" className="flex items-center space-x-2">
+            {/* Logo link to home */}
+            <a href="/">
               <Logo />
             </a>
+
             <div className="hidden md:flex items-center space-x-8">
-              <a href="/features" className="text-gray-300 hover:text-indigo-400 transition-colors">
+              <a href="#features" className="text-gray-300 hover:text-indigo-400 transition-colors">
                 Features
               </a>
               <a href="/pricing" className="text-gray-300 hover:text-indigo-400 transition-colors">
@@ -286,10 +289,10 @@ function Contact() {
                 Contact
               </a>
               <a
-                href={user ? "/dashboard" : "/signup"}
+                href={ctaHref}
                 className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-full transition-all transform hover:scale-105"
               >
-                {user ? "Dashboard" : "Get Started"}
+                {ctaText}
               </a>
             </div>
           </nav>
@@ -366,11 +369,12 @@ function Contact() {
         </div>
       </main>
 
+      {/* Footer (similar to Pricing.tsx) */}
       <footer className="bg-gray-900 border-t border-gray-800">
         <div className="container mx-auto px-4 py-6">
           <div className="flex flex-col md:flex-row items-center justify-between">
             <div className="flex items-center space-x-4">
-              <a href="/privacy" className="text-sm text-gray-400 hover:text-indigo-400">
+              <a href="/privacy-policy" className="text-sm text-gray-400 hover:text-indigo-400">
                 Privacy Policy
               </a>
               <span className="text-gray-600">|</span>

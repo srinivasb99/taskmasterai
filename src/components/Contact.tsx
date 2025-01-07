@@ -1,22 +1,53 @@
-// src/components/Contact.tsx
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
 import { subscribeToAuthState } from '../lib/pricing-firebase';
 import { Logo } from './Logo';
+import { saveContactMessage } from '../lib/contact-firebase';
 
 function Contact() {
-  // 1) AUTH LOADING + USER
   const { loading } = useAuth();
   const [user, setUser] = useState<any>(null);
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    message: ''
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    // Subscribe to Firebase auth state
     const unsubscribe = subscribeToAuthState((firebaseUser) => {
       setUser(firebaseUser);
     });
     return () => unsubscribe();
   }, []);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setFormData(prev => ({
+      ...prev,
+      [e.target.id]: e.target.value
+    }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    try {
+      await saveContactMessage({
+        ...formData,
+        userId: user?.uid || null
+      });
+      
+      // Reset form
+      setFormData({ name: '', email: '', message: '' });
+      alert('Message sent successfully!');
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to send message');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -26,29 +57,18 @@ function Contact() {
     );
   }
 
-  // 2) CTA TEXT / LINK
   const ctaText = user ? 'Dashboard' : 'Get Started Today';
   const ctaHref = user ? '/dashboard' : '/signup';
 
-  // 3) FORM SUBMISSION (DEMO)
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // TODO: actually handle sending the contact message
-    alert('Message sent! (This is just a demo.)');
-  };
-
-  // 4) RENDER
   return (
     <div className="flex flex-col min-h-screen bg-gray-900 font-poppins">
-      {/* Header (similar to Pricing.tsx) */}
       <header className="fixed w-full bg-gray-900/80 backdrop-blur-lg border-b border-gray-800 z-50">
         <div className="container mx-auto px-4 py-4">
           <nav className="flex items-center justify-between">
-            {/* Logo link to home */}
             <a href="/">
               <Logo />
             </a>
-
+            
             <div className="hidden md:flex items-center space-x-8">
               <a href="#features" className="text-gray-300 hover:text-indigo-400 transition-colors">
                 Features
@@ -70,14 +90,12 @@ function Contact() {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-8 text-white">
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-indigo-400 mb-2">Contact Us</h1>
-          <p className="text-gray-300">Send us a message and we’ll get back to you soon.</p>
+          <p className="text-gray-300">Send us a message and we'll get back to you soon.</p>
         </div>
 
-        {/* Contact Form */}
         <div className="max-w-lg mx-auto bg-gray-800 rounded-xl p-6">
           <h2 className="text-2xl font-semibold mb-4">Send us a message</h2>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -88,9 +106,12 @@ function Contact() {
               <input
                 type="text"
                 id="name"
-                className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white focus:outline-none"
+                value={formData.name}
+                onChange={handleChange}
+                className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
                 placeholder="Your Name"
                 required
+                disabled={isSubmitting}
               />
             </div>
 
@@ -101,9 +122,12 @@ function Contact() {
               <input
                 type="email"
                 id="email"
-                className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white focus:outline-none"
+                value={formData.email}
+                onChange={handleChange}
+                className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
                 placeholder="Your Email"
                 required
+                disabled={isSubmitting}
               />
             </div>
 
@@ -113,24 +137,34 @@ function Contact() {
               </label>
               <textarea
                 id="message"
-                className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white focus:outline-none"
+                value={formData.message}
+                onChange={handleChange}
+                className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
                 rows={5}
                 placeholder="How can we help you?"
                 required
+                disabled={isSubmitting}
               />
             </div>
 
             <button
               type="submit"
-              className="w-full px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-full font-semibold text-white transition-colors"
+              disabled={isSubmitting}
+              className="w-full px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-full font-semibold text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Send
+              {isSubmitting ? (
+                <span className="flex items-center justify-center">
+                  <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                  Sending...
+                </span>
+              ) : (
+                'Send'
+              )}
             </button>
           </form>
         </div>
       </main>
 
-      {/* Footer (similar to Pricing.tsx) */}
       <footer className="bg-gray-900 border-t border-gray-800">
         <div className="container mx-auto px-4 py-6">
           <div className="flex flex-col md:flex-row items-center justify-between">

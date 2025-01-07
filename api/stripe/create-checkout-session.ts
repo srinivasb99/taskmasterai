@@ -11,7 +11,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
 
 export async function POST(req: NextRequest) {
   try {
-    const { priceId, userId } = await req.json();
+    const { priceId, userId, email } = await req.json();
 
     if (!priceId || !userId) {
       return NextResponse.json(
@@ -29,12 +29,15 @@ export async function POST(req: NextRequest) {
           quantity: 1,
         },
       ],
+      customer_email: email, // Pre-fill user's email
       success_url: `${process.env.CLIENT_URL}/dashboard?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.CLIENT_URL}/pricing`,
       client_reference_id: userId,
+      billing_address_collection: 'required',
+      allow_promotion_codes: true,
     });
 
-    return NextResponse.json({ url: session.url });
+    return NextResponse.json({ sessionId: session.id });
   } catch (error) {
     console.error('Stripe error:', error);
     return NextResponse.json(

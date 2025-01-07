@@ -1,10 +1,20 @@
 import React, { useEffect, useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from './contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
-import { subscribeToAuthState } from '../lib/pricing-firebase';
+import { subscribeToAuthState } from './lib/pricing-firebase';
 import { Logo } from './Logo';
-import { createCheckoutSession } from '../lib/stripe-client';
-import { STRIPE_CONFIG } from '../lib/stripe-config';
+
+// Direct Stripe price IDs
+const STRIPE_PRICES = {
+  PREMIUM: {
+    yearly: 'price_1Qe2OnIdgEonJvEbSDwoNCuH',
+    monthly: 'price_1Qe2JWIdgEonJvEbGUYEkTu6'
+  },
+  PRO: {
+    yearly: 'price_1Qe2QaIdgEonJvEbaq1M4CQs',
+    monthly: 'price_1Qe2NXIdgEonJvEbxSUK8dMB'
+  }
+};
 
 function Pricing() {
   const { loading } = useAuth();
@@ -18,18 +28,14 @@ function Pricing() {
     return () => unsubscribe();
   }, []);
 
-  const handleSubscribe = async (priceId: string) => {
+  const handleSubscribe = (priceId: string) => {
     if (!user) {
       alert('Please login to subscribe');
       return;
     }
 
-    try {
-      await createCheckoutSession(priceId, user.uid);
-    } catch (error) {
-      console.error('Subscription error:', error);
-      alert('Failed to start subscription process. Please try again.');
-    }
+    // Direct URL to Stripe checkout
+    window.open(`https://checkout.stripe.com/c/pay/${priceId}`, '_blank');
   };
 
   if (loading) {
@@ -134,7 +140,7 @@ function Pricing() {
             </ul>
             {user ? (
               <button 
-                onClick={() => handleSubscribe(STRIPE_CONFIG.PREMIUM[isYearly ? 'yearly' : 'monthly'])}
+                onClick={() => handleSubscribe(STRIPE_PRICES.PREMIUM[isYearly ? 'yearly' : 'monthly'])}
                 className="w-full text-center py-3 rounded-full font-semibold bg-white text-indigo-600 hover:scale-105 transition-transform"
               >
                 Subscribe Now
@@ -163,7 +169,7 @@ function Pricing() {
             </ul>
             {user ? (
               <button 
-                onClick={() => handleSubscribe(STRIPE_CONFIG.PRO[isYearly ? 'yearly' : 'monthly'])}
+                onClick={() => handleSubscribe(STRIPE_PRICES.PRO[isYearly ? 'yearly' : 'monthly'])}
                 className="w-full text-center py-3 rounded-full font-semibold bg-indigo-500 text-white hover:scale-105 transition-transform"
               >
                 Subscribe Now

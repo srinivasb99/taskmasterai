@@ -63,7 +63,7 @@ function Pricing() {
             </a>
             
             <div className="hidden md:flex items-center space-x-8">
-              <a href="#features" className="text-gray-300 hover:text-indigo-400 transition-colors">
+              <a href="/#features" className="text-gray-300 hover:text-indigo-400 transition-colors">
                 Features
               </a>
               <a href="pricing" className="text-gray-300 hover:text-indigo-400 transition-colors">

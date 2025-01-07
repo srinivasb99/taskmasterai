@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
 import { subscribeToAuthState } from '../lib/pricing-firebase';
 import { Logo } from './Logo';
+import { createCheckoutSession } from '../lib/stripe-client';
 
 // Direct Stripe price IDs
 const STRIPE_PRICES = {
@@ -28,14 +29,15 @@ function Pricing() {
     return () => unsubscribe();
   }, []);
 
-  const handleSubscribe = (priceId: string) => {
+  const handleSubscribe = async (priceId: string) => {
     if (!user) {
       alert('Please login to subscribe');
       return;
     }
 
     // Direct URL to Stripe checkout
-    window.open(`https://checkout.stripe.com/c/pay/${priceId}`, '_blank');
+    const checkoutUrl = `https://checkout.stripe.com/c/pay/${priceId}`;
+    window.open(checkoutUrl, '_blank');
   };
 
   if (loading) {

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { useAuth } from './contexts/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
-import { subscribeToAuthState } from './lib/pricing-firebase';
+import { subscribeToAuthState } from '../lib/pricing-firebase';
 import { Logo } from './Logo';
 
 // Direct Stripe price IDs

@@ -1,16 +1,36 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Loader2, CheckCircle } from 'lucide-react';
+import { Loader2, CheckCircle, ArrowRight, ArrowLeft } from 'lucide-react';
 import { subscribeToAuthState } from '../lib/pricing-firebase';
 import { Logo } from './Logo';
 import { saveContactMessage } from '../lib/contact-firebase';
 
+interface FormData {
+  step: number;
+  name: string;
+  email: string;
+  inquiryType: string;
+  subscriptionPlan: string;
+  planQuestion: string;
+  cancellationIssue: string;
+  billingIssue: string;
+  planChange: string;
+  message: string;
+}
+
 function Contact() {
   const { loading } = useAuth();
   const [user, setUser] = useState<any>(null);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
+    step: 1,
     name: '',
     email: '',
+    inquiryType: '',
+    subscriptionPlan: '',
+    planQuestion: '',
+    cancellationIssue: '',
+    billingIssue: '',
+    planChange: '',
     message: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -23,11 +43,19 @@ function Contact() {
     return () => unsubscribe();
   }, []);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setFormData(prev => ({
       ...prev,
       [e.target.id]: e.target.value
     }));
+  };
+
+  const nextStep = () => {
+    setFormData(prev => ({ ...prev, step: prev.step + 1 }));
+  };
+
+  const prevStep = () => {
+    setFormData(prev => ({ ...prev, step: prev.step - 1 }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -41,15 +69,195 @@ function Contact() {
         userId: user?.uid || null
       });
       
-      // Reset form
-      setFormData({ name: '', email: '', message: '' });
+      setFormData({
+        step: 1,
+        name: '',
+        email: '',
+        inquiryType: '',
+        subscriptionPlan: '',
+        planQuestion: '',
+        cancellationIssue: '',
+        billingIssue: '',
+        planChange: '',
+        message: ''
+      });
       setIsSuccess(true);
     } catch (error) {
-      alert(error instanceof Error ? error.message : 'Failed to send message');
+      console.error('Error submitting form:', error);
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  const renderStep1 = () => (
+    <>
+      <div>
+        <label htmlFor="name" className="block text-sm text-gray-300 mb-2">
+          Name
+        </label>
+        <input
+          type="text"
+          id="name"
+          value={formData.name}
+          onChange={handleChange}
+          className="w-full bg-gray-900 border border-gray-700 rounded-full px-6 py-3 text-white focus:outline-none focus:border-indigo-500 transition-colors"
+          placeholder="Your Name"
+          required
+          disabled={isSubmitting}
+        />
+      </div>
+
+      <div>
+        <label htmlFor="email" className="block text-sm text-gray-300 mb-2">
+          Email
+        </label>
+        <input
+          type="email"
+          id="email"
+          value={formData.email}
+          onChange={handleChange}
+          className="w-full bg-gray-900 border border-gray-700 rounded-full px-6 py-3 text-white focus:outline-none focus:border-indigo-500 transition-colors"
+          placeholder="Your Email"
+          required
+          disabled={isSubmitting}
+        />
+      </div>
+
+      <div>
+        <label htmlFor="inquiryType" className="block text-sm text-gray-300 mb-2">
+          Inquiry Type
+        </label>
+        <select
+          id="inquiryType"
+          value={formData.inquiryType}
+          onChange={handleChange}
+          className="w-full bg-gray-900 border border-gray-700 rounded-full px-6 py-3 text-white focus:outline-none focus:border-indigo-500 transition-colors"
+          required
+          disabled={isSubmitting}
+        >
+          <option value="">Select Inquiry Type</option>
+          <option value="general">General Inquiry</option>
+          <option value="subscription">Subscription/Payment Help</option>
+          <option value="technical">Technical Support</option>
+          <option value="feature">Feature Request</option>
+          <option value="feedback">Feedback/Suggestions</option>
+        </select>
+      </div>
+    </>
+  );
+
+  const renderStep2 = () => (
+    <>
+      {formData.inquiryType === 'subscription' && (
+        <>
+          <div>
+            <label htmlFor="subscriptionPlan" className="block text-sm text-gray-300 mb-2">
+              Subscription Plan
+            </label>
+            <select
+              id="subscriptionPlan"
+              value={formData.subscriptionPlan}
+              onChange={handleChange}
+              className="w-full bg-gray-900 border border-gray-700 rounded-full px-6 py-3 text-white focus:outline-none focus:border-indigo-500 transition-colors"
+              required
+              disabled={isSubmitting}
+            >
+              <option value="">Select Your Plan</option>
+              <option value="pro">Pro Plan</option>
+              <option value="premium">Premium Plan</option>
+              <option value="not-sure">Not Sure</option>
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="planQuestion" className="block text-sm text-gray-300 mb-2">
+              What would you like to know about this plan?
+            </label>
+            <textarea
+              id="planQuestion"
+              value={formData.planQuestion}
+              onChange={handleChange}
+              className="w-full bg-gray-900 border border-gray-700 rounded-2xl px-6 py-4 text-white focus:outline-none focus:border-indigo-500 transition-colors"
+              rows={4}
+              disabled={isSubmitting}
+            />
+          </div>
+
+          <div>
+            <label htmlFor="cancellationIssue" className="block text-sm text-gray-300 mb-2">
+              Are you having trouble canceling your subscription?
+            </label>
+            <select
+              id="cancellationIssue"
+              value={formData.cancellationIssue}
+              onChange={handleChange}
+              className="w-full bg-gray-900 border border-gray-700 rounded-full px-6 py-3 text-white focus:outline-none focus:border-indigo-500 transition-colors"
+              disabled={isSubmitting}
+            >
+              <option value="">Select Issue (if applicable)</option>
+              <option value="find-cancel">Unable to find the cancel option</option>
+              <option value="not-processed">Cancel request not processed</option>
+              <option value="unexpected-charges">Unexpected charges after cancellation</option>
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="billingIssue" className="block text-sm text-gray-300 mb-2">
+              Billing and Payment Support
+            </label>
+            <select
+              id="billingIssue"
+              value={formData.billingIssue}
+              onChange={handleChange}
+              className="w-full bg-gray-900 border border-gray-700 rounded-full px-6 py-3 text-white focus:outline-none focus:border-indigo-500 transition-colors"
+              disabled={isSubmitting}
+            >
+              <option value="">Select Billing Issue (if applicable)</option>
+              <option value="failed-payment">Failed Payments</option>
+              <option value="incorrect-charge">Incorrect Charges</option>
+              <option value="refund">Refund Request</option>
+              <option value="invoice">Invoice/Receipt Request</option>
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="planChange" className="block text-sm text-gray-300 mb-2">
+              Plan Change Request
+            </label>
+            <select
+              id="planChange"
+              value={formData.planChange}
+              onChange={handleChange}
+              className="w-full bg-gray-900 border border-gray-700 rounded-full px-6 py-3 text-white focus:outline-none focus:border-indigo-500 transition-colors"
+              disabled={isSubmitting}
+            >
+              <option value="">Select Plan Change (if applicable)</option>
+              <option value="upgrade-premium">Upgrade from Pro to Premium</option>
+              <option value="downgrade-pro">Downgrade from Premium to Pro</option>
+              <option value="switch-annual">Switch from Monthly to Annual Billing</option>
+              <option value="switch-monthly">Switch from Annual to Monthly Billing</option>
+            </select>
+          </div>
+        </>
+      )}
+
+      <div>
+        <label htmlFor="message" className="block text-sm text-gray-300 mb-2">
+          Additional Details
+        </label>
+        <textarea
+          id="message"
+          value={formData.message}
+          onChange={handleChange}
+          className="w-full bg-gray-900 border border-gray-700 rounded-2xl px-6 py-4 text-white focus:outline-none focus:border-indigo-500 transition-colors"
+          rows={6}
+          placeholder="Please provide any additional details about your inquiry..."
+          required
+          disabled={isSubmitting}
+        />
+      </div>
+    </>
+  );
 
   if (loading) {
     return (
@@ -59,20 +267,16 @@ function Contact() {
     );
   }
 
-  const ctaText = user ? 'Dashboard' : 'Get Started Today';
-  const ctaHref = user ? '/dashboard' : '/signup';
-
   return (
-    <div className="flex flex-col min-h-screen bg-gray-900 font-poppins">
+    <div className="min-h-screen bg-gray-900 flex flex-col">
       <header className="fixed w-full bg-gray-900/80 backdrop-blur-lg border-b border-gray-800 z-50">
         <div className="container mx-auto px-4 py-4">
           <nav className="flex items-center justify-between">
-            <a href="/">
+            <a href="/" className="flex items-center space-x-2">
               <Logo />
             </a>
-            
             <div className="hidden md:flex items-center space-x-8">
-              <a href="#features" className="text-gray-300 hover:text-indigo-400 transition-colors">
+              <a href="/features" className="text-gray-300 hover:text-indigo-400 transition-colors">
                 Features
               </a>
               <a href="/pricing" className="text-gray-300 hover:text-indigo-400 transition-colors">
@@ -82,102 +286,81 @@ function Contact() {
                 Contact
               </a>
               <a
-                href={ctaHref}
+                href={user ? "/dashboard" : "/signup"}
                 className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-full transition-all transform hover:scale-105"
               >
-                {ctaText}
+                {user ? "Dashboard" : "Get Started"}
               </a>
             </div>
           </nav>
         </div>
       </header>
 
-      <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-8 text-white">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-indigo-400 mb-2">Contact Us</h1>
-          <p className="text-gray-300">Send us a message and we'll get back to you soon.</p>
-        </div>
+      <main className="flex-grow container mx-auto px-4 pt-28 pb-12">
+        <div className="max-w-3xl mx-auto">
+          <div className="text-center mb-12">
+            <h1 className="text-4xl font-bold text-indigo-400 mb-2">Contact Us</h1>
+            <p className="text-gray-300">We're here to help with any questions or concerns</p>
+          </div>
 
-        <div className="max-w-2xl mx-auto bg-gray-800 rounded-2xl p-8">
-          <h2 className="text-2xl font-semibold mb-6">Send us a message</h2>
           {isSuccess ? (
-            <div className="text-center py-8">
+            <div className="bg-gray-800 rounded-2xl p-8 text-center">
               <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-green-400 mb-2">Message Sent Successfully!</h3>
-              <p className="text-gray-300">
-                Thank you for reaching out. Our support team will get back to you within 24 hours.
-              </p>
+              <h2 className="text-2xl font-bold text-white mb-2">Message Sent Successfully!</h2>
+              <p className="text-gray-300 mb-6">We'll get back to you as soon as possible.</p>
               <button
                 onClick={() => setIsSuccess(false)}
-                className="mt-6 px-6 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-full text-white transition-colors"
+                className="px-6 py-3 bg-indigo-500 text-white rounded-full hover:bg-indigo-600 transition-colors"
               >
                 Send Another Message
               </button>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div>
-                <label htmlFor="name" className="block text-sm text-gray-300 mb-2">
-                  Name
-                </label>
-                <input
-                  type="text"
-                  id="name"
-                  value={formData.name}
-                  onChange={handleChange}
-                  className="w-full bg-gray-900 border border-gray-700 rounded-full px-6 py-3 text-white focus:outline-none focus:border-indigo-500 transition-colors"
-                  placeholder="Your Name"
-                  required
-                  disabled={isSubmitting}
-                />
+            <form onSubmit={handleSubmit} className="bg-gray-800 rounded-2xl p-8">
+              <div className="space-y-6">
+                {formData.step === 1 ? renderStep1() : renderStep2()}
               </div>
 
-              <div>
-                <label htmlFor="email" className="block text-sm text-gray-300 mb-2">
-                  Email
-                </label>
-                <input
-                  type="email"
-                  id="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  className="w-full bg-gray-900 border border-gray-700 rounded-full px-6 py-3 text-white focus:outline-none focus:border-indigo-500 transition-colors"
-                  placeholder="Your Email"
-                  required
-                  disabled={isSubmitting}
-                />
-              </div>
-
-              <div>
-                <label htmlFor="message" className="block text-sm text-gray-300 mb-2">
-                  Message
-                </label>
-                <textarea
-                  id="message"
-                  value={formData.message}
-                  onChange={handleChange}
-                  className="w-full bg-gray-900 border border-gray-700 rounded-2xl px-6 py-4 text-white focus:outline-none focus:border-indigo-500 transition-colors"
-                  rows={8}
-                  placeholder="How can we help you?"
-                  required
-                  disabled={isSubmitting}
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full px-6 py-3 bg-indigo-600 hover:bg-indigo-700 rounded-full font-semibold text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isSubmitting ? (
-                  <span className="flex items-center justify-center">
-                    <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                    Sending...
-                  </span>
-                ) : (
-                  'Send Message'
+              <div className="flex justify-between mt-8">
+                {formData.step > 1 && (
+                  <button
+                    type="button"
+                    onClick={prevStep}
+                    className="flex items-center px-6 py-3 text-gray-300 hover:text-white transition-colors disabled:opacity-50"
+                    disabled={isSubmitting}
+                  >
+                    <ArrowLeft className="w-5 h-5 mr-2" />
+                    Previous
+                  </button>
                 )}
-              </button>
+                
+                {formData.step === 1 ? (
+                  <button
+                    type="button"
+                    onClick={nextStep}
+                    className="flex items-center px-6 py-3 bg-indigo-500 text-white rounded-full hover:bg-indigo-600 transition-colors ml-auto disabled:opacity-50"
+                    disabled={!formData.name || !formData.email || !formData.inquiryType || isSubmitting}
+                  >
+                    Next
+                    <ArrowRight className="w-5 h-5 ml-2" />
+                  </button>
+                ) : (
+                  <button
+                    type="submit"
+                    className="flex items-center px-6 py-3 bg-indigo-500 text-white rounded-full hover:bg-indigo-600 transition-colors ml-auto disabled:opacity-50"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                        Sending...
+                      </>
+                    ) : (
+                      'Send Message'
+                    )}
+                  </button>
+                )}
+              </div>
             </form>
           )}
         </div>
@@ -187,7 +370,7 @@ function Contact() {
         <div className="container mx-auto px-4 py-6">
           <div className="flex flex-col md:flex-row items-center justify-between">
             <div className="flex items-center space-x-4">
-              <a href="/privacy-policy" className="text-sm text-gray-400 hover:text-indigo-400">
+              <a href="/privacy" className="text-sm text-gray-400 hover:text-indigo-400">
                 Privacy Policy
               </a>
               <span className="text-gray-600">|</span>

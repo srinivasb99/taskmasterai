@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Loader2 } from 'lucide-react';
+import { Loader2, CheckCircle } from 'lucide-react';
 import { subscribeToAuthState } from '../lib/pricing-firebase';
 import { Logo } from './Logo';
 import { saveContactMessage } from '../lib/contact-firebase';
@@ -14,6 +14,7 @@ function Contact() {
     message: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
 
   useEffect(() => {
     const unsubscribe = subscribeToAuthState((firebaseUser) => {
@@ -32,6 +33,7 @@ function Contact() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setIsSuccess(false);
 
     try {
       await saveContactMessage({
@@ -41,7 +43,7 @@ function Contact() {
       
       // Reset form
       setFormData({ name: '', email: '', message: '' });
-      alert('Message sent successfully!');
+      setIsSuccess(true);
     } catch (error) {
       alert(error instanceof Error ? error.message : 'Failed to send message');
     } finally {
@@ -96,72 +98,88 @@ function Contact() {
           <p className="text-gray-300">Send us a message and we'll get back to you soon.</p>
         </div>
 
-        <div className="max-w-lg mx-auto bg-gray-800 rounded-xl p-6">
-          <h2 className="text-2xl font-semibold mb-4">Send us a message</h2>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label htmlFor="name" className="block text-sm text-gray-300 mb-1">
-                Name
-              </label>
-              <input
-                type="text"
-                id="name"
-                value={formData.name}
-                onChange={handleChange}
-                className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
-                placeholder="Your Name"
-                required
-                disabled={isSubmitting}
-              />
+        <div className="max-w-2xl mx-auto bg-gray-800 rounded-2xl p-8">
+          <h2 className="text-2xl font-semibold mb-6">Send us a message</h2>
+          {isSuccess ? (
+            <div className="text-center py-8">
+              <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-green-400 mb-2">Message Sent Successfully!</h3>
+              <p className="text-gray-300">
+                Thank you for reaching out. Our support team will get back to you within 24 hours.
+              </p>
+              <button
+                onClick={() => setIsSuccess(false)}
+                className="mt-6 px-6 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-full text-white transition-colors"
+              >
+                Send Another Message
+              </button>
             </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div>
+                <label htmlFor="name" className="block text-sm text-gray-300 mb-2">
+                  Name
+                </label>
+                <input
+                  type="text"
+                  id="name"
+                  value={formData.name}
+                  onChange={handleChange}
+                  className="w-full bg-gray-900 border border-gray-700 rounded-full px-6 py-3 text-white focus:outline-none focus:border-indigo-500 transition-colors"
+                  placeholder="Your Name"
+                  required
+                  disabled={isSubmitting}
+                />
+              </div>
 
-            <div>
-              <label htmlFor="email" className="block text-sm text-gray-300 mb-1">
-                Email
-              </label>
-              <input
-                type="email"
-                id="email"
-                value={formData.email}
-                onChange={handleChange}
-                className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
-                placeholder="Your Email"
-                required
+              <div>
+                <label htmlFor="email" className="block text-sm text-gray-300 mb-2">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  id="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  className="w-full bg-gray-900 border border-gray-700 rounded-full px-6 py-3 text-white focus:outline-none focus:border-indigo-500 transition-colors"
+                  placeholder="Your Email"
+                  required
+                  disabled={isSubmitting}
+                />
+              </div>
+
+              <div>
+                <label htmlFor="message" className="block text-sm text-gray-300 mb-2">
+                  Message
+                </label>
+                <textarea
+                  id="message"
+                  value={formData.message}
+                  onChange={handleChange}
+                  className="w-full bg-gray-900 border border-gray-700 rounded-2xl px-6 py-4 text-white focus:outline-none focus:border-indigo-500 transition-colors"
+                  rows={8}
+                  placeholder="How can we help you?"
+                  required
+                  disabled={isSubmitting}
+                />
+              </div>
+
+              <button
+                type="submit"
                 disabled={isSubmitting}
-              />
-            </div>
-
-            <div>
-              <label htmlFor="message" className="block text-sm text-gray-300 mb-1">
-                Message
-              </label>
-              <textarea
-                id="message"
-                value={formData.message}
-                onChange={handleChange}
-                className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
-                rows={5}
-                placeholder="How can we help you?"
-                required
-                disabled={isSubmitting}
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-full font-semibold text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isSubmitting ? (
-                <span className="flex items-center justify-center">
-                  <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                  Sending...
-                </span>
-              ) : (
-                'Send'
-              )}
-            </button>
-          </form>
+                className="w-full px-6 py-3 bg-indigo-600 hover:bg-indigo-700 rounded-full font-semibold text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSubmitting ? (
+                  <span className="flex items-center justify-center">
+                    <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                    Sending...
+                  </span>
+                ) : (
+                  'Send Message'
+                )}
+              </button>
+            </form>
+          )}
         </div>
       </main>
 

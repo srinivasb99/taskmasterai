@@ -29,15 +29,19 @@ export async function POST(req: NextRequest) {
           quantity: 1,
         },
       ],
-      customer_email: email, // Pre-fill user's email
+      customer_email: email,
       success_url: `${process.env.CLIENT_URL}/dashboard?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.CLIENT_URL}/pricing`,
       client_reference_id: userId,
       billing_address_collection: 'required',
       allow_promotion_codes: true,
+      ui_mode: 'embedded',
     });
 
-    return NextResponse.json({ sessionId: session.id });
+    return NextResponse.json({ 
+      sessionId: session.id,
+      clientSecret: session.client_secret 
+    });
   } catch (error) {
     console.error('Stripe error:', error);
     return NextResponse.json(

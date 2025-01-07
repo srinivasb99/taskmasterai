@@ -5,25 +5,13 @@ import { subscribeToAuthState } from '../lib/pricing-firebase';
 import { Logo } from './Logo';
 import { loadStripe } from '@stripe/stripe-js';
 
-// Initialize Stripe
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
-
-// Price IDs configuration
-const STRIPE_PRICES = {
-  PREMIUM: {
-    yearly: 'price_1Qe2OnIdgEonJvEbSDwoNCuH',
-    monthly: 'price_1Qe2JWIdgEonJvEbGUYEkTu6'
-  },
-  PRO: {
-    yearly: 'price_1Qe2QaIdgEonJvEbaq1M4CQs',
-    monthly: 'price_1Qe2NXIdgEonJvEbxSUK8dMB'
-  }
-};
 
 function Pricing() {
   const { loading } = useAuth();
   const [user, setUser] = useState<any>(null);
   const [isYearly, setIsYearly] = useState(true);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
   useEffect(() => {
     const unsubscribe = subscribeToAuthState((firebaseUser) => {
@@ -39,10 +27,10 @@ function Pricing() {
     }
 
     try {
+      setCheckoutError(null);
       const stripe = await stripePromise;
       if (!stripe) throw new Error('Stripe failed to load');
 
-      // Create checkout session
       const response = await fetch('/api/stripe/create-checkout-session', {
         method: 'POST',
         headers: {
@@ -57,20 +45,21 @@ function Pricing() {
 
       if (!response.ok) {
         const errorData = await response.text();
-        throw new Error(`HTTP error! status: ${response.status}, message: ${errorData}`);
+        throw new Error(`Payment failed: ${errorData}`);
       }
 
       const { sessionId } = await response.json();
       
-      // Redirect to checkout
-      const { error } = await stripe.redirectToCheckout({ sessionId });
-      
+      const { error } = await stripe.redirectToCheckout({
+        sessionId,
+      });
+
       if (error) {
         throw error;
       }
     } catch (error) {
       console.error('Subscription error:', error);
-      alert('Failed to start subscription process. Please try again.');
+      setCheckoutError(error instanceof Error ? error.message : 'Failed to start subscription');
     }
   };
 
@@ -90,6 +79,7 @@ function Pricing() {
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-900 font-poppins">
+      {/* Keep existing header code */}
       <header className="fixed w-full bg-gray-900/80 backdrop-blur-lg border-b border-gray-800 z-50">
         <div className="container mx-auto px-4 py-4">
           <nav className="flex items-center justify-between">
@@ -119,11 +109,18 @@ function Pricing() {
       </header>
 
       <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-8 text-white">
+        {checkoutError && (
+          <div className="mb-4 p-4 bg-red-500/10 border border-red-500 rounded-lg text-red-500">
+            {checkoutError}
+          </div>
+        )}
+
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-indigo-400 mb-2">Choose Your Perfect Plan</h1>
           <p className="text-gray-300">Select a plan that works best for you.</p>
         </div>
 
+        {/* Keep existing pricing toggle code */}
         <div className="flex justify-center mb-8">
           <div className="bg-gray-800 rounded-full flex">
             <button 
@@ -141,6 +138,7 @@ function Pricing() {
           </div>
         </div>
 
+        {/* Keep existing pricing plans code */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
           {/* Basic Plan */}
           <div className="bg-gray-800 rounded-xl p-6 w-full sm:w-1/3">
@@ -158,7 +156,7 @@ function Pricing() {
               href={user ? "/dashboard" : "/signup"}
               className="inline-block w-full text-center py-3 rounded-full font-semibold bg-indigo-500 text-white hover:scale-105 transition-transform"
             >
-              {user ? 'Get Started for Free' : 'Sign Up to Start'}
+              {user ? 'Access Dashboard' : 'Sign Up Free'}
             </a>
           </div>
 
@@ -175,7 +173,7 @@ function Pricing() {
               <li>Add Unlimited Friends</li>
             </ul>
             <button 
-              onClick={() => handleSubscribe(STRIPE_PRICES.PREMIUM[isYearly ? 'yearly' : 'monthly'])}
+              onClick={() => handleSubscribe(STRIPE_CONFIG.PREMIUM[isYearly ? 'yearly' : 'monthly'])}
               disabled={!user}
               className={`w-full text-center py-3 rounded-full font-semibold bg-white text-indigo-600 hover:scale-105 transition-transform ${!user ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
@@ -196,7 +194,7 @@ function Pricing() {
               <li>Add Up to 10 Friends</li>
             </ul>
             <button 
-              onClick={() => handleSubscribe(STRIPE_PRICES.PRO[isYearly ? 'yearly' : 'monthly'])}
+              onClick={() => handleSubscribe(STRIPE_CONFIG.PRO[isYearly ? 'yearly' : 'monthly'])}
               disabled={!user}
               className={`w-full text-center py-3 rounded-full font-semibold bg-indigo-500 text-white hover:scale-105 transition-transform ${!user ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
@@ -206,6 +204,7 @@ function Pricing() {
         </div>
       </main>
 
+      {/* Keep existing footer code */}
       <footer className="bg-gray-900 border-t border-gray-800">
         <div className="container mx-auto px-4 py-6">
           <div className="flex flex-col md:flex-row items-center justify-between">

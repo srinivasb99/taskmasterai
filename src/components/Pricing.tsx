@@ -5,6 +5,17 @@ import { subscribeToAuthState } from '../lib/pricing-firebase';
 import { Logo } from './Logo';
 import { loadStripe } from '@stripe/stripe-js';
 
+const STRIPE_CONFIG = {
+  PREMIUM: {
+    monthly: 'price_1Qe2JWIdgEonJvEbGUYEkTu6',
+    yearly: 'price_1Qe2OnIdgEonJvEbSDwoNCuH',
+  },
+  PRO: {
+    monthly: 'price_1Qe2NXIdgEonJvEbxSUK8dMB', 
+    yearly: 'price_1Qe2QaIdgEonJvEbaq1M4CQs',
+  },
+};
+
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
 
 function Pricing() {

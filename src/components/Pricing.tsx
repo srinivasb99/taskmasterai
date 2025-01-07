@@ -48,8 +48,8 @@ function Pricing() {
   }
 
   // Pricing logic
-  const standardPriceText = isYearly ? '$6.99 per month' : '$9.99 per month';
-  const proPriceText = isYearly ? '$4.99 per month' : '$7.99 per month';
+  const standardPriceText = isYearly ? '$7.99 per month' : '$9.99 per month';
+  const proPriceText = isYearly ? '$4.99 per month' : '$6.99 per month';
   const standardBillingText = isYearly ? 'Billed yearly' : 'Billed monthly';
   const proBillingText = isYearly ? 'Billed yearly' : 'Billed monthly';
 

@@ -3,17 +3,20 @@ import { useAuth } from '../contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
 import { subscribeToAuthState } from '../lib/pricing-firebase';
 import { Logo } from './Logo';
-import { createCheckoutSession } from '../lib/stripe-client';
+import { loadStripe } from '@stripe/stripe-js';
 
-// Direct Stripe checkout URLs
+// Initialize Stripe
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
+
+// Price IDs configuration
 const STRIPE_PRICES = {
   PREMIUM: {
-    yearly: 'https://buy.stripe.com/eVa6q71vu9UMghydQS',
-    monthly: 'https://buy.stripe.com/dR68yf6POc2U6GY8wA'
+    yearly: 'price_1Qe2OnIdgEonJvEbSDwoNCuH',
+    monthly: 'price_1Qe2JWIdgEonJvEbGUYEkTu6'
   },
   PRO: {
-    yearly: 'https://buy.stripe.com/5kA8yfca8gja7L26oo',
-    monthly: 'https://buy.stripe.com/8wM01Jca89UM4yQ6or'
+    yearly: 'price_1Qe2QaIdgEonJvEbaq1M4CQs',
+    monthly: 'price_1Qe2NXIdgEonJvEbxSUK8dMB'
   }
 };
 
@@ -29,14 +32,46 @@ function Pricing() {
     return () => unsubscribe();
   }, []);
 
-  const handleSubscribe = async (checkoutUrl: string) => {
+  const handleSubscribe = async (priceId: string) => {
     if (!user) {
       alert('Please login to subscribe');
       return;
     }
 
-    // Open Stripe checkout in new tab
-    window.open(checkoutUrl, '_blank');
+    try {
+      const stripe = await stripePromise;
+      if (!stripe) throw new Error('Stripe failed to load');
+
+      // Create checkout session
+      const response = await fetch('/api/stripe/create-checkout-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          priceId,
+          userId: user.uid,
+          email: user.email,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        throw new Error(`HTTP error! status: ${response.status}, message: ${errorData}`);
+      }
+
+      const { sessionId } = await response.json();
+      
+      // Redirect to checkout
+      const { error } = await stripe.redirectToCheckout({ sessionId });
+      
+      if (error) {
+        throw error;
+      }
+    } catch (error) {
+      console.error('Subscription error:', error);
+      alert('Failed to start subscription process. Please try again.');
+    }
   };
 
   if (loading) {
@@ -48,8 +83,8 @@ function Pricing() {
   }
 
   // Pricing logic
-  const standardPriceText = isYearly ? '$7.99 per month' : '$9.99 per month';
-  const proPriceText = isYearly ? '$4.99 per month' : '$6.99 per month';
+  const standardPriceText = isYearly ? '$8.99 per month' : '$12.99 per month';
+  const proPriceText = isYearly ? '$3.99 per month' : '$8.99 per month';
   const standardBillingText = isYearly ? 'Billed yearly' : 'Billed monthly';
   const proBillingText = isYearly ? 'Billed yearly' : 'Billed monthly';
 
@@ -69,11 +104,11 @@ function Pricing() {
               <a href="pricing" className="text-gray-300 hover:text-indigo-400 transition-colors">
                 Pricing
               </a>
-              <a href="contact" className="text-gray-300 hover:text-indigo-400 transition-colors">
+              <a href="contact.html" className="text-gray-300 hover:text-indigo-400 transition-colors">
                 Contact
               </a>
               <a
-                href={user ? "/dashboard.html" : "/signup"}
+                href={user ? "/dashboard" : "/signup"}
                 className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-full transition-all transform hover:scale-105"
               >
                 {user ? "Dashboard" : "Get Started Today"}
@@ -123,7 +158,7 @@ function Pricing() {
               href={user ? "/dashboard" : "/signup"}
               className="inline-block w-full text-center py-3 rounded-full font-semibold bg-indigo-500 text-white hover:scale-105 transition-transform"
             >
-              {user ? 'Access Dashboard' : 'Sign Up Free'}
+              {user ? 'Get Started for Free' : 'Sign Up to Start'}
             </a>
           </div>
 
@@ -139,21 +174,13 @@ function Pricing() {
               <li>1,500 Tokens Included</li>
               <li>Add Unlimited Friends</li>
             </ul>
-            {user ? (
-              <button 
-                onClick={() => handleSubscribe(STRIPE_PRICES.PREMIUM[isYearly ? 'yearly' : 'monthly'])}
-                className="w-full text-center py-3 rounded-full font-semibold bg-white text-indigo-600 hover:scale-105 transition-transform"
-              >
-                Subscribe Now
-              </button>
-            ) : (
-              <a 
-                href="/signup"
-                className="inline-block w-full text-center py-3 rounded-full font-semibold bg-white text-indigo-600 hover:scale-105 transition-transform"
-              >
-                Sign Up to Subscribe
-              </a>
-            )}
+            <button 
+              onClick={() => handleSubscribe(STRIPE_PRICES.PREMIUM[isYearly ? 'yearly' : 'monthly'])}
+              disabled={!user}
+              className={`w-full text-center py-3 rounded-full font-semibold bg-white text-indigo-600 hover:scale-105 transition-transform ${!user ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              {!user ? 'Please login to subscribe' : 'Subscribe Now'}
+            </button>
           </div>
 
           {/* Pro Plan */}
@@ -168,21 +195,13 @@ function Pricing() {
               <li>750 Tokens Included</li>
               <li>Add Up to 10 Friends</li>
             </ul>
-            {user ? (
-              <button 
-                onClick={() => handleSubscribe(STRIPE_PRICES.PRO[isYearly ? 'yearly' : 'monthly'])}
-                className="w-full text-center py-3 rounded-full font-semibold bg-indigo-500 text-white hover:scale-105 transition-transform"
-              >
-                Subscribe Now
-              </button>
-            ) : (
-              <a 
-                href="/signup"
-                className="inline-block w-full text-center py-3 rounded-full font-semibold bg-indigo-500 text-white hover:scale-105 transition-transform"
-              >
-                Sign Up to Subscribe
-              </a>
-            )}
+            <button 
+              onClick={() => handleSubscribe(STRIPE_PRICES.PRO[isYearly ? 'yearly' : 'monthly'])}
+              disabled={!user}
+              className={`w-full text-center py-3 rounded-full font-semibold bg-indigo-500 text-white hover:scale-105 transition-transform ${!user ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              {!user ? 'Please login to subscribe' : 'Subscribe Now'}
+            </button>
           </div>
         </div>
       </main>

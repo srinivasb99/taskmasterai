@@ -2686,13 +2686,7 @@ Key Points:
 - [Key point 4]
 - [Key point 5]
 
-Text to analyze: "${chunk}"
-
-Remember:
-1. Summary must be 4 sentences or less
-2. Exactly 5 key points are required
-3. Each key point must start with a dash (-)
-4. Keep the format exactly as shown above`;
+Text to analyze: "${chunk}"`;
 
         while (attempt < maxRetries) {
             try {
@@ -2711,37 +2705,13 @@ Remember:
                     const generatedText = result[0]?.generated_text || "";
                     console.log('Raw response:', generatedText);
 
-                    // Extract summary
-                    let summary = "";
-                    if (generatedText.includes('Summary:') && generatedText.includes('Key Points:')) {
-                        summary = generatedText
-                            .split('Summary:')[1]
-                            .split('Key Points:')[0]
-                            .trim();
-                    }
+                    // Extract summary and key points
+                    const parsedResponse = parseGeneratedText(generatedText);
+                    console.log('Parsed response:', parsedResponse);
 
-                    // Ensure summary is no more than 4 sentences
-                    summary = summary
-                        .split(/[.!?]+/)
-                        .filter(sentence => sentence.trim().length > 0)
-                        .slice(0, 4)
-                        .join('. ') + '.';
-
-                    // Extract key points
-                    let points = [];
-                    if (generatedText.includes('Key Points:')) {
-                        const keyPointsSection = generatedText.split('Key Points:')[1].trim();
-                        points = keyPointsSection
-                            .split('\n')
-                            .filter(line => line.trim().startsWith('-'))
-                            .map(point => point.replace('-', '').trim())
-                            .filter(point => point.length > 0);
-                    }
-
-                    // Ensure we have both summary and at least 3 key points
-                    if (summary && summary.length > 0 && points.length >= 3) {
-                        summaries.push(summary);
-                        keyPoints.push(...points);
+                    if (parsedResponse.summary && parsedResponse.points.length > 0) {
+                        summaries.push(parsedResponse.summary);
+                        keyPoints.push(...parsedResponse.points);
 
                         // Update progress
                         const currentProgress = ((i + 1) / totalChunks) * 100;
@@ -2762,7 +2732,6 @@ Remember:
 
                         break;
                     } else {
-                        console.error('Parsed response:', { summary, points });
                         throw new Error('Failed to extract valid summary and key points');
                     }
                 } else {
@@ -2802,6 +2771,49 @@ Remember:
         overview: overviewSentences,
         keyPoints: [...new Set(keyPoints)] // Remove any duplicate key points
     };
+}
+
+// Helper function to parse the generated text
+function parseGeneratedText(text) {
+    let summary = "";
+    let points = [];
+
+    try {
+        // Extract summary
+        if (text.includes('Summary:') && text.includes('Key Points:')) {
+            summary = text
+                .split('Summary:')[1]
+                .split('Key Points:')[0]
+                .trim();
+
+            // Ensure summary is no more than 4 sentences and properly formatted
+            summary = summary
+                .split(/[.!?]+/)
+                .filter(sentence => sentence.trim().length > 0)
+                .slice(0, 4)
+                .join('. ') + '.';
+        }
+
+        // Extract key points
+        if (text.includes('Key Points:')) {
+            const keyPointsSection = text.split('Key Points:')[1].trim();
+            points = keyPointsSection
+                .split('\n')
+                .filter(line => line.trim().startsWith('-'))
+                .map(point => point.replace(/^-\s*/, '').trim()) // Remove dash and any leading whitespace
+                .filter(point => point.length > 0);
+        }
+
+        // Validate the extracted content
+        if (!summary || points.length === 0) {
+            throw new Error('Invalid response format');
+        }
+
+        return { summary, points };
+    } catch (error) {
+        console.error('Error parsing generated text:', error);
+        return { summary: "", points: [] };
+    }
 }
 
 

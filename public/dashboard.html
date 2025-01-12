@@ -4087,8 +4087,8 @@ function updateIcon(isHidden) {
 }
 
 // Constants
-const huggingFaceApiKey = "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";
-const modelEndpoint = "https://api-inference.huggingface.co/models/meta-llama/Llama-3.2-11B-Vision-Instruct";
+const huggingFaceApiKey = "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";
+const modelEndpoint = "https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct";
 const collections = ['tasks', 'goals', 'projects', 'plans'];
 
 // Fetch data from all collections and user info
@@ -4137,8 +4137,6 @@ async function fetchCollectionData(userId) {
     }
 }
 
-
-
 // Function to render placeholder message
 function renderPlaceholderMessage() {
     const aiSummarySection = document.getElementById('ai-summary-section');
@@ -4158,84 +4156,77 @@ function renderPlaceholderMessage() {
     summaryContainer.appendChild(placeholderSection);
 }
 
-// First AI call to generate section content
+// Generate section content with optimized prompt for Llama model
 async function generateSection(data, instructions) {
-    const sectionPrompt = `Hello ${data.displayName}! I am TaskMaster, a friendly productivity-focused AI assistant. 
-I will Generate ONLY the section content and title, keeping responses concise, clear, and professional.
+    const sectionPrompt = `You are TaskMaster, a professional productivity AI assistant. Your task is to analyze the following user data and generate a section summary following specific instructions.
 
 USER DATA:
 ${data}
 
-INSTRUCTIONS FOR THIS SECTION:
+SECTION INSTRUCTIONS:
 ${instructions}
 
-I WILL FORMAT MY RESPONSE EXACTLY LIKE THIS:
+Requirements:
+- Generate ONLY the section title and content
+- Keep responses concise and professional
+- Focus on actionable insights
+- Use appropriate emojis sparingly
+- Maintain a friendly, motivational tone
+
+Format your response EXACTLY as follows:
 Title: [Section title]
-Content: [Complete response here]`;
+Content: [Section content]
 
-    const response = await fetch(modelEndpoint, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${huggingFaceApiKey}`,
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ inputs: sectionPrompt }),
-    });
+Do not include any additional commentary or explanations.`;
 
-    if (!response.ok) {
-        throw new Error(`Failed to generate section`);
+    try {
+        const response = await fetch(modelEndpoint, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${huggingFaceApiKey}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ 
+                inputs: sectionPrompt,
+                parameters: {
+                    max_length: 1000,
+                    temperature: 0.3,
+                    top_p: 0.9,
+                    return_full_text: false
+                }
+            }),
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to generate section`);
+        }
+
+        const result = await response.json();
+        console.log('Raw response:', result); // Debug log
+
+        const titleMatch = result[0]?.generated_text.match(/Title:\s*(.*?)(?=\nContent:|$)/s);
+        const contentMatch = result[0]?.generated_text.match(/Content:\s*([\s\S]*?)$/s);
+
+        const title = titleMatch ? titleMatch[1].trim() : "Loading...";
+        const content = contentMatch ? contentMatch[1].trim() : "💬 TaskMaster requires additional information. Continue adding tasks, goals, projects, or plans for a clearer summary.";
+
+        console.log('Parsed section:', { title, content }); // Debug log
+        return { title, content };
+
+    } catch (error) {
+        console.error('Error generating section:', error);
+        return {
+            title: "Error",
+            content: "Failed to generate section. Please try again."
+        };
     }
-
-    const result = await response.json();
-    const titleMatch = result[0]?.generated_text.match(/Title:\s*(.*)/);
-    const contentMatch = result[0]?.generated_text.match(/Content:\s*([\s\S]*)/);
-
-    const title = titleMatch ? titleMatch[1].trim() : "Loading...";
-    const content = contentMatch ? contentMatch[1].trim() : "💬 TaskMaster requires additional information. Continue adding tasks, goals, projects, or plans for a clearer summary.";
-
-    return { title, content };
 }
 
-// Second AI call to review and verify the content
-async function reviewSection(title, content) {
-    const reviewPrompt = `Please review the following section for any errors, inconsistencies, or improvements. 
-Ensure that the section is clear, concise, and free from mistakes. Provide the corrected title and content. In your final response do not include explanations or questions. 
-
-Title: ${title}
-Content: ${content}
-
-Format the response exactly like this (REMEMBER DO NOT INCLUDE EXPLANATIONS OR QUESTIONS):
-Title: [Corrected title]
-Content: [Final, corrected content]`;
-
-    const response = await fetch(modelEndpoint, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${huggingFaceApiKey}`,
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ inputs: reviewPrompt }),
-    });
-
-    if (!response.ok) {
-        throw new Error(`Failed to review section`);
-    }
-
-    const result = await response.json();
-    const titleMatch = result[0]?.generated_text.match(/Title:\s*(.*)/);
-    const contentMatch = result[0]?.generated_text.match(/Content:\s*([\s\S]*)/);
-
-    const finalTitle = titleMatch ? titleMatch[1].trim() : title;
-    const finalContent = contentMatch ? contentMatch[1].trim() : content;
-
-    return { title: finalTitle, content: finalContent };
-}
-
-// Main function that generates the AI summary sequentially
+// Main function that generates the AI summary
 async function generateAISummary(data) {
-    const displayName = data.displayName || "User"; // Fallback if displayName is not set
+    const displayName = data.displayName || "User";
     const formattedData = Object.entries(data)
-        .filter(([key, items]) => key !== 'displayName' && items.length > 0) // Only include non-empty collections
+        .filter(([key, items]) => key !== 'displayName' && items.length > 0)
         .map(([category, items]) => {
             return `${category.toUpperCase()}:\n` + 
                 items.map(item => `- ${item.type}: ${item[item.type]} (Due: ${new Date(item.dueDate?.seconds * 1000).toLocaleDateString() || 'No date'})`).join('\n');
@@ -4249,51 +4240,34 @@ async function generateAISummary(data) {
     }
 
     try {
-        // Generate sections sequentially with verification
-        let section = await generateSection(formattedData, `
-1. Begin with a friendly and motivational greeting to ${displayName}.
-2. Use 🚨 for items due within 3 days, and ⏰ for items due within 14 days.
-3. Provide a clear, actionable tip for each item.
-4. Exclude any categories without urgent items.
-5. Keep under 150 words; exclude "Urgent Items" or explanations.
-        `);
-        section = await reviewSection(section.title, section.content);
+        // Generate each section
+        const urgentItems = await generateSection(formattedData, `
+1. Begin with a friendly and motivational greeting to ${displayName}
+2. Use 🚨 for items due within 3 days, and ⏰ for items due within 14 days
+3. Provide a clear, actionable tip for each item
+4. Exclude any categories without urgent items
+5. Keep under 150 words`);
 
-        const urgentItems = section;
+        const inProgress = await generateSection(formattedData, `
+1. Start with an encouraging note for ${displayName}
+2. Use 🎯 for goals, 📋 for tasks, 📊 for projects, followed by a period
+3. Include practical next steps for each
+4. Exclude any categories that don't have ongoing data
+5. Keep under 150 words`);
 
-        section = await generateSection(formattedData, `
-1. Start with an encouraging note for ${displayName}.
-2. Use 🎯 for goals, 📋 for tasks, 📊 for projects, followed by a period.
-3. Include practical next steps for each.
-4. Exclude any categories that don’t have ongoing data.
-5. Keep under 150 words; avoid "In Progress."
-        `);
-        section = await reviewSection(section.title, section.content);
+        const comingUp = await generateSection(formattedData, `
+1. Provide one preparation tip per upcoming item
+2. Avoid dates unless critical
+3. Use emojis meaningfully, not excessively
+4. Exclude categories without upcoming data
+5. Keep under 150 words`);
 
-        const inProgress = section;
+        const overviewAndRecommendations = await generateSection(formattedData, `
+1. Provide four actionable, personalized recommendations for ${displayName}
+2. End with two motivational sentences tailored to ${displayName}
+3. Only include categories present in user data
+4. Keep under 150 words`);
 
-        section = await generateSection(formattedData, `
-1. Provide one preparation tip per upcoming item.
-2. Avoid dates unless critical.
-3. Use emojis meaningfully, not excessively.
-4. Exclude categories without upcoming data.
-5. Keep concise; omit "Coming Up."
-        `);
-        section = await reviewSection(section.title, section.content);
-
-        const comingUp = section;
-
-        section = await generateSection(formattedData, `
-1. Provide four actionable, personalized recommendations for ${displayName}.
-2. End with two motivational sentences tailored to ${displayName}.
-3. Only include categories present in user data.
-4. Keep concise, under 150 words; omit "Overview."
-        `);
-        section = await reviewSection(section.title, section.content);
-
-        const overviewAndRecommendations = section;
-
-        // Return the final reviewed sections
         return {
             urgentItems,
             inProgress,

@@ -4173,7 +4173,6 @@ async function generateSection(data, instructions, sectionType) {
     const optimizedData = data.split('\n')
         .filter(line => line.trim())
         .map(line => {
-            // Extract and format dates for better context
             const dateMatch = line.match(/\((.*?)\)/);
             if (dateMatch) {
                 const date = dateMatch[1];
@@ -4189,9 +4188,9 @@ async function generateSection(data, instructions, sectionType) {
     const basePrompt = `You are TaskMaster, an advanced AI productivity assistant specializing in Smart Overviews. Your core purpose is to analyze productivity data and generate actionable, personalized insights.
 
 CONTEXT:
-This data represents a user's productivity items. Important notes:
+This data represents a user's productivity items:
 - Items may include: tasks, goals, projects, and/or plans
-- Some items may have due dates, others may not
+- Some items have due dates, others may not
 - Only analyze and mention categories that are present in the data
 - For items without due dates, focus on their content and priority
 
@@ -4205,13 +4204,24 @@ ANALYSIS REQUIREMENTS:
 2. Adapt analysis based on whether items have due dates
 3. Identify patterns and dependencies between existing items
 4. Focus on actionable insights for the available data
-5. Maintain a motivational tone
+5. Maintain a professional, concise tone
+6. Use emojis sparingly and only when meaningful
+7. Keep responses clean and properly formatted
+
+RESPONSE FORMAT RULES:
+1. Start directly with "Title:" followed by a clear, specific title
+2. Follow with "Content:" and provide the main content
+3. No markdown syntax or extra formatting
+4. No additional commentary or notes
+5. No repeated information
+6. Maximum 3 emojis per section
+7. Clean, professional language only
 
 ${instructions}
 
-Format response exactly as:
-Title: [Create a unique, context-appropriate title]
-Content: [Provide detailed, actionable content following the instructions]`;
+Format your response EXACTLY as:
+Title: [Single line, specific title]
+Content: [Clear, concise content]`;
 
     try {
         console.log('📤 Requesting model response...');
@@ -4225,8 +4235,8 @@ Content: [Provide detailed, actionable content following the instructions]`;
                 inputs: basePrompt,
                 parameters: {
                     max_new_tokens: 300,
-                    temperature: 0.7,
-                    top_p: 0.9,
+                    temperature: 0.6, // Reduced for more consistent output
+                    top_p: 0.85,
                     repetition_penalty: 1.2,
                     return_full_text: false,
                     do_sample: true
@@ -4239,8 +4249,11 @@ Content: [Provide detailed, actionable content following the instructions]`;
         const result = await response.json();
         console.log('📥 Received model response');
         
+        // Enhanced response cleaning
         const cleanedResponse = result[0]?.generated_text
             .replace(/\[\/INST\]|\[INST\]|<\/?s>|<\/?p>/g, '')
+            .replace(/```markdown|```|###/g, '')
+            .replace(/Response|End/g, '')
             .trim();
 
         const titleMatch = cleanedResponse.match(/Title:\s*(.*?)(?=\nContent:|$)/s);
@@ -4248,8 +4261,16 @@ Content: [Provide detailed, actionable content following the instructions]`;
 
         if (!titleMatch || !contentMatch) throw new Error('Invalid response format');
 
-        const title = titleMatch[1].trim();
-        const content = contentMatch[1].trim();
+        // Additional cleaning for title and content
+        const title = titleMatch[1]
+            .trim()
+            .replace(/^["'\s]+|["'\s]+$/g, ''); // Remove quotes and extra spaces
+
+        const content = contentMatch[1]
+            .trim()
+            .replace(/^["'\s]+|["'\s]+$/g, '') // Remove quotes and extra spaces
+            .replace(/\n{2,}/g, '\n') // Remove extra newlines
+            .replace(/\s{2,}/g, ' '); // Remove extra spaces
 
         console.log(`✅ ${sectionType} section generated successfully`);
         return { title, content };

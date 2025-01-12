@@ -4093,21 +4093,25 @@ const collections = ['tasks', 'goals', 'projects', 'plans'];
 
 // Fetch data from all collections and user info
 async function fetchCollectionData(userId) {
+    console.log('🔄 Starting data fetch for user:', userId);
     try {
         const allData = {};
 
         // Fetch user info
+        console.log('📥 Fetching user information...');
         const userDoc = await db.collection('users').doc(userId).get();
         if (!userDoc.exists) {
-            console.warn('User not found');
+            console.warn('⚠️ User not found');
             return null;
         }
 
         const userInfo = userDoc.data();
         const displayName = userInfo.displayName || "User";
+        console.log('👤 User found:', displayName);
 
         // Fetch collections
         for (const collectionName of collections) {
+            console.log(`📚 Fetching ${collectionName} collection...`);
             const snapshot = await db.collection(collectionName)
                 .where('userId', '==', userId)
                 .get();
@@ -4115,38 +4119,42 @@ async function fetchCollectionData(userId) {
             allData[collectionName] = snapshot.docs.map(doc => ({
                 id: doc.id,
                 ...doc.data(),
-                type: collectionName.slice(0, -1) // e.g., 'task' for 'tasks'
+                type: collectionName.slice(0, -1)
             }));
+            console.log(`✅ Found ${allData[collectionName].length} ${collectionName}`);
         }
 
         // Check if any data is found
         const hasData = Object.values(allData).some(collection => collection.length > 0);
 
         if (!hasData) {
+            console.log('ℹ️ No data found, rendering placeholder');
             renderPlaceholderMessage();
             return null;
         }
 
         // Attach displayName for use in summary generation
         allData.displayName = displayName;
+        console.log('✅ Data fetch complete');
         return allData;
 
     } catch (error) {
-        console.error('Error fetching data:', error);
+        console.error('❌ Error fetching data:', error);
         return null;
     }
 }
 
 // Function to render placeholder message
 function renderPlaceholderMessage() {
+    console.log('🎨 Rendering placeholder message');
     const aiSummarySection = document.getElementById('ai-summary-section');
     const summaryContainer = aiSummarySection.querySelector('.ai-assistant-card');
     const existingSections = summaryContainer.querySelectorAll('.summary-section');
 
-    // Remove old sections
+    console.log('🧹 Removing old sections');
     existingSections.forEach(section => section.remove());
 
-    // Create and add placeholder section
+    console.log('✨ Creating new placeholder section');
     const placeholderSection = document.createElement('div');
     placeholderSection.className = 'summary-section';
     placeholderSection.innerHTML = `
@@ -4154,10 +4162,13 @@ function renderPlaceholderMessage() {
         <div class="section-content">TaskMaster is ready to generate your Smart Overview. To get started, create a task, goal, project, or plan.</div>
     `;
     summaryContainer.appendChild(placeholderSection);
+    console.log('✅ Placeholder message rendered');
 }
 
 // Generate section content with optimized prompt for Llama model
-async function generateSection(data, instructions) {
+async function generateSection(data, instructions, maxRetries = 3, delayInterval = 3000) {
+    console.log('🎯 Starting section generation with instructions:', instructions.split('\n')[0]);
+    
     const sectionPrompt = `You are TaskMaster, a professional productivity AI assistant. Your task is to analyze the following user data and generate a section summary following specific instructions.
 
 USER DATA:
@@ -4179,52 +4190,78 @@ Content: [Section content]
 
 Do not include any additional commentary or explanations.`;
 
-    try {
-        const response = await fetch(modelEndpoint, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${huggingFaceApiKey}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ 
-                inputs: sectionPrompt,
-                parameters: {
-                    max_length: 1000,
-                    temperature: 0.3,
-                    top_p: 0.9,
-                    return_full_text: false
-                }
-            }),
-        });
+    let attempt = 0;
 
-        if (!response.ok) {
-            throw new Error(`Failed to generate section`);
+    while (attempt < maxRetries) {
+        console.log(`🔄 Attempt ${attempt + 1}/${maxRetries}`);
+        try {
+            console.log('📤 Sending request to model...');
+            const response = await fetch(modelEndpoint, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${huggingFaceApiKey}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ 
+                    inputs: sectionPrompt,
+                    parameters: {
+                        max_length: 1000,
+                        temperature: 0.3,
+                        top_p: 0.9,
+                        return_full_text: false
+                    }
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            console.log('📥 Received response from model');
+            const result = await response.json();
+            console.log('🔍 Parsing response...');
+
+            const titleMatch = result[0]?.generated_text.match(/Title:\s*(.*?)(?=\nContent:|$)/s);
+            const contentMatch = result[0]?.generated_text.match(/Content:\s*([\s\S]*?)$/s);
+
+            if (!titleMatch || !contentMatch) {
+                throw new Error('Failed to parse response format');
+            }
+
+            const title = titleMatch[1].trim();
+            const content = contentMatch[1].trim();
+
+            if (!title || !content) {
+                throw new Error('Empty title or content');
+            }
+
+            console.log('✅ Successfully generated section:', { title });
+            return { title, content };
+
+        } catch (error) {
+            console.error(`❌ Attempt ${attempt + 1} failed:`, error);
+            if (attempt < maxRetries - 1) {
+                console.log(`⏳ Retrying in ${delayInterval / 1000} seconds...`);
+                await new Promise(resolve => setTimeout(resolve, delayInterval));
+                attempt++;
+            } else {
+                console.error('❌ All attempts failed');
+                return {
+                    title: "Error",
+                    content: "Failed to generate section. Please try again."
+                };
+            }
         }
-
-        const result = await response.json();
-        console.log('Raw response:', result); // Debug log
-
-        const titleMatch = result[0]?.generated_text.match(/Title:\s*(.*?)(?=\nContent:|$)/s);
-        const contentMatch = result[0]?.generated_text.match(/Content:\s*([\s\S]*?)$/s);
-
-        const title = titleMatch ? titleMatch[1].trim() : "Loading...";
-        const content = contentMatch ? contentMatch[1].trim() : "💬 TaskMaster requires additional information. Continue adding tasks, goals, projects, or plans for a clearer summary.";
-
-        console.log('Parsed section:', { title, content }); // Debug log
-        return { title, content };
-
-    } catch (error) {
-        console.error('Error generating section:', error);
-        return {
-            title: "Error",
-            content: "Failed to generate section. Please try again."
-        };
     }
 }
 
 // Main function that generates the AI summary
 async function generateAISummary(data) {
+    console.log('🚀 Starting AI summary generation');
     const displayName = data.displayName || "User";
+    console.log('👤 Generating summary for:', displayName);
+
+    console.log('📝 Formatting user data...');
     const formattedData = Object.entries(data)
         .filter(([key, items]) => key !== 'displayName' && items.length > 0)
         .map(([category, items]) => {
@@ -4233,6 +4270,7 @@ async function generateAISummary(data) {
         }).join('\n\n');
 
     if (!formattedData.trim()) {
+        console.log('ℹ️ No data available for summary');
         return {
             title: "No Data",
             content: "💬 TaskMaster needs more information! Add tasks, goals, projects, or plans to receive a tailored summary."
@@ -4240,34 +4278,37 @@ async function generateAISummary(data) {
     }
 
     try {
-        // Generate each section
-        const urgentItems = await generateSection(formattedData, `
+        console.log('🔄 Generating all sections in parallel...');
+        const [urgentItems, inProgress, comingUp, overviewAndRecommendations] = await Promise.all([
+            generateSection(formattedData, `
 1. Begin with a friendly and motivational greeting to ${displayName}
 2. Use 🚨 for items due within 3 days, and ⏰ for items due within 14 days
 3. Provide a clear, actionable tip for each item
 4. Exclude any categories without urgent items
-5. Keep under 150 words`);
+5. Keep under 150 words`),
 
-        const inProgress = await generateSection(formattedData, `
+            generateSection(formattedData, `
 1. Start with an encouraging note for ${displayName}
 2. Use 🎯 for goals, 📋 for tasks, 📊 for projects, followed by a period
 3. Include practical next steps for each
 4. Exclude any categories that don't have ongoing data
-5. Keep under 150 words`);
+5. Keep under 150 words`),
 
-        const comingUp = await generateSection(formattedData, `
+            generateSection(formattedData, `
 1. Provide one preparation tip per upcoming item
 2. Avoid dates unless critical
 3. Use emojis meaningfully, not excessively
 4. Exclude categories without upcoming data
-5. Keep under 150 words`);
+5. Keep under 150 words`),
 
-        const overviewAndRecommendations = await generateSection(formattedData, `
+            generateSection(formattedData, `
 1. Provide four actionable, personalized recommendations for ${displayName}
 2. End with two motivational sentences tailored to ${displayName}
 3. Only include categories present in user data
-4. Keep under 150 words`);
+4. Keep under 150 words`)
+        ]);
 
+        console.log('✅ All sections generated successfully');
         return {
             urgentItems,
             inProgress,
@@ -4276,7 +4317,7 @@ async function generateAISummary(data) {
         };
 
     } catch (error) {
-        console.error('Error generating AI summary:', error);
+        console.error('❌ Error generating AI summary:', error);
         return {
             title: "Error",
             content: "Failed to generate complete summary. Please try again."

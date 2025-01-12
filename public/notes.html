@@ -2653,8 +2653,10 @@ function splitTextIntoChunks(text, maxLength = 2000) {
 
 async function generateSummary(text, maxRetries = 5, delayInterval = 5000) {
     console.log('Generating summary and key points...');
+    const chunks = splitTextIntoChunks(text);
     const summaries = [];
     const keyPoints = [];
+    const totalChunks = chunks.length;
     const startTime = Date.now();
 
     const estimatedTimeDisplay = document.getElementById('estimated-time');
@@ -2666,10 +2668,14 @@ async function generateSummary(text, maxRetries = 5, delayInterval = 5000) {
 
     await simulateRealTimeUploadProgress();
 
-    const prompt = `
+    for (let i = 0; i < totalChunks; i++) {
+        let chunk = chunks[i];
+        let attempt = 0;
+
+        const prompt = `
 Analyze the following text and provide a comprehensive summary and key points:
 
-Text: "${text}"
+Text: "${chunk}"
 
 Please generate the output in this exact format:
 
@@ -2689,73 +2695,76 @@ Important:
 - Make each key point a complete, meaningful statement
 `;
 
-    let attempt = 0;
-    while (attempt < maxRetries) {
-        try {
-            console.log('Sending text to Hugging Face API...');
-            const response = await fetch(modelEndpoint, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${huggingFaceApiKey}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ inputs: prompt })
-            });
+        while (attempt < maxRetries) {
+            try {
+                console.log('Sending chunk to Hugging Face API...');
+                const response = await fetch(modelEndpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${huggingFaceApiKey}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ inputs: prompt })
+                });
 
-            if (response.ok) {
-                const result = await response.json();
-                const generatedText = result[0]?.generated_text || "";
+                if (response.ok) {
+                    const result = await response.json();
+                    const generatedText = result[0]?.generated_text || "";
 
-                // Parse summary and key points
-                const summaryMatch = generatedText.match(/Summary:(.*?)(?=Key Points:)/s);
-                const keyPointsMatch = generatedText.match(/Key Points:(.*?)$/s);
+                    // Parse summary and key points
+                    const summaryMatch = generatedText.match(/Summary:(.*?)(?=Key Points:)/s);
+                    const keyPointsMatch = generatedText.match(/Key Points:(.*?)$/s);
 
-                if (summaryMatch && keyPointsMatch) {
-                    const summary = summaryMatch[1].trim();
-                    summaries.push(summary);
+                    if (summaryMatch && keyPointsMatch) {
+                        const summary = summaryMatch[1].trim();
+                        summaries.push(summary);
 
-                    const points = keyPointsMatch[1]
-                        .split('-')
-                        .map(point => point.trim())
-                        .filter(point => point.length > 0);
-                    keyPoints.push(...points);
+                        const points = keyPointsMatch[1]
+                            .split('-')
+                            .map(point => point.trim())
+                            .filter(point => point.length > 0);
+                        keyPoints.push(...points);
 
-                    // Update progress
-                    const currentProgress = 100;
-                    progressBar.value = currentProgress;
-                    percentageDisplay.innerText = `${Math.floor(currentProgress)}%`;
+                        // Update progress
+                        const currentProgress = ((i + 1) / totalChunks) * 100;
+                        progressBar.value = currentProgress;
+                        percentageDisplay.innerText = `${Math.floor(currentProgress)}%`;
 
-                    // Update estimated time
-                    if (estimatedTimeDisplay) {
+                        // Update estimated time
                         const elapsedTime = Date.now() - startTime;
-                        const minutes = Math.floor(elapsedTime / 60000);
-                        const seconds = Math.floor((elapsedTime % 60000) / 1000);
-                        const formattedTime = `${minutes}m ${seconds}s`;
-                        estimatedTimeDisplay.innerText = `Time elapsed: ${formattedTime}`;
-                    }
+                        const estimatedTotalTime = (elapsedTime / (i + 1)) * totalChunks;
+                        const remainingTime = estimatedTotalTime - elapsedTime;
 
-                    break;
+                        if (estimatedTimeDisplay) {
+                            const minutes = Math.floor(remainingTime / 60000);
+                            const seconds = Math.floor((remainingTime % 60000) / 1000);
+                            const formattedRemainingTime = `${minutes}m ${seconds}s`;
+                            estimatedTimeDisplay.innerText = `Estimated time remaining: ${formattedRemainingTime}`;
+                        }
+
+                        break;
+                    } else {
+                        throw new Error('Failed to parse summary and key points from response');
+                    }
                 } else {
-                    throw new Error('Failed to parse summary and key points from response');
+                    const errorDetails = await response.json();
+                    if (errorDetails.error && errorDetails.error.includes('loading')) {
+                        console.log(`Attempt ${attempt + 1}: Model is still loading. Retrying in ${delayInterval / 1000} seconds...`);
+                        await delay(delayInterval);
+                        attempt++;
+                    } else {
+                        throw new Error(`Error generating summary: ${errorDetails.error}`);
+                    }
                 }
-            } else {
-                const errorDetails = await response.json();
-                if (errorDetails.error && errorDetails.error.includes('loading')) {
-                    console.log(`Attempt ${attempt + 1}: Model is still loading. Retrying in ${delayInterval / 1000} seconds...`);
+            } catch (error) {
+                console.error(`Failed to generate summary for chunk: ${error.message}`);
+                if (attempt < maxRetries - 1) {
+                    console.log(`Retrying in ${delayInterval / 1000} seconds...`);
                     await delay(delayInterval);
                     attempt++;
                 } else {
-                    throw new Error(`Error generating summary: ${errorDetails.error}`);
+                    throw error;
                 }
-            }
-        } catch (error) {
-            console.error(`Failed to generate summary: ${error.message}`);
-            if (attempt < maxRetries - 1) {
-                console.log(`Retrying in ${delayInterval / 1000} seconds...`);
-                await delay(delayInterval);
-                attempt++;
-            } else {
-                throw error;
             }
         }
     }

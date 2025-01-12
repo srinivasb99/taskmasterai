@@ -2555,8 +2555,8 @@ async function simulateRealTimeUploadProgress2() {
 }
 
 // Hugging Face API setup
-const huggingFaceApiKey = "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";
-const modelEndpoint = "https://api-inference.huggingface.co/models/facebook/bart-large-cnn";
+const huggingFaceApiKey = "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";
+const modelEndpoint = "https://api-inference.huggingface.co/models/meta-llama/Llama-3.2-11B-Vision-Instruct";
 
 // File input and progress bar elements
 const pdfFileInput = document.getElementById('pdfFileInput');
@@ -2653,93 +2653,109 @@ function splitTextIntoChunks(text, maxLength = 2000) {
 
 async function generateSummary(text, maxRetries = 5, delayInterval = 5000) {
     console.log('Generating summary and key points...');
-    const chunks = splitTextIntoChunks(text);
     const summaries = [];
     const keyPoints = [];
-    const totalChunks = chunks.length; // Total number of chunks
-    const startTime = Date.now(); // Capture the start time
+    const startTime = Date.now();
 
-    // Ensure this is defined before the loop
-    const estimatedTimeDisplay = document.getElementById('estimated-time'); // Get the element for estimated time
-    const progressBar = document.getElementById('progressBar2'); // Get the progress bar element
-    const percentageDisplay = document.querySelector('.progress-percentage'); // Get the percentage display element
+    const estimatedTimeDisplay = document.getElementById('estimated-time');
+    const progressBar = document.getElementById('progressBar2');
+    const percentageDisplay = document.querySelector('.progress-percentage');
 
     const uploadingText = document.getElementById('uploading-text');
     uploadingText.innerHTML = 'Generating Note<span id="ellipsis2"></span>';
 
-    // Start simulating progress
     await simulateRealTimeUploadProgress();
 
-    for (let i = 0; i < totalChunks; i++) {
-        let chunk = chunks[i];
-        let attempt = 0;
+    const prompt = `
+Analyze the following text and provide a comprehensive summary and key points:
 
-        while (attempt < maxRetries) {
-            try {
-                console.log('Sending chunk to Hugging Face API...');
-                const response = await fetch(modelEndpoint, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${huggingFaceApiKey}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ inputs: chunk })
-                });
+Text: "${text}"
 
-                if (response.ok) {
-                    const result = await response.json();
-                    const summary = result[0].summary_text;
+Please generate the output in this exact format:
+
+Summary:
+(Provide a clear, concise summary of the main ideas in 4-5 sentences)
+
+Key Points:
+- (First key point)
+- (Second key point)
+- (Third key point)
+(Continue with additional key points as needed)
+
+Important:
+- Keep the summary focused on the most important concepts
+- Extract clear, standalone key points
+- Ensure all points are directly related to the text
+- Make each key point a complete, meaningful statement
+`;
+
+    let attempt = 0;
+    while (attempt < maxRetries) {
+        try {
+            console.log('Sending text to Hugging Face API...');
+            const response = await fetch(modelEndpoint, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${huggingFaceApiKey}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ inputs: prompt })
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                const generatedText = result[0]?.generated_text || "";
+
+                // Parse summary and key points
+                const summaryMatch = generatedText.match(/Summary:(.*?)(?=Key Points:)/s);
+                const keyPointsMatch = generatedText.match(/Key Points:(.*?)$/s);
+
+                if (summaryMatch && keyPointsMatch) {
+                    const summary = summaryMatch[1].trim();
                     summaries.push(summary);
 
-                    // Generate key points based on the summary
-                    const sentences = summary.split('. ');
-                    keyPoints.push(...sentences.map(sentence => sentence.trim() + '.')); // Ensure full sentences
+                    const points = keyPointsMatch[1]
+                        .split('-')
+                        .map(point => point.trim())
+                        .filter(point => point.length > 0);
+                    keyPoints.push(...points);
 
-                    console.log('Received summary for chunk.');
-
-                    // Update the estimated time and progress after processing each chunk
-                    const currentProgress = (i + 1) / totalChunks * 100; // Calculate percentage based on chunks processed
-                    const elapsedTime = Date.now() - startTime;
-                    const estimatedTotalTime = (elapsedTime / (i + 1)) * totalChunks; // Recalculate estimated total time
-                    const remainingTime = estimatedTotalTime - elapsedTime;
-
-                    // Update progress bar and percentage display
+                    // Update progress
+                    const currentProgress = 100;
                     progressBar.value = currentProgress;
                     percentageDisplay.innerText = `${Math.floor(currentProgress)}%`;
 
-// Update the display for estimated time remaining
-if (estimatedTimeDisplay) {
-    const minutes = Math.floor(remainingTime / 60000); // Get minutes
-    const seconds = Math.floor((remainingTime % 60000) / 1000); // Get remaining seconds
-
-    const formattedRemainingTime = `${minutes}m ${seconds}s`; // Format as "Xm Ys"
-    estimatedTimeDisplay.innerText = `Estimated time remaining: ${formattedRemainingTime}`;
-}
-
-
-                    break; // Exit retry loop after successful response
-
-                } else {
-                    const errorDetails = await response.json();
-
-                    if (errorDetails.error && errorDetails.error.includes('loading')) {
-                        console.log(`Attempt ${attempt + 1}: Model is still loading. Retrying in ${delayInterval / 1000} seconds...`);
-                        await delay(delayInterval); // Wait and retry
-                        attempt++;
-                    } else {
-                        console.error(`Error from Hugging Face API: ${errorDetails.error}`);
-                        throw new Error(`Error generating summary: ${errorDetails.error}`);
+                    // Update estimated time
+                    if (estimatedTimeDisplay) {
+                        const elapsedTime = Date.now() - startTime;
+                        const minutes = Math.floor(elapsedTime / 60000);
+                        const seconds = Math.floor((elapsedTime % 60000) / 1000);
+                        const formattedTime = `${minutes}m ${seconds}s`;
+                        estimatedTimeDisplay.innerText = `Time elapsed: ${formattedTime}`;
                     }
+
+                    break;
+                } else {
+                    throw new Error('Failed to parse summary and key points from response');
                 }
-            } catch (error) {
-                console.error(`Failed to generate summary: ${error.message}`);
-                if (attempt < maxRetries - 1) {
-                    console.log(`Retrying in ${delayInterval / 1000} seconds...`);
+            } else {
+                const errorDetails = await response.json();
+                if (errorDetails.error && errorDetails.error.includes('loading')) {
+                    console.log(`Attempt ${attempt + 1}: Model is still loading. Retrying in ${delayInterval / 1000} seconds...`);
                     await delay(delayInterval);
                     attempt++;
                 } else {
-                    throw error;
+                    throw new Error(`Error generating summary: ${errorDetails.error}`);
                 }
+            }
+        } catch (error) {
+            console.error(`Failed to generate summary: ${error.message}`);
+            if (attempt < maxRetries - 1) {
+                console.log(`Retrying in ${delayInterval / 1000} seconds...`);
+                await delay(delayInterval);
+                attempt++;
+            } else {
+                throw error;
             }
         }
     }
@@ -2748,10 +2764,10 @@ if (estimatedTimeDisplay) {
 
     // Combine summaries and limit overview to a maximum of 4 sentences
     const combinedOverview = summaries.join(' ');
-    const overviewSentences = combinedOverview.split('. ').slice(0, 4).join('. '); // Limit to 4 sentences
+    const overviewSentences = combinedOverview.split('. ').slice(0, 4).join('. ');
 
     return {
-        overview: overviewSentences, // Final overview limited to 4 sentences
+        overview: overviewSentences,
         keyPoints
     };
 }

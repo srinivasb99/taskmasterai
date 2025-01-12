@@ -4119,12 +4119,11 @@ async function fetchCollectionData(userId) {
             }));
         }
 
-        // Check if any data is found
-        const hasData = Object.values(allData).some(collection => collection.length > 0);
-
-        if (!hasData) {
-            renderPlaceholderMessage();
-            return null;
+        // Ensure all collections are represented, even if empty
+        for (const collectionName of collections) {
+            if (!allData[collectionName]) {
+                allData[collectionName] = [];
+            }
         }
 
         // Attach displayName for use in summary generation
@@ -4218,20 +4217,14 @@ async function generateAISummary(data) {
         };
     }
 
-    const formattedData = Object.entries(data)
-        .filter(([key, items]) => key !== 'displayName' && items.length > 0)
-        .map(([category, items]) => {
-            return `${category.toUpperCase()}:
-` + 
-                items.map(item => `- ${item.type}: ${item[item.type]} (Due: ${new Date(item.dueDate?.seconds * 1000).toLocaleDateString() || 'No date'})`).join('\n');
-        }).join('\n\n');
-
-    if (!formattedData.trim()) {
-        return {
-            title: "No Data",
-            content: "💬 TaskMaster needs more information! Add tasks, goals, projects, or plans to receive a tailored summary."
-        };
-    }
+    const formattedData = collections.map(collection => {
+        const items = data[collection];
+        if (items.length === 0) {
+            return `${collection.toUpperCase()}:\n- No ${collection.slice(0, -1)}s available.`;
+        }
+        return `${collection.toUpperCase()}:\n` + 
+            items.map(item => `- ${item.type}: ${item[item.type]} (Due: ${new Date(item.dueDate?.seconds * 1000).toLocaleDateString() || 'No date'})`).join('\n');
+    }).join('\n\n');
 
     try {
         const instructions = [
@@ -4289,6 +4282,7 @@ function renderSections(summaryData) {
         }, index * 300);
     });
 }
+
 
 
 

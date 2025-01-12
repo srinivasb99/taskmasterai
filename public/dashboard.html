@@ -4088,7 +4088,7 @@ function updateIcon(isHidden) {
 
 // Constants
 const huggingFaceApiKey = "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";
-const modelEndpoint = "https://api-inference.huggingface.co/models/meta-llama/Llama-3.2-11B-Vision-Instruct";
+const modelEndpoint = "https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct";
 const collections = ['tasks', 'goals', 'projects', 'plans'];
 
 // Fetch data from all collections and user info
@@ -4165,27 +4165,30 @@ function renderPlaceholderMessage() {
     console.log('✅ Placeholder message rendered');
 }
 
-// Generate section content with optimized prompt for 11B model
-async function generateSection(data, instructions, maxRetries = 3, delayInterval = 2000) {
+// Generate section content with optimized prompt for Llama model
+async function generateSection(data, instructions, maxRetries = 2, delayInterval = 1500) {
     console.log('🎯 Starting section generation with instructions:', instructions.split('\n')[0]);
     
-    const sectionPrompt = `[INST] As TaskMaster, analyze this data and create a section summary:
+    // Optimize the data format to reduce token count
+    const optimizedData = data.split('\n').filter(line => line.trim()).join('\n');
+    
+    const sectionPrompt = `[INST]As TaskMaster, generate a productivity summary section.
 
 DATA:
-${data}
+${optimizedData}
 
 INSTRUCTIONS:
 ${instructions}
 
-FORMAT:
+RESPONSE FORMAT:
 Title: [title]
 Content: [content]
 
 RULES:
-- Be concise and professional
-- Focus on actionable insights
-- Use emojis sparingly
-- Keep friendly tone [/INST]`;
+- Be concise and direct
+- Use specified emojis only
+- Focus on actionable items
+- Keep under 150 words[/INST]`;
 
     let attempt = 0;
 
@@ -4202,11 +4205,13 @@ RULES:
                 body: JSON.stringify({ 
                     inputs: sectionPrompt,
                     parameters: {
-                        max_new_tokens: 250,
-                        temperature: 0.3,
-                        top_p: 0.9,
-                        do_sample: true,
-                        return_full_text: false
+                        max_new_tokens: 200,
+                        temperature: 0.7,
+                        top_p: 0.95,
+                        top_k: 50,
+                        repetition_penalty: 1.1,
+                        return_full_text: false,
+                        do_sample: true
                     }
                 }),
             });
@@ -4217,7 +4222,7 @@ RULES:
 
             console.log('📥 Received response from model');
             const result = await response.json();
-            console.log('🔍 Raw response:', result);
+            console.log('🔍 Parsing response...');
 
             const titleMatch = result[0]?.generated_text.match(/Title:\s*(.*?)(?=\nContent:|$)/s);
             const contentMatch = result[0]?.generated_text.match(/Content:\s*([\s\S]*?)$/s);
@@ -4233,7 +4238,7 @@ RULES:
                 throw new Error('Empty title or content');
             }
 
-            console.log('✅ Successfully generated section:', { title, content });
+            console.log('✅ Successfully generated section:', { title });
             return { title, content };
 
         } catch (error) {
@@ -4263,8 +4268,8 @@ async function generateAISummary(data) {
     const formattedData = Object.entries(data)
         .filter(([key, items]) => key !== 'displayName' && items.length > 0)
         .map(([category, items]) => {
-            return `${category.toUpperCase()}:\n` + 
-                items.map(item => `- ${item.type}: ${item[item.type]} (Due: ${new Date(item.dueDate?.seconds * 1000).toLocaleDateString() || 'No date'})`).join('\n');
+            return `${category}:\n` + 
+                items.map(item => `${item.type}: ${item[item.type]} (${new Date(item.dueDate?.seconds * 1000).toLocaleDateString() || 'No date'})`).join('\n');
         }).join('\n\n');
 
     if (!formattedData.trim()) {
@@ -4276,35 +4281,24 @@ async function generateAISummary(data) {
     }
 
     try {
-        console.log('🔄 Generating sections sequentially for better stability...');
+        console.log('🔄 Generating sections sequentially for better performance...');
         
-        console.log('📋 Generating urgent items...');
-        const urgentItems = await generateSection(formattedData, `
-1. List urgent items due within 3 days (🚨) and within 14 days (⏰)
-2. Add one quick tip per item
-3. Skip categories without urgent items
-4. Max 150 words`);
+        // Generate sections one by one to reduce server load
+        const urgentItems = await generateSection(formattedData, 
+            `List urgent items with 🚨(3 days) or ⏰(14 days). Start with greeting to ${displayName}.`);
+        console.log('✅ Urgent items generated');
 
-        console.log('📊 Generating in-progress items...');
-        const inProgress = await generateSection(formattedData, `
-1. List ongoing items with 🎯goals, 📋tasks, 📊projects
-2. Add one next step per item
-3. Skip inactive categories
-4. Max 150 words`);
+        const inProgress = await generateSection(formattedData,
+            `List ongoing items with 🎯(goals), 📋(tasks), 📊(projects). Start with note to ${displayName}.`);
+        console.log('✅ In progress items generated');
 
-        console.log('📅 Generating upcoming items...');
-        const comingUp = await generateSection(formattedData, `
-1. List upcoming items with preparation tips
-2. Use dates only if critical
-3. Use relevant emojis
-4. Max 150 words`);
+        const comingUp = await generateSection(formattedData,
+            `List upcoming items with preparation tips. Use relevant emojis.`);
+        console.log('✅ Coming up items generated');
 
-        console.log('💡 Generating recommendations...');
-        const overviewAndRecommendations = await generateSection(formattedData, `
-1. Give 4 actionable recommendations
-2. Add 2 motivational sentences
-3. Focus on present data
-4. Max 150 words`);
+        const overviewAndRecommendations = await generateSection(formattedData,
+            `Give 4 recommendations and 2 motivational sentences for ${displayName}.`);
+        console.log('✅ Overview generated');
 
         console.log('✅ All sections generated successfully');
         return {

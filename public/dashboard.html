@@ -4166,13 +4166,22 @@ function renderPlaceholderMessage() {
 }
 
 // Generate section content with optimized prompt for Llama model
-async function generateSection(data, instructions, maxRetries = 2, delayInterval = 1500) {
-    console.log('🎯 Starting section generation with instructions:', instructions.split('\n')[0]);
+async function generateSection(data, instructions, sectionType, maxRetries = 2, delayInterval = 1500) {
+    console.log(`🎯 Starting generation for ${sectionType} section`);
     
-    // Optimize the data format to reduce token count
     const optimizedData = data.split('\n').filter(line => line.trim()).join('\n');
     
-    const sectionPrompt = `[INST]As TaskMaster, generate a productivity summary section.
+    // Define unique title prefixes for each section type
+    const titlePrefixes = {
+        urgent: ["Priority Alert", "Time-Sensitive Tasks", "Urgent Action Items", "Critical Updates"],
+        inProgress: ["Current Focus Areas", "Active Initiatives", "Ongoing Progress", "Work in Motion"],
+        comingUp: ["Future Roadmap", "Upcoming Milestones", "Planning Ahead", "On the Horizon"],
+        overview: ["Strategic Insights", "Performance Overview", "Success Blueprint", "Growth Path"]
+    };
+    
+    const prefix = titlePrefixes[sectionType][Math.floor(Math.random() * titlePrefixes[sectionType].length)];
+    
+    const sectionPrompt = `[INST]As TaskMaster, create a detailed ${sectionType} summary section.
 
 DATA:
 ${optimizedData}
@@ -4181,13 +4190,14 @@ INSTRUCTIONS:
 ${instructions}
 
 RESPONSE FORMAT:
-Title: [title]
-Content: [content]
+Title: ${prefix}: [Complete the title]
+Content: [Detailed content]
 
-RULES:
-- Be concise and direct
-- Use specified emojis only
-- Focus on actionable items
+REQUIREMENTS:
+- Create detailed, personalized content
+- Use specified emojis thoughtfully
+- Focus on actionable insights
+- Maintain professional tone
 - Keep under 150 words[/INST]`;
 
     let attempt = 0;
@@ -4224,8 +4234,11 @@ RULES:
             const result = await response.json();
             console.log('🔍 Parsing response...');
 
-            const titleMatch = result[0]?.generated_text.match(/Title:\s*(.*?)(?=\nContent:|$)/s);
-            const contentMatch = result[0]?.generated_text.match(/Content:\s*([\s\S]*?)$/s);
+            // Clean up the response by removing [/INST] and other artifacts
+            let cleanedResponse = result[0]?.generated_text.replace(/\[\/INST\]/g, '').trim();
+            
+            const titleMatch = cleanedResponse.match(/Title:\s*(.*?)(?=\nContent:|$)/s);
+            const contentMatch = cleanedResponse.match(/Content:\s*([\s\S]*?)$/s);
 
             if (!titleMatch || !contentMatch) {
                 throw new Error('Failed to parse response format');
@@ -4283,21 +4296,48 @@ async function generateAISummary(data) {
     try {
         console.log('🔄 Generating sections sequentially for better performance...');
         
-        // Generate sections one by one to reduce server load
         const urgentItems = await generateSection(formattedData, 
-            `List urgent items with 🚨(3 days) or ⏰(14 days). Start with greeting to ${displayName}.`);
+            `Create a detailed urgent items summary for ${displayName}:
+            - Start with a personalized greeting
+            - Mark items due within 3 days with 🚨
+            - Mark items due within 14 days with ⏰
+            - Prioritize items by urgency
+            - Add specific action steps for each item
+            - Include time management tips`, 
+            'urgent');
         console.log('✅ Urgent items generated');
 
         const inProgress = await generateSection(formattedData,
-            `List ongoing items with 🎯(goals), 📋(tasks), 📊(projects). Start with note to ${displayName}.`);
+            `Create a comprehensive progress update for ${displayName}:
+            - Begin with an encouraging progress note
+            - Use 🎯 for goals with completion estimates
+            - Use 📋 for tasks with status updates
+            - Use 📊 for projects with milestone tracking
+            - Include specific next actions for each item
+            - Add efficiency tips where relevant`,
+            'inProgress');
         console.log('✅ In progress items generated');
 
         const comingUp = await generateSection(formattedData,
-            `List upcoming items with preparation tips. Use relevant emojis.`);
+            `Create a detailed upcoming items preview for ${displayName}:
+            - Focus on preparation and planning
+            - Include one strategic tip per item
+            - Suggest resource allocation
+            - Highlight dependencies between items
+            - Add timeline recommendations
+            - Use relevant emojis for categorization`,
+            'comingUp');
         console.log('✅ Coming up items generated');
 
         const overviewAndRecommendations = await generateSection(formattedData,
-            `Give 4 recommendations and 2 motivational sentences for ${displayName}.`);
+            `Create a personalized strategy overview for ${displayName}:
+            - Provide 4 data-driven recommendations
+            - Include specific action steps for each recommendation
+            - Add implementation timeline suggestions
+            - Consider resource constraints
+            - End with two motivational sentences specific to ${displayName}'s goals
+            - Focus on achievable improvements`,
+            'overview');
         console.log('✅ Overview generated');
 
         console.log('✅ All sections generated successfully');
@@ -4316,7 +4356,6 @@ async function generateAISummary(data) {
         };
     }
 }
-
 // Function to render the sections with left-to-right fade-in animation and proper spacing
 function renderSections(summaryData) {
     const aiSummarySection = document.getElementById('ai-summary-section');

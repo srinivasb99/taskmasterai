@@ -4119,11 +4119,12 @@ async function fetchCollectionData(userId) {
             }));
         }
 
-        // Ensure all collections are represented, even if empty
-        for (const collectionName of collections) {
-            if (!allData[collectionName]) {
-                allData[collectionName] = [];
-            }
+        // Check if any data is found
+        const hasData = Object.values(allData).some(collection => collection.length > 0);
+
+        if (!hasData) {
+            renderPlaceholderMessage();
+            return null;
         }
 
         // Attach displayName for use in summary generation
@@ -4135,6 +4136,8 @@ async function fetchCollectionData(userId) {
         return null;
     }
 }
+
+
 
 // Function to render placeholder message
 function renderPlaceholderMessage() {
@@ -4155,96 +4158,148 @@ function renderPlaceholderMessage() {
     summaryContainer.appendChild(placeholderSection);
 }
 
-// AI API call helper
-async function callAIModel(prompt) {
+// First AI call to generate section content
+async function generateSection(data, instructions) {
+    const sectionPrompt = `Hello ${data.displayName}! I am TaskMaster, a friendly productivity-focused AI assistant. 
+I will Generate ONLY the section content and title, keeping responses concise, clear, and professional.
+
+USER DATA:
+${data}
+
+INSTRUCTIONS FOR THIS SECTION:
+${instructions}
+
+I WILL FORMAT MY RESPONSE EXACTLY LIKE THIS:
+Title: [Section title]
+Content: [Complete response here]`;
+
     const response = await fetch(modelEndpoint, {
         method: 'POST',
         headers: {
             'Authorization': `Bearer ${huggingFaceApiKey}`,
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ inputs: prompt }),
+        body: JSON.stringify({ inputs: sectionPrompt }),
     });
 
     if (!response.ok) {
-        throw new Error('AI model call failed');
+        throw new Error(`Failed to generate section`);
     }
 
-    return response.json();
+    const result = await response.json();
+    const titleMatch = result[0]?.generated_text.match(/Title:\s*(.*)/);
+    const contentMatch = result[0]?.generated_text.match(/Content:\s*([\s\S]*)/);
+
+    const title = titleMatch ? titleMatch[1].trim() : "Loading...";
+    const content = contentMatch ? contentMatch[1].trim() : "💬 TaskMaster requires additional information. Continue adding tasks, goals, projects, or plans for a clearer summary.";
+
+    return { title, content };
 }
 
-// Generate section content
-async function generateSection(data, instructions) {
-    const sectionPrompt = `Hello ${data.displayName}! I am TaskMaster, a friendly productivity-focused AI assistant. 
-I will generate ONLY the section content and title, keeping responses concise, clear, and professional.
+// Second AI call to review and verify the content
+async function reviewSection(title, content) {
+    const reviewPrompt = `Please review the following section for any errors, inconsistencies, or improvements. 
+Ensure that the section is clear, concise, and free from mistakes. Provide the corrected title and content. In your final response do not include explanations or questions. 
 
-USER DATA:
-${JSON.stringify(data, null, 2)}
+Title: ${title}
+Content: ${content}
 
-INSTRUCTIONS FOR THIS SECTION:
-${instructions}
+Format the response exactly like this (REMEMBER DO NOT INCLUDE EXPLANATIONS OR QUESTIONS):
+Title: [Corrected title]
+Content: [Final, corrected content]`;
 
-FORMAT RESPONSE EXACTLY AS:
-Title: [Section title]
-Content: [Complete response here]`;
+    const response = await fetch(modelEndpoint, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${huggingFaceApiKey}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ inputs: reviewPrompt }),
+    });
 
-    try {
-        const result = await callAIModel(sectionPrompt);
-
-        const titleMatch = result[0]?.generated_text.match(/Title:\s*(.*)/);
-        const contentMatch = result[0]?.generated_text.match(/Content:\s*([\s\S]*)/);
-
-        const title = titleMatch ? titleMatch[1].trim() : "Loading...";
-        const content = contentMatch ? contentMatch[1].trim() : "💬 TaskMaster requires additional information. Continue adding tasks, goals, projects, or plans for a clearer summary.";
-
-        return { title, content };
-
-    } catch (error) {
-        console.error('Error generating section:', error);
-        return {
-            title: "Error",
-            content: "Failed to generate section. Please try again later."
-        };
+    if (!response.ok) {
+        throw new Error(`Failed to review section`);
     }
+
+    const result = await response.json();
+    const titleMatch = result[0]?.generated_text.match(/Title:\s*(.*)/);
+    const contentMatch = result[0]?.generated_text.match(/Content:\s*([\s\S]*)/);
+
+    const finalTitle = titleMatch ? titleMatch[1].trim() : title;
+    const finalContent = contentMatch ? contentMatch[1].trim() : content;
+
+    return { title: finalTitle, content: finalContent };
 }
 
 // Main function that generates the AI summary sequentially
 async function generateAISummary(data) {
-    if (!data || !data.displayName) {
+    const displayName = data.displayName || "User"; // Fallback if displayName is not set
+    const formattedData = Object.entries(data)
+        .filter(([key, items]) => key !== 'displayName' && items.length > 0) // Only include non-empty collections
+        .map(([category, items]) => {
+            return `${category.toUpperCase()}:\n` + 
+                items.map(item => `- ${item.type}: ${item[item.type]} (Due: ${new Date(item.dueDate?.seconds * 1000).toLocaleDateString() || 'No date'})`).join('\n');
+        }).join('\n\n');
+
+    if (!formattedData.trim()) {
         return {
             title: "No Data",
             content: "💬 TaskMaster needs more information! Add tasks, goals, projects, or plans to receive a tailored summary."
         };
     }
 
-    const formattedData = collections.map(collection => {
-        const items = data[collection];
-        if (items.length === 0) {
-            return `${collection.toUpperCase()}:\n- No ${collection.slice(0, -1)}s available.`;
-        }
-        return `${collection.toUpperCase()}:\n` + 
-            items.map(item => `- ${item.type}: ${item[item.type]} (Due: ${new Date(item.dueDate?.seconds * 1000).toLocaleDateString() || 'No date'})`).join('\n');
-    }).join('\n\n');
-
     try {
-        const instructions = [
-            `1. Begin with a friendly and motivational greeting.
-             2. Use 🚨 for items due within 3 days, and ⏰ for items due within 14 days.
-             3. Provide a clear, actionable tip for each item.
-             4. Keep responses concise.`,
-            `1. Use 🎯 for goals, 📋 for tasks, 📊 for projects.
-             2. Include practical next steps for each.
-             3. Provide concise, actionable advice.`
-        ];
+        // Generate sections sequentially with verification
+        let section = await generateSection(formattedData, `
+1. Begin with a friendly and motivational greeting to ${displayName}.
+2. Use 🚨 for items due within 3 days, and ⏰ for items due within 14 days.
+3. Provide a clear, actionable tip for each item.
+4. Exclude any categories without urgent items.
+5. Keep under 150 words; exclude "Urgent Items" or explanations.
+        `);
+        section = await reviewSection(section.title, section.content);
 
-        const results = [];
+        const urgentItems = section;
 
-        for (const instruction of instructions) {
-            const section = await generateSection({ displayName: data.displayName, ...data }, instruction);
-            results.push(section);
-        }
+        section = await generateSection(formattedData, `
+1. Start with an encouraging note for ${displayName}.
+2. Use 🎯 for goals, 📋 for tasks, 📊 for projects, followed by a period.
+3. Include practical next steps for each.
+4. Exclude any categories that don’t have ongoing data.
+5. Keep under 150 words; avoid "In Progress."
+        `);
+        section = await reviewSection(section.title, section.content);
 
-        return results;
+        const inProgress = section;
+
+        section = await generateSection(formattedData, `
+1. Provide one preparation tip per upcoming item.
+2. Avoid dates unless critical.
+3. Use emojis meaningfully, not excessively.
+4. Exclude categories without upcoming data.
+5. Keep concise; omit "Coming Up."
+        `);
+        section = await reviewSection(section.title, section.content);
+
+        const comingUp = section;
+
+        section = await generateSection(formattedData, `
+1. Provide four actionable, personalized recommendations for ${displayName}.
+2. End with two motivational sentences tailored to ${displayName}.
+3. Only include categories present in user data.
+4. Keep concise, under 150 words; omit "Overview."
+        `);
+        section = await reviewSection(section.title, section.content);
+
+        const overviewAndRecommendations = section;
+
+        // Return the final reviewed sections
+        return {
+            urgentItems,
+            inProgress,
+            comingUp,
+            overviewAndRecommendations
+        };
 
     } catch (error) {
         console.error('Error generating AI summary:', error);
@@ -4255,7 +4310,7 @@ async function generateAISummary(data) {
     }
 }
 
-// Function to render the sections with animation
+// Function to render the sections with left-to-right fade-in animation and proper spacing
 function renderSections(summaryData) {
     const aiSummarySection = document.getElementById('ai-summary-section');
     const summaryContainer = aiSummarySection.querySelector('.ai-assistant-card');
@@ -4264,25 +4319,27 @@ function renderSections(summaryData) {
     // Remove existing sections
     existingSections.forEach(section => section.remove());
 
-    // Render new sections
-    summaryData.forEach(({ title, content }, index) => {
+    // Render new sections with animation
+    Object.values(summaryData).forEach(({ title, content }, index) => {
         const sectionElement = document.createElement('div');
-        sectionElement.className = 'summary-section hidden';
+        sectionElement.className = 'summary-section hidden'; // Add "hidden" class initially
+
+        const sanitizedTitle = sanitizeTitle(title);
+        const sanitizedContent = sanitizeContent(content);
 
         sectionElement.innerHTML = `
-            <h3 class="section-title">${sanitizeTitle(title)}</h3>
-            <div class="section-content">${sanitizeContent(content)}</div>
+            <h3 class="section-title">${sanitizedTitle}</h3>
+            <div class="section-content">${sanitizedContent}</div>
         `;
 
         summaryContainer.appendChild(sectionElement);
 
-        // Apply fade-in animation
+        // Apply animation with a delay for each section
         setTimeout(() => {
-            sectionElement.classList.remove('hidden');
-        }, index * 300);
+            sectionElement.classList.remove('hidden'); // Trigger fade-in animation
+        }, index * 300); // Adjust delay as needed (e.g., 300ms between sections)
     });
 }
-
 
 
 

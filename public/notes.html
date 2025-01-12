@@ -2651,9 +2651,9 @@ function splitTextIntoChunks(text, maxLength = 2000) {
     return chunks;
 }
 
-async function generateSummary(text, maxRetries = 5, delayInterval = 5000) {
+async function generateSummary(text, maxRetries = 3, delayInterval = 3000) {
     console.log('Generating summary and key points...');
-    const chunks = splitTextIntoChunks(text);
+    const chunks = splitTextIntoChunks(text, 4000); // Increased chunk size for better context
     const summaries = [];
     const keyPoints = [];
     const totalChunks = chunks.length;
@@ -2668,92 +2668,28 @@ async function generateSummary(text, maxRetries = 5, delayInterval = 5000) {
 
     await simulateRealTimeUploadProgress();
 
-    for (let i = 0; i < totalChunks; i++) {
-        let chunk = chunks[i];
-        let attempt = 0;
+    // Process chunks in parallel with a limit of 2 concurrent requests
+    const batchSize = 2;
+    for (let i = 0; i < totalChunks; i += batchSize) {
+        const batch = chunks.slice(i, i + batchSize);
+        const batchPromises = batch.map((chunk, batchIndex) => 
+            processChunk(chunk, i + batchIndex, totalChunks, startTime, {
+                estimatedTimeDisplay,
+                progressBar,
+                percentageDisplay
+            }, maxRetries, delayInterval)
+        );
 
-        const prompt = `
-Analyze the following text and provide a concise summary (maximum 4 sentences) and exactly 5 key points.
-Your response MUST follow this EXACT format:
-
-Summary:
-[Provide a clear summary in 4 sentences or less]
-
-Key Points:
-- [Key point 1]
-- [Key point 2]
-- [Key point 3]
-- [Key point 4]
-- [Key point 5]
-
-Text to analyze: "${chunk}"`;
-
-        while (attempt < maxRetries) {
-            try {
-                console.log('Sending chunk to Hugging Face API...');
-                const response = await fetch(modelEndpoint, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${huggingFaceApiKey}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ inputs: prompt })
-                });
-
-                if (response.ok) {
-                    const result = await response.json();
-                    const generatedText = result[0]?.generated_text || "";
-                    console.log('Raw response:', generatedText);
-
-                    // Extract summary and key points
-                    const parsedResponse = parseGeneratedText(generatedText);
-                    console.log('Parsed response:', parsedResponse);
-
-                    if (parsedResponse.summary && parsedResponse.points.length > 0) {
-                        summaries.push(parsedResponse.summary);
-                        keyPoints.push(...parsedResponse.points);
-
-                        // Update progress
-                        const currentProgress = ((i + 1) / totalChunks) * 100;
-                        progressBar.value = currentProgress;
-                        percentageDisplay.innerText = `${Math.floor(currentProgress)}%`;
-
-                        // Update estimated time
-                        const elapsedTime = Date.now() - startTime;
-                        const estimatedTotalTime = (elapsedTime / (i + 1)) * totalChunks;
-                        const remainingTime = estimatedTotalTime - elapsedTime;
-
-                        if (estimatedTimeDisplay) {
-                            const minutes = Math.floor(remainingTime / 60000);
-                            const seconds = Math.floor((remainingTime % 60000) / 1000);
-                            const formattedRemainingTime = `${minutes}m ${seconds}s`;
-                            estimatedTimeDisplay.innerText = `Estimated time remaining: ${formattedRemainingTime}`;
-                        }
-
-                        break;
-                    } else {
-                        throw new Error('Failed to extract valid summary and key points');
-                    }
-                } else {
-                    const errorDetails = await response.json();
-                    if (errorDetails.error && errorDetails.error.includes('loading')) {
-                        console.log(`Attempt ${attempt + 1}: Model is still loading. Retrying in ${delayInterval / 1000} seconds...`);
-                        await delay(delayInterval);
-                        attempt++;
-                    } else {
-                        throw new Error(`Error generating summary: ${errorDetails.error}`);
-                    }
+        try {
+            const batchResults = await Promise.all(batchPromises);
+            batchResults.forEach(result => {
+                if (result) {
+                    summaries.push(result.summary);
+                    keyPoints.push(...result.points);
                 }
-            } catch (error) {
-                console.error(`Failed to generate summary for chunk: ${error.message}`);
-                if (attempt < maxRetries - 1) {
-                    console.log(`Retrying in ${delayInterval / 1000} seconds...`);
-                    await delay(delayInterval);
-                    attempt++;
-                } else {
-                    throw error;
-                }
-            }
+            });
+        } catch (error) {
+            console.error('Batch processing error:', error);
         }
     }
 
@@ -2773,20 +2709,103 @@ Text to analyze: "${chunk}"`;
     };
 }
 
-// Helper function to parse the generated text
+async function processChunk(chunk, index, totalChunks, startTime, elements, maxRetries, delayInterval) {
+    const prompt = `You are NoteGPT, an advanced AI system specialized in generating high-quality study notes and summaries. Your task is to analyze the provided text and create a concise, informative summary along with key learning points.
+
+Task Requirements:
+1. Create a clear, coherent summary in 2-4 sentences that captures the main ideas
+2. Extract exactly 5 key points that represent the most important concepts
+3. Ensure all content is accurate and directly related to the source text
+4. Use academic language while maintaining clarity
+
+Format your response EXACTLY as follows:
+
+Summary:
+[Your 2-4 sentence summary]
+
+Key Points:
+- [Concise, specific key point 1]
+- [Concise, specific key point 2]
+- [Concise, specific key point 3]
+- [Concise, specific key point 4]
+- [Concise, specific key point 5]
+
+Text to analyze: "${chunk}"`;
+
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+            console.log(`Processing chunk ${index + 1}/${totalChunks}`);
+            const response = await fetch("https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct", {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${huggingFaceApiKey}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ 
+                    inputs: prompt,
+                    parameters: {
+                        max_new_tokens: 1000,
+                        temperature: 0.3, // Lower temperature for more consistent outputs
+                        top_p: 0.9,
+                        repetition_penalty: 1.2
+                    }
+                })
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                const generatedText = result[0]?.generated_text || "";
+                const parsedResponse = parseGeneratedText(generatedText);
+
+                if (parsedResponse.summary && parsedResponse.points.length > 0) {
+                    updateProgress(index + 1, totalChunks, startTime, elements);
+                    return parsedResponse;
+                }
+            }
+
+            if (attempt < maxRetries - 1) {
+                await delay(delayInterval);
+            }
+        } catch (error) {
+            console.error(`Attempt ${attempt + 1} failed:`, error);
+            if (attempt < maxRetries - 1) {
+                await delay(delayInterval);
+            }
+        }
+    }
+    return null;
+}
+
+function updateProgress(current, total, startTime, elements) {
+    const { estimatedTimeDisplay, progressBar, percentageDisplay } = elements;
+    const currentProgress = (current / total) * 100;
+    
+    if (progressBar) progressBar.value = currentProgress;
+    if (percentageDisplay) percentageDisplay.innerText = `${Math.floor(currentProgress)}%`;
+    
+    const elapsedTime = Date.now() - startTime;
+    const estimatedTotalTime = (elapsedTime / current) * total;
+    const remainingTime = estimatedTotalTime - elapsedTime;
+    
+    if (estimatedTimeDisplay) {
+        const minutes = Math.floor(remainingTime / 60000);
+        const seconds = Math.floor((remainingTime % 60000) / 1000);
+        estimatedTimeDisplay.innerText = `Estimated time remaining: ${minutes}m ${seconds}s`;
+    }
+}
+
+// Helper function to parse the generated text (unchanged)
 function parseGeneratedText(text) {
     let summary = "";
     let points = [];
 
     try {
-        // Extract summary
         if (text.includes('Summary:') && text.includes('Key Points:')) {
             summary = text
                 .split('Summary:')[1]
                 .split('Key Points:')[0]
                 .trim();
 
-            // Ensure summary is no more than 4 sentences and properly formatted
             summary = summary
                 .split(/[.!?]+/)
                 .filter(sentence => sentence.trim().length > 0)
@@ -2794,17 +2813,15 @@ function parseGeneratedText(text) {
                 .join('. ') + '.';
         }
 
-        // Extract key points
         if (text.includes('Key Points:')) {
             const keyPointsSection = text.split('Key Points:')[1].trim();
             points = keyPointsSection
                 .split('\n')
                 .filter(line => line.trim().startsWith('-'))
-                .map(point => point.replace(/^-\s*/, '').trim()) // Remove dash and any leading whitespace
+                .map(point => point.replace(/^-\s*/, '').trim())
                 .filter(point => point.length > 0);
         }
 
-        // Validate the extracted content
         if (!summary || points.length === 0) {
             throw new Error('Invalid response format');
         }
@@ -2815,7 +2832,6 @@ function parseGeneratedText(text) {
         return { summary: "", points: [] };
     }
 }
-
 
 
 

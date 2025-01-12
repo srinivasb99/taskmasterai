@@ -2673,18 +2673,26 @@ async function generateSummary(text, maxRetries = 5, delayInterval = 5000) {
         let attempt = 0;
 
         const prompt = `
-Please analyze this text and provide a summary and key points. Format your response exactly as shown:
+Analyze the following text and provide a concise summary (maximum 4 sentences) and exactly 5 key points.
+Your response MUST follow this EXACT format:
 
 Summary:
-[Write a clear, concise summary of the main ideas in 4-5 sentences]
+[Provide a clear summary in 4 sentences or less]
 
 Key Points:
-- [First key point]
-- [Second key point]
-- [Third key point]
-[Add more key points if needed]
+- [Key point 1]
+- [Key point 2]
+- [Key point 3]
+- [Key point 4]
+- [Key point 5]
 
-Text to analyze: "${chunk}"`;
+Text to analyze: "${chunk}"
+
+Remember:
+1. Summary must be 4 sentences or less
+2. Exactly 5 key points are required
+3. Each key point must start with a dash (-)
+4. Keep the format exactly as shown above`;
 
         while (attempt < maxRetries) {
             try {
@@ -2701,39 +2709,37 @@ Text to analyze: "${chunk}"`;
                 if (response.ok) {
                     const result = await response.json();
                     const generatedText = result[0]?.generated_text || "";
-                    console.log('Raw response:', generatedText); // Debug log
+                    console.log('Raw response:', generatedText);
 
-                    // More flexible parsing
+                    // Extract summary
                     let summary = "";
-                    let points = [];
-
-                    // Try to extract summary
-                    if (generatedText.includes('Summary:')) {
-                        const summaryText = generatedText.split('Summary:')[1].split('Key Points:')[0];
-                        summary = summaryText.trim();
-                    } else {
-                        // If no summary section, treat first paragraph as summary
-                        summary = generatedText.split('\n')[0].trim();
+                    if (generatedText.includes('Summary:') && generatedText.includes('Key Points:')) {
+                        summary = generatedText
+                            .split('Summary:')[1]
+                            .split('Key Points:')[0]
+                            .trim();
                     }
 
-                    // Try to extract key points
+                    // Ensure summary is no more than 4 sentences
+                    summary = summary
+                        .split(/[.!?]+/)
+                        .filter(sentence => sentence.trim().length > 0)
+                        .slice(0, 4)
+                        .join('. ') + '.';
+
+                    // Extract key points
+                    let points = [];
                     if (generatedText.includes('Key Points:')) {
-                        const keyPointsSection = generatedText.split('Key Points:')[1];
+                        const keyPointsSection = generatedText.split('Key Points:')[1].trim();
                         points = keyPointsSection
                             .split('\n')
                             .filter(line => line.trim().startsWith('-'))
                             .map(point => point.replace('-', '').trim())
                             .filter(point => point.length > 0);
-                    } else {
-                        // If no key points section, try to extract bullet points from anywhere
-                        points = generatedText
-                            .split('\n')
-                            .filter(line => line.trim().startsWith('-'))
-                            .map(point => point.replace('-', '').trim())
-                            .filter(point => point.length > 0);
                     }
 
-                    if (summary && points.length > 0) {
+                    // Ensure we have both summary and at least 3 key points
+                    if (summary && summary.length > 0 && points.length >= 3) {
                         summaries.push(summary);
                         keyPoints.push(...points);
 
@@ -2756,7 +2762,7 @@ Text to analyze: "${chunk}"`;
 
                         break;
                     } else {
-                        console.error('Parsed response:', { summary, points }); // Debug log
+                        console.error('Parsed response:', { summary, points });
                         throw new Error('Failed to extract valid summary and key points');
                     }
                 } else {
@@ -2784,13 +2790,17 @@ Text to analyze: "${chunk}"`;
 
     console.log('Summary generation complete.');
 
-    // Combine summaries and limit overview to a maximum of 4 sentences
+    // Combine summaries and ensure maximum 4 sentences
     const combinedOverview = summaries.join(' ');
-    const overviewSentences = combinedOverview.split('. ').slice(0, 4).join('. ');
+    const overviewSentences = combinedOverview
+        .split(/[.!?]+/)
+        .filter(sentence => sentence.trim().length > 0)
+        .slice(0, 4)
+        .join('. ') + '.';
 
     return {
         overview: overviewSentences,
-        keyPoints
+        keyPoints: [...new Set(keyPoints)] // Remove any duplicate key points
     };
 }
 

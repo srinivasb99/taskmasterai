@@ -2684,6 +2684,8 @@ async function generateSummary(text, maxRetries = 3, delayInterval = 3000) {
             const batchResults = await Promise.all(batchPromises);
             batchResults.forEach(result => {
                 if (result) {
+                    console.log('Chunk Summary:', result.summary);
+                    console.log('Chunk Key Points:', result.points);
                     summaries.push(result.summary);
                     keyPoints.push(...result.points);
                 }
@@ -2702,6 +2704,10 @@ async function generateSummary(text, maxRetries = 3, delayInterval = 3000) {
         .filter(sentence => sentence.trim().length > 0)
         .slice(0, 4)
         .join('. ') + '.';
+
+    // Log final results
+    console.log('Final Combined Summary:', overviewSentences);
+    console.log('Final Key Points:', [...new Set(keyPoints)]);
 
     return {
         overview: overviewSentences,

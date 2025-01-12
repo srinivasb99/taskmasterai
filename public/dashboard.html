@@ -4165,28 +4165,53 @@ function renderPlaceholderMessage() {
     console.log('✅ Placeholder message rendered');
 }
 
-// Optimized section generation for Smart Overview
+// Enhanced section generation for Smart Overview
 async function generateSection(data, instructions, sectionType) {
     console.log(`🎯 Generating ${sectionType} section`);
     
-    // Optimize data format for faster processing
+    // Enhanced data formatting for better context
     const optimizedData = data.split('\n')
         .filter(line => line.trim())
-        .map(line => line.replace(/\(Due: No date\)/, ''))
+        .map(line => {
+            // Extract and format dates for better context
+            const dateMatch = line.match(/\((.*?)\)/);
+            if (dateMatch) {
+                const date = dateMatch[1];
+                if (date === 'no due date') {
+                    return line.replace(/\(.*?\)/, '(📌 No due date)');
+                }
+                return line.replace(/\(.*?\)/, `(Due: ${date === 'ongoing' ? '🔄 Ongoing' : `📅 ${date}`})`);
+            }
+            return line;
+        })
         .join('\n');
     
-    const basePrompt = `You are TaskMaster, an AI productivity assistant specializing in creating Smart Overviews. Your purpose is to quickly analyze and summarize user productivity data into actionable insights.
+    const basePrompt = `You are TaskMaster, an advanced AI productivity assistant specializing in Smart Overviews. Your core purpose is to analyze productivity data and generate actionable, personalized insights.
+
+CONTEXT:
+This data represents a user's productivity items. Important notes:
+- Items may include: tasks, goals, projects, and/or plans
+- Some items may have due dates, others may not
+- Only analyze and mention categories that are present in the data
+- For items without due dates, focus on their content and priority
 
 DATA:
 ${optimizedData}
 
 SECTION TYPE: ${sectionType}
 
+ANALYSIS REQUIREMENTS:
+1. Only mention categories that exist in the data
+2. Adapt analysis based on whether items have due dates
+3. Identify patterns and dependencies between existing items
+4. Focus on actionable insights for the available data
+5. Maintain a motivational tone
+
 ${instructions}
 
 Format response exactly as:
-Title: [Section Title]
-Content: [Section Content]`;
+Title: [Create a unique, context-appropriate title]
+Content: [Provide detailed, actionable content following the instructions]`;
 
     try {
         console.log('📤 Requesting model response...');
@@ -4199,11 +4224,12 @@ Content: [Section Content]`;
             body: JSON.stringify({ 
                 inputs: basePrompt,
                 parameters: {
-                    max_new_tokens: 150,
-                    temperature: 0.5,
-                    top_p: 0.85,
+                    max_new_tokens: 300,
+                    temperature: 0.7,
+                    top_p: 0.9,
                     repetition_penalty: 1.2,
-                    return_full_text: false
+                    return_full_text: false,
+                    do_sample: true
                 }
             }),
         });
@@ -4211,6 +4237,8 @@ Content: [Section Content]`;
         if (!response.ok) throw new Error('API request failed');
 
         const result = await response.json();
+        console.log('📥 Received model response');
+        
         const cleanedResponse = result[0]?.generated_text
             .replace(/\[\/INST\]|\[INST\]|<\/?s>|<\/?p>/g, '')
             .trim();
@@ -4223,11 +4251,11 @@ Content: [Section Content]`;
         const title = titleMatch[1].trim();
         const content = contentMatch[1].trim();
 
-        console.log('✅ Section generated successfully');
+        console.log(`✅ ${sectionType} section generated successfully`);
         return { title, content };
 
     } catch (error) {
-        console.error('❌ Section generation failed:', error);
+        console.error(`❌ ${sectionType} section generation failed:`, error);
         return {
             title: `${sectionType.charAt(0).toUpperCase() + sectionType.slice(1)} Overview`,
             content: "Unable to generate section. Please try again."
@@ -4235,17 +4263,35 @@ Content: [Section Content]`;
     }
 }
 
-// Optimized main summary generation
+// Enhanced main summary generation with better data handling
 async function generateAISummary(data) {
     console.log('🚀 Initiating Smart Overview generation');
     const displayName = data.displayName || "User";
 
-    // Optimize data formatting
+    // Get available categories
+    const availableCategories = Object.entries(data)
+        .filter(([key, items]) => key !== 'displayName' && Array.isArray(items) && items.length > 0)
+        .map(([key]) => key);
+
+    console.log('📊 Available categories:', availableCategories);
+
+    // Enhanced data formatting with better context
     const formattedData = Object.entries(data)
-        .filter(([key, items]) => key !== 'displayName' && items?.length > 0)
+        .filter(([key, items]) => key !== 'displayName' && Array.isArray(items) && items.length > 0)
         .map(([category, items]) => {
-            return `${category.toUpperCase()}:\n${items
-                .map(item => `• ${item[item.type]} (${new Date(item.dueDate?.seconds * 1000).toLocaleDateString() || 'ongoing'})`)
+            const categoryEmoji = {
+                tasks: '📋',
+                goals: '🎯',
+                projects: '📊',
+                plans: '📅'
+            }[category.toLowerCase()] || '•';
+            
+            return `${categoryEmoji} ${category.toUpperCase()}:\n${items
+                .map(item => {
+                    const date = item.dueDate ? new Date(item.dueDate.seconds * 1000) : null;
+                    const dueText = date ? date.toLocaleDateString() : 'no due date';
+                    return `  • ${item[item.type]} (${dueText})`;
+                })
                 .join('\n')}`;
         }).join('\n\n');
 
@@ -4257,47 +4303,50 @@ async function generateAISummary(data) {
     }
 
     try {
-        // Streamlined section generation with focused instructions
+        // Adapt section generation based on available data
         const sections = {
             urgent: await generateSection(formattedData, 
-                `Create a focused urgent items summary:
-                • Highlight items due within 3 days (🚨)
-                • Mark items due within 14 days (⏰)
-                • List only time-sensitive items
-                • Add brief action steps
-                Keep response under 100 words.`, 
+                `Create a detailed urgent items analysis:
+                • Only analyze items with due dates
+                • Prioritize items due within 3 days (🚨)
+                • Highlight items due within 14 days (⏰)
+                • For items without due dates, focus on their importance
+                Maximum 200 words.`, 
                 'urgent'
             ),
 
             inProgress: await generateSection(formattedData,
-                `Create a concise progress summary:
-                • Use 🎯 for goals, 📋 for tasks, 📊 for projects
-                • Focus on active items only
-                • Include next immediate step for each
-                Keep response under 100 words.`,
+                `Create a comprehensive progress analysis:
+                • Focus on currently active items
+                • Include both dated and non-dated items
+                • Provide specific next steps for each major item
+                • Suggest ways to track progress for items without dates
+                Maximum 200 words.`,
                 'progress'
             ),
 
             comingUp: await generateSection(formattedData,
-                `Create a brief upcoming items preview:
-                • List only items starting within 30 days
-                • One preparation tip per item
-                • Focus on critical dependencies
-                Keep response under 100 words.`,
+                `Create a strategic upcoming items analysis:
+                • Focus on items with future due dates
+                • Include preparation steps for non-dated items
+                • Suggest prioritization strategies
+                • Provide planning tips for all item types
+                Maximum 200 words.`,
                 'upcoming'
             ),
 
             overview: await generateSection(formattedData,
-                `Create a strategic overview:
-                • 3 key recommendations based on current data
-                • 1 immediate action step per recommendation
-                • End with one motivational sentence for ${displayName}
-                Keep response under 100 words.`,
+                `Create a personalized strategic overview for ${displayName}:
+                • Only analyze existing categories: ${availableCategories.join(', ')}
+                • Provide 3-4 data-driven recommendations
+                • Include specific action steps for each recommendation
+                • Add a personalized motivation message
+                Maximum 200 words.`,
                 'overview'
             )
         };
 
-        console.log('✅ Smart Overview generated successfully');
+        console.log('✅ Enhanced Smart Overview generated successfully');
         return sections;
 
     } catch (error) {
@@ -4308,7 +4357,6 @@ async function generateAISummary(data) {
         };
     }
 }
-
 
 // Function to render the sections with left-to-right fade-in animation and proper spacing
 function renderSections(summaryData) {

@@ -2673,27 +2673,18 @@ async function generateSummary(text, maxRetries = 5, delayInterval = 5000) {
         let attempt = 0;
 
         const prompt = `
-Analyze the following text and provide a comprehensive summary and key points:
-
-Text: "${chunk}"
-
-Please generate the output in this exact format:
+Please analyze this text and provide a summary and key points. Format your response exactly as shown:
 
 Summary:
-(Provide a clear, concise summary of the main ideas in 4-5 sentences)
+[Write a clear, concise summary of the main ideas in 4-5 sentences]
 
 Key Points:
-- (First key point)
-- (Second key point)
-- (Third key point)
-(Continue with additional key points as needed)
+- [First key point]
+- [Second key point]
+- [Third key point]
+[Add more key points if needed]
 
-Important:
-- Keep the summary focused on the most important concepts
-- Extract clear, standalone key points
-- Ensure all points are directly related to the text
-- Make each key point a complete, meaningful statement
-`;
+Text to analyze: "${chunk}"`;
 
         while (attempt < maxRetries) {
             try {
@@ -2710,19 +2701,40 @@ Important:
                 if (response.ok) {
                     const result = await response.json();
                     const generatedText = result[0]?.generated_text || "";
+                    console.log('Raw response:', generatedText); // Debug log
 
-                    // Parse summary and key points
-                    const summaryMatch = generatedText.match(/Summary:(.*?)(?=Key Points:)/s);
-                    const keyPointsMatch = generatedText.match(/Key Points:(.*?)$/s);
+                    // More flexible parsing
+                    let summary = "";
+                    let points = [];
 
-                    if (summaryMatch && keyPointsMatch) {
-                        const summary = summaryMatch[1].trim();
-                        summaries.push(summary);
+                    // Try to extract summary
+                    if (generatedText.includes('Summary:')) {
+                        const summaryText = generatedText.split('Summary:')[1].split('Key Points:')[0];
+                        summary = summaryText.trim();
+                    } else {
+                        // If no summary section, treat first paragraph as summary
+                        summary = generatedText.split('\n')[0].trim();
+                    }
 
-                        const points = keyPointsMatch[1]
-                            .split('-')
-                            .map(point => point.trim())
+                    // Try to extract key points
+                    if (generatedText.includes('Key Points:')) {
+                        const keyPointsSection = generatedText.split('Key Points:')[1];
+                        points = keyPointsSection
+                            .split('\n')
+                            .filter(line => line.trim().startsWith('-'))
+                            .map(point => point.replace('-', '').trim())
                             .filter(point => point.length > 0);
+                    } else {
+                        // If no key points section, try to extract bullet points from anywhere
+                        points = generatedText
+                            .split('\n')
+                            .filter(line => line.trim().startsWith('-'))
+                            .map(point => point.replace('-', '').trim())
+                            .filter(point => point.length > 0);
+                    }
+
+                    if (summary && points.length > 0) {
+                        summaries.push(summary);
                         keyPoints.push(...points);
 
                         // Update progress
@@ -2744,7 +2756,8 @@ Important:
 
                         break;
                     } else {
-                        throw new Error('Failed to parse summary and key points from response');
+                        console.error('Parsed response:', { summary, points }); // Debug log
+                        throw new Error('Failed to extract valid summary and key points');
                     }
                 } else {
                     const errorDetails = await response.json();

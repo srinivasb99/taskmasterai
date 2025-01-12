@@ -4165,30 +4165,27 @@ function renderPlaceholderMessage() {
     console.log('✅ Placeholder message rendered');
 }
 
-// Generate section content with optimized prompt for Llama model
-async function generateSection(data, instructions, maxRetries = 3, delayInterval = 3000) {
+// Generate section content with optimized prompt for 11B model
+async function generateSection(data, instructions, maxRetries = 3, delayInterval = 2000) {
     console.log('🎯 Starting section generation with instructions:', instructions.split('\n')[0]);
     
-    const sectionPrompt = `You are TaskMaster, a professional productivity AI assistant. Your task is to analyze the following user data and generate a section summary following specific instructions.
+    const sectionPrompt = `[INST] As TaskMaster, analyze this data and create a section summary:
 
-USER DATA:
+DATA:
 ${data}
 
-SECTION INSTRUCTIONS:
+INSTRUCTIONS:
 ${instructions}
 
-Requirements:
-- Generate ONLY the section title and content
-- Keep responses concise and professional
+FORMAT:
+Title: [title]
+Content: [content]
+
+RULES:
+- Be concise and professional
 - Focus on actionable insights
-- Use appropriate emojis sparingly
-- Maintain a friendly, motivational tone
-
-Format your response EXACTLY as follows:
-Title: [Section title]
-Content: [Section content]
-
-Do not include any additional commentary or explanations.`;
+- Use emojis sparingly
+- Keep friendly tone [/INST]`;
 
     let attempt = 0;
 
@@ -4205,9 +4202,10 @@ Do not include any additional commentary or explanations.`;
                 body: JSON.stringify({ 
                     inputs: sectionPrompt,
                     parameters: {
-                        max_length: 1000,
+                        max_new_tokens: 250,
                         temperature: 0.3,
                         top_p: 0.9,
+                        do_sample: true,
                         return_full_text: false
                     }
                 }),
@@ -4219,7 +4217,7 @@ Do not include any additional commentary or explanations.`;
 
             console.log('📥 Received response from model');
             const result = await response.json();
-            console.log('🔍 Parsing response...');
+            console.log('🔍 Raw response:', result);
 
             const titleMatch = result[0]?.generated_text.match(/Title:\s*(.*?)(?=\nContent:|$)/s);
             const contentMatch = result[0]?.generated_text.match(/Content:\s*([\s\S]*?)$/s);
@@ -4235,7 +4233,7 @@ Do not include any additional commentary or explanations.`;
                 throw new Error('Empty title or content');
             }
 
-            console.log('✅ Successfully generated section:', { title });
+            console.log('✅ Successfully generated section:', { title, content });
             return { title, content };
 
         } catch (error) {
@@ -4278,35 +4276,35 @@ async function generateAISummary(data) {
     }
 
     try {
-        console.log('🔄 Generating all sections in parallel...');
-        const [urgentItems, inProgress, comingUp, overviewAndRecommendations] = await Promise.all([
-            generateSection(formattedData, `
-1. Begin with a friendly and motivational greeting to ${displayName}
-2. Use 🚨 for items due within 3 days, and ⏰ for items due within 14 days
-3. Provide a clear, actionable tip for each item
-4. Exclude any categories without urgent items
-5. Keep under 150 words`),
+        console.log('🔄 Generating sections sequentially for better stability...');
+        
+        console.log('📋 Generating urgent items...');
+        const urgentItems = await generateSection(formattedData, `
+1. List urgent items due within 3 days (🚨) and within 14 days (⏰)
+2. Add one quick tip per item
+3. Skip categories without urgent items
+4. Max 150 words`);
 
-            generateSection(formattedData, `
-1. Start with an encouraging note for ${displayName}
-2. Use 🎯 for goals, 📋 for tasks, 📊 for projects, followed by a period
-3. Include practical next steps for each
-4. Exclude any categories that don't have ongoing data
-5. Keep under 150 words`),
+        console.log('📊 Generating in-progress items...');
+        const inProgress = await generateSection(formattedData, `
+1. List ongoing items with 🎯goals, 📋tasks, 📊projects
+2. Add one next step per item
+3. Skip inactive categories
+4. Max 150 words`);
 
-            generateSection(formattedData, `
-1. Provide one preparation tip per upcoming item
-2. Avoid dates unless critical
-3. Use emojis meaningfully, not excessively
-4. Exclude categories without upcoming data
-5. Keep under 150 words`),
+        console.log('📅 Generating upcoming items...');
+        const comingUp = await generateSection(formattedData, `
+1. List upcoming items with preparation tips
+2. Use dates only if critical
+3. Use relevant emojis
+4. Max 150 words`);
 
-            generateSection(formattedData, `
-1. Provide four actionable, personalized recommendations for ${displayName}
-2. End with two motivational sentences tailored to ${displayName}
-3. Only include categories present in user data
-4. Keep under 150 words`)
-        ]);
+        console.log('💡 Generating recommendations...');
+        const overviewAndRecommendations = await generateSection(formattedData, `
+1. Give 4 actionable recommendations
+2. Add 2 motivational sentences
+3. Focus on present data
+4. Max 150 words`);
 
         console.log('✅ All sections generated successfully');
         return {

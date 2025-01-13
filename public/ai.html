@@ -1077,62 +1077,57 @@ function showTypingIndicator() {
     return indicator;
 }
 
-// Hugging Face API Configuration
+// Constants for API and collections
 const HUGGING_FACE_API_KEY = "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";
 const MODEL_ENDPOINT = "https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct";
 
-// Add conversation history array
+// Collection mappings
+const COLLECTIONS = {
+    tasks: ['tasks'],
+    goals: ['goals'],
+    projects: ['projects'],
+    plans: ['plans'],
+    communications: ['chats', 'messages', 'groupchats'],
+    social: ['contacts', 'friendRequests', 'pinnedFriends', 'pinnedGroups'],
+    content: ['generatednotes', 'generatedpdfs', 'uploads'],
+    events: ['events'],
+    time: ['timers']
+};
+
+const COLLECTION_KEYWORDS = {
+    tasks: ['task', 'todo', 'to-do', 'to do'],
+    goals: ['goal', 'target', 'objective'],
+    projects: ['project', 'initiative'],
+    plans: ['plan', 'schedule', 'agenda'],
+    communications: ['chat', 'message', 'conversation'],
+    social: ['friend', 'contact', 'group'],
+    content: ['note', 'pdf', 'document', 'file'],
+    events: ['event', 'meeting', 'appointment'],
+    time: ['timer', 'countdown', 'reminder']
+};
+
 let conversationHistory = [];
 
 async function queryHuggingFaceAPI(userInput, userData = null, username = null) {
     const userIdentityKeywords = ['who am i', 'what is my name', "what's my name", 'my name', 'who i am'];
     const isIdentityQuestion = userIdentityKeywords.some(keyword => userInput.toLowerCase().includes(keyword));
 
-    // Format conversation history for the prompt
-    const formattedHistory = conversationHistory.map(msg => 
+    // Format conversation history concisely
+    const formattedHistory = conversationHistory.slice(-5).map(msg => 
         `${msg.role}: ${msg.content}`
     ).join('\n');
 
-    const systemPrompt = `You are TaskMaster AI, an advanced productivity and communication assistant powered by Llama 3. Your core purpose is to help users manage their tasks, communications, and content while also being able to answer general questions.
+    const systemPrompt = `<|im_start|>system
+You are TaskMaster AI, a helpful productivity assistant. ${isIdentityQuestion ? `The user's name is ${username}.` : ''}
 
-${isIdentityQuestion ? `The user's name is ${username}. When responding to identity questions, use this name.` : ''}
-
-Role: You are a knowledgeable, helpful, and efficient assistant that can:
-1. Answer general questions (e.g. math, knowledge, etc.)
-2. Provide productivity and organization insights
-3. Help manage tasks, communications, and content
-4. Assist with social connections and group interactions
-
-Previous Conversation Context:
+Context:
 ${formattedHistory}
 
-${userData ? `Current User Data:
-${Object.entries(userData).map(([category, collections]) => 
-    `\n${category.toUpperCase()}:${Object.entries(collections).map(([collection, items]) =>
-        items.length > 0 ? 
-        `\n${collection}:\n${items.map(item => {
-            const title = item.title || item.name || item.description || item.content || item.message || item[collection.slice(0, -1)];
-            const date = item.dueDate || item.createdAt || item.timestamp;
-            return `- ${title}${date ? ` (${new Date(date.seconds * 1000).toLocaleDateString()})` : ''}`;
-        }).join('\n')}` :
-        `\n${collection}: No items`
-    ).join('')}`
-).join('\n')}` : 'No user data available'}
+${userData ? `User Data: ${JSON.stringify(userData)}` : ''}
 
-Instructions:
-1. For general questions, provide direct and accurate answers
-2. For productivity queries, analyze tasks/goals/projects/plans and provide insights
-3. For social/communication queries, consider user connections and chat history
-4. For content-related queries, reference notes/documents/uploads
-5. Keep responses concise but informative
-6. Use a professional yet friendly tone
-7. For identity questions, use the provided username in your response
-8. IMPORTANT: Maintain conversation context and refer back to previous messages when appropriate
-9. For short responses like "yes" or "no", refer to the previous context to understand what the user is agreeing or disagreeing with
-
-User Query: ${userInput}
-
-Response:`;
+Respond naturally and concisely to: ${userInput}
+<|im_end|>
+<|im_start|>assistant`;
 
     try {
         const response = await fetch(MODEL_ENDPOINT, {
@@ -1144,20 +1139,26 @@ Response:`;
             body: JSON.stringify({
                 inputs: systemPrompt,
                 parameters: {
-                    max_length: 500,
+                    max_new_tokens: 200,
                     temperature: 0.7,
                     top_p: 0.9,
-                    do_sample: true
+                    return_full_text: false,
+                    stop: ["<|im_end|>", "<|im_start|>"]
                 }
             })
         });
 
-        if (!response.ok) {
-            throw new Error('API request failed');
-        }
+        if (!response.ok) throw new Error('API request failed');
 
         const result = await response.json();
-        return result[0].generated_text;
+        // Clean up the response to remove any system prompt remnants
+        const cleanResponse = result[0].generated_text
+            .replace(systemPrompt, '')
+            .replace(/<\|im_start\|>assistant/g, '')
+            .replace(/<\|im_end\|>/g, '')
+            .trim();
+
+        return cleanResponse;
     } catch (error) {
         console.error('Error querying Hugging Face API:', error);
         throw error;
@@ -1171,10 +1172,7 @@ async function handleUserMessage() {
     userInput.value = '';
     addMessage(message, true);
     
-    // Add user message to conversation history
     conversationHistory.push({ role: 'User', content: message });
-    
-    // Keep only the last 10 messages for context
     if (conversationHistory.length > 10) {
         conversationHistory = conversationHistory.slice(-10);
     }
@@ -1186,9 +1184,9 @@ async function handleUserMessage() {
         if (!user) throw new Error('User not authenticated');
 
         const username = user.displayName || user.email;
-        
-        // Determine which categories of data to fetch based on the message
         const messageLower = message.toLowerCase();
+        
+        // Only fetch relevant data based on message content
         const relevantCategories = Object.entries(COLLECTION_KEYWORDS)
             .filter(([_, keywords]) => keywords.some(keyword => messageLower.includes(keyword)))
             .map(([category]) => category);
@@ -1196,8 +1194,6 @@ async function handleUserMessage() {
         let userData = null;
         if (relevantCategories.length > 0) {
             userData = {};
-            
-            // Fetch data for relevant categories
             await Promise.all(relevantCategories.map(async (category) => {
                 userData[category] = {};
                 const collections = COLLECTIONS[category];
@@ -1206,7 +1202,7 @@ async function handleUserMessage() {
                     const querySnapshot = await db.collection(collection)
                         .where('userId', '==', user.uid)
                         .orderBy('createdAt', 'desc')
-                        .limit(10)  // Limit to recent items for better performance
+                        .limit(5)
                         .get();
                     
                     userData[category][collection] = querySnapshot.docs.map(doc => ({
@@ -1218,8 +1214,6 @@ async function handleUserMessage() {
         }
 
         const aiResponse = await queryHuggingFaceAPI(message, userData, username);
-        
-        // Add AI response to conversation history
         conversationHistory.push({ role: 'Assistant', content: aiResponse });
         
         typingIndicator.remove();
@@ -1231,6 +1225,45 @@ async function handleUserMessage() {
         addMessage("I apologize, but I'm having trouble processing your request. Please try again later.");
     }
 }
+
+// Message display functions
+function addMessage(message, isUser = false) {
+    const messageContainer = document.createElement('div');
+    messageContainer.className = `message ${isUser ? 'user-message' : 'ai-message'}`;
+    
+    const messageContent = document.createElement('div');
+    messageContent.className = 'message-content';
+    messageContent.textContent = message;
+    
+    messageContainer.appendChild(messageContent);
+    chatMessages.appendChild(messageContainer);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function showTypingIndicator() {
+    const typingContainer = document.createElement('div');
+    typingContainer.className = 'message ai-message typing-indicator';
+    typingContainer.innerHTML = '<div class="dot"></div><div class="dot"></div><div class="dot"></div>';
+    chatMessages.appendChild(typingContainer);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+    return typingContainer;
+}
+
+// Event listeners
+document.addEventListener('DOMContentLoaded', () => {
+    userInput = document.getElementById('user-input');
+    chatMessages = document.getElementById('chat-messages');
+    
+    userInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleUserMessage();
+        }
+    });
+    
+    document.getElementById('send-button').addEventListener('click', handleUserMessage);
+});
+
 // Initialize the chatbot when the page loads
 document.addEventListener('DOMContentLoaded', function() {
     firebase.auth().onAuthStateChanged(async function(user) {

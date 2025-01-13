@@ -1208,28 +1208,7 @@ async function handleUserMessage() {
     }
 }
 
-// Message display functions
-function addMessage(message, isUser = false) {
-    const messageContainer = document.createElement('div');
-    messageContainer.className = `message ${isUser ? 'user-message' : 'ai-message'}`;
-    
-    const messageContent = document.createElement('div');
-    messageContent.className = 'message-content';
-    messageContent.textContent = message;
-    
-    messageContainer.appendChild(messageContent);
-    chatMessages.appendChild(messageContainer);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-}
 
-function showTypingIndicator() {
-    const typingContainer = document.createElement('div');
-    typingContainer.className = 'message ai-message typing-indicator';
-    typingContainer.innerHTML = '<div class="dot"></div><div class="dot"></div><div class="dot"></div>';
-    chatMessages.appendChild(typingContainer);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-    return typingContainer;
-}
 
 // Event listeners
 document.addEventListener('DOMContentLoaded', () => {

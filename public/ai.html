@@ -1262,22 +1262,55 @@ async function handleUserMessage() {
             .filter(([_, keywords]) => keywords.some(keyword => messageLower.includes(keyword)))
             .map(([collection]) => collection);
 
-        let userData = null;
-        if (relevantCollections.length > 0) {
-            userData = {};
-            await Promise.all(relevantCollections.map(async (collection) => {
-                const querySnapshot = await db.collection(collection)
-                    .where('userId', '==', user.uid)
-                    .orderBy('createdAt', 'desc')
-                    .limit(5)
-                    .get();
-                
-                userData[collection] = querySnapshot.docs.map(doc => ({
-                    id: doc.id,
-                    ...doc.data()
-                }));
-            }));
+        // Always include user data
+        relevantCollections.push('users');
+
+        let userData = {};
+        
+        // Fetch user data first
+        const userDoc = await db.collection('users').doc(user.uid).get();
+        if (userDoc.exists) {
+            userData.user = userDoc.data();
         }
+
+        // Fetch data from relevant collections
+        await Promise.all(relevantCollections.map(async (collection) => {
+            if (collection === 'users') return; // Skip users collection as we already fetched it
+            
+            const querySnapshot = await db.collection(collection)
+                .where('userId', '==', user.uid) // Use uid for userId field
+                .orderBy('createdAt', 'desc')
+                .limit(5)
+                .get();
+            
+            userData[collection] = querySnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+        }));
+
+        // Also check for documents where uid is used instead of userId
+        await Promise.all(relevantCollections.map(async (collection) => {
+            if (collection === 'users') return;
+            
+            const uidQuerySnapshot = await db.collection(collection)
+                .where('uid', '==', user.uid) // Check uid field as well
+                .orderBy('createdAt', 'desc')
+                .limit(5)
+                .get();
+            
+            if (uidQuerySnapshot.docs.length > 0) {
+                userData[collection] = [
+                    ...(userData[collection] || []),
+                    ...uidQuerySnapshot.docs.map(doc => ({
+                        id: doc.id,
+                        ...doc.data()
+                    }))
+                ];
+            }
+        }));
+
+        console.log('Fetched user data:', userData); // Debug log
 
         const aiResponse = await queryHuggingFaceAPI(message, userData, username);
         conversationHistory.push({ role: 'Assistant', content: aiResponse });
@@ -1286,7 +1319,7 @@ async function handleUserMessage() {
         addMessage(aiResponse);
 
     } catch (error) {
-        console.error('Error:', error);
+        console.error('Error in handleUserMessage:', error);
         typingIndicator.remove();
         addMessage("I apologize, but I'm having trouble processing your request. Please try again later.");
     }

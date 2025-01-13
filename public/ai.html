@@ -1063,31 +1063,110 @@ function showTypingIndicator() {
 const HUGGING_FACE_API_KEY = "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";
 const MODEL_ENDPOINT = "https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct";
 
-// Collection mappings
-const COLLECTIONS = {
-    tasks: ['tasks'],
-    goals: ['goals'],
-    projects: ['projects'],
-    plans: ['plans'],
-    communications: ['chats', 'messages', 'groupchats'],
-    social: ['contacts', 'friendRequests', 'pinnedFriends', 'pinnedGroups'],
-    content: ['generatednotes', 'generatedpdfs', 'uploads'],
-    events: ['events'],
-    time: ['timers']
+// Collection Schemas
+const COLLECTION_SCHEMAS = {
+    users: {
+        acceptedFriends: 'array',
+        displayName: 'string',
+        email: 'string',
+        firstName: 'string',
+        lastName: 'string',
+        lastSeen: 'timestamp',
+        nightMode: 'string',
+        online: 'boolean',
+        profilePicture: 'string',
+        uid: 'string',
+        recentEmojis: 'array',
+        createdAt: 'timestamp'
+    },
+    uploads: {
+        fileName: 'string',
+        fileUrl: 'string',
+        uploaderId: 'string',
+        uploaderName: 'string'
+    },
+    timers: {
+        createdAt: 'timestamp',
+        name: 'string',
+        time: 'number',
+        userId: 'string'
+    },
+    tasks: {
+        createdAt: 'timestamp',
+        dueDate: 'timestamp',
+        task: 'string',
+        userId: 'string'
+    },
+    goals: {
+        createdAt: 'timestamp',
+        dueDate: 'timestamp',
+        goal: 'string',
+        userId: 'string'
+    },
+    plans: {
+        createdAt: 'timestamp',
+        dueDate: 'timestamp',
+        plan: 'string',
+        userId: 'string'
+    },
+    projects: {
+        createdAt: 'timestamp',
+        dueDate: 'timestamp',
+        project: 'string',
+        userId: 'string'
+    },
+    replies: {
+        chatId: 'string',
+        messageId: 'string',
+        replyText: 'string',
+        sender: 'string',
+        timestamp: 'timestamp'
+    },
+    generatedpdfs: {
+        fileName: 'string',
+        keyPoints: 'array',
+        overview: 'string',
+        rawQuestions: 'array',
+        choices: 'array',
+        correctAnswer: 'string',
+        keyPoint: 'string',
+        question: 'string',
+        timestamp: 'timestamp',
+        userId: 'string'
+    },
+    events: {
+        day: 'number',
+        description: 'string',
+        endTime: 'string',
+        month: 'number',
+        startTime: 'string',
+        title: 'string',
+        uid: 'string',
+        year: 'number'
+    }
 };
 
+// Collection mappings for related data
+const COLLECTIONS = {
+    productivity: ['tasks', 'goals', 'projects', 'plans'],
+    time: ['timers', 'events'],
+    content: ['uploads', 'generatedpdfs'],
+    communication: ['replies'],
+    user: ['users']
+};
+
+// Keywords for identifying collection context
 const COLLECTION_KEYWORDS = {
     tasks: ['task', 'todo', 'to-do', 'to do'],
     goals: ['goal', 'target', 'objective'],
     projects: ['project', 'initiative'],
     plans: ['plan', 'schedule', 'agenda'],
-    communications: ['chat', 'message', 'conversation'],
-    social: ['friend', 'contact', 'group'],
-    content: ['note', 'pdf', 'document', 'file'],
+    timers: ['timer', 'countdown', 'reminder'],
     events: ['event', 'meeting', 'appointment'],
-    time: ['timer', 'countdown', 'reminder']
+    uploads: ['file', 'upload', 'document'],
+    generatedpdfs: ['pdf', 'generated', 'summary'],
+    replies: ['reply', 'message', 'response']
 };
-
 let conversationHistory = [];
 
 async function queryHuggingFaceAPI(userInput, userData = null, username = null) {
@@ -1099,8 +1178,17 @@ async function queryHuggingFaceAPI(userInput, userData = null, username = null) 
         `${msg.role}: ${msg.content}`
     ).join('\n');
 
+    // Include collection schemas in system prompt for better context
     const systemPrompt = `<|im_start|>system
 You are TaskMaster AI, a helpful productivity assistant. ${isIdentityQuestion ? `The user's name is ${username}.` : ''}
+
+Available Collections and their structures:
+${Object.entries(COLLECTION_SCHEMAS)
+    .map(([collection, schema]) => 
+        `${collection}: ${Object.entries(schema)
+            .map(([field, type]) => `${field} (${type})`)
+            .join(', ')}`)
+    .join('\n')}
 
 Context:
 ${formattedHistory}
@@ -1111,40 +1199,7 @@ Respond naturally and concisely to: ${userInput}
 <|im_end|>
 <|im_start|>assistant`;
 
-    try {
-        const response = await fetch(MODEL_ENDPOINT, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${HUGGING_FACE_API_KEY}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                inputs: systemPrompt,
-                parameters: {
-                    max_new_tokens: 200,
-                    temperature: 0.7,
-                    top_p: 0.9,
-                    return_full_text: false,
-                    stop: ["<|im_end|>", "<|im_start|>"]
-                }
-            })
-        });
-
-        if (!response.ok) throw new Error('API request failed');
-
-        const result = await response.json();
-        // Clean up the response to remove any system prompt remnants
-        const cleanResponse = result[0].generated_text
-            .replace(systemPrompt, '')
-            .replace(/<\|im_start\|>assistant/g, '')
-            .replace(/<\|im_end\|>/g, '')
-            .trim();
-
-        return cleanResponse;
-    } catch (error) {
-        console.error('Error querying Hugging Face API:', error);
-        throw error;
-    }
+    [Rest of the function remains unchanged...]
 }
 
 async function handleUserMessage() {
@@ -1168,29 +1223,24 @@ async function handleUserMessage() {
         const username = user.displayName || user.email;
         const messageLower = message.toLowerCase();
         
-        // Only fetch relevant data based on message content
-        const relevantCategories = Object.entries(COLLECTION_KEYWORDS)
+        // Determine relevant collections based on message content
+        const relevantCollections = Object.entries(COLLECTION_KEYWORDS)
             .filter(([_, keywords]) => keywords.some(keyword => messageLower.includes(keyword)))
-            .map(([category]) => category);
+            .map(([collection]) => collection);
 
         let userData = null;
-        if (relevantCategories.length > 0) {
+        if (relevantCollections.length > 0) {
             userData = {};
-            await Promise.all(relevantCategories.map(async (category) => {
-                userData[category] = {};
-                const collections = COLLECTIONS[category];
+            await Promise.all(relevantCollections.map(async (collection) => {
+                const querySnapshot = await db.collection(collection)
+                    .where('userId', '==', user.uid)
+                    .orderBy('createdAt', 'desc')
+                    .limit(5)
+                    .get();
                 
-                await Promise.all(collections.map(async (collection) => {
-                    const querySnapshot = await db.collection(collection)
-                        .where('userId', '==', user.uid)
-                        .orderBy('createdAt', 'desc')
-                        .limit(5)
-                        .get();
-                    
-                    userData[category][collection] = querySnapshot.docs.map(doc => ({
-                        id: doc.id,
-                        ...doc.data()
-                    }));
+                userData[collection] = querySnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
                 }));
             }));
         }

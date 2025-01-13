@@ -1081,9 +1081,17 @@ function showTypingIndicator() {
 const HUGGING_FACE_API_KEY = "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";
 const MODEL_ENDPOINT = "https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct";
 
+// Add conversation history array
+let conversationHistory = [];
+
 async function queryHuggingFaceAPI(userInput, userData = null, username = null) {
     const userIdentityKeywords = ['who am i', 'what is my name', "what's my name", 'my name', 'who i am'];
     const isIdentityQuestion = userIdentityKeywords.some(keyword => userInput.toLowerCase().includes(keyword));
+
+    // Format conversation history for the prompt
+    const formattedHistory = conversationHistory.map(msg => 
+        `${msg.role}: ${msg.content}`
+    ).join('\n');
 
     const systemPrompt = `You are TaskMaster AI, an advanced productivity and communication assistant powered by Llama 3. Your core purpose is to help users manage their tasks, communications, and content while also being able to answer general questions.
 
@@ -1094,6 +1102,9 @@ Role: You are a knowledgeable, helpful, and efficient assistant that can:
 2. Provide productivity and organization insights
 3. Help manage tasks, communications, and content
 4. Assist with social connections and group interactions
+
+Previous Conversation Context:
+${formattedHistory}
 
 ${userData ? `Current User Data:
 ${Object.entries(userData).map(([category, collections]) => 
@@ -1116,6 +1127,8 @@ Instructions:
 5. Keep responses concise but informative
 6. Use a professional yet friendly tone
 7. For identity questions, use the provided username in your response
+8. IMPORTANT: Maintain conversation context and refer back to previous messages when appropriate
+9. For short responses like "yes" or "no", refer to the previous context to understand what the user is agreeing or disagreeing with
 
 User Query: ${userInput}
 
@@ -1158,6 +1171,14 @@ async function handleUserMessage() {
     userInput.value = '';
     addMessage(message, true);
     
+    // Add user message to conversation history
+    conversationHistory.push({ role: 'User', content: message });
+    
+    // Keep only the last 10 messages for context
+    if (conversationHistory.length > 10) {
+        conversationHistory = conversationHistory.slice(-10);
+    }
+    
     const typingIndicator = showTypingIndicator();
     
     try {
@@ -1197,6 +1218,10 @@ async function handleUserMessage() {
         }
 
         const aiResponse = await queryHuggingFaceAPI(message, userData, username);
+        
+        // Add AI response to conversation history
+        conversationHistory.push({ role: 'Assistant', content: aiResponse });
+        
         typingIndicator.remove();
         addMessage(aiResponse);
 
@@ -1206,7 +1231,6 @@ async function handleUserMessage() {
         addMessage("I apologize, but I'm having trouble processing your request. Please try again later.");
     }
 }
-
 // Initialize the chatbot when the page loads
 document.addEventListener('DOMContentLoaded', function() {
     firebase.auth().onAuthStateChanged(async function(user) {

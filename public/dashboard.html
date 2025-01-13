@@ -4165,8 +4165,9 @@ function renderPlaceholderMessage() {
     console.log('✅ Placeholder message rendered');
 }
 
-async function generateSection(data, instructions, sectionType, displayName) {
-    console.log(`🎯 Generating ${sectionType} section for ${displayName}`);
+// Enhanced section generation for Smart Overview
+async function generateSection(data, instructions, sectionType) {
+    console.log(`🎯 Generating ${sectionType} section`);
     
     // Enhanced data formatting for better context
     const optimizedData = data.split('\n')
@@ -4184,42 +4185,46 @@ async function generateSection(data, instructions, sectionType, displayName) {
         })
         .join('\n');
     
-    const basePrompt = `You are TaskMaster, a friendly and personalized AI productivity assistant. Your purpose is to help ${displayName} stay organized and motivated by providing a Smart Overview of their tasks, goals, projects, and plans.
+    const basePrompt = `You are TaskMaster, an advanced AI productivity assistant specializing in Smart Overviews. Your core purpose is to analyze productivity data and generate actionable, personalized insights.
 
-CONVERSATION STYLE:
-- Address ${displayName} directly and personally
-- Be friendly and encouraging, but professional
-- Use natural, conversational language
-- Avoid technical or analytical descriptions
-- Make it feel like a one-on-one conversation
+CONTEXT:
+This data represents a user's productivity items:
+- Items may include: tasks, goals, projects, and/or plans
+- Some items have due dates, others may not
+- Only analyze and mention categories that are present in the data
+- For items without due dates, focus on their content and priority
 
-DATA CONTEXT:
+DATA:
 ${optimizedData}
 
-SECTION PURPOSE: ${sectionType}
+SECTION TYPE: ${sectionType}
 
-KEY REQUIREMENTS:
-1. Start each response by addressing ${displayName} personally
-2. Only mention items that exist in the data
-3. Be encouraging and supportive
-4. Provide practical, actionable advice
-5. Keep the tone warm and engaging
-6. Use emojis thoughtfully (max 3)
-7. Focus on ${displayName}'s success and progress
+ANALYSIS REQUIREMENTS:
+1. Only mention categories that exist in the data
+2. Adapt analysis based on whether items have due dates
+3. Identify patterns and dependencies between existing items
+4. Focus on actionable insights for the available data
+5. Maintain a professional, concise tone
+6. Use emojis sparingly and only when meaningful
+7. Keep responses clean and properly formatted
 
-RESPONSE FORMAT:
-Title: [Engaging, personal title]
-Content: [Friendly, conversational content that directly addresses ${displayName}]
+RESPONSE FORMAT RULES:
+1. Start directly with "Title:" followed by a clear, specific title
+2. Follow with "Content:" and provide the main content
+3. No markdown syntax or extra formatting
+4. No additional commentary or notes
+5. No repeated information
+6. Maximum 3 emojis per section
+7. Clean, professional language only
 
-IMPORTANT:
-- No technical analysis or data summaries
-- No markdown or code blocks
-- No meta-commentary
-- Keep it natural and flowing
+${instructions}
 
-${instructions}`;
+Format your response EXACTLY as:
+Title: [Single line, specific title]
+Content: [Clear, concise content]`;
 
     try {
+        console.log('📤 Requesting model response...');
         const response = await fetch(modelEndpoint, {
             method: 'POST',
             headers: {
@@ -4230,8 +4235,8 @@ ${instructions}`;
                 inputs: basePrompt,
                 parameters: {
                     max_new_tokens: 300,
-                    temperature: 0.7, // Slightly increased for more natural language
-                    top_p: 0.9,
+                    temperature: 0.6, // Reduced for more consistent output
+                    top_p: 0.85,
                     repetition_penalty: 1.2,
                     return_full_text: false,
                     do_sample: true
@@ -4242,14 +4247,13 @@ ${instructions}`;
         if (!response.ok) throw new Error('API request failed');
 
         const result = await response.json();
+        console.log('📥 Received model response');
         
-        // Enhanced cleaning to remove any analysis-style content
+        // Enhanced response cleaning
         const cleanedResponse = result[0]?.generated_text
             .replace(/\[\/INST\]|\[INST\]|<\/?s>|<\/?p>/g, '')
             .replace(/```markdown|```|###/g, '')
             .replace(/Response|End/g, '')
-            .replace(/The given data includes|This code block|The data shows/g, '')
-            .replace(/^#.*$/gm, '') // Remove any markdown headers
             .trim();
 
         const titleMatch = cleanedResponse.match(/Title:\s*(.*?)(?=\nContent:|$)/s);
@@ -4257,70 +4261,120 @@ ${instructions}`;
 
         if (!titleMatch || !contentMatch) throw new Error('Invalid response format');
 
+        // Additional cleaning for title and content
         const title = titleMatch[1]
             .trim()
-            .replace(/^["'\s]+|["'\s]+$/g, '')
-            .replace(/^Analysis of|^Overview of|^Summary of/g, ''); // Remove analytical prefixes
+            .replace(/^["'\s]+|["'\s]+$/g, ''); // Remove quotes and extra spaces
 
         const content = contentMatch[1]
             .trim()
-            .replace(/^["'\s]+|["'\s]+$/g, '')
-            .replace(/\n{2,}/g, '\n')
-            .replace(/\s{2,}/g, ' ')
-            .replace(/^Let me analyze|^Based on the data|^The analysis shows/g, '')
-            .replace(/^Here's what I found:|^Here's what I see:/g, '');
+            .replace(/^["'\s]+|["'\s]+$/g, '') // Remove quotes and extra spaces
+            .replace(/\n{2,}/g, '\n') // Remove extra newlines
+            .replace(/\s{2,}/g, ' '); // Remove extra spaces
 
+        console.log(`✅ ${sectionType} section generated successfully`);
         return { title, content };
 
     } catch (error) {
-        console.error(`❌ Section generation failed:`, error);
+        console.error(`❌ ${sectionType} section generation failed:`, error);
         return {
-            title: `Hey ${displayName}!`,
-            content: "I'll have your personalized insights ready in just a moment. Please try again."
+            title: `${sectionType.charAt(0).toUpperCase() + sectionType.slice(1)} Overview`,
+            content: "Unable to generate section. Please try again."
         };
     }
 }
 
-// Update the generateAISummary function to pass displayName
+// Enhanced main summary generation with better data handling
 async function generateAISummary(data) {
-    const displayName = data.displayName || "there";
+    console.log('🚀 Initiating Smart Overview generation');
+    const displayName = data.displayName || "User";
+
+    // Get available categories
+    const availableCategories = Object.entries(data)
+        .filter(([key, items]) => key !== 'displayName' && Array.isArray(items) && items.length > 0)
+        .map(([key]) => key);
+
+    console.log('📊 Available categories:', availableCategories);
+
+    // Enhanced data formatting with better context
     const formattedData = Object.entries(data)
-        .filter(([key, items]) => key !== 'displayName' && items.length > 0)
+        .filter(([key, items]) => key !== 'displayName' && Array.isArray(items) && items.length > 0)
         .map(([category, items]) => {
-            return `${category.toUpperCase()}:\n` + 
-                items.map(item => `- ${item.type}: ${item[item.type]} (Due: ${new Date(item.dueDate?.seconds * 1000).toLocaleDateString() || 'No date'})`).join('\n');
+            const categoryEmoji = {
+                tasks: '📋',
+                goals: '🎯',
+                projects: '📊',
+                plans: '📅'
+            }[category.toLowerCase()] || '•';
+            
+            return `${categoryEmoji} ${category.toUpperCase()}:\n${items
+                .map(item => {
+                    const date = item.dueDate ? new Date(item.dueDate.seconds * 1000) : null;
+                    const dueText = date ? date.toLocaleDateString() : 'no due date';
+                    return `  • ${item[item.type]} (${dueText})`;
+                })
+                .join('\n')}`;
         }).join('\n\n');
 
+    if (!formattedData.trim()) {
+        return {
+            title: "Smart Overview",
+            content: "Add tasks, goals, projects, or plans to receive your personalized Smart Overview."
+        };
+    }
+
     try {
+        // Adapt section generation based on available data
         const sections = {
-            urgentItems: await generateSection(formattedData, 
-                "Focus on immediate priorities and upcoming deadlines. Be encouraging but create urgency when needed.", 
-                "Urgent Priorities", 
-                displayName),
-            
-            inProgress: await generateSection(formattedData, 
-                "Highlight current progress and provide motivation for ongoing tasks.", 
-                "Current Progress", 
-                displayName),
-            
-            comingUp: await generateSection(formattedData, 
-                "Preview upcoming items and offer preparation tips.", 
-                "Looking Ahead", 
-                displayName),
-            
-            overviewAndRecommendations: await generateSection(formattedData, 
-                "Provide personalized recommendations and end with encouragement.", 
-                "Personal Recommendations", 
-                displayName)
+            urgent: await generateSection(formattedData, 
+                `Create a detailed urgent items analysis:
+                • Only analyze items with due dates
+                • Prioritize items due within 3 days (🚨)
+                • Highlight items due within 14 days (⏰)
+                • For items without due dates, focus on their importance
+                Maximum 200 words.`, 
+                'urgent'
+            ),
+
+            inProgress: await generateSection(formattedData,
+                `Create a comprehensive progress analysis:
+                • Focus on currently active items
+                • Include both dated and non-dated items
+                • Provide specific next steps for each major item
+                • Suggest ways to track progress for items without dates
+                Maximum 200 words.`,
+                'progress'
+            ),
+
+            comingUp: await generateSection(formattedData,
+                `Create a strategic upcoming items analysis:
+                • Focus on items with future due dates
+                • Include preparation steps for non-dated items
+                • Suggest prioritization strategies
+                • Provide planning tips for all item types
+                Maximum 200 words.`,
+                'upcoming'
+            ),
+
+            overview: await generateSection(formattedData,
+                `Create a personalized strategic overview for ${displayName}:
+                • Only analyze existing categories: ${availableCategories.join(', ')}
+                • Provide 3-4 data-driven recommendations
+                • Include specific action steps for each recommendation
+                • Add a personalized motivation message
+                Maximum 200 words.`,
+                'overview'
+            )
         };
 
+        console.log('✅ Enhanced Smart Overview generated successfully');
         return sections;
 
     } catch (error) {
-        console.error('Error generating AI summary:', error);
+        console.error('❌ Smart Overview generation failed:', error);
         return {
-            title: `Hello ${displayName}!`,
-            content: "I'll have your personalized Smart Overview ready in just a moment. Please try again."
+            title: "Smart Overview Error",
+            content: "Unable to generate overview. Please try again."
         };
     }
 }

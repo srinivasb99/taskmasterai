@@ -1001,24 +1001,6 @@ const chatMessages = document.getElementById('chatMessages');
 const userInput = document.getElementById('userInput');
 const sendButton = document.getElementById('sendMessage');
 
-// Collection categories and their related keywords
-const COLLECTIONS = {
-    productivity: ['tasks', 'goals', 'projects', 'plans'],
-    communication: ['chats', 'messages', 'replies', 'contacts', 'friendRequests', 'pinnedFriends'],
-    content: ['generatednotes', 'generatedpdfs', 'uploads'],
-    social: ['groupchats', 'pinnedGroups'],
-    time: ['events', 'timers'],
-    system: ['notifications', 'recentEmojis', 'users']
-};
-
-const COLLECTION_KEYWORDS = {
-    productivity: ['task', 'goal', 'project', 'plan', 'todo', 'deadline', 'schedule'],
-    communication: ['chat', 'message', 'reply', 'contact', 'friend', 'request', 'conversation'],
-    content: ['note', 'pdf', 'document', 'file', 'upload'],
-    social: ['group', 'team', 'community'],
-    time: ['event', 'timer', 'reminder', 'calendar'],
-    system: ['notification', 'emoji', 'profile', 'setting']
-};
 
 function addMessage(message, isUser = false) {
     const messageDiv = document.createElement('div');

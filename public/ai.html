@@ -317,25 +317,191 @@ body.night-mode {
     flex-grow: 1;
     height: 100%;
     width: 100%;
-    margin: 0; /* Remove margin to take up full space */
-    border: none; /* Remove border if you want it seamless */
-    border-radius: 0; /* Remove border radius if you want it seamless */
-    box-shadow: none; /* Remove box-shadow for a cleaner look */
-    overflow: hidden;
+    margin: 0;
+    background-color: var(--bg-color);
+    position: relative;
+}
+
+.chat-messages {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
 }
 
 .chatbot-header {
-    background-color: #333;
-    color: #fff;
-    padding: 16px;
+    background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+    color: var(--text-color);
+    padding: 20px;
     text-align: center;
+    font-family: 'Poppins', sans-serif;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.chatbot-iframe {
+.chatbot-header h2 {
+    margin: 0;
+    font-size: 1.8rem;
+    background: linear-gradient(135deg, #fff, #f0f0f0);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+
+.message {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    max-width: 80%;
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+.message.user {
+    margin-left: auto;
+    flex-direction: row-reverse;
+}
+
+.message-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.message.ai .message-avatar {
+    background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+}
+
+.message.user .message-avatar {
+    background: linear-gradient(135deg, var(--accent-color), #FF1493);
+}
+
+.message-content {
+    background-color: var(--glass-bg);
+    padding: 12px 16px;
+    border-radius: 12px;
+    position: relative;
+    backdrop-filter: blur(10px);
+}
+
+.message.ai .message-content {
+    border-top-left-radius: 4px;
+}
+
+.message.user .message-content {
+    border-top-right-radius: 4px;
+    background: linear-gradient(135deg, var(--accent-color), #FF1493);
+}
+
+.message-text {
+    color: var(--text-color);
+    line-height: 1.5;
+}
+
+.message-time {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.6);
+    margin-top: 4px;
+}
+
+.chat-input-container {
+    padding: 20px;
+    background-color: var(--card-bg);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.chat-input-wrapper {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    background-color: var(--glass-bg);
+    padding: 12px;
+    border-radius: 12px;
+    backdrop-filter: blur(10px);
+}
+
+.chat-input {
     flex-grow: 1;
-    width: 100%;
-    height: 100%;
+    background: none;
     border: none;
+    color: var(--text-color);
+    font-size: 1rem;
+    padding: 8px;
+    outline: none;
+}
+
+.chat-input::placeholder {
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.send-button {
+    background: linear-gradient(135deg, var(--accent-color), #FF1493);
+    border: none;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+.send-button:hover {
+    transform: scale(1.05);
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.typing-indicator {
+    display: flex;
+    gap: 4px;
+    padding: 8px 12px;
+    background-color: var(--glass-bg);
+    border-radius: 12px;
+    width: fit-content;
+    margin-top: 8px;
+}
+
+.typing-dot {
+    width: 8px;
+    height: 8px;
+    background-color: var(--text-color);
+    border-radius: 50%;
+    animation: typingAnimation 1.4s infinite ease-in-out;
+}
+
+.typing-dot:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.typing-dot:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+@keyframes typingAnimation {
+    0%, 60%, 100% {
+        transform: translateY(0);
+    }
+    30% {
+        transform: translateY(-4px);
+    }
 }
 
 /* Existing styles */
@@ -544,14 +710,33 @@ body.night-mode {
         <div class="chatbot-header">
             <h2>TaskMaster AI</h2>
         </div>
-        <iframe
-            class="chatbot-iframe"
-            src="https://www.chatbase.co/chatbot-iframe/vW6F6qkbplgn0Y-JOy8qU"
-            title="Chatbot"
-            frameborder="0"
-        ></iframe>
+        <div class="chat-messages" id="chatMessages">
+            <!-- Messages will be dynamically added here -->
+            <div class="message ai">
+                <div class="message-avatar">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 3V4M12 20V21M4 12H3M6.31412 6.31412L5.5 5.5M17.6859 6.31412L18.5 5.5M6.31412 17.69L5.5 18.5001M17.6859 17.69L18.5 18.5001M21 12H20M16 12C16 14.2091 14.2091 16 12 16C9.79086 16 8 14.2091 8 12C8 9.79086 9.79086 8 12 8C14.2091 8 16 9.79086 16 12Z" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                    </svg>
+                </div>
+                <div class="message-content">
+                    <div class="message-text">Hello! I'm TaskMaster AI. How can I assist you today?</div>
+                    <div class="message-time">Just now</div>
+                </div>
+            </div>
+        </div>
+        <div class="chat-input-container">
+            <div class="chat-input-wrapper">
+                <input type="text" class="chat-input" id="userInput" placeholder="Type your message..." />
+                <button class="send-button" id="sendMessage">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M22 2L11 13M22 2L15 22L11 13M11 13L2 9L22 2" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
     </div>
 </div>
+
     <script>
         document.querySelector('.sidebar-toggle').addEventListener('click', () => {
             document.querySelector('.sidebar').classList.toggle('active');
@@ -641,18 +826,7 @@ window.addEventListener('beforeunload', () => {
     }
 });
 
-    document.addEventListener('DOMContentLoaded', function() {
-        firebase.auth().onAuthStateChanged(function(user) {
-            if (user) {
-                const username = user.displayName || user.email;
-                document.getElementById('username').textContent = username;
-                document.getElementById('displayName').textContent = username;
-            } else {
-                // No user is signed in.
-                window.location.href = "login.html"; // Redirect to login page
-            }
-        });
-    });
+
 
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -821,6 +995,179 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 </script>
+
+<script>
+const chatMessages = document.getElementById('chatMessages');
+const userInput = document.getElementById('userInput');
+const sendButton = document.getElementById('sendMessage');
+
+function addMessage(message, isUser = false) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${isUser ? 'user' : 'ai'}`;
+    
+    const avatar = document.createElement('div');
+    avatar.className = 'message-avatar';
+    avatar.innerHTML = isUser ? `
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM12 5C13.66 5 15 6.34 15 8C15 9.66 13.66 11 12 11C10.34 11 9 9.66 9 8C9 6.34 10.34 5 12 5ZM12 19.2C9.5 19.2 7.29 17.92 6 15.98C6.03 13.99 10 12.9 12 12.9C13.99 12.9 17.97 13.99 18 15.98C16.71 17.92 14.5 19.2 12 19.2Z" fill="#FFFFFF"/>
+        </svg>
+    ` : `
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 3V4M12 20V21M4 12H3M6.31412 6.31412L5.5 5.5M17.6859 6.31412L18.5 5.5M6.31412 17.69L5.5 18.5001M17.6859 17.69L18.5 18.5001M21 12H20M16 12C16 14.2091 14.2091 16 12 16C9.79086 16 8 14.2091 8 12C8 9.79086 9.79086 8 12 8C14.2091 8 16 9.79086 16 12Z" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+        </svg>
+    `;
+
+    const content = document.createElement('div');
+    content.className = 'message-content';
+    
+    const text = document.createElement('div');
+    text.className = 'message-text';
+    text.textContent = message;
+    
+    const time = document.createElement('div');
+    time.className = 'message-time';
+    time.textContent = 'Just now';
+    
+    content.appendChild(text);
+    content.appendChild(time);
+    
+    messageDiv.appendChild(avatar);
+    messageDiv.appendChild(content);
+    
+    chatMessages.appendChild(messageDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function showTypingIndicator() {
+    const indicator = document.createElement('div');
+    indicator.className = 'message ai';
+    indicator.innerHTML = `
+        <div class="message-avatar">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 3V4M12 20V21M4 12H3M6.31412 6.31412L5.5 5.5M17.6859 6.31412L18.5 5.5M6.31412 17.69L5.5 18.5001M17.6859 17.69L18.5 18.5001M21 12H20M16 12C16 14.2091 14.2091 16 12 16C9.79086 16 8 14.2091 8 12C8 9.79086 9.79086 8 12 8C14.2091 8 16 9.79086 16 12Z" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+            </svg>
+        </div>
+        <div class="typing-indicator">
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+        </div>
+    `;
+    chatMessages.appendChild(indicator);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+    return indicator;
+}
+
+// Hugging Face API Configuration
+const HUGGING_FACE_API_KEY = "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";
+const MODEL_ENDPOINT = "https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct";
+
+async function queryHuggingFaceAPI(userInput, userData = null) {
+    const systemPrompt = `You are TaskMaster AI, an advanced AI assistant. You have access to the following user data:
+${userData ? JSON.stringify(userData, null, 2) : 'No user data available'}
+
+Please provide a helpful, accurate, and relevant response to the user's query. If the query relates to their tasks, goals, projects, or plans, use the provided user data to give a personalized response.
+
+User Query: ${userInput}
+
+Response:`;
+
+    try {
+        const response = await fetch(MODEL_ENDPOINT, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${HUGGING_FACE_API_KEY}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                inputs: systemPrompt,
+                parameters: {
+                    max_length: 500,
+                    temperature: 0.7,
+                    top_p: 0.9,
+                    do_sample: true
+                }
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('API request failed');
+        }
+
+        const result = await response.json();
+        return result[0].generated_text;
+    } catch (error) {
+        console.error('Error querying Hugging Face API:', error);
+        throw error;
+    }
+}
+
+
+async function handleUserMessage() {
+    const message = userInput.value.trim();
+    if (!message) return;
+    
+    userInput.value = '';
+    addMessage(message, true);
+    
+    const typingIndicator = showTypingIndicator();
+    
+    try {
+        // Get current user's data from Firebase
+        const user = firebase.auth().currentUser;
+        if (!user) {
+            throw new Error('User not authenticated');
+        }
+
+        // Fetch user's data from Firestore
+        const userData = {};
+        const collections = ['tasks', 'goals', 'projects', 'plans'];
+        
+        for (const collection of collections) {
+            const querySnapshot = await db.collection(collection)
+                .where('userId', '==', user.uid)
+                .get();
+            
+            userData[collection] = querySnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+        }
+
+        // Get AI response
+        const aiResponse = await queryHuggingFaceAPI(message, userData);
+        typingIndicator.remove();
+        addMessage(aiResponse);
+
+    } catch (error) {
+        console.error('Error:', error);
+        typingIndicator.remove();
+        addMessage("I apologize, but I'm having trouble processing your request. Please try again later.");
+    }
+}
+
+// Initialize the chatbot when the page loads
+document.addEventListener('DOMContentLoaded', function() {
+    firebase.auth().onAuthStateChanged(async function(user) {
+        if (user) {
+            const username = user.displayName || user.email;
+            document.getElementById('username').textContent = username;
+            addMessage(`Hello ${username}! I'm TaskMaster AI. I can help you manage your tasks, goals, projects, and plans. How can I assist you today?`);
+        } else {
+            window.location.href = "login.html";
+        }
+    });
+});
+
+
+sendButton.addEventListener('click', handleUserMessage);
+userInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        handleUserMessage();
+    }
+});
+</script>
+
         
 </body>
 </html>

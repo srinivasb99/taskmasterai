@@ -1001,26 +1001,23 @@ const chatMessages = document.getElementById('chatMessages');
 const userInput = document.getElementById('userInput');
 const sendButton = document.getElementById('sendMessage');
 
-// Hugging Face API Configuration
-const HUGGING_FACE_API_KEY = "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";
-const MODEL_ENDPOINT = "https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct";
-
-// Define all available collections
+// Collection categories and their related keywords
 const COLLECTIONS = {
-    productivity: ['tasks', 'goals', 'projects', 'plans', 'timers'],
-    social: ['contacts', 'friendRequests', 'pinnedFriends', 'pinnedGroups'],
-    communication: ['chats', 'groupchats', 'messages', 'replies', 'recentEmojis'],
+    productivity: ['tasks', 'goals', 'projects', 'plans'],
+    communication: ['chats', 'messages', 'replies', 'contacts', 'friendRequests', 'pinnedFriends'],
     content: ['generatednotes', 'generatedpdfs', 'uploads'],
-    system: ['events', 'notifications', 'users']
+    social: ['groupchats', 'pinnedGroups'],
+    time: ['events', 'timers'],
+    system: ['notifications', 'recentEmojis', 'users']
 };
 
-// Keywords that trigger collection data fetching
 const COLLECTION_KEYWORDS = {
-    productivity: ['task', 'goal', 'project', 'plan', 'timer', 'schedule', 'deadline', 'due', 'progress'],
-    social: ['friend', 'contact', 'group', 'social', 'connect', 'network'],
-    communication: ['chat', 'message', 'conversation', 'reply', 'emoji'],
-    content: ['note', 'pdf', 'file', 'upload', 'document'],
-    system: ['event', 'notification', 'profile', 'setting']
+    productivity: ['task', 'goal', 'project', 'plan', 'todo', 'deadline', 'schedule'],
+    communication: ['chat', 'message', 'reply', 'contact', 'friend', 'request', 'conversation'],
+    content: ['note', 'pdf', 'document', 'file', 'upload'],
+    social: ['group', 'team', 'community'],
+    time: ['event', 'timer', 'reminder', 'calendar'],
+    system: ['notification', 'emoji', 'profile', 'setting']
 };
 
 function addMessage(message, isUser = false) {
@@ -1080,8 +1077,17 @@ function showTypingIndicator() {
     return indicator;
 }
 
-async function queryHuggingFaceAPI(userInput, userData = null) {
+// Hugging Face API Configuration
+const HUGGING_FACE_API_KEY = "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";
+const MODEL_ENDPOINT = "https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct";
+
+async function queryHuggingFaceAPI(userInput, userData = null, username = null) {
+    const userIdentityKeywords = ['who am i', 'what is my name', "what's my name", 'my name', 'who i am'];
+    const isIdentityQuestion = userIdentityKeywords.some(keyword => userInput.toLowerCase().includes(keyword));
+
     const systemPrompt = `You are TaskMaster AI, an advanced productivity and communication assistant powered by Llama 3. Your core purpose is to help users manage their tasks, communications, and content while also being able to answer general questions.
+
+${isIdentityQuestion ? `The user's name is ${username}. When responding to identity questions, use this name.` : ''}
 
 Role: You are a knowledgeable, helpful, and efficient assistant that can:
 1. Answer general questions (e.g. math, knowledge, etc.)
@@ -1109,6 +1115,7 @@ Instructions:
 4. For content-related queries, reference notes/documents/uploads
 5. Keep responses concise but informative
 6. Use a professional yet friendly tone
+7. For identity questions, use the provided username in your response
 
 User Query: ${userInput}
 
@@ -1124,20 +1131,20 @@ Response:`;
             body: JSON.stringify({
                 inputs: systemPrompt,
                 parameters: {
-                    max_new_tokens: 500,        // Increased for more comprehensive responses
-                    temperature: 0.7,           // Balanced for creativity and accuracy
-                    top_p: 0.9,                // High value for better quality
-                    repetition_penalty: 1.2,    // Prevent repetitive responses
-                    do_sample: true,           // Enable sampling for better quality
-                    return_full_text: false    // Only get the generated response
+                    max_length: 500,
+                    temperature: 0.7,
+                    top_p: 0.9,
+                    do_sample: true
                 }
             })
         });
 
-        if (!response.ok) throw new Error('API request failed');
+        if (!response.ok) {
+            throw new Error('API request failed');
+        }
 
         const result = await response.json();
-        return result[0].generated_text.replace(/\[\/INST\]|\[INST\]|<\/?s>|<\/?p>/g, '').trim();
+        return result[0].generated_text;
     } catch (error) {
         console.error('Error querying Hugging Face API:', error);
         throw error;
@@ -1157,6 +1164,8 @@ async function handleUserMessage() {
         const user = firebase.auth().currentUser;
         if (!user) throw new Error('User not authenticated');
 
+        const username = user.displayName || user.email;
+        
         // Determine which categories of data to fetch based on the message
         const messageLower = message.toLowerCase();
         const relevantCategories = Object.entries(COLLECTION_KEYWORDS)
@@ -1187,7 +1196,7 @@ async function handleUserMessage() {
             }));
         }
 
-        const aiResponse = await queryHuggingFaceAPI(message, userData);
+        const aiResponse = await queryHuggingFaceAPI(message, userData, username);
         typingIndicator.remove();
         addMessage(aiResponse);
 
@@ -1204,7 +1213,6 @@ document.addEventListener('DOMContentLoaded', function() {
         if (user) {
             const username = user.displayName || user.email;
             document.getElementById('username').textContent = username;
-            addMessage(`Hello ${username}! I'm TaskMaster AI. I can help you manage your tasks, goals, projects, and plans. How can I assist you today?`);
         } else {
             window.location.href = "login.html";
         }

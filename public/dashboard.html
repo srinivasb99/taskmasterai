@@ -4173,12 +4173,10 @@ async function generateSection(data, instructions, sectionType) {
     const optimizedData = data.split('\n')
         .filter(line => line.trim())
         .map(line => {
+            // Extract and format dates for better context
             const dateMatch = line.match(/\((.*?)\)/);
             if (dateMatch) {
                 const date = dateMatch[1];
-                if (date === 'no due date') {
-                    return line.replace(/\(.*?\)/, '(📌 No due date)');
-                }
                 return line.replace(/\(.*?\)/, `(Due: ${date === 'ongoing' ? '🔄 Ongoing' : `📅 ${date}`})`);
             }
             return line;
@@ -4188,11 +4186,7 @@ async function generateSection(data, instructions, sectionType) {
     const basePrompt = `You are TaskMaster, an advanced AI productivity assistant specializing in Smart Overviews. Your core purpose is to analyze productivity data and generate actionable, personalized insights.
 
 CONTEXT:
-This data represents a user's productivity items:
-- Items may include: tasks, goals, projects, and/or plans
-- Some items have due dates, others may not
-- Only analyze and mention categories that are present in the data
-- For items without due dates, focus on their content and priority
+This data represents a user's productivity items including tasks, goals, projects, and plans. Each item has a type and due date. Your role is to create a meaningful ${sectionType} summary that helps the user stay organized and motivated.
 
 DATA:
 ${optimizedData}
@@ -4200,28 +4194,17 @@ ${optimizedData}
 SECTION TYPE: ${sectionType}
 
 ANALYSIS REQUIREMENTS:
-1. Only mention categories that exist in the data
-2. Adapt analysis based on whether items have due dates
-3. Identify patterns and dependencies between existing items
-4. Focus on actionable insights for the available data
-5. Maintain a professional, concise tone
-6. Use emojis sparingly and only when meaningful
-7. Keep responses clean and properly formatted
-
-RESPONSE FORMAT RULES:
-1. Start directly with "Title:" followed by a clear, specific title
-2. Follow with "Content:" and provide the main content
-3. No markdown syntax or extra formatting
-4. No additional commentary or notes
-5. No repeated information
-6. Maximum 3 emojis per section
-7. Clean, professional language only
+1. Understand the relationships between different items
+2. Consider due dates and priorities
+3. Identify patterns and dependencies
+4. Focus on actionable insights
+5. Maintain a motivational tone
 
 ${instructions}
 
-Format your response EXACTLY as:
-Title: [Single line, specific title]
-Content: [Clear, concise content]`;
+Format response exactly as:
+Title: [Create a unique, context-appropriate title]
+Content: [Provide detailed, actionable content following the instructions]`;
 
     try {
         console.log('📤 Requesting model response...');
@@ -4234,12 +4217,12 @@ Content: [Clear, concise content]`;
             body: JSON.stringify({ 
                 inputs: basePrompt,
                 parameters: {
-                    max_new_tokens: 300,
-                    temperature: 0.6, // Reduced for more consistent output
-                    top_p: 0.85,
+                    max_new_tokens: 300, // Increased for more detailed responses
+                    temperature: 0.7,    // Increased for more creative responses
+                    top_p: 0.9,         // Adjusted for better quality
                     repetition_penalty: 1.2,
                     return_full_text: false,
-                    do_sample: true
+                    do_sample: true     // Enable sampling for better quality
                 }
             }),
         });
@@ -4249,11 +4232,8 @@ Content: [Clear, concise content]`;
         const result = await response.json();
         console.log('📥 Received model response');
         
-        // Enhanced response cleaning
         const cleanedResponse = result[0]?.generated_text
             .replace(/\[\/INST\]|\[INST\]|<\/?s>|<\/?p>/g, '')
-            .replace(/```markdown|```|###/g, '')
-            .replace(/Response|End/g, '')
             .trim();
 
         const titleMatch = cleanedResponse.match(/Title:\s*(.*?)(?=\nContent:|$)/s);
@@ -4261,16 +4241,8 @@ Content: [Clear, concise content]`;
 
         if (!titleMatch || !contentMatch) throw new Error('Invalid response format');
 
-        // Additional cleaning for title and content
-        const title = titleMatch[1]
-            .trim()
-            .replace(/^["'\s]+|["'\s]+$/g, ''); // Remove quotes and extra spaces
-
-        const content = contentMatch[1]
-            .trim()
-            .replace(/^["'\s]+|["'\s]+$/g, '') // Remove quotes and extra spaces
-            .replace(/\n{2,}/g, '\n') // Remove extra newlines
-            .replace(/\s{2,}/g, ' '); // Remove extra spaces
+        const title = titleMatch[1].trim();
+        const content = contentMatch[1].trim();
 
         console.log(`✅ ${sectionType} section generated successfully`);
         return { title, content };
@@ -4284,21 +4256,14 @@ Content: [Clear, concise content]`;
     }
 }
 
-// Enhanced main summary generation with better data handling
+// Enhanced main summary generation
 async function generateAISummary(data) {
     console.log('🚀 Initiating Smart Overview generation');
     const displayName = data.displayName || "User";
 
-    // Get available categories
-    const availableCategories = Object.entries(data)
-        .filter(([key, items]) => key !== 'displayName' && Array.isArray(items) && items.length > 0)
-        .map(([key]) => key);
-
-    console.log('📊 Available categories:', availableCategories);
-
     // Enhanced data formatting with better context
     const formattedData = Object.entries(data)
-        .filter(([key, items]) => key !== 'displayName' && Array.isArray(items) && items.length > 0)
+        .filter(([key, items]) => key !== 'displayName' && items?.length > 0)
         .map(([category, items]) => {
             const categoryEmoji = {
                 tasks: '📋',
@@ -4310,7 +4275,7 @@ async function generateAISummary(data) {
             return `${categoryEmoji} ${category.toUpperCase()}:\n${items
                 .map(item => {
                     const date = item.dueDate ? new Date(item.dueDate.seconds * 1000) : null;
-                    const dueText = date ? date.toLocaleDateString() : 'no due date';
+                    const dueText = date ? date.toLocaleDateString() : 'ongoing';
                     return `  • ${item[item.type]} (${dueText})`;
                 })
                 .join('\n')}`;
@@ -4324,44 +4289,44 @@ async function generateAISummary(data) {
     }
 
     try {
-        // Adapt section generation based on available data
+        // Enhanced section generation with more detailed instructions
         const sections = {
             urgent: await generateSection(formattedData, 
                 `Create a detailed urgent items analysis:
-                • Only analyze items with due dates
-                • Prioritize items due within 3 days (🚨)
-                • Highlight items due within 14 days (⏰)
-                • For items without due dates, focus on their importance
+                • Prioritize items due within 3 days (🚨) with specific action steps
+                • Highlight items due within 14 days (⏰) with preparation tips
+                • Consider dependencies between items
+                • Suggest time management strategies
                 Maximum 200 words.`, 
                 'urgent'
             ),
 
             inProgress: await generateSection(formattedData,
                 `Create a comprehensive progress analysis:
-                • Focus on currently active items
-                • Include both dated and non-dated items
+                • Analyze current status of ongoing items
+                • Identify potential bottlenecks or dependencies
                 • Provide specific next steps for each major item
-                • Suggest ways to track progress for items without dates
+                • Suggest efficiency improvements
                 Maximum 200 words.`,
                 'progress'
             ),
 
             comingUp: await generateSection(formattedData,
                 `Create a strategic upcoming items analysis:
-                • Focus on items with future due dates
-                • Include preparation steps for non-dated items
-                • Suggest prioritization strategies
-                • Provide planning tips for all item types
+                • Analyze items due within the next 30 days
+                • Identify preparation needs and dependencies
+                • Suggest resource allocation and timing
+                • Provide risk mitigation strategies
                 Maximum 200 words.`,
                 'upcoming'
             ),
 
             overview: await generateSection(formattedData,
-                `Create a personalized strategic overview for ${displayName}:
-                • Only analyze existing categories: ${availableCategories.join(', ')}
+                `Create a personalized strategic overview:
+                • Analyze patterns across all items
                 • Provide 3-4 data-driven recommendations
                 • Include specific action steps for each recommendation
-                • Add a personalized motivation message
+                • Add a personalized motivation message for ${displayName}
                 Maximum 200 words.`,
                 'overview'
             )
@@ -4378,6 +4343,7 @@ async function generateAISummary(data) {
         };
     }
 }
+
 
 // Function to render the sections with left-to-right fade-in animation and proper spacing
 function renderSections(summaryData) {

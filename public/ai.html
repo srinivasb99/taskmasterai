@@ -996,66 +996,104 @@ document.addEventListener('DOMContentLoaded', function() {
 
 </script>
 
-    <script>
-    // Constants for API and collections
-    const HUGGING_FACE_API_KEY = "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";
-    const MODEL_ENDPOINT = "https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct";
+<script>
+const chatMessages = document.getElementById('chatMessages');
+const userInput = document.getElementById('userInput');
+const sendButton = document.getElementById('sendMessage');
 
-    // Collection categories and their related keywords
-    const COLLECTION_KEYWORDS = {
-        productivity: ['task', 'goal', 'project', 'plan', 'schedule', 'deadline', 'todo'],
-        communication: ['chat', 'message', 'contact', 'friend', 'group', 'notification'],
-        content: ['note', 'pdf', 'document', 'upload'],
-        time: ['timer', 'reminder', 'event']
-    };
+// Collection categories and their related keywords
+const COLLECTIONS = {
+    productivity: ['tasks', 'goals', 'projects', 'plans'],
+    communication: ['chats', 'messages', 'replies', 'contacts', 'friendRequests', 'pinnedFriends'],
+    content: ['generatednotes', 'generatedpdfs', 'uploads'],
+    social: ['groupchats', 'pinnedGroups'],
+    time: ['events', 'timers'],
+    system: ['notifications', 'recentEmojis', 'users']
+};
 
-    // Collections organized by category
-    const COLLECTIONS = {
-        productivity: ['tasks', 'goals', 'projects', 'plans'],
-        communication: ['chats', 'messages', 'contacts', 'friendRequests', 'groupchats', 'notifications', 'pinnedFriends', 'pinnedGroups', 'replies'],
-        content: ['generatednotes', 'generatedpdfs', 'uploads'],
-        time: ['timers', 'events']
-    };
+const COLLECTION_KEYWORDS = {
+    productivity: ['task', 'goal', 'project', 'plan', 'todo', 'deadline', 'schedule'],
+    communication: ['chat', 'message', 'reply', 'contact', 'friend', 'request', 'conversation'],
+    content: ['note', 'pdf', 'document', 'file', 'upload'],
+    social: ['group', 'team', 'community'],
+    time: ['event', 'timer', 'reminder', 'calendar'],
+    system: ['notification', 'emoji', 'profile', 'setting']
+};
 
-    // DOM Elements
-    const chatContainer = document.querySelector('.chat-container');
-    const userInput = document.querySelector('#user-input');
-    const sendButton = document.querySelector('#send-button');
+function addMessage(message, isUser = false) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${isUser ? 'user' : 'ai'}`;
+    
+    const avatar = document.createElement('div');
+    avatar.className = 'message-avatar';
+    avatar.innerHTML = isUser ? `
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM12 5C13.66 5 15 6.34 15 8C15 9.66 13.66 11 12 11C10.34 11 9 9.66 9 8C9 6.34 10.34 5 12 5ZM12 19.2C9.5 19.2 7.29 17.92 6 15.98C6.03 13.99 10 12.9 12 12.9C13.99 12.9 17.97 13.99 18 15.98C16.71 17.92 14.5 19.2 12 19.2Z" fill="#FFFFFF"/>
+        </svg>
+    ` : `
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 3V4M12 20V21M4 12H3M6.31412 6.31412L5.5 5.5M17.6859 6.31412L18.5 5.5M6.31412 17.69L5.5 18.5001M17.6859 17.69L18.5 18.5001M21 12H20M16 12C16 14.2091 14.2091 16 12 16C9.79086 16 8 14.2091 8 12C8 9.79086 9.79086 8 12 8C14.2091 8 16 9.79086 16 12Z" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+        </svg>
+    `;
 
-    // Conversation history array
-    let conversationHistory = [];
+    const content = document.createElement('div');
+    content.className = 'message-content';
+    
+    const text = document.createElement('div');
+    text.className = 'message-text';
+    text.textContent = message;
+    
+    const time = document.createElement('div');
+    time.className = 'message-time';
+    time.textContent = 'Just now';
+    
+    content.appendChild(text);
+    content.appendChild(time);
+    
+    messageDiv.appendChild(avatar);
+    messageDiv.appendChild(content);
+    
+    chatMessages.appendChild(messageDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
 
-    function addMessage(message, isUser = false) {
-        const messageDiv = document.createElement('div');
-        messageDiv.className = `message ${isUser ? 'user-message' : 'ai-message'}`;
-        
-        const contentDiv = document.createElement('div');
-        contentDiv.className = 'message-content';
-        contentDiv.textContent = message;
-        
-        messageDiv.appendChild(contentDiv);
-        chatContainer.appendChild(messageDiv);
-        chatContainer.scrollTop = chatContainer.scrollHeight;
-    }
+function showTypingIndicator() {
+    const indicator = document.createElement('div');
+    indicator.className = 'message ai';
+    indicator.innerHTML = `
+        <div class="message-avatar">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 3V4M12 20V21M4 12H3M6.31412 6.31412L5.5 5.5M17.6859 6.31412L18.5 5.5M6.31412 17.69L5.5 18.5001M17.6859 17.69L18.5 18.5001M21 12H20M16 12C16 14.2091 14.2091 16 12 16C9.79086 16 8 14.2091 8 12C8 9.79086 9.79086 8 12 8C14.2091 8 16 9.79086 16 12Z" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+            </svg>
+        </div>
+        <div class="typing-indicator">
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+        </div>
+    `;
+    chatMessages.appendChild(indicator);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+    return indicator;
+}
 
-    function showTypingIndicator() {
-        const typingDiv = document.createElement('div');
-        typingDiv.className = 'message ai-message typing-indicator';
-        typingDiv.innerHTML = '<div class="dot"></div><div class="dot"></div><div class="dot"></div>';
-        chatContainer.appendChild(typingDiv);
-        chatContainer.scrollTop = chatContainer.scrollHeight;
-        return typingDiv;
-    }
+// Hugging Face API Configuration
+const HUGGING_FACE_API_KEY = "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";
+const MODEL_ENDPOINT = "https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct";
 
-    async function queryHuggingFaceAPI(userInput, userData = null, username = null) {
-        const userIdentityKeywords = ['who am i', 'what is my name', "what's my name", 'my name', 'who i am'];
-        const isIdentityQuestion = userIdentityKeywords.some(keyword => userInput.toLowerCase().includes(keyword));
+// Add conversation history array
+let conversationHistory = [];
 
-        const formattedHistory = conversationHistory.map(msg => 
-            `${msg.role}: ${msg.content}`
-        ).join('\n');
+async function queryHuggingFaceAPI(userInput, userData = null, username = null) {
+    const userIdentityKeywords = ['who am i', 'what is my name', "what's my name", 'my name', 'who i am'];
+    const isIdentityQuestion = userIdentityKeywords.some(keyword => userInput.toLowerCase().includes(keyword));
 
-        const systemPrompt = `You are TaskMaster AI, an advanced productivity and communication assistant powered by Llama 3. Your core purpose is to help users manage their tasks, communications, and content while also being able to answer general questions.
+    // Format conversation history for the prompt
+    const formattedHistory = conversationHistory.map(msg => 
+        `${msg.role}: ${msg.content}`
+    ).join('\n');
+
+    const systemPrompt = `You are TaskMaster AI, an advanced productivity and communication assistant powered by Llama 3. Your core purpose is to help users manage their tasks, communications, and content while also being able to answer general questions.
 
 ${isIdentityQuestion ? `The user's name is ${username}. When responding to identity questions, use this name.` : ''}
 
@@ -1096,108 +1134,122 @@ User Query: ${userInput}
 
 Response:`;
 
-        try {
-            const response = await fetch(MODEL_ENDPOINT, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${HUGGING_FACE_API_KEY}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    inputs: systemPrompt,
-                    parameters: {
-                        max_length: 500,
-                        temperature: 0.7,
-                        top_p: 0.9,
-                        do_sample: true
-                    }
-                })
-            });
+    try {
+        const response = await fetch(MODEL_ENDPOINT, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${HUGGING_FACE_API_KEY}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                inputs: systemPrompt,
+                parameters: {
+                    max_length: 500,
+                    temperature: 0.7,
+                    top_p: 0.9,
+                    do_sample: true
+                }
+            })
+        });
 
-            if (!response.ok) {
-                throw new Error('API request failed');
-            }
-
-            const result = await response.json();
-            return result[0].generated_text;
-        } catch (error) {
-            console.error('Error querying Hugging Face API:', error);
-            throw error;
+        if (!response.ok) {
+            throw new Error('API request failed');
         }
+
+        const result = await response.json();
+        return result[0].generated_text;
+    } catch (error) {
+        console.error('Error querying Hugging Face API:', error);
+        throw error;
     }
+}
 
-    async function handleUserMessage() {
-        const message = userInput.value.trim();
-        if (!message) return;
-        
-        userInput.value = '';
-        addMessage(message, true);
-        
-        conversationHistory.push({ role: 'User', content: message });
-        
-        if (conversationHistory.length > 10) {
-            conversationHistory = conversationHistory.slice(-10);
-        }
-        
-        const typingIndicator = showTypingIndicator();
-        
-        try {
-            const user = firebase.auth().currentUser;
-            if (!user) throw new Error('User not authenticated');
+async function handleUserMessage() {
+    const message = userInput.value.trim();
+    if (!message) return;
+    
+    userInput.value = '';
+    addMessage(message, true);
+    
+    // Add user message to conversation history
+    conversationHistory.push({ role: 'User', content: message });
+    
+    // Keep only the last 10 messages for context
+    if (conversationHistory.length > 10) {
+        conversationHistory = conversationHistory.slice(-10);
+    }
+    
+    const typingIndicator = showTypingIndicator();
+    
+    try {
+        const user = firebase.auth().currentUser;
+        if (!user) throw new Error('User not authenticated');
 
-            const username = user.displayName || user.email;
+        const username = user.displayName || user.email;
+        
+        // Determine which categories of data to fetch based on the message
+        const messageLower = message.toLowerCase();
+        const relevantCategories = Object.entries(COLLECTION_KEYWORDS)
+            .filter(([_, keywords]) => keywords.some(keyword => messageLower.includes(keyword)))
+            .map(([category]) => category);
+
+        let userData = null;
+        if (relevantCategories.length > 0) {
+            userData = {};
             
-            const messageLower = message.toLowerCase();
-            const relevantCategories = Object.entries(COLLECTION_KEYWORDS)
-                .filter(([_, keywords]) => keywords.some(keyword => messageLower.includes(keyword)))
-                .map(([category]) => category);
-
-            let userData = null;
-            if (relevantCategories.length > 0) {
-                userData = {};
+            // Fetch data for relevant categories
+            await Promise.all(relevantCategories.map(async (category) => {
+                userData[category] = {};
+                const collections = COLLECTIONS[category];
                 
-                await Promise.all(relevantCategories.map(async (category) => {
-                    userData[category] = {};
-                    const collections = COLLECTIONS[category];
+                await Promise.all(collections.map(async (collection) => {
+                    const querySnapshot = await db.collection(collection)
+                        .where('userId', '==', user.uid)
+                        .orderBy('createdAt', 'desc')
+                        .limit(10)  // Limit to recent items for better performance
+                        .get();
                     
-                    await Promise.all(collections.map(async (collection) => {
-                        const querySnapshot = await db.collection(collection)
-                            .where('userId', '==', user.uid)
-                            .orderBy('createdAt', 'desc')
-                            .limit(10)
-                            .get();
-                        
-                        userData[category][collection] = querySnapshot.docs.map(doc => ({
-                            id: doc.id,
-                            ...doc.data()
-                        }));
+                    userData[category][collection] = querySnapshot.docs.map(doc => ({
+                        id: doc.id,
+                        ...doc.data()
                     }));
                 }));
-            }
-
-            const aiResponse = await queryHuggingFaceAPI(message, userData, username);
-            
-            conversationHistory.push({ role: 'Assistant', content: aiResponse });
-            
-            typingIndicator.remove();
-            addMessage(aiResponse);
-
-        } catch (error) {
-            console.error('Error:', error);
-            typingIndicator.remove();
-            addMessage("I apologize, but I'm having trouble processing your request. Please try again later.");
+            }));
         }
+
+        const aiResponse = await queryHuggingFaceAPI(message, userData, username);
+        
+        // Add AI response to conversation history
+        conversationHistory.push({ role: 'Assistant', content: aiResponse });
+        
+        typingIndicator.remove();
+        addMessage(aiResponse);
+
+    } catch (error) {
+        console.error('Error:', error);
+        typingIndicator.remove();
+        addMessage("I apologize, but I'm having trouble processing your request. Please try again later.");
     }
-
-    // Event Listeners
-    sendButton.addEventListener('click', handleUserMessage);
-
-    userInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            handleUserMessage();
+}
+// Initialize the chatbot when the page loads
+document.addEventListener('DOMContentLoaded', function() {
+    firebase.auth().onAuthStateChanged(async function(user) {
+        if (user) {
+            const username = user.displayName || user.email;
+            document.getElementById('username').textContent = username;
+        } else {
+            window.location.href = "login.html";
         }
     });
+});
+
+// Event listeners for user input
+sendButton.addEventListener('click', handleUserMessage);
+userInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        handleUserMessage();
+    }
+});
 </script>
 
         

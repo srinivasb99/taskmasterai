@@ -1240,10 +1240,10 @@ function handleOptionClick(event) {
     
     // Convert letter option to number (A=0, B=1, C=2, D=3)
     const optionToNumber = {
-        'A': '0',
-        'B': '1',
-        'C': '2',
-        'D': '3'
+        'A': 0,  // Changed from string to number
+        'B': 1,
+        'C': 2,
+        'D': 3
     };
     
     const selectedNumber = optionToNumber[selectedOption];
@@ -1260,21 +1260,29 @@ function handleOptionClick(event) {
                 if (!snapshot.empty) {
                     const doc = snapshot.docs[0];
                     const data = doc.data();
-                    const correctAnswer = data.correctAnswer;
                     
-                    // Check if answer is correct
-                    if (selectedNumber === correctAnswer) {
+                    // Get the question index from the question ID
+                    const questionIndex = parseInt(questionId.replace('q', '')) - 1;
+                    
+                    // Get the correct answer for this specific question
+                    const correctAnswers = data.correctAnswers || [];
+                    const correctAnswer = correctAnswers[questionIndex];
+                    
+                    console.log('Selected:', selectedNumber, 'Correct:', correctAnswer);
+                    
+                    // Check if answer is correct (compare as numbers)
+                    if (selectedNumber === parseInt(correctAnswer)) {
                         option.classList.add('correct');
                     } else {
                         option.classList.add('incorrect');
                         // Show correct answer
                         const numberToOption = {
-                            '0': 'A',
-                            '1': 'B',
-                            '2': 'C',
-                            '3': 'D'
+                            0: 'A',
+                            1: 'B',
+                            2: 'C',
+                            3: 'D'
                         };
-                        const correctLetter = numberToOption[correctAnswer];
+                        const correctLetter = numberToOption[parseInt(correctAnswer)];
                         
                         allOptions.forEach(opt => {
                             if (opt.dataset.option === correctLetter) {
@@ -1289,7 +1297,6 @@ function handleOptionClick(event) {
             });
     }
 }
-
 function showTypingIndicator() {
     const indicator = document.createElement('div');
     indicator.className = 'message ai';

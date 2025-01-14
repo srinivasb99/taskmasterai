@@ -1495,6 +1495,49 @@ Respond naturally and concisely to: ${userInput}
     }
 }
 
+async function fetchCollectionData(collection, user, relevantCollections) {
+    if (collection === 'users') return null;
+
+    const limit = relevantCollections.includes(collection) ? 10 : 5;
+    let results = [];
+    
+    // Try all possible field and orderBy combinations
+    const fieldCombinations = [
+        { idField: 'userId', orderBy: 'timestamp' },
+        { idField: 'userId', orderBy: 'createdAt' },
+        { idField: 'uid', orderBy: 'timestamp' },
+        { idField: 'uid', orderBy: 'createdAt' }
+    ];
+
+    for (const { idField, orderBy } of fieldCombinations) {
+        try {
+            const querySnapshot = await db.collection(collection)
+                .where(idField, '==', user.uid)
+                .orderBy(orderBy, 'desc')
+                .limit(limit)
+                .get();
+
+            if (!querySnapshot.empty) {
+                const docs = querySnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+                results = [...results, ...docs];
+                
+                // If we found documents, break the loop
+                if (results.length > 0) break;
+            }
+        } catch (error) {
+            // If error is about missing index, continue to next combination
+            if (error.code === 'failed-precondition') continue;
+            console.error(`Error fetching ${collection} with ${idField}/${orderBy}:`, error);
+        }
+    }
+
+    // Remove duplicates based on document ID
+    return Array.from(new Map(results.map(item => [item.id, item])).values());
+}
+
 async function handleUserMessage() {
     const message = userInput.value.trim();
     if (!message) return;
@@ -1516,46 +1559,38 @@ async function handleUserMessage() {
         const username = user.displayName || user.email;
         const messageLower = message.toLowerCase();
         
-        const relevantCollections = Object.entries(COLLECTION_KEYWORDS)
-            .filter(([_, keywords]) => keywords.some(keyword => messageLower.includes(keyword)))
-            .map(([collection]) => collection);
-
-        relevantCollections.push('users');
-        if (messageLower.includes('study') || messageLower.includes('notes') || messageLower.includes('pdf')) {
-            relevantCollections.push('generatedpdfs');
-        }
-
+        // Initialize userData
         let userData = {};
         
+        // Fetch user profile data
         const userDoc = await db.collection('users').doc(user.uid).get();
         if (userDoc.exists) {
             userData.user = userDoc.data();
         }
 
-        await Promise.all(relevantCollections.map(async (collection) => {
-            if (collection === 'users') return;
-            
-            let querySnapshot = await db.collection(collection)
-                .where('userId', '==', user.uid)
-                .orderBy('timestamp', 'desc')
-                .limit(5)
-                .get();
-            
-            if (querySnapshot.empty) {
-                querySnapshot = await db.collection(collection)
-                    .where('uid', '==', user.uid)
-                    .orderBy('timestamp', 'desc')
-                    .limit(5)
-                    .get();
-            }
-            
-            userData[collection] = querySnapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            }));
-        }));
+        // Determine relevant collections based on message content
+        const relevantCollections = Object.entries(COLLECTION_KEYWORDS)
+            .filter(([_, keywords]) => keywords.some(keyword => messageLower.includes(keyword)))
+            .map(([collection]) => collection);
+
+        // Always include users collection
+        if (!relevantCollections.includes('users')) {
+            relevantCollections.push('users');
+        }
+
+        // Fetch data from all collections
+        const collectionPromises = Object.keys(COLLECTION_SCHEMAS)
+            .map(async (collection) => {
+                const data = await fetchCollectionData(collection, user, relevantCollections);
+                if (data && data.length > 0) {
+                    userData[collection] = data;
+                }
+            });
+
+        await Promise.all(collectionPromises);
 
         console.log('Fetched user data:', userData);
+        console.log('Relevant collections:', relevantCollections);
 
         const aiResponse = await queryHuggingFaceAPI(message, userData, username);
         conversationHistory.push({ role: 'Assistant', content: aiResponse });

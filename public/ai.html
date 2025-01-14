@@ -1178,6 +1178,7 @@ function handleOptionClick(event) {
     const option = event.currentTarget;
     const questionId = option.dataset.questionId;
     const selectedOption = option.dataset.option;
+    const questionText = option.closest('.message-text').querySelector('.question').textContent;
     
     // Get all options for this question
     const allOptions = document.querySelectorAll(`.option[data-question-id="${questionId}"]`);
@@ -1196,25 +1197,37 @@ function handleOptionClick(event) {
         db.collection('generatedpdfs')
             .where('userId', '==', user.uid)
             .orderBy('timestamp', 'desc')
-            .limit(1)
             .get()
             .then(snapshot => {
                 if (!snapshot.empty) {
-                    const doc = snapshot.docs[0];
-                    const data = doc.data();
-                    const correctAnswer = data.correctAnswer;
+                    // Find the document that contains this question
+                    let correctAnswer = null;
+                    let found = false;
                     
-                    // Check if answer is correct
-                    if (selectedOption === correctAnswer) {
-                        option.classList.add('correct');
+                    snapshot.forEach(doc => {
+                        const data = doc.data();
+                        // Check if this document contains our question
+                        if (data.question && data.question.trim() === questionText.trim()) {
+                            correctAnswer = data.correctAnswer;
+                            found = true;
+                        }
+                    });
+                    
+                    if (found && correctAnswer) {
+                        // Check if answer is correct
+                        if (selectedOption === correctAnswer) {
+                            option.classList.add('correct');
+                        } else {
+                            option.classList.add('incorrect');
+                            // Show correct answer
+                            allOptions.forEach(opt => {
+                                if (opt.dataset.option === correctAnswer) {
+                                    opt.classList.add('correct');
+                                }
+                            });
+                        }
                     } else {
-                        option.classList.add('incorrect');
-                        // Show correct answer
-                        allOptions.forEach(opt => {
-                            if (opt.dataset.option === correctAnswer) {
-                                opt.classList.add('correct');
-                            }
-                        });
+                        console.error('Question not found in database');
                     }
                 }
             })
@@ -1223,6 +1236,7 @@ function handleOptionClick(event) {
             });
     }
 }
+
 function showTypingIndicator() {
     const indicator = document.createElement('div');
     indicator.className = 'message ai';

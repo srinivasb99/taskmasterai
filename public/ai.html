@@ -1173,35 +1173,6 @@ const COLLECTION_KEYWORDS = {
 let conversationHistory = [];
 
 async function queryHuggingFaceAPI(userInput, userData = null, username = null) {
-    const userIdentityKeywords = ['who am i', 'what is my name', "what's my name", 'my name', 'who i am'];
-    const isIdentityQuestion = userIdentityKeywords.some(keyword => userInput.toLowerCase().includes(keyword));
-
-    // Format conversation history concisely
-    const formattedHistory = conversationHistory.slice(-5).map(msg => 
-        `${msg.role}: ${msg.content}`
-    ).join('\n');
-
-    // Include collection schemas in system prompt for better context
-    const systemPrompt = `<|im_start|>system
-You are TaskMaster AI, a helpful productivity assistant. ${isIdentityQuestion ? `The user's name is ${username}.` : ''}
-
-Available Collections and their structures:
-${Object.entries(COLLECTION_SCHEMAS)
-    .map(([collection, schema]) => 
-        `${collection}: ${Object.entries(schema)
-            .map(([field, type]) => `${field} (${type})`)
-            .join(', ')}`)
-    .join('\n')}
-
-Context:
-${formattedHistory}
-
-${userData ? `User Data: ${JSON.stringify(userData)}` : ''}
-
-Respond naturally and concisely to: ${userInput}
-<|im_end|>
-<|im_start|>assistant`;
-
     try {
         const response = await fetch(MODEL_ENDPOINT, {
             method: 'POST',
@@ -1212,28 +1183,19 @@ Respond naturally and concisely to: ${userInput}
             body: JSON.stringify({
                 inputs: systemPrompt,
                 parameters: {
-                    max_new_tokens: 200,
+                    max_length: 1000,
                     temperature: 0.7,
                     top_p: 0.9,
-                    return_full_text: false,
-                    stop: ["<|im_end|>", "<|im_start|>"]
+                    return_full_text: false
                 }
             })
         });
 
         if (!response.ok) throw new Error('API request failed');
-
         const result = await response.json();
-        // Clean up the response to remove any system prompt remnants
-        const cleanResponse = result[0].generated_text
-            .replace(systemPrompt, '')
-            .replace(/<\|im_start\|>assistant/g, '')
-            .replace(/<\|im_end\|>/g, '')
-            .trim();
-
-        return cleanResponse;
+        return result[0].generated_text;
     } catch (error) {
-        console.error('Error querying Hugging Face API:', error);
+        console.error('Error calling Hugging Face API:', error);
         throw error;
     }
 }
@@ -1310,8 +1272,6 @@ async function handleUserMessage() {
                 }
             }));
         }
-
-
 
         // Enhanced system prompt with PDF context if available
         let enhancedPrompt = `You are TaskMaster AI, a helpful productivity assistant. ${isIdentityQuestion ? `The user's name is ${username}.` : ''}

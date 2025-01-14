@@ -1238,11 +1238,12 @@ Respond naturally and concisely to: ${userInput}
             body: JSON.stringify({
                 inputs: systemPrompt,
                 parameters: {
-                    max_new_tokens: 200,
+                    max_new_tokens: 400, // Increased from 200 to 400 to allow for longer responses
                     temperature: 0.7,
                     top_p: 0.9,
                     return_full_text: false,
-                    stop: ["<|im_end|>", "<|im_start|>"]
+                    stop: ["<|im_end|>", "<|im_start|>"],
+                    repetition_penalty: 1.1 // Added to help prevent repetitive text
                 }
             })
         });

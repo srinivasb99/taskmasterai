@@ -700,49 +700,6 @@ body.night-mode {
             color: var(--text-color, #F8F9FA);
         }
 
-    .message {
-        display: flex;
-        align-items: flex-start;
-        margin-bottom: 20px;
-        gap: 10px;
-    }
-
-    .profile-pic {
-        width: 40px;
-        height: 40px;
-        border-radius: 50%;
-        overflow: hidden;
-        flex-shrink: 0;
-        background-color: var(--glass-bg);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-
-    .profile-pic img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-    }
-
-    .profile-pic svg {
-        width: 24px;
-        height: 24px;
-        color: var(--text-color);
-    }
-
-    .message-content {
-        flex-grow: 1;
-    }
-
-    .user-message {
-        flex-direction: row-reverse;
-    }
-
-    .user-message .message-content {
-        align-items: flex-end;
-    }
-
     </style>
 </head>
 <body>
@@ -1178,15 +1135,50 @@ function addMessage(message, isUser = false) {
     
     const avatar = document.createElement('div');
     avatar.className = 'message-avatar';
-    avatar.innerHTML = isUser ? `
-        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM12 5C13.66 5 15 6.34 15 8C15 9.66 13.66 11 12 11C10.34 11 9 9.66 9 8C9 6.34 10.34 5 12 5ZM12 19.2C9.5 19.2 7.29 17.92 6 15.98C6.03 13.99 10 12.9 12 12.9C13.99 12.9 17.97 13.99 18 15.98C16.71 17.92 14.5 19.2 12 19.2Z" fill="#FFFFFF"/>
-        </svg>
-    ` : `
-        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 3V4M12 20V21M4 12H3M6.31412 6.31412L5.5 5.5M17.6859 6.31412L18.5 5.5M6.31412 17.69L5.5 18.5001M17.6859 17.69L18.5 18.5001M21 12H20M16 12C16 14.2091 14.2091 16 12 16C9.79086 16 8 14.2091 8 12C8 9.79086 9.79086 8 12 8C14.2091 8 16 9.79086 16 12Z" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-        </svg>
-    `;
+    
+    if (isUser) {
+        // For user messages, check Firebase for profile picture
+        const currentUser = firebase.auth().currentUser;
+        if (currentUser) {
+            const uid = currentUser.uid;
+            const userDocRef = firestore.collection('users').doc(uid);
+            
+            userDocRef.get().then(doc => {
+                if (doc.exists && doc.data().profilePicture) {
+                    avatar.innerHTML = `<img src="${doc.data().profilePicture}" alt="Profile Picture">`;
+                } else {
+                    // Use default avatar if no profile picture
+                    avatar.innerHTML = `
+                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM12 5C13.66 5 15 6.34 15 8C15 9.66 13.66 11 12 11C10.34 11 9 9.66 9 8C9 6.34 10.34 5 12 5ZM12 19.2C9.5 19.2 7.29 17.92 6 15.98C6.03 13.99 10 12.9 12 12.9C13.99 12.9 17.97 13.99 18 15.98C16.71 17.92 14.5 19.2 12 19.2Z" fill="#FFFFFF"/>
+                        </svg>
+                    `;
+                }
+            }).catch(error => {
+                console.error("Error loading profile picture:", error);
+                // Use default avatar on error
+                avatar.innerHTML = `
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM12 5C13.66 5 15 6.34 15 8C15 9.66 13.66 11 12 11C10.34 11 9 9.66 9 8C9 6.34 10.34 5 12 5ZM12 19.2C9.5 19.2 7.29 17.92 6 15.98C6.03 13.99 10 12.9 12 12.9C13.99 12.9 17.97 13.99 18 15.98C16.71 17.92 14.5 19.2 12 19.2Z" fill="#FFFFFF"/>
+                    </svg>
+                `;
+            });
+        } else {
+            // Use default avatar if no user is logged in
+            avatar.innerHTML = `
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM12 5C13.66 5 15 6.34 15 8C15 9.66 13.66 11 12 11C10.34 11 9 9.66 9 8C9 6.34 10.34 5 12 5ZM12 19.2C9.5 19.2 7.29 17.92 6 15.98C6.03 13.99 10 12.9 12 12.9C13.99 12.9 17.97 13.99 18 15.98C16.71 17.92 14.5 19.2 12 19.2Z" fill="#FFFFFF"/>
+                </svg>
+            `;
+        }
+    } else {
+        // AI avatar remains unchanged
+        avatar.innerHTML = `
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 3V4M12 20V21M4 12H3M6.31412 6.31412L5.5 5.5M17.6859 6.31412L18.5 5.5M6.31412 17.69L5.5 18.5001M17.6859 17.69L18.5 18.5001M21 12H20M16 12C16 14.2091 14.2091 16 12 16C9.79086 16 8 14.2091 8 12C8 9.79086 9.79086 8 12 8C14.2091 8 16 9.79086 16 12Z" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+            </svg>
+        `;
+    }
 
     const content = document.createElement('div');
     content.className = 'message-content';
@@ -1215,7 +1207,6 @@ function addMessage(message, isUser = false) {
     chatMessages.appendChild(messageDiv);
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
-
 // Function to handle option clicks
 function handleOptionClick(event) {
     const option = event.currentTarget;
@@ -1266,71 +1257,6 @@ function handleOptionClick(event) {
             });
     }
 }
-
-// Function to get user's profile picture URL
-async function getUserProfilePicture(userId) {
-    try {
-        const doc = await db.collection('users').doc(userId).get();
-        if (doc.exists && doc.data().profilePicture) {
-            return doc.data().profilePicture;
-        }
-        return null;
-    } catch (error) {
-        console.error('Error fetching profile picture:', error);
-        return null;
-    }
-}
-
-// Function to create message element
-function createMessageElement(message, isUser = false) {
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${isUser ? 'user-message' : 'ai-message'}`;
-    
-    const profilePicDiv = document.createElement('div');
-    profilePicDiv.className = 'profile-pic';
-    
-    if (isUser) {
-        // For user messages, fetch and set profile picture
-        const user = firebase.auth().currentUser;
-        if (user) {
-            getUserProfilePicture(user.uid).then(profilePicUrl => {
-                if (profilePicUrl) {
-                    profilePicDiv.innerHTML = `<img src="${profilePicUrl}" alt="Profile Picture">`;
-                } else {
-                    // Default user avatar SVG if no profile picture
-                    profilePicDiv.innerHTML = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM12 4C14.21 4 16 5.79 16 8C16 10.21 14.21 12 12 12C9.79 12 8 10.21 8 8C8 5.79 9.79 4 12 4ZM12 20C9.33 20 6.34 18.87 4.63 16.74C5.91 15.43 8.39 14.5 12 14.5C15.61 14.5 18.09 15.43 19.37 16.74C17.66 18.87 14.67 20 12 20Z" fill="currentColor"/>
-                    </svg>`;
-                }
-            });
-        }
-    } else {
-        // AI avatar
-        profilePicDiv.innerHTML = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM12 4C14.21 4 16 5.79 16 8C16 10.21 14.21 12 12 12C9.79 12 8 10.21 8 8C8 5.79 9.79 4 12 4ZM12 20C9.33 20 6.34 18.87 4.63 16.74C5.91 15.43 8.39 14.5 12 14.5C15.61 14.5 18.09 15.43 19.37 16.74C17.66 18.87 14.67 20 12 20Z" fill="currentColor"/>
-        </svg>`;
-    }
-
-    const messageContent = document.createElement('div');
-    messageContent.className = 'message-content';
-    
-    const messageText = document.createElement('div');
-    messageText.className = 'message-text';
-    messageText.innerHTML = message;
-    
-    const timestamp = document.createElement('div');
-    timestamp.className = 'timestamp';
-    timestamp.textContent = 'Just now';
-    
-    messageContent.appendChild(messageText);
-    messageContent.appendChild(timestamp);
-    
-    messageDiv.appendChild(profilePicDiv);
-    messageDiv.appendChild(messageContent);
-    
-    return messageDiv;
-}
-
 function showTypingIndicator() {
     const indicator = document.createElement('div');
     indicator.className = 'message ai';

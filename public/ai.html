@@ -1264,69 +1264,97 @@ async function handleUserMessage() {
             .filter(([_, keywords]) => keywords.some(keyword => messageLower.includes(keyword)))
             .map(([collection]) => collection);
 
-        // Always include user data
-        relevantCollections.push('users');
-
         let userData = {};
         
-        // Fetch user data first
-        const userDoc = await db.collection('users').doc(user.uid).get();
-        if (userDoc.exists) {
-            userData.user = userDoc.data();
+        // Always fetch generatedpdfs data if message contains relevant keywords
+        if (messageLower.includes('pdf') || messageLower.includes('notes') || messageLower.includes('summary')) {
+            const pdfSnapshot = await db.collection('generatedpdfs')
+                .where('userId', '==', user.uid)
+                .orderBy('timestamp', 'desc')
+                .limit(5)
+                .get();
+
+            if (!pdfSnapshot.empty) {
+                userData.generatedpdfs = pdfSnapshot.docs.map(doc => {
+                    const data = doc.data();
+                    return {
+                        fileName: data.fileName,
+                        keyPoints: Array.isArray(data.keyPoints) ? data.keyPoints : [],
+                        overview: data.overview,
+                        rawQuestions: Array.isArray(data.rawQuestions) ? data.rawQuestions.map(q => ({
+                            question: q.question,
+                            choices: q.choices,
+                            correctAnswer: q.correctAnswer,
+                            keyPoint: q.keyPoint
+                        })) : [],
+                        timestamp: data.timestamp
+                    };
+                });
+            }
         }
 
-        // Fetch data from relevant collections
-        await Promise.all(relevantCollections.map(async (collection) => {
-            if (collection === 'users') return; // Skip users collection as we already fetched it
-            
-            const querySnapshot = await db.collection(collection)
-                .where('userId', '==', user.uid) // Use uid for userId field
-                .orderBy('createdAt', 'desc')
-                .limit(5)
-                .get();
-            
-            userData[collection] = querySnapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            }));
-        }));
-
-        // Also check for documents where uid is used instead of userId
-        await Promise.all(relevantCollections.map(async (collection) => {
-            if (collection === 'users') return;
-            
-            const uidQuerySnapshot = await db.collection(collection)
-                .where('uid', '==', user.uid) // Check uid field as well
-                .orderBy('createdAt', 'desc')
-                .limit(5)
-                .get();
-            
-            if (uidQuerySnapshot.docs.length > 0) {
-                userData[collection] = [
-                    ...(userData[collection] || []),
-                    ...uidQuerySnapshot.docs.map(doc => ({
+        // Fetch other relevant collections
+        if (relevantCollections.length > 0) {
+            await Promise.all(relevantCollections.map(async (collection) => {
+                if (collection !== 'generatedpdfs') { // Skip if already fetched
+                    const querySnapshot = await db.collection(collection)
+                        .where('userId', '==', user.uid)
+                        .orderBy('createdAt', 'desc')
+                        .limit(5)
+                        .get();
+                    
+                    userData[collection] = querySnapshot.docs.map(doc => ({
                         id: doc.id,
                         ...doc.data()
-                    }))
-                ];
-            }
-        }));
+                    }));
+                }
+            }));
+        }
 
-        console.log('Fetched user data:', userData); // Debug log
 
-        const aiResponse = await queryHuggingFaceAPI(message, userData, username);
+
+        // Enhanced system prompt with PDF context if available
+        let enhancedPrompt = `You are TaskMaster AI, a helpful productivity assistant. ${isIdentityQuestion ? `The user's name is ${username}.` : ''}
+
+Available Collections and their structures:
+${Object.entries(COLLECTION_SCHEMAS)
+    .map(([collection, schema]) => 
+        `${collection}: ${Object.entries(schema)
+            .map(([field, type]) => `${field} (${type})`)
+            .join(', ')}`)
+    .join('\n')}
+
+Context:
+${formattedHistory}
+
+`;
+
+        // Add PDF-specific context if available
+        if (userData.generatedpdfs && userData.generatedpdfs.length > 0) {
+            enhancedPrompt += `\nRecent PDF Documents:\n${userData.generatedpdfs.map(pdf => `
+File: ${pdf.fileName}
+Overview: ${pdf.overview}
+Key Points:
+${pdf.keyPoints.map((point, i) => `${i + 1}. ${point}`).join('\n')}
+${pdf.rawQuestions ? `\nQuestions Available: Yes (${pdf.rawQuestions.length} questions)` : ''}`).join('\n\n')}`;
+        }
+
+        enhancedPrompt += `\n\nUser Data: ${JSON.stringify(userData)}
+
+Respond naturally and concisely to: ${userInput}`;
+
+        const aiResponse = await queryHuggingFaceAPI(enhancedPrompt, userData, username);
         conversationHistory.push({ role: 'Assistant', content: aiResponse });
         
         typingIndicator.remove();
         addMessage(aiResponse);
 
     } catch (error) {
-        console.error('Error in handleUserMessage:', error);
+        console.error('Error:', error);
         typingIndicator.remove();
         addMessage("I apologize, but I'm having trouble processing your request. Please try again later.");
     }
 }
-
 
 
 // Event listeners

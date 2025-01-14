@@ -1271,26 +1271,30 @@ function handleOptionClick(event) {
             });
     }
 }
+
+
+let userInput, chatMessages;
+
 function showTypingIndicator() {
-    const indicator = document.createElement('div');
-    indicator.className = 'message ai';
-    indicator.innerHTML = `
+    const typingDiv = document.createElement('div');
+    typingDiv.className = 'message ai typing';
+    typingDiv.innerHTML = `
         <div class="message-avatar">
             <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M12 3V4M12 20V21M4 12H3M6.31412 6.31412L5.5 5.5M17.6859 6.31412L18.5 5.5M6.31412 17.69L5.5 18.5001M17.6859 17.69L18.5 18.5001M21 12H20M16 12C16 14.2091 14.2091 16 12 16C9.79086 16 8 14.2091 8 12C8 9.79086 9.79086 8 12 8C14.2091 8 16 9.79086 16 12Z" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
             </svg>
         </div>
-        <div class="typing-indicator">
-            <div class="typing-dot"></div>
-            <div class="typing-dot"></div>
-            <div class="typing-dot"></div>
-        </div>
-    `;
-    chatMessages.appendChild(indicator);
+        <div class="message-content">
+            <div class="typing-indicator">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </div>`;
+    chatMessages.appendChild(typingDiv);
     chatMessages.scrollTop = chatMessages.scrollHeight;
-    return indicator;
+    return typingDiv;
 }
-
 // Constants for API and collections
 const HUGGING_FACE_API_KEY = "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";
 const MODEL_ENDPOINT = "https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct";
@@ -1584,43 +1588,54 @@ async function handleUserMessage() {
         const username = user.displayName || user.email;
         const messageLower = message.toLowerCase();
         
-        const relevantCollections = Object.entries(COLLECTION_KEYWORDS)
-            .filter(([_, keywords]) => keywords.some(keyword => messageLower.includes(keyword)))
-            .map(([collection]) => collection);
-
-        relevantCollections.push('users');
-        if (messageLower.includes('study') || messageLower.includes('notes') || messageLower.includes('pdf')) {
-            relevantCollections.push('generatedpdfs');
-        }
+        // Determine which collections to query based on message content
+        const relevantCollections = new Set(['users']); // Always include users
+        
+        Object.entries(COLLECTION_KEYWORDS).forEach(([collection, keywords]) => {
+            if (keywords.some(keyword => messageLower.includes(keyword))) {
+                relevantCollections.add(collection);
+            }
+        });
 
         let userData = {};
         
+        // Fetch user data
         const userDoc = await db.collection('users').doc(user.uid).get();
         if (userDoc.exists) {
             userData.user = userDoc.data();
         }
 
-        await Promise.all(relevantCollections.map(async (collection) => {
-            if (collection === 'users') return;
+        // Fetch data from relevant collections
+        await Promise.all([...relevantCollections].map(async (collection) => {
+            if (collection === 'users') return; // Skip users as we already fetched it
             
-            let querySnapshot = await db.collection(collection)
-                .where('userId', '==', user.uid)
-                .orderBy('timestamp', 'desc')
-                .limit(5)
-                .get();
-            
-            if (querySnapshot.empty) {
-                querySnapshot = await db.collection(collection)
-                    .where('uid', '==', user.uid)
-                    .orderBy('timestamp', 'desc')
-                    .limit(5)
-                    .get();
+            try {
+                let query = db.collection(collection);
+                
+                // Add appropriate where clause based on collection
+                if (collection === 'events') {
+                    query = query.where('uid', '==', user.uid);
+                } else {
+                    query = query.where('userId', '==', user.uid);
+                }
+                
+                // Add ordering if the collection has a timestamp field
+                if (COLLECTION_SCHEMAS[collection].timestamp || 
+                    COLLECTION_SCHEMAS[collection].createdAt) {
+                    const timeField = COLLECTION_SCHEMAS[collection].timestamp ? 'timestamp' : 'createdAt';
+                    query = query.orderBy(timeField, 'desc');
+                }
+                
+                const querySnapshot = await query.limit(5).get();
+                
+                userData[collection] = querySnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+            } catch (error) {
+                console.error(`Error fetching ${collection}:`, error);
+                userData[collection] = []; // Set empty array if fetch fails
             }
-            
-            userData[collection] = querySnapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            }));
         }));
 
         console.log('Fetched user data:', userData);
@@ -1642,6 +1657,7 @@ async function handleUserMessage() {
 document.addEventListener('DOMContentLoaded', () => {
     userInput = document.getElementById('user-input');
     chatMessages = document.getElementById('chat-messages');
+    const sendButton = document.getElementById('send-button');
     
     userInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -1650,12 +1666,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     
-    document.getElementById('send-button').addEventListener('click', handleUserMessage);
-});
+    sendButton.addEventListener('click', handleUserMessage);
 
-// Initialize the chatbot when the page loads
-document.addEventListener('DOMContentLoaded', function() {
-    firebase.auth().onAuthStateChanged(async function(user) {
+    // Initialize Firebase auth state
+    firebase.auth().onAuthStateChanged(function(user) {
         if (user) {
             const username = user.displayName || user.email;
             document.getElementById('username').textContent = username;
@@ -1665,13 +1679,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-// Event listeners for user input
-sendButton.addEventListener('click', handleUserMessage);
-userInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-        handleUserMessage();
-    }
-});
 </script>
 
         

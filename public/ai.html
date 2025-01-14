@@ -1549,18 +1549,18 @@ async function handleUserMessage() {
         const username = user.displayName || user.email;
         const messageLower = message.toLowerCase();
         
-        // Determine relevant collections based on message content
-        const relevantCollections = Object.entries(COLLECTION_KEYWORDS)
-            .filter(([_, keywords]) => keywords.some(keyword => messageLower.includes(keyword)))
-            .map(([collection]) => collection);
-
-        // Always include user data and generated PDFs for context
-        relevantCollections.push('users');
-        if (messageLower.includes('study') || messageLower.includes('notes') || messageLower.includes('pdf')) {
-            relevantCollections.push('generatedpdfs');
-        }
-
-        let userData = {};
+        // Initialize userData with all collections
+        let userData = {
+            tasks: [],
+            goals: [],
+            projects: [],
+            plans: [],
+            timers: [],
+            events: [],
+            uploads: [],
+            generatedpdfs: [],
+            replies: []
+        };
         
         // Fetch user profile data
         const userDoc = await db.collection('users').doc(user.uid).get();
@@ -1568,39 +1568,71 @@ async function handleUserMessage() {
             userData.user = userDoc.data();
         }
 
-        // Fetch data from relevant collections
-        await Promise.all(relevantCollections.map(async (collection) => {
-            if (collection === 'users') return;
-            
-            try {
-                // Try userId first
-                let querySnapshot = await db.collection(collection)
-                    .where('userId', '==', user.uid)
-                    .orderBy('timestamp', 'desc')
-                    .limit(5)
-                    .get();
-                
-                // If no results, try uid
-                if (querySnapshot.empty) {
-                    querySnapshot = await db.collection(collection)
-                        .where('uid', '==', user.uid)
-                        .orderBy('timestamp', 'desc')
-                        .limit(5)
-                        .get();
-                }
-                
-                if (!querySnapshot.empty) {
-                    userData[collection] = querySnapshot.docs.map(doc => ({
-                        id: doc.id,
-                        ...doc.data()
-                    }));
-                }
-            } catch (error) {
-                console.error(`Error fetching ${collection} data:`, error);
-            }
-        }));
+        // Determine which collections to prioritize based on message content
+        const priorityCollections = Object.entries(COLLECTION_KEYWORDS)
+            .filter(([_, keywords]) => keywords.some(keyword => messageLower.includes(keyword)))
+            .map(([collection]) => collection);
 
+        // Always include user data
+        if (!priorityCollections.includes('users')) {
+            priorityCollections.push('users');
+        }
+
+        // Fetch data from ALL collections, but prioritize relevant ones
+        const fetchPromises = Object.keys(COLLECTION_SCHEMAS)
+            .filter(collection => collection !== 'users')
+            .map(async (collection) => {
+                try {
+                    // Try userId first
+                    let querySnapshot = await db.collection(collection)
+                        .where('userId', '==', user.uid)
+                        .orderBy('timestamp', 'desc')
+                        .limit(priorityCollections.includes(collection) ? 10 : 5) // Fetch more items from priority collections
+                        .get();
+                    
+                    // If no results, try uid
+                    if (querySnapshot.empty) {
+                        querySnapshot = await db.collection(collection)
+                            .where('uid', '==', user.uid)
+                            .orderBy('timestamp', 'desc')
+                            .limit(priorityCollections.includes(collection) ? 10 : 5)
+                            .get();
+                    }
+                    
+                    if (!querySnapshot.empty) {
+                        userData[collection] = querySnapshot.docs.map(doc => ({
+                            id: doc.id,
+                            ...doc.data()
+                        }));
+                    }
+                } catch (error) {
+                    console.error(`Error fetching ${collection} data:`, error);
+                    // Don't throw error, continue with other collections
+                }
+            });
+
+        // Wait for all collection fetches to complete
+        await Promise.all(fetchPromises);
+
+        // Log fetched data for debugging
         console.log('Fetched user data:', userData);
+        console.log('Priority collections:', priorityCollections);
+
+        // Format collection data for AI context
+        const formattedCollections = Object.entries(userData)
+            .filter(([collection, data]) => collection !== 'user' && Array.isArray(data) && data.length > 0)
+            .map(([collection, data]) => {
+                if (collection === 'generatedpdfs') {
+                    return formatGeneratedPDFs(data);
+                } else {
+                    return formatOtherCollection(collection, data);
+                }
+            })
+            .filter(Boolean)
+            .join('\n\n');
+
+        // Add formatted collections to userData for AI context
+        userData.formattedCollections = formattedCollections;
 
         const aiResponse = await queryHuggingFaceAPI(message, userData, username);
         conversationHistory.push({ role: 'Assistant', content: aiResponse });
@@ -1613,6 +1645,44 @@ async function handleUserMessage() {
         typingIndicator.remove();
         addMessage("I apologize, but I'm having trouble processing your request. Please try again later.");
     }
+}
+
+// Helper function to format generated PDFs data
+function formatGeneratedPDFs(pdfs) {
+    return `Generated PDFs Information:
+${pdfs.map(pdf => `
+Document: ${pdf.fileName}
+Overview: ${pdf.overview}
+Key Points:
+${pdf.keyPoints?.map((point, i) => `${i + 1}. ${point}`).join('\n')}
+Questions:
+${pdf.rawQuestions?.map((q, i) => {
+    const choices = pdf.choices?.[i] || [];
+    return `Q${i + 1}: ${q}
+Choices: ${choices.join(' | ')}
+Correct Answer: ${pdf.correctAnswer}
+Related Key Point: ${pdf.keyPoint}`;
+}).join('\n')}
+`).join('\n')}`;
+}
+
+// Helper function to format other collections
+function formatOtherCollection(collection, data) {
+    const title = collection.charAt(0).toUpperCase() + collection.slice(1);
+    const items = data.map(item => {
+        const mainField = item.task || item.goal || item.project || item.plan || 
+                         item.name || item.title || item.fileName;
+        const dueDate = item.dueDate ? new Date(item.dueDate.seconds * 1000).toLocaleDateString() : 'No due date';
+        const status = item.status || 'In Progress';
+        const description = item.description || '';
+        
+        return `- ${mainField}
+  Due: ${dueDate}
+  Status: ${status}
+  ${description ? `Description: ${description}` : ''}`;
+    }).filter(Boolean);
+
+    return items.length > 0 ? `${title}:\n${items.join('\n')}` : '';
 }
 
 // Event listeners

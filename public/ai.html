@@ -1105,6 +1105,7 @@ const chatMessages = document.getElementById('chatMessages');
 const userInput = document.getElementById('userInput');
 const sendButton = document.getElementById('sendMessage');
 
+// [Previous formatMessage function remains unchanged]
 function formatMessage(text) {
     // Format bullet points
     text = text.replace(/\n\s*\*\s+/g, '\n<li class="bullet-point">');
@@ -1143,6 +1144,7 @@ function formatMessage(text) {
     return text;
 }
 
+// [Previous addMessage function remains unchanged]
 function addMessage(message, isUser = false) {
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${isUser ? 'user' : 'ai'}`;
@@ -1221,84 +1223,101 @@ function addMessage(message, isUser = false) {
     chatMessages.appendChild(messageDiv);
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
-// Function to handle option clicks
-function handleOptionClick(event) {
+
+// Updated handleOptionClick function to handle both PDF and other collection answers
+async function handleOptionClick(event) {
     const option = event.currentTarget;
     const questionId = option.dataset.questionId;
     const selectedOption = option.dataset.option;
     
-    // Get all options for this question
     const allOptions = document.querySelectorAll(`.option[data-question-id="${questionId}"]`);
-    
-    // Remove previous selections
-    allOptions.forEach(opt => {
-        opt.classList.remove('correct', 'incorrect', 'selected');
-    });
-    
-    // Add selected class
+    allOptions.forEach(opt => opt.classList.remove('correct', 'incorrect', 'selected'));
     option.classList.add('selected');
     
-    // Get correct answer from Firebase
     const user = firebase.auth().currentUser;
-    if (user) {
-        db.collection('generatedpdfs')
+    if (!user) return;
+
+    try {
+        // First try generatedpdfs collection
+        const pdfSnapshot = await db.collection('generatedpdfs')
             .where('userId', '==', user.uid)
             .orderBy('timestamp', 'desc')
             .limit(1)
-            .get()
-            .then(snapshot => {
-                if (!snapshot.empty) {
-                    const doc = snapshot.docs[0];
-                    const data = doc.data();
-                    const correctAnswer = data.correctAnswer;
-                    
-                    // Check if answer is correct
-                    if (selectedOption === correctAnswer) {
-                        option.classList.add('correct');
-                    } else {
-                        option.classList.add('incorrect');
-                        // Show correct answer
-                        allOptions.forEach(opt => {
-                            if (opt.dataset.option === correctAnswer) {
-                                opt.classList.add('correct');
-                            }
-                        });
-                    }
+            .get();
+
+        if (!pdfSnapshot.empty) {
+            const pdfDoc = pdfSnapshot.docs[0];
+            const pdfData = pdfDoc.data();
+            
+            if (pdfData.correctAnswer) {
+                handleAnswerResult(selectedOption, pdfData.correctAnswer, option, allOptions);
+                return;
+            }
+        }
+
+        // If no answer found in PDFs, check other collections
+        const collections = ['tasks', 'goals', 'projects', 'plans'];
+        for (const collection of collections) {
+            const snapshot = await db.collection(collection)
+                .where('userId', '==', user.uid)
+                .where('questionId', '==', questionId)
+                .limit(1)
+                .get();
+
+            if (!snapshot.empty) {
+                const doc = snapshot.docs[0];
+                const data = doc.data();
+                
+                if (data.correctAnswer) {
+                    handleAnswerResult(selectedOption, data.correctAnswer, option, allOptions);
+                    return;
                 }
-            })
-            .catch(error => {
-                console.error('Error checking answer:', error);
-            });
+            }
+        }
+    } catch (error) {
+        console.error('Error checking answer:', error);
     }
 }
 
+function handleAnswerResult(selectedOption, correctAnswer, selectedElement, allOptions) {
+    if (selectedOption === correctAnswer) {
+        selectedElement.classList.add('correct');
+    } else {
+        selectedElement.classList.add('incorrect');
+        allOptions.forEach(opt => {
+            if (opt.dataset.option === correctAnswer) {
+                opt.classList.add('correct');
+            }
+        });
+    }
+}
 
-
+// [Previous showTypingIndicator function remains unchanged]
 function showTypingIndicator() {
-    const typingDiv = document.createElement('div');
-    typingDiv.className = 'message ai typing';
-    typingDiv.innerHTML = `
+    const indicator = document.createElement('div');
+    indicator.className = 'message ai';
+    indicator.innerHTML = `
         <div class="message-avatar">
             <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M12 3V4M12 20V21M4 12H3M6.31412 6.31412L5.5 5.5M17.6859 6.31412L18.5 5.5M6.31412 17.69L5.5 18.5001M17.6859 17.69L18.5 18.5001M21 12H20M16 12C16 14.2091 14.2091 16 12 16C9.79086 16 8 14.2091 8 12C8 9.79086 9.79086 8 12 8C14.2091 8 16 9.79086 16 12Z" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
             </svg>
         </div>
-        <div class="message-content">
-            <div class="typing-indicator">
-                <span></span>
-                <span></span>
-                <span></span>
-            </div>
-        </div>`;
-    chatMessages.appendChild(typingDiv);
+        <div class="typing-indicator">
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+        </div>
+    `;
+    chatMessages.appendChild(indicator);
     chatMessages.scrollTop = chatMessages.scrollHeight;
-    return typingDiv;
+    return indicator;
 }
-// Constants for API and collections
+
+// Constants and configurations
 const HUGGING_FACE_API_KEY = "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";
 const MODEL_ENDPOINT = "https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct";
 
-// Collection Schemas
+// Updated collection schemas
 const COLLECTION_SCHEMAS = {
     users: {
         acceptedFriends: 'array',
@@ -1381,7 +1400,7 @@ const COLLECTION_SCHEMAS = {
     }
 };
 
-// Collection mappings for related data
+// Collection groupings
 const COLLECTIONS = {
     productivity: ['tasks', 'goals', 'projects', 'plans'],
     time: ['timers', 'events'],
@@ -1390,23 +1409,27 @@ const COLLECTIONS = {
     user: ['users']
 };
 
-// Keywords for identifying collection context
+// Enhanced keywords for better context understanding
 const COLLECTION_KEYWORDS = {
-    tasks: ['task', 'todo', 'to-do', 'to do'],
-    goals: ['goal', 'target', 'objective'],
-    projects: ['project', 'initiative'],
-    plans: ['plan', 'schedule', 'agenda'],
-    timers: ['timer', 'countdown', 'reminder'],
-    events: ['event', 'meeting', 'appointment'],
-    uploads: ['file', 'upload', 'document'],
+    tasks: ['task', 'todo', 'to-do', 'to do', 'assignment', 'work item'],
+    goals: ['goal', 'target', 'objective', 'aim', 'aspiration'],
+    projects: ['project', 'initiative', 'venture', 'undertaking'],
+    plans: ['plan', 'schedule', 'agenda', 'timeline', 'roadmap'],
+    timers: ['timer', 'countdown', 'reminder', 'alert', 'notification'],
+    events: ['event', 'meeting', 'appointment', 'schedule', 'calendar'],
+    uploads: ['file', 'upload', 'document', 'attachment'],
     generatedpdfs: [
         'pdf', 'generated', 'summary', 'notes', 'document', 
         'key points', 'overview', 'questions', 'study', 'learn',
-        'transformer', 'transformers', 'study material', 'study notes'
+        'transformer', 'transformers', 'study material', 'study notes',
+        'lecture', 'class', 'course'
     ],
-    replies: ['reply', 'message', 'response']
+    replies: ['reply', 'message', 'response', 'answer', 'comment']
 };
 
+let conversationHistory = [];
+
+// Updated queryHuggingFaceAPI function with enhanced context handling
 async function queryHuggingFaceAPI(userInput, userData = null, username = null) {
     const userIdentityKeywords = ['who am i', 'what is my name', "what's my name", 'my name', 'who i am'];
     const isIdentityQuestion = userIdentityKeywords.some(keyword => userInput.toLowerCase().includes(keyword));
@@ -1415,118 +1438,56 @@ async function queryHuggingFaceAPI(userInput, userData = null, username = null) 
         `${msg.role}: ${msg.content}`
     ).join('\n');
 
-    function formatCollectionData(userData) {
-        if (!userData) return '';
-        let formattedData = '';
-
-        // Format timestamps helper function
-        const formatTimestamp = (timestamp) => {
-            if (!timestamp) return 'N/A';
-            if (timestamp.seconds) {
-                return new Date(timestamp.seconds * 1000).toLocaleString();
-            }
-            return timestamp;
-        };
-
-        // Handle generatedpdfs with special formatting
-        if (userData.generatedpdfs?.length > 0) {
-            formattedData += '\nStudy Materials:\n';
-            userData.generatedpdfs.forEach((pdf, index) => {
-                formattedData += `
-Document ${index + 1}: ${pdf.fileName}
-Overview: ${pdf.overview}
-Key Points:
-${pdf.keyPoints?.map((point, i) => `${i + 1}. ${point}`).join('\n')}
-${pdf.rawQuestions ? `
-Questions:
-${pdf.rawQuestions.map((q, i) => {
-    const choices = pdf.choices?.[i] || [];
-    return `Q${i + 1}: ${q}
-${choices.length > 0 ? `Choices: ${choices.join(' | ')}` : ''}
-${pdf.correctAnswer ? `Correct Answer: ${pdf.correctAnswer}` : ''}
-${pdf.keyPoint ? `Related Key Point: ${pdf.keyPoint}` : ''}`;
-}).join('\n')}` : ''}
-Created: ${formatTimestamp(pdf.timestamp)}
-`;
-            });
-        }
-
-        // Handle productivity items (tasks, goals, plans, projects)
-        const productivityCollections = ['tasks', 'goals', 'plans', 'projects'];
-        productivityCollections.forEach(collection => {
-            if (userData[collection]?.length > 0) {
-                formattedData += `\n${collection.charAt(0).toUpperCase() + collection.slice(1)}:\n`;
-                userData[collection]
-                    .sort((a, b) => (b.dueDate?.seconds || 0) - (a.dueDate?.seconds || 0))
-                    .forEach((item, index) => {
-                        formattedData += `${index + 1}. ${item[collection.slice(0, -1)]}\n`;
-                        formattedData += `   Due: ${formatTimestamp(item.dueDate)}\n`;
-                    });
-            }
-        });
-
-        // Handle events
-        if (userData.events?.length > 0) {
-            formattedData += '\nEvents:\n';
-            userData.events
-                .sort((a, b) => {
-                    const dateA = new Date(a.year, a.month - 1, a.day);
-                    const dateB = new Date(b.year, b.month - 1, b.day);
-                    return dateA - dateB;
-                })
-                .forEach((event, index) => {
-                    formattedData += `${index + 1}. ${event.title}\n`;
-                    formattedData += `   Date: ${event.month}/${event.day}/${event.year}\n`;
-                    formattedData += `   Time: ${event.startTime} - ${event.endTime}\n`;
-                    if (event.description) formattedData += `   Description: ${event.description}\n`;
-                });
-        }
-
-        // Handle timers
-        if (userData.timers?.length > 0) {
-            formattedData += '\nTimers:\n';
-            userData.timers.forEach((timer, index) => {
-                formattedData += `${index + 1}. ${timer.name}: ${timer.time} minutes\n`;
-            });
-        }
-
-        return formattedData;
-    }
-
+    // Enhanced system prompt with better context handling
     const systemPrompt = `<|im_start|>system
 You are TaskMaster AI, a helpful productivity assistant. ${isIdentityQuestion ? `The user's name is ${username}.` : ''}
 
-Context:
-${formatCollectionData(userData)}
+Available Collections and their structures:
+${Object.entries(COLLECTION_SCHEMAS)
+    .map(([collection, schema]) => 
+        `${collection}: ${Object.entries(schema)
+            .map(([field, type]) => `${field} (${type})`)
+            .join(', ')}`)
+    .join('\n')}
 
-Conversation History:
+${userData ? Object.entries(userData).map(([collection, data]) => {
+    if (collection === 'generatedpdfs' && data?.length > 0) {
+        return `Generated PDFs Information:
+${data.map(pdf => `
+Document: ${pdf.fileName}
+Overview: ${pdf.overview}
+Key Points:
+${pdf.keyPoints?.map((point, i) => `${i + 1}. ${point}`).join('\n')}
+Questions:
+${pdf.rawQuestions?.map((q, i) => {
+    const choices = pdf.choices?.[i] || [];
+    return `Q${i + 1}: ${q}
+Choices: ${choices.join(' | ')}
+Correct Answer: ${pdf.correctAnswer}
+Related Key Point: ${pdf.keyPoint}`;
+}).join('\n')}
+`).join('\n')}`;
+    } else if (data?.length > 0) {
+        return `${collection.charAt(0).toUpperCase() + collection.slice(1)}:
+${data.map(item => {
+    const mainField = item.task || item.goal || item.project || item.plan;
+    return mainField ? `- ${mainField} (Due: ${item.dueDate ? new Date(item.dueDate.seconds * 1000).toLocaleDateString() : 'No due date'})` : '';
+}).filter(Boolean).join('\n')}`;
+    }
+    return '';
+}).filter(Boolean).join('\n\n') : ''}
+
+Context:
 ${formattedHistory}
 
 Instructions:
-1. Study Materials (PDFs):
-   - Reference specific content from documents
-   - Use key points and questions accurately
-   - Provide learning recommendations based on content
+1. If the user asks about their study materials or PDFs, reference the specific content from their generatedpdfs.
+2. When discussing tasks, goals, projects, or plans, provide specific details from those collections.
+3. For questions about specific topics, check all relevant collections for the most up-to-date information.
+4. If asked about questions or quizzes, use the stored questions and answers from generatedpdfs.
+5. Maintain context awareness across all collections to provide comprehensive responses.
 
-2. Productivity Items:
-   - Prioritize tasks/goals/plans/projects by due date
-   - Consider dependencies between items
-   - Provide actionable next steps
-   - Help with time management
-
-3. Events and Timers:
-   - Consider scheduling conflicts
-   - Suggest optimal timing for tasks
-   - Help with time blocking and planning
-
-4. General Guidelines:
-   - Give concise, relevant responses
-   - Focus on upcoming deadlines
-   - Maintain conversation context
-   - Be specific in recommendations
-   - Consider user's schedule and commitments
-
-Current request: ${userInput}
+Respond naturally and concisely to: ${userInput}
 <|im_end|>
 <|im_start|>assistant`;
 
@@ -1566,6 +1527,7 @@ Current request: ${userInput}
     }
 }
 
+// Updated handleUserMessage function with enhanced collection handling
 async function handleUserMessage() {
     const message = userInput.value.trim();
     if (!message) return;
@@ -1587,53 +1549,54 @@ async function handleUserMessage() {
         const username = user.displayName || user.email;
         const messageLower = message.toLowerCase();
         
-        // Determine which collections to query based on message content
-        const relevantCollections = new Set(['users']); // Always include users
-        
-        Object.entries(COLLECTION_KEYWORDS).forEach(([collection, keywords]) => {
-            if (keywords.some(keyword => messageLower.includes(keyword))) {
-                relevantCollections.add(collection);
-            }
-        });
+        // Determine relevant collections based on message content
+        const relevantCollections = Object.entries(COLLECTION_KEYWORDS)
+            .filter(([_, keywords]) => keywords.some(keyword => messageLower.includes(keyword)))
+            .map(([collection]) => collection);
+
+        // Always include user data and generated PDFs for context
+        relevantCollections.push('users');
+        if (messageLower.includes('study') || messageLower.includes('notes') || messageLower.includes('pdf')) {
+            relevantCollections.push('generatedpdfs');
+        }
 
         let userData = {};
         
-        // Fetch user data
+        // Fetch user profile data
         const userDoc = await db.collection('users').doc(user.uid).get();
         if (userDoc.exists) {
             userData.user = userDoc.data();
         }
 
         // Fetch data from relevant collections
-        await Promise.all([...relevantCollections].map(async (collection) => {
-            if (collection === 'users') return; // Skip users as we already fetched it
+        await Promise.all(relevantCollections.map(async (collection) => {
+            if (collection === 'users') return;
             
             try {
-                let query = db.collection(collection);
+                // Try userId first
+                let querySnapshot = await db.collection(collection)
+                    .where('userId', '==', user.uid)
+                    .orderBy('timestamp', 'desc')
+                    .limit(5)
+                    .get();
                 
-                // Add appropriate where clause based on collection
-                if (collection === 'events') {
-                    query = query.where('uid', '==', user.uid);
-                } else {
-                    query = query.where('userId', '==', user.uid);
+                // If no results, try uid
+                if (querySnapshot.empty) {
+                    querySnapshot = await db.collection(collection)
+                        .where('uid', '==', user.uid)
+                        .orderBy('timestamp', 'desc')
+                        .limit(5)
+                        .get();
                 }
                 
-                // Add ordering if the collection has a timestamp field
-                if (COLLECTION_SCHEMAS[collection].timestamp || 
-                    COLLECTION_SCHEMAS[collection].createdAt) {
-                    const timeField = COLLECTION_SCHEMAS[collection].timestamp ? 'timestamp' : 'createdAt';
-                    query = query.orderBy(timeField, 'desc');
+                if (!querySnapshot.empty) {
+                    userData[collection] = querySnapshot.docs.map(doc => ({
+                        id: doc.id,
+                        ...doc.data()
+                    }));
                 }
-                
-                const querySnapshot = await query.limit(5).get();
-                
-                userData[collection] = querySnapshot.docs.map(doc => ({
-                    id: doc.id,
-                    ...doc.data()
-                }));
             } catch (error) {
-                console.error(`Error fetching ${collection}:`, error);
-                userData[collection] = []; // Set empty array if fetch fails
+                console.error(`Error fetching ${collection} data:`, error);
             }
         }));
 
@@ -1656,7 +1619,6 @@ async function handleUserMessage() {
 document.addEventListener('DOMContentLoaded', () => {
     userInput = document.getElementById('user-input');
     chatMessages = document.getElementById('chat-messages');
-    const sendButton = document.getElementById('send-button');
     
     userInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -1665,10 +1627,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     
-    sendButton.addEventListener('click', handleUserMessage);
+    document.getElementById('send-button').addEventListener('click', handleUserMessage);
+});
 
-    // Initialize Firebase auth state
-    firebase.auth().onAuthStateChanged(function(user) {
+// Initialize chatbot
+document.addEventListener('DOMContentLoaded', function() {
+    firebase.auth().onAuthStateChanged(async function(user) {
         if (user) {
             const username = user.displayName || user.email;
             document.getElementById('username').textContent = username;
@@ -1678,6 +1642,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
+// Event listeners for user input
+sendButton.addEventListener('click', handleUserMessage);
+userInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        handleUserMessage();
+    }
+});
 </script>
 
         

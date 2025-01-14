@@ -1221,7 +1221,7 @@ function addMessage(message, isUser = false) {
     chatMessages.appendChild(messageDiv);
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
-// Function to handle option clicks
+
 function handleOptionClick(event) {
     const option = event.currentTarget;
     const questionId = option.dataset.questionId;
@@ -1238,6 +1238,16 @@ function handleOptionClick(event) {
     // Add selected class
     option.classList.add('selected');
     
+    // Convert letter option to number (A=0, B=1, C=2, D=3)
+    const optionToNumber = {
+        'A': '0',
+        'B': '1',
+        'C': '2',
+        'D': '3'
+    };
+    
+    const selectedNumber = optionToNumber[selectedOption];
+    
     // Get correct answer from Firebase
     const user = firebase.auth().currentUser;
     if (user) {
@@ -1253,13 +1263,21 @@ function handleOptionClick(event) {
                     const correctAnswer = data.correctAnswer;
                     
                     // Check if answer is correct
-                    if (selectedOption === correctAnswer) {
+                    if (selectedNumber === correctAnswer) {
                         option.classList.add('correct');
                     } else {
                         option.classList.add('incorrect');
                         // Show correct answer
+                        const numberToOption = {
+                            '0': 'A',
+                            '1': 'B',
+                            '2': 'C',
+                            '3': 'D'
+                        };
+                        const correctLetter = numberToOption[correctAnswer];
+                        
                         allOptions.forEach(opt => {
-                            if (opt.dataset.option === correctAnswer) {
+                            if (opt.dataset.option === correctLetter) {
                                 opt.classList.add('correct');
                             }
                         });
@@ -1271,6 +1289,7 @@ function handleOptionClick(event) {
             });
     }
 }
+
 function showTypingIndicator() {
     const indicator = document.createElement('div');
     indicator.className = 'message ai';

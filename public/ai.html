@@ -612,6 +612,67 @@ body.night-mode {
     display: none; /* Snowflakes hidden by default */
 }
 
+       .message-text {
+            line-height: 1.5;
+            white-space: pre-wrap;
+        }
+        
+        .bullet-list {
+            margin: 8px 0;
+            padding-left: 20px;
+            list-style-type: none;
+        }
+        
+        .bullet-point {
+            position: relative;
+            margin: 4px 0;
+            padding-left: 20px;
+        }
+        
+        .bullet-point::before {
+            content: "•";
+            position: absolute;
+            left: 0;
+            color: var(--primary-color, #6C63FF);
+        }
+        
+        .question {
+            margin: 12px 0;
+            padding: 8px 12px;
+            background: rgba(108, 99, 255, 0.1);
+            border-left: 4px solid var(--primary-color, #6C63FF);
+            border-radius: 4px;
+            font-weight: 500;
+        }
+        
+        .heading {
+            margin: 16px 0 8px 0;
+            font-size: 1.1em;
+            font-weight: 600;
+            color: var(--primary-color, #6C63FF);
+        }
+        
+        .important {
+            font-weight: 500;
+            color: var(--accent-color, #F50057);
+        }
+        
+        .inline-code {
+            padding: 2px 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.9em;
+        }
+        
+        .paragraph {
+            margin: 8px 0;
+        }
+        
+        .message.ai .message-text {
+            color: var(--text-color, #F8F9FA);
+        }
+
     </style>
 </head>
 <body>
@@ -1003,6 +1064,34 @@ const chatMessages = document.getElementById('chatMessages');
 const userInput = document.getElementById('userInput');
 const sendButton = document.getElementById('sendMessage');
 
+function formatMessage(text) {
+    // Format bullet points
+    text = text.replace(/\n\s*\*\s+/g, '\n<li class="bullet-point">');
+    text = text.replace(/\n\s*-\s+/g, '\n<li class="bullet-point">');
+    if (text.includes('<li class="bullet-point">')) {
+        text = '<ul class="bullet-list">' + text + '</ul>';
+    }
+    
+    // Format questions (lines ending with ?)
+    text = text.replace(/^(.+\?)\s*$/gm, '<div class="question">$1</div>');
+    
+    // Format headings (lines with : at the end)
+    text = text.replace(/^(.+):\s*$/gm, '<div class="heading">$1:</div>');
+    
+    // Format important text (between *)
+    text = text.replace(/\*([^*]+)\*/g, '<span class="important">$1</span>');
+    
+    // Format code or technical terms (between `)
+    text = text.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
+    
+    // Add paragraphs for better spacing
+    text = text.split('\n\n').map(para => 
+        para.trim() ? `<p class="paragraph">${para}</p>` : ''
+    ).join('');
+    
+    return text;
+}
+
 function addMessage(message, isUser = false) {
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${isUser ? 'user' : 'ai'}`;
@@ -1024,7 +1113,7 @@ function addMessage(message, isUser = false) {
     
     const text = document.createElement('div');
     text.className = 'message-text';
-    text.textContent = message;
+    text.innerHTML = isUser ? message : formatMessage(message);
     
     const time = document.createElement('div');
     time.className = 'message-time';

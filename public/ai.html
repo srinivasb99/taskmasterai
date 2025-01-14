@@ -612,7 +612,7 @@ body.night-mode {
     display: none; /* Snowflakes hidden by default */
 }
 
-       .message-text {
+        .message-text {
             line-height: 1.5;
             white-space: pre-wrap;
         }
@@ -643,6 +643,33 @@ body.night-mode {
             border-left: 4px solid var(--primary-color, #6C63FF);
             border-radius: 4px;
             font-weight: 500;
+        }
+        
+        .option {
+            margin: 8px 0;
+            padding: 8px 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .option:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        
+        .option.selected {
+            background: rgba(255, 255, 255, 0.15);
+        }
+        
+        .option.correct {
+            background: rgba(76, 175, 80, 0.2);
+            border-left: 4px solid #4CAF50;
+        }
+        
+        .option.incorrect {
+            background: rgba(244, 67, 54, 0.2);
+            border-left: 4px solid #F44336;
         }
         
         .heading {
@@ -1073,7 +1100,17 @@ function formatMessage(text) {
     }
     
     // Format questions (lines ending with ?)
-    text = text.replace(/^(.+\?)\s*$/gm, '<div class="question">$1</div>');
+    text = text.replace(/^(.+\?)\s*$/gm, (match, question) => {
+        // Generate a unique ID for each question
+        const questionId = 'q' + Math.random().toString(36).substr(2, 9);
+        return `<div class="question" data-question-id="${questionId}">${question}</div>`;
+    });
+    
+    // Format multiple choice options (A), B), C), D))
+    text = text.replace(/^([A-D]\))\s*(.+)$/gm, (match, label, option) => {
+        const questionId = 'q' + Math.random().toString(36).substr(2, 9);
+        return `<div class="option" data-option="${label.charAt(0)}" data-question-id="${questionId}">${label} ${option}</div>`;
+    });
     
     // Format headings (lines with : at the end)
     text = text.replace(/^(.+):\s*$/gm, '<div class="heading">$1:</div>');
@@ -1115,6 +1152,13 @@ function addMessage(message, isUser = false) {
     text.className = 'message-text';
     text.innerHTML = isUser ? message : formatMessage(message);
     
+    // Add click handlers for options if this is an AI message
+    if (!isUser) {
+        text.querySelectorAll('.option').forEach(option => {
+            option.addEventListener('click', handleOptionClick);
+        });
+    }
+    
     const time = document.createElement('div');
     time.className = 'message-time';
     time.textContent = 'Just now';
@@ -1129,6 +1173,56 @@ function addMessage(message, isUser = false) {
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
+// Function to handle option clicks
+function handleOptionClick(event) {
+    const option = event.currentTarget;
+    const questionId = option.dataset.questionId;
+    const selectedOption = option.dataset.option;
+    
+    // Get all options for this question
+    const allOptions = document.querySelectorAll(`.option[data-question-id="${questionId}"]`);
+    
+    // Remove previous selections
+    allOptions.forEach(opt => {
+        opt.classList.remove('correct', 'incorrect', 'selected');
+    });
+    
+    // Add selected class
+    option.classList.add('selected');
+    
+    // Get correct answer from Firebase
+    const user = firebase.auth().currentUser;
+    if (user) {
+        db.collection('generatedpdfs')
+            .where('userId', '==', user.uid)
+            .orderBy('timestamp', 'desc')
+            .limit(1)
+            .get()
+            .then(snapshot => {
+                if (!snapshot.empty) {
+                    const doc = snapshot.docs[0];
+                    const data = doc.data();
+                    const correctAnswer = data.correctAnswer;
+                    
+                    // Check if answer is correct
+                    if (selectedOption === correctAnswer) {
+                        option.classList.add('correct');
+                    } else {
+                        option.classList.add('incorrect');
+                        // Show correct answer
+                        allOptions.forEach(opt => {
+                            if (opt.dataset.option === correctAnswer) {
+                                opt.classList.add('correct');
+                            }
+                        });
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error checking answer:', error);
+            });
+    }
+}
 function showTypingIndicator() {
     const indicator = document.createElement('div');
     indicator.className = 'message ai';

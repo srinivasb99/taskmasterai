@@ -1254,26 +1254,37 @@ function handleOptionClick(event) {
                     // Get the raw questions array
                     const questions = data.rawQuestions || [];
                     
-                    // Find the matching question by its ID
-                    const question = questions.find(q => {
-                        // Extract question number from the HTML element ID
-                        const currentQuestionNum = parseInt(questionId.replace('q', ''));
-                        // Match with the question's position in the array
-                        return questions.indexOf(q) === currentQuestionNum - 1;
-                    });
+                    // Extract question number from the HTML element ID
+                    const currentQuestionNum = parseInt(questionId.replace('q', ''));
+                    
+                    // Get the question directly by index
+                    const question = questions[currentQuestionNum - 1];
 
                     if (question && question.correctAnswer) {
                         console.log('Question found:', question);
                         console.log('Selected:', selectedOption, 'Correct:', question.correctAnswer);
                         
-                        // Compare the selected option with the correct answer
-                        if (selectedOption === question.correctAnswer) {
+                        // Convert both to same case for comparison
+                        const normalizedSelected = selectedOption.toLowerCase();
+                        const normalizedCorrect = question.correctAnswer.toLowerCase();
+                        
+                        // Map letter indices to array indices
+                        const letterToIndex = {
+                            'a': '0',
+                            'b': '1',
+                            'c': '2',
+                            'd': '3'
+                        };
+                        
+                        // Compare using the mapped indices
+                        if (letterToIndex[normalizedSelected] === normalizedCorrect) {
                             option.classList.add('correct');
                         } else {
                             option.classList.add('incorrect');
                             // Show the correct answer
                             allOptions.forEach(opt => {
-                                if (opt.dataset.option === question.correctAnswer) {
+                                const optionLetter = opt.dataset.option.toLowerCase();
+                                if (letterToIndex[optionLetter] === normalizedCorrect) {
                                     opt.classList.add('correct');
                                 }
                             });

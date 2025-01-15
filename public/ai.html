@@ -1251,33 +1251,35 @@ function handleOptionClick(event) {
                     const doc = snapshot.docs[0];
                     const data = doc.data();
                     
-                    // Get the question index from the question ID
-                    const questionIndex = parseInt(questionId.replace('q', '')) - 1;
+                    // Get the raw questions array
+                    const questions = data.rawQuestions || [];
                     
-                    // Get the raw questions array which contains the correct answers
-                    const rawQuestions = data.rawQuestions || [];
-                    
-                    // Make sure we have valid data
-                    if (Array.isArray(rawQuestions) && rawQuestions[questionIndex]) {
-                        const questionData = rawQuestions[questionIndex];
-                        const correctAnswer = questionData.correctAnswer;
+                    // Find the matching question by its ID
+                    const question = questions.find(q => {
+                        // Extract question number from the HTML element ID
+                        const currentQuestionNum = parseInt(questionId.replace('q', ''));
+                        // Match with the question's position in the array
+                        return questions.indexOf(q) === currentQuestionNum - 1;
+                    });
+
+                    if (question && question.correctAnswer) {
+                        console.log('Question found:', question);
+                        console.log('Selected:', selectedOption, 'Correct:', question.correctAnswer);
                         
-                        console.log('Selected:', selectedOption, 'Correct:', correctAnswer);
-                        
-                        // Direct string comparison
-                        if (selectedOption === correctAnswer) {
+                        // Compare the selected option with the correct answer
+                        if (selectedOption === question.correctAnswer) {
                             option.classList.add('correct');
                         } else {
                             option.classList.add('incorrect');
-                            // Show correct answer
+                            // Show the correct answer
                             allOptions.forEach(opt => {
-                                if (opt.dataset.option === correctAnswer) {
+                                if (opt.dataset.option === question.correctAnswer) {
                                     opt.classList.add('correct');
                                 }
                             });
                         }
                     } else {
-                        console.error('Invalid question data:', rawQuestions);
+                        console.error('Question or correct answer not found:', questionId);
                     }
                 }
             })

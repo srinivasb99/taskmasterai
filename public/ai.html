@@ -1238,16 +1238,6 @@ function handleOptionClick(event) {
     // Add selected class
     option.classList.add('selected');
     
-    // Convert letter option to number (A=0, B=1, C=2, D=3)
-    const optionToNumber = {
-        'A': 0,  // Changed from string to number
-        'B': 1,
-        'C': 2,
-        'D': 3
-    };
-    
-    const selectedNumber = optionToNumber[selectedOption];
-    
     // Get correct answer from Firebase
     const user = firebase.auth().currentUser;
     if (user) {
@@ -1264,31 +1254,30 @@ function handleOptionClick(event) {
                     // Get the question index from the question ID
                     const questionIndex = parseInt(questionId.replace('q', '')) - 1;
                     
-                    // Get the correct answer for this specific question
-                    const correctAnswers = data.correctAnswers || [];
-                    const correctAnswer = correctAnswers[questionIndex];
+                    // Get the raw questions array which contains the correct answers
+                    const rawQuestions = data.rawQuestions || [];
                     
-                    console.log('Selected:', selectedNumber, 'Correct:', correctAnswer);
-                    
-                    // Check if answer is correct (compare as numbers)
-                    if (selectedNumber === parseInt(correctAnswer)) {
-                        option.classList.add('correct');
-                    } else {
-                        option.classList.add('incorrect');
-                        // Show correct answer
-                        const numberToOption = {
-                            0: 'A',
-                            1: 'B',
-                            2: 'C',
-                            3: 'D'
-                        };
-                        const correctLetter = numberToOption[parseInt(correctAnswer)];
+                    // Make sure we have valid data
+                    if (Array.isArray(rawQuestions) && rawQuestions[questionIndex]) {
+                        const questionData = rawQuestions[questionIndex];
+                        const correctAnswer = questionData.correctAnswer;
                         
-                        allOptions.forEach(opt => {
-                            if (opt.dataset.option === correctLetter) {
-                                opt.classList.add('correct');
-                            }
-                        });
+                        console.log('Selected:', selectedOption, 'Correct:', correctAnswer);
+                        
+                        // Direct string comparison
+                        if (selectedOption === correctAnswer) {
+                            option.classList.add('correct');
+                        } else {
+                            option.classList.add('incorrect');
+                            // Show correct answer
+                            allOptions.forEach(opt => {
+                                if (opt.dataset.option === correctAnswer) {
+                                    opt.classList.add('correct');
+                                }
+                            });
+                        }
+                    } else {
+                        console.error('Invalid question data:', rawQuestions);
                     }
                 }
             })
@@ -1297,6 +1286,8 @@ function handleOptionClick(event) {
             });
     }
 }
+
+
 function showTypingIndicator() {
     const indicator = document.createElement('div');
     indicator.className = 'message ai';

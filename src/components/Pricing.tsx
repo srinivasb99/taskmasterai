@@ -183,7 +183,7 @@ function Pricing() {
               <li>Add Up to 3 Friends</li>
             </ul>
             <a 
-              href={user ? "/dashboard" : "/signup"}
+              href={user ? "/dashboard.html" : "/signup"}
               className="inline-block w-full text-center py-3 rounded-full font-semibold bg-indigo-500 text-white hover:scale-105 transition-transform"
             >
               {user ? 'Access Dashboard' : 'Sign Up Free'}

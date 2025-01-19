@@ -2633,11 +2633,14 @@ const summaryContainer = document.getElementById('summaryContainer');
 const pdfSummary = document.getElementById('pdfSummary');
 // Get modal and elements
 const pdfModal = document.getElementById("pdfUploadModal");
+const youtubeModal = document.getElementById("youtubeUploadModal");
+
 const closeButton = document.querySelector(".close-button");
 // Function to open the modal
 function openPdfUploadModal() {
     pdfModal.style.display = "flex";
 }
+
 
 // Function to close the modal
 function closePdfUploadModal() {
@@ -2651,8 +2654,31 @@ window.onclick = (event) => {
     }
 };
 
+// Function to open the modal
+function openYoutubeUploadModal() {
+    youtubeModal.style.display = "flex";
+}
+
+
+// Function to close the modal
+function closeYoutubeUploadModal() {
+    youtubeModal.style.display = "none";
+}
+
+// Close modal when clicking outside the modal content
+window.onclick = (event) => {
+    if (event.target === youtubeModal) {
+        closeYoutubeUploadModal();
+    }
+};
+
+// Close modal when clicking the close button
+closeButton.onclick = closeYoutubeUploadModal;
+
 // Close modal when clicking the close button
 closeButton.onclick = closePdfUploadModal;
+
+
 
 // File input click handler
 pdfDragArea.addEventListener('click', () => {

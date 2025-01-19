@@ -613,18 +613,6 @@ body.night-mode {
     font-weight: 600; /* Semi-bold */
 }
 
-/* Snowflake wrapper - hidden by default */
-.snowflakes {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    z-index: -1; /* Ensures snowflakes are behind all content */
-    pointer-events: none; /* Prevents snowflakes from interfering with user interactions */
-    overflow: hidden;
-    display: none; /* Snowflakes hidden by default */
-}
 
         .message-text {
             line-height: 1.5;
@@ -713,6 +701,19 @@ body.night-mode {
         .message.ai .message-text {
             color: var(--text-color, #F8F9FA);
         }
+
+/* Snowflake wrapper - hidden by default */
+.snowflakes {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1; /* Ensures snowflakes are behind all content */
+    pointer-events: none; /* Prevents snowflakes from interfering with user interactions */
+    overflow: hidden;
+    display: none; /* Snowflakes hidden by default */
+}
 
     </style>
 </head>
@@ -809,6 +810,7 @@ body.night-mode {
 <div class="main-content">
     <div class="snowflakes">
         <!-- Snowflakes will be dynamically created here -->
+    </div>
     <div class="chatbot-container">
         <div class="chatbot-header">
             <h2>TaskMaster AI</h2>
@@ -838,7 +840,6 @@ body.night-mode {
             </div>
         </div>
     </div>
-</div>
 </div>
 
     <script>

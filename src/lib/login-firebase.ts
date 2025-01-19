@@ -1,5 +1,11 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { 
+  getAuth, 
+  signInWithEmailAndPassword, 
+  GoogleAuthProvider, 
+  signInWithPopup,
+  sendPasswordResetEmail as firebaseSendPasswordResetEmail
+} from 'firebase/auth';
 import { getFirestore, doc, setDoc } from 'firebase/firestore';
 
 // Your Firebase configuration
@@ -55,6 +61,20 @@ export const emailSignIn = async (email: string, password: string) => {
     return user; // Return user info if needed
   } catch (error) {
     console.error("Error signing in:", error);
+    throw error; // Re-throw the error to handle it in the calling function
+  }
+};
+
+// Password Reset Function
+export const sendPasswordResetEmail = async (email: string) => {
+  try {
+    await firebaseSendPasswordResetEmail(auth, email, {
+      url: window.location.origin + '/login', // Redirect URL after password reset
+      handleCodeInApp: false // Set to true if you want to handle the code in your app
+    });
+    console.log("Password reset email sent successfully");
+  } catch (error) {
+    console.error("Error sending password reset email:", error);
     throw error; // Re-throw the error to handle it in the calling function
   }
 };

@@ -7,7 +7,7 @@ import { SignUpPage } from './pages/signup-page';
 import { AuthProvider } from './contexts/AuthContext';
 import Pricing from './components/Pricing'; // The Pricing component
 import Terms from './components/Terms'; // The Terms component
-import ForgotPassword from './components/Terms'; // The Forgot-Password component
+import ForgotPassword from './components/Forgot-Password'; // The Forgot-Password component
 import PrivacyPolicy from './components/Privacy-Policy'; // The Privacy-Policy component
 import { Dashboard } from './components/Dashboard'; // Import the Dashboard component
 import Contact from './components/Contact';

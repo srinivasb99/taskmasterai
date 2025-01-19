@@ -155,15 +155,15 @@ function PrivacyPolicy() {
             <div className="prose prose-invert max-w-none">
               <p className="text-gray-300">We collect the following types of data to provide you with the best experience:</p>
               <ul className="text-gray-300 list-disc pl-6 mt-4">
-                <li className="flex items-center gap-2"><User className="w-4 h-4 flex-shrink-0" /> <span><strong>Account Information:</strong> Name, email address, and other personal details for user authentication.</span></li>
-                <li className="flex items-center gap-2"><FileText className="w-4 h-4 flex-shrink-0" /> <span><strong>User-Generated Data:</strong> Tasks, goals, projects, and plans, including descriptions, deadlines, and statuses, stored in Firebase Firestore.</span></li>
-                <li className="flex items-center gap-2"><Bot className="w-4 h-4 flex-shrink-0" /> <span><strong>AI-Generated Data:</strong> Content like Smart Overview, notes, and quizzes created from your input. Stored only if saved.</span></li>
-                <li className="flex items-center gap-2"><MessageSquare className="w-4 h-4 flex-shrink-0" /> <span><strong>Friends and Messages:</strong> Messages exchanged with friends, securely stored in Firebase Firestore.</span></li>
-                <li className="flex items-center gap-2"><Image className="w-4 h-4 flex-shrink-0" /> <span><strong>Profile Pictures:</strong> Uploaded images to personalize your experience, securely stored and visible only to friends.</span></li>
-                <li className="flex items-center gap-2"><Calendar className="w-4 h-4 flex-shrink-0" /> <span><strong>Calendar Events:</strong> Schedule events stored to help manage your time effectively.</span></li>
-                <li className="flex items-center gap-2"><Bot className="w-4 h-4 flex-shrink-0" /> <span><strong>AI Chat Bot:</strong> Real-time interaction data, not stored in Firebase Firestore.</span></li>
-                <li className="flex items-center gap-2"><Bell className="w-4 h-4 flex-shrink-0" /> <span><strong>Notifications:</strong> Alerts for important messages and updates. Data is used temporarily and not stored.</span></li>
-                <li className="flex items-center gap-2"><MapPin className="w-4 h-4 flex-shrink-0" /> <span><strong>Location Data:</strong> Used for features like weather updates, temporarily processed without storage.</span></li>
+                <li className="flex items-center gap-2"><User className="w-4 h-4 flex-shrink-0" /> <strong>Account Information:</strong> Name, email address, and other personal details for user authentication.</li>
+                <li className="flex items-center gap-2"><FileText className="w-4 h-4 flex-shrink-0" /> <strong>User-Generated Data:</strong> Tasks, goals, projects, and plans, including descriptions, deadlines, and statuses, stored in Firebase Firestore.</li>
+                <li className="flex items-center gap-2"><Bot className="w-4 h-4 flex-shrink-0" /> <strong>AI-Generated Data:</strong> Content like Smart Overview, notes, and quizzes created from your input. Stored only if saved.</li>
+                <li className="flex items-center gap-2"><MessageSquare className="w-4 h-4 flex-shrink-0" /> <strong>Friends and Messages:</strong> Messages exchanged with friends, securely stored in Firebase Firestore.</li>
+                <li className="flex items-center gap-2"><Image className="w-4 h-4 flex-shrink-0" /> <strong>Profile Pictures:</strong> Uploaded images to personalize your experience, securely stored and visible only to friends.</li>
+                <li className="flex items-center gap-2"><Calendar className="w-4 h-4 flex-shrink-0" /> <strong>Calendar Events:</strong> Schedule events stored to help manage your time effectively.</li>
+                <li className="flex items-center gap-2"><Bot className="w-4 h-4 flex-shrink-0" /> <strong>AI Chat Bot:</strong> Real-time interaction data, not stored in Firebase Firestore.</li>
+                <li className="flex items-center gap-2"><Bell className="w-4 h-4 flex-shrink-0" /> <strong>Notifications:</strong> Alerts for important messages and updates. Data is used temporarily and not stored.</li>
+                <li className="flex items-center gap-2"><MapPin className="w-4 h-4 flex-shrink-0" /> <strong>Location Data:</strong> Used for features like weather updates, temporarily processed without storage.</li>
               </ul>
             </div>
           </section>
@@ -175,14 +175,14 @@ function PrivacyPolicy() {
             <div className="prose prose-invert max-w-none">
               <p className="text-gray-300">We use your data to:</p>
               <ul className="text-gray-300 list-disc pl-6 mt-4">
-                <li className="flex items-center gap-2"><CheckSquare className="w-4 h-4 flex-shrink-0" /> <span><strong>Task Management:</strong> Efficiently organize your tasks and projects, storing them securely in Firebase Firestore.</span></li>
-                <li className="flex items-center gap-2"><Brain className="w-4 h-4 flex-shrink-0" /> <span><strong>AI Features:</strong> Provide insights through Smart Overview and generate custom notes or quizzes.</span></li>
-                <li className="flex items-center gap-2"><Mail className="w-4 h-4 flex-shrink-0" /> <span><strong>Friendship and Messaging:</strong> Enable communication with friends while keeping your conversations secure.</span></li>
-                <li className="flex items-center gap-2"><UserCircle className="w-4 h-4 flex-shrink-0" /> <span><strong>Profile Customization:</strong> Personalize your experience with profile pictures visible only to your friends.</span></li>
-                <li className="flex items-center gap-2"><CalendarCheck className="w-4 h-4 flex-shrink-0" /> <span><strong>Event Management:</strong> Help you stay on top of deadlines and schedules.</span></li>
-                <li className="flex items-center gap-2"><TrendingUp className="w-4 h-4 flex-shrink-0" /> <span><strong>Service Improvement:</strong> Enhance AI models and optimize user experience.</span></li>
-                <li className="flex items-center gap-2"><Bell className="w-4 h-4 flex-shrink-0" /> <span><strong>Notifications:</strong> Keep you updated on tasks, events, and friend interactions.</span></li>
-                <li className="flex items-center gap-2"><Globe className="w-4 h-4 flex-shrink-0" /> <span><strong>Location-Based Features:</strong> Provide contextual services like weather updates without storing your location data.</span></li>
+                <li className="flex items-center gap-2"><CheckSquare className="w-4 h-4 flex-shrink-0" /> <strong>Task Management:</strong> Efficiently organize your tasks and projects, storing them securely in Firebase Firestore.</li>
+                <li className="flex items-center gap-2"><Brain className="w-4 h-4 flex-shrink-0" /> <strong>AI Features:</strong> Provide insights through Smart Overview and generate custom notes or quizzes.</li>
+                <li className="flex items-center gap-2"><Mail className="w-4 h-4 flex-shrink-0" /> <strong>Friendship and Messaging:</strong> Enable communication with friends while keeping your conversations secure.</li>
+                <li className="flex items-center gap-2"><UserCircle className="w-4 h-4 flex-shrink-0" /> <strong>Profile Customization:</strong> Personalize your experience with profile pictures visible only to your friends.</li>
+                <li className="flex items-center gap-2"><CalendarCheck className="w-4 h-4 flex-shrink-0" /> <strong>Event Management:</strong> Help you stay on top of deadlines and schedules.</li>
+                <li className="flex items-center gap-2"><TrendingUp className="w-4 h-4 flex-shrink-0" /> <strong>Service Improvement:</strong> Enhance AI models and optimize user experience.</li>
+                <li className="flex items-center gap-2"><Bell className="w-4 h-4 flex-shrink-0" /> <strong>Notifications:</strong> Keep you updated on tasks, events, and friend interactions.</li>
+                <li className="flex items-center gap-2"><Globe className="w-4 h-4 flex-shrink-0" /> <strong>Location-Based Features:</strong> Provide contextual services like weather updates without storing your location data.</li>
               </ul>
             </div>
           </section>
@@ -194,9 +194,9 @@ function PrivacyPolicy() {
             <div className="prose prose-invert max-w-none">
               <p className="text-gray-300">We store your data securely in Firebase Firestore, including:</p>
               <ul className="text-gray-300 list-disc pl-6 mt-4">
-                <li className="flex items-center gap-2"><FileText className="w-4 h-4 flex-shrink-0" /> Tasks, goals, projects, and plans</li>
-                <li className="flex items-center gap-2"><MessageSquare className="w-4 h-4 flex-shrink-0" /> Messages with friends</li>
-                <li className="flex items-center gap-2"><Image className="w-4 h-4 flex-shrink-0" /> Profile pictures and calendar events</li>
+                <li>Tasks, goals, projects, and plans</li>
+                <li>Messages with friends</li>
+                <li>Profile pictures and calendar events</li>
               </ul>
               <p className="text-gray-300 mt-4">
                 <strong>Temporary Data:</strong> AI-generated content (e.g., Smart Overview) and location data are processed in real-time and not stored unless saved by you.
@@ -209,14 +209,14 @@ function PrivacyPolicy() {
 
           <section className="bg-gray-800 rounded-xl p-6">
             <h2 className="text-2xl font-bold mb-4 text-indigo-400 flex items-center gap-2">
-              <Lock className="w-6 h-6" /> How We Protect Your Information
+              <Shield className="w-6 h-6" /> How We Protect Your Information
             </h2>
             <div className="prose prose-invert max-w-none">
               <p className="text-gray-300">Your data security is critical. We implement:</p>
               <ul className="text-gray-300 list-disc pl-6 mt-4">
                 <li className="flex items-center gap-2"><Lock className="w-4 h-4 flex-shrink-0" /> Encryption for data in transit and at rest</li>
-                <li className="flex items-center gap-2"><Shield className="w-4 h-4 flex-shrink-0" /> Secure access controls</li>
-                <li className="flex items-center gap-2"><Bell className="w-4 h-4 flex-shrink-0" /> Regular security audits and updates</li>
+                <li className="flex items-center gap-2"><Settings className="w-4 h-4 flex-shrink-0" /> Secure access controls</li>
+                <li className="flex items-center gap-2"><Shield className="w-4 h-4 flex-shrink-0" /> Regular security audits and updates</li>
               </ul>
               <p className="text-gray-300 mt-4">
                 While we strive to protect your information, please note that no method of transmission or storage is entirely secure.

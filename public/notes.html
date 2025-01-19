@@ -2145,7 +2145,7 @@ h9 svg {
             <h3 class="modal-header">Youtube Upload</h3>
             <p>Paste YouTube link below:</p>
             <textarea id="youtubeLink" placeholder="Enter YouTube link here..." rows="4"></textarea>
-            <button class="generate-youtube-notes-btn">Generate Notes</button>
+            <button class="generate-youtube-notes-btn" onclick="generateNotes()">Generate Notes</button>
         </div>
     </div>
 
@@ -2755,6 +2755,79 @@ pdfDragArea.addEventListener('drop', (e) => {
 
 // Set PDF.js worker source
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.worker.min.js';
+
+   async function getVideoId(url) {
+        const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
+        const match = url.match(regex);
+        return match ? match[1] : null;
+    }
+
+    async function getVideoTranscript(videoId) {
+        try {
+            const response = await fetch(`https://www.googleapis.com/youtube/v3/captions?part=snippet&videoId=${videoId}`, {
+                headers: {
+                    'Authorization': `Bearer AIzaSyD4iosX8Y1X4bOThSGhYyUfCmWKBEkc6x4`
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to fetch captions');
+            }
+
+            const data = await response.json();
+            
+            // Get video details for title and description
+            const videoResponse = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoId}&key=AIzaSyD4iosX8Y1X4bOThSGhYyUfCmWKBEkc6x4`);
+            const videoData = await videoResponse.json();
+            
+            if (videoData.items && videoData.items[0]) {
+                const videoInfo = videoData.items[0].snippet;
+                return {
+                    title: videoInfo.title,
+                    description: videoInfo.description
+                };
+            }
+
+            throw new Error('Video data not found');
+        } catch (error) {
+            console.error('Error fetching video data:', error);
+            throw error;
+        }
+    }
+
+    async function generateNotes() {
+        const youtubeLink = document.getElementById('youtubeLink').value;
+        console.log('Processing YouTube link:', youtubeLink);
+
+        try {
+            // Get video ID from the URL
+            const videoId = await getVideoId(youtubeLink);
+            if (!videoId) {
+                console.error('Invalid YouTube URL');
+                return;
+            }
+
+            // Get video data
+            const videoData = await getVideoTranscript(videoId);
+            console.log('Video data retrieved:', videoData);
+
+            // Prepare text for AI processing
+            const textToProcess = `Title: ${videoData.title}\n\nDescription: ${videoData.description}`;
+            
+            // Generate summary using your existing AI code
+            const result = await generateSummary(textToProcess);
+            
+            // Log the results
+            console.log('Generated Notes:');
+            console.log('Overview:', result.overview);
+            console.log('Key Points:', result.keyPoints);
+
+        } catch (error) {
+            console.error('Error generating notes:', error);
+        }
+    }
+
+    // Your existing helper functions and AI processing code remains the same...
 
 // Helper function to wait for a certain amount of time (in ms)
 function delay(ms) {

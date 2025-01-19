@@ -854,7 +854,7 @@ body.night-mode {
                 document.getElementById('displayName').textContent = username;
             } else {
                 // No user is signed in.
-                window.location.href = "login.html"; // Redirect to login page
+                window.location.href = "login"; // Redirect to login page
             }
         });
     });
@@ -999,7 +999,7 @@ let currentDayKey = null;
 
     firebase.auth().onAuthStateChanged((user) => {
         if (!user) {
-            window.location.href = 'login.html'; // Redirect to login if not authenticated
+            window.location.href = 'login'; // Redirect to login if not authenticated
         } else {
             calculateCurrentWeek();
             updateCalendarHeader();

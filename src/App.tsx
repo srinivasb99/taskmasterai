@@ -123,8 +123,7 @@ function App() {
         </nav>
       </div>
     </header>
-  );
-};
+
 
       <main>
         <HeroSection />

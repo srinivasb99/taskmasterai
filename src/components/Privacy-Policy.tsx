@@ -25,7 +25,10 @@ import {
   ExternalLink,
   ScrollText,
   RefreshCw,
-  Phone
+  Phone,
+  Settings,
+  Edit,
+  Trash2
 } from 'lucide-react';
 import { Logo } from './Logo';
 

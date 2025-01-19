@@ -94,7 +94,7 @@ function Pricing() {
 
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center space-x-8">
-              <a href="#features" className="text-gray-300 hover:text-indigo-400 transition-colors">Features</a>
+              <a href="/" className="text-gray-300 hover:text-indigo-400 transition-colors">Features</a>
               <a href="pricing" className="text-gray-300 hover:text-indigo-400 transition-colors">Pricing</a>
               <a href="contact" className="text-gray-300 hover:text-indigo-400 transition-colors">Contact</a>
               <a 
@@ -113,7 +113,7 @@ function Pricing() {
             >
               <div className="container mx-auto px-4 py-4 flex flex-col space-y-4">
                 <a
-                  href="#features"
+                  href="/"
                   className="text-gray-300 hover:text-indigo-400 transition-colors"
                   onClick={toggleMenu}
                 >

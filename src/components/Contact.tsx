@@ -433,7 +433,7 @@ function Contact() {
         <div className="container mx-auto px-4 py-6">
           <div className="flex flex-col md:flex-row items-center justify-between">
             <div className="flex items-center space-x-4">
-              <a href="/privacy" className="text-sm text-gray-400 hover:text-indigo-400">
+              <a href="/privacy-policy" className="text-sm text-gray-400 hover:text-indigo-400">
                 Privacy Policy
               </a>
               <span className="text-gray-600">|</span>

@@ -1,6 +1,22 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Loader2 } from 'lucide-react';
+import { 
+  Loader2,
+  ScrollText,
+  Wrench,
+  User,
+  XCircle,
+  Laptop,
+  BarChart2,
+  Phone,
+  LineChart,
+  RefreshCw,
+  AlertTriangle,
+  Shield,
+  FileText,
+  Map,
+  Mail
+} from 'lucide-react';
 import { Logo } from './Logo';
 
 function Terms() {
@@ -104,7 +120,9 @@ function Terms() {
 
       <main className="flex-grow max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-8 text-white">
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-indigo-400 mb-2">📜 Terms & Conditions</h1>
+          <h1 className="text-4xl font-bold text-indigo-400 mb-2 flex items-center justify-center gap-3">
+            <ScrollText className="w-8 h-8" /> Terms & Conditions
+          </h1>
           <p className="text-gray-300">Last updated: January 1, 2024</p>
         </div>
 
@@ -118,7 +136,9 @@ function Terms() {
           </section>
 
           <section className="bg-gray-800 rounded-xl p-6">
-            <h2 className="text-2xl font-bold mb-4 text-indigo-400">🛠️ Use of Services</h2>
+            <h2 className="text-2xl font-bold mb-4 flex items-center gap-3">
+              <Wrench className="w-6 h-6 text-indigo-400" /> Use of Services
+            </h2>
             <div className="prose prose-invert max-w-none">
               <p className="text-gray-300">
                 TaskMaster AI provides tools for task management, AI-driven insights, and collaboration features. By using our services, you agree to:
@@ -132,7 +152,9 @@ function Terms() {
           </section>
 
           <section className="bg-gray-800 rounded-xl p-6">
-            <h2 className="text-2xl font-bold mb-4 text-indigo-400">👤 Account Responsibilities</h2>
+            <h2 className="text-2xl font-bold mb-4 flex items-center gap-3">
+              <User className="w-6 h-6 text-indigo-400" /> Account Responsibilities
+            </h2>
             <div className="prose prose-invert max-w-none">
               <p className="text-gray-300">
                 To use TaskMaster AI, you may need to create an account. You are responsible for:
@@ -146,7 +168,9 @@ function Terms() {
           </section>
 
           <section className="bg-gray-800 rounded-xl p-6">
-            <h2 className="text-2xl font-bold mb-4 text-indigo-400">❌ Prohibited Activities</h2>
+            <h2 className="text-2xl font-bold mb-4 flex items-center gap-3">
+              <XCircle className="w-6 h-6 text-indigo-400" /> Prohibited Activities
+            </h2>
             <div className="prose prose-invert max-w-none">
               <p className="text-gray-300">When using TaskMaster AI, you agree not to:</p>
               <ul className="text-gray-300 list-disc pl-6 mt-4">
@@ -159,7 +183,9 @@ function Terms() {
           </section>
 
           <section className="bg-gray-800 rounded-xl p-6">
-            <h2 className="text-2xl font-bold mb-4 text-indigo-400">💻 Intellectual Property</h2>
+            <h2 className="text-2xl font-bold mb-4 flex items-center gap-3">
+              <Laptop className="w-6 h-6 text-indigo-400" /> Intellectual Property
+            </h2>
             <div className="prose prose-invert max-w-none">
               <p className="text-gray-300">
                 All intellectual property rights related to TaskMaster AI, including but not limited to software, design, logos, trademarks, and content, are owned by TaskMaster AI or its licensors. You may not use, copy, or distribute these materials without our express permission.
@@ -168,7 +194,9 @@ function Terms() {
           </section>
 
           <section className="bg-gray-800 rounded-xl p-6">
-            <h2 className="text-2xl font-bold mb-4 text-indigo-400">📊 Data and Privacy</h2>
+            <h2 className="text-2xl font-bold mb-4 flex items-center gap-3">
+              <BarChart2 className="w-6 h-6 text-indigo-400" /> Data and Privacy
+            </h2>
             <div className="prose prose-invert max-w-none">
               <p className="text-gray-300">
                 Your use of TaskMaster AI is also governed by our Privacy Policy. By using our platform, you agree to the collection and use of your information as outlined in the policy.
@@ -177,7 +205,9 @@ function Terms() {
           </section>
 
           <section className="bg-gray-800 rounded-xl p-6">
-            <h2 className="text-2xl font-bold mb-4 text-indigo-400">📞 Communication</h2>
+            <h2 className="text-2xl font-bold mb-4 flex items-center gap-3">
+              <Phone className="w-6 h-6 text-indigo-400" /> Communication
+            </h2>
             <div className="prose prose-invert max-w-none">
               <p className="text-gray-300">
                 By creating an account, you consent to receive communications related to your tasks, account, or updates about TaskMaster AI. You can manage your notification preferences in the app settings.
@@ -186,7 +216,9 @@ function Terms() {
           </section>
 
           <section className="bg-gray-800 rounded-xl p-6">
-            <h2 className="text-2xl font-bold mb-4 text-indigo-400">📉 Service Availability</h2>
+            <h2 className="text-2xl font-bold mb-4 flex items-center gap-3">
+              <LineChart className="w-6 h-6 text-indigo-400" /> Service Availability
+            </h2>
             <div className="prose prose-invert max-w-none">
               <p className="text-gray-300">
                 We strive to provide uninterrupted access to our services, but we do not guarantee that the platform will be available at all times. TaskMaster AI is not responsible for downtime, data loss, or service interruptions caused by technical issues, maintenance, or factors beyond our control.
@@ -195,7 +227,9 @@ function Terms() {
           </section>
 
           <section className="bg-gray-800 rounded-xl p-6">
-            <h2 className="text-2xl font-bold mb-4 text-indigo-400">🔄 Modifications to Services</h2>
+            <h2 className="text-2xl font-bold mb-4 flex items-center gap-3">
+              <RefreshCw className="w-6 h-6 text-indigo-400" /> Modifications to Services
+            </h2>
             <div className="prose prose-invert max-w-none">
               <p className="text-gray-300">
                 We may update, enhance, or discontinue certain features of the platform at any time. We will provide notice of significant changes where possible. Your continued use of the platform signifies your acceptance of such changes.
@@ -204,7 +238,9 @@ function Terms() {
           </section>
 
           <section className="bg-gray-800 rounded-xl p-6">
-            <h2 className="text-2xl font-bold mb-4 text-indigo-400">⚠️ Disclaimer of Warranties</h2>
+            <h2 className="text-2xl font-bold mb-4 flex items-center gap-3">
+              <AlertTriangle className="w-6 h-6 text-indigo-400" /> Disclaimer of Warranties
+            </h2>
             <div className="prose prose-invert max-w-none">
               <p className="text-gray-300">
                 TaskMaster AI is provided on an "as is" and "as available" basis. We do not guarantee the accuracy, completeness, or reliability of the content or features. To the fullest extent permitted by law, we disclaim all warranties, express or implied.
@@ -213,7 +249,9 @@ function Terms() {
           </section>
 
           <section className="bg-gray-800 rounded-xl p-6">
-            <h2 className="text-2xl font-bold mb-4 text-indigo-400">🛡️ Limitation of Liability</h2>
+            <h2 className="text-2xl font-bold mb-4 flex items-center gap-3">
+              <Shield className="w-6 h-6 text-indigo-400" /> Limitation of Liability
+            </h2>
             <div className="prose prose-invert max-w-none">
               <p className="text-gray-300">
                 TaskMaster AI and its team are not liable for any direct, indirect, incidental, or consequential damages arising from your use of the platform. This includes, but is not limited to, loss of data, profits, or service interruptions.
@@ -222,7 +260,9 @@ function Terms() {
           </section>
 
           <section className="bg-gray-800 rounded-xl p-6">
-            <h2 className="text-2xl font-bold mb-4 text-indigo-400">📜 Termination</h2>
+            <h2 className="text-2xl font-bold mb-4 flex items-center gap-3">
+              <FileText className="w-6 h-6 text-indigo-400" /> Termination
+            </h2>
             <div className="prose prose-invert max-w-none">
               <p className="text-gray-300">
                 We reserve the right to suspend or terminate your access to TaskMaster AI if you violate these terms or engage in prohibited activities. Upon termination, your data may be deleted in accordance with our data retention policy.
@@ -231,7 +271,9 @@ function Terms() {
           </section>
 
           <section className="bg-gray-800 rounded-xl p-6">
-            <h2 className="text-2xl font-bold mb-4 text-indigo-400">🗺️ Governing Law</h2>
+            <h2 className="text-2xl font-bold mb-4 flex items-center gap-3">
+              <Map className="w-6 h-6 text-indigo-400" /> Governing Law
+            </h2>
             <div className="prose prose-invert max-w-none">
               <p className="text-gray-300">
                 These terms are governed by the laws of the jurisdiction where TaskMaster AI is operated. Any disputes arising from the use of our services will be resolved in accordance with local laws.
@@ -240,7 +282,9 @@ function Terms() {
           </section>
 
           <section className="bg-gray-800 rounded-xl p-6">
-            <h2 className="text-2xl font-bold mb-4 text-indigo-400">🔄 Changes to These Terms</h2>
+            <h2 className="text-2xl font-bold mb-4 flex items-center gap-3">
+              <RefreshCw className="w-6 h-6 text-indigo-400" /> Changes to These Terms
+            </h2>
             <div className="prose prose-invert max-w-none">
               <p className="text-gray-300">
                 We may update these Terms & Conditions periodically. Any changes will be posted here with an updated revision date. Continued use of the platform indicates your acceptance of the revised terms.
@@ -250,7 +294,9 @@ function Terms() {
         </div>
 
         <div className="mt-12 bg-gray-800 rounded-xl p-6">
-          <h2 className="text-2xl font-bold mb-4 text-center text-indigo-400">📞 Contact Us</h2>
+          <h2 className="text-2xl font-bold mb-4 text-center flex items-center justify-center gap-3">
+            <Mail className="w-6 h-6 text-indigo-400" /> Contact Us
+          </h2>
           <p className="text-center text-gray-300 mb-6">
             If you have any questions or concerns about these Terms & Conditions, contact us at taskmasteroneai@gmail.com
           </p>

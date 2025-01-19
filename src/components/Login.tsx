@@ -122,7 +122,7 @@ function Login() {
 
           {/* Forgot Password Link */}
           <div className="text-center mt-4">
-            <a href="#" className="text-sm text-indigo-400 hover:underline">Forgot password?</a>
+            <a href="/forgot-password" className="text-sm text-indigo-400 hover:underline">Forgot password?</a>
           </div>
 
           {/* Sign Up Link */}

@@ -2,20 +2,20 @@ import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { 
   Loader2,
-  ScrollText,
+  Scroll,
   Wrench,
-  User,
+  UserCircle,
   XCircle,
   Laptop,
-  BarChart2,
-  Phone,
-  LineChart,
+  Database,
+  MessageSquare,
+  Power,
   RefreshCw,
   AlertTriangle,
   Shield,
-  FileText,
-  Map,
-  Mail
+  FileTerminal,
+  Globe,
+  Phone
 } from 'lucide-react';
 import { Logo } from './Logo';
 
@@ -120,8 +120,9 @@ function Terms() {
 
       <main className="flex-grow max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-8 text-white">
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-indigo-400 mb-2 flex items-center justify-center gap-3">
-            <ScrollText className="w-8 h-8" /> Terms & Conditions
+          <h1 className="text-4xl font-bold mb-2 flex items-center justify-center gap-3 text-indigo-400">
+            <Scroll className="w-8 h-8" />
+            <span>Terms & Conditions</span>
           </h1>
           <p className="text-gray-300">Last updated: January 1, 2024</p>
         </div>
@@ -136,12 +137,12 @@ function Terms() {
           </section>
 
           <section className="bg-gray-800 rounded-xl p-6">
-<h2 className="text-2xl font-bold mb-4 flex flex-wrap items-center gap-3 text-indigo-400">
-  <span className="flex items-center gap-2">
-    <Wrench className="w-6 h-6 flex-shrink-0" />
-    <span>Use of Services</span>
-  </span>
-</h2>
+            <h2 className="text-2xl font-bold mb-4 flex flex-wrap items-center gap-3 text-indigo-400">
+              <span className="flex items-center gap-2">
+                <Wrench className="w-6 h-6 flex-shrink-0" />
+                <span>Use of Services</span>
+              </span>
+            </h2>
             <div className="prose prose-invert max-w-none">
               <p className="text-gray-300">
                 TaskMaster AI provides tools for task management, AI-driven insights, and collaboration features. By using our services, you agree to:
@@ -155,8 +156,11 @@ function Terms() {
           </section>
 
           <section className="bg-gray-800 rounded-xl p-6">
-            <h2 className="text-2xl font-bold mb-4 flex items-center gap-3 text-indigo-400">
-              <User className="w-6 h-6" /> Account Responsibilities
+            <h2 className="text-2xl font-bold mb-4 flex flex-wrap items-center gap-3 text-indigo-400">
+              <span className="flex items-center gap-2">
+                <UserCircle className="w-6 h-6 flex-shrink-0" />
+                <span>Account Responsibilities</span>
+              </span>
             </h2>
             <div className="prose prose-invert max-w-none">
               <p className="text-gray-300">
@@ -171,8 +175,11 @@ function Terms() {
           </section>
 
           <section className="bg-gray-800 rounded-xl p-6">
-            <h2 className="text-2xl font-bold mb-4 flex items-center gap-3 text-indigo-400">
-              <XCircle className="w-6 h-6" /> Prohibited Activities
+            <h2 className="text-2xl font-bold mb-4 flex flex-wrap items-center gap-3 text-indigo-400">
+              <span className="flex items-center gap-2">
+                <XCircle className="w-6 h-6 flex-shrink-0" />
+                <span>Prohibited Activities</span>
+              </span>
             </h2>
             <div className="prose prose-invert max-w-none">
               <p className="text-gray-300">When using TaskMaster AI, you agree not to:</p>
@@ -186,8 +193,11 @@ function Terms() {
           </section>
 
           <section className="bg-gray-800 rounded-xl p-6">
-            <h2 className="text-2xl font-bold mb-4 flex items-center gap-3 text-indigo-400">
-              <Laptop className="w-6 h-6" /> Intellectual Property
+            <h2 className="text-2xl font-bold mb-4 flex flex-wrap items-center gap-3 text-indigo-400">
+              <span className="flex items-center gap-2">
+                <Laptop className="w-6 h-6 flex-shrink-0" />
+                <span>Intellectual Property</span>
+              </span>
             </h2>
             <div className="prose prose-invert max-w-none">
               <p className="text-gray-300">
@@ -197,8 +207,11 @@ function Terms() {
           </section>
 
           <section className="bg-gray-800 rounded-xl p-6">
-            <h2 className="text-2xl font-bold mb-4 flex items-center gap-3 text-indigo-400">
-              <BarChart2 className="w-6 h-6" /> Data and Privacy
+            <h2 className="text-2xl font-bold mb-4 flex flex-wrap items-center gap-3 text-indigo-400">
+              <span className="flex items-center gap-2">
+                <Database className="w-6 h-6 flex-shrink-0" />
+                <span>Data and Privacy</span>
+              </span>
             </h2>
             <div className="prose prose-invert max-w-none">
               <p className="text-gray-300">
@@ -208,8 +221,11 @@ function Terms() {
           </section>
 
           <section className="bg-gray-800 rounded-xl p-6">
-            <h2 className="text-2xl font-bold mb-4 flex items-center gap-3 text-indigo-400">
-              <Phone className="w-6 h-6" /> Communication
+            <h2 className="text-2xl font-bold mb-4 flex flex-wrap items-center gap-3 text-indigo-400">
+              <span className="flex items-center gap-2">
+                <MessageSquare className="w-6 h-6 flex-shrink-0" />
+                <span>Communication</span>
+              </span>
             </h2>
             <div className="prose prose-invert max-w-none">
               <p className="text-gray-300">
@@ -219,8 +235,11 @@ function Terms() {
           </section>
 
           <section className="bg-gray-800 rounded-xl p-6">
-            <h2 className="text-2xl font-bold mb-4 flex items-center gap-3 text-indigo-400">
-              <LineChart className="w-6 h-6" /> Service Availability
+            <h2 className="text-2xl font-bold mb-4 flex flex-wrap items-center gap-3 text-indigo-400">
+              <span className="flex items-center gap-2">
+                <Power className="w-6 h-6 flex-shrink-0" />
+                <span>Service Availability</span>
+              </span>
             </h2>
             <div className="prose prose-invert max-w-none">
               <p className="text-gray-300">
@@ -230,8 +249,11 @@ function Terms() {
           </section>
 
           <section className="bg-gray-800 rounded-xl p-6">
-            <h2 className="text-2xl font-bold mb-4 flex items-center gap-3 text-indigo-400">
-              <RefreshCw className="w-6 h-6" /> Modifications to Services
+            <h2 className="text-2xl font-bold mb-4 flex flex-wrap items-center gap-3 text-indigo-400">
+              <span className="flex items-center gap-2">
+                <RefreshCw className="w-6 h-6 flex-shrink-0" />
+                <span>Modifications to Services</span>
+              </span>
             </h2>
             <div className="prose prose-invert max-w-none">
               <p className="text-gray-300">
@@ -241,8 +263,11 @@ function Terms() {
           </section>
 
           <section className="bg-gray-800 rounded-xl p-6">
-            <h2 className="text-2xl font-bold mb-4 flex items-center gap-3 text-indigo-400">
-              <AlertTriangle className="w-6 h-6" /> Disclaimer of Warranties
+            <h2 className="text-2xl font-bold mb-4 flex flex-wrap items-center gap-3 text-indigo-400">
+              <span className="flex items-center gap-2">
+                <AlertTriangle className="w-6 h-6 flex-shrink-0" />
+                <span>Disclaimer of Warranties</span>
+              </span>
             </h2>
             <div className="prose prose-invert max-w-none">
               <p className="text-gray-300">
@@ -252,8 +277,11 @@ function Terms() {
           </section>
 
           <section className="bg-gray-800 rounded-xl p-6">
-            <h2 className="text-2xl font-bold mb-4 flex items-center gap-3 text-indigo-400">
-              <Shield className="w-6 h-6" /> Limitation of Liability
+            <h2 className="text-2xl font-bold mb-4 flex flex-wrap items-center gap-3 text-indigo-400">
+              <span className="flex items-center gap-2">
+                <Shield className="w-6 h-6 flex-shrink-0" />
+                <span>Limitation of Liability</span>
+              </span>
             </h2>
             <div className="prose prose-invert max-w-none">
               <p className="text-gray-300">
@@ -263,8 +291,11 @@ function Terms() {
           </section>
 
           <section className="bg-gray-800 rounded-xl p-6">
-            <h2 className="text-2xl font-bold mb-4 flex items-center gap-3 text-indigo-400">
-              <FileText className="w-6 h-6" /> Termination
+            <h2 className="text-2xl font-bold mb-4 flex flex-wrap items-center gap-3 text-indigo-400">
+              <span className="flex items-center gap-2">
+                <FileTerminal className="w-6 h-6 flex-shrink-0" />
+                <span>Termination</span>
+              </span>
             </h2>
             <div className="prose prose-invert max-w-none">
               <p className="text-gray-300">
@@ -274,8 +305,11 @@ function Terms() {
           </section>
 
           <section className="bg-gray-800 rounded-xl p-6">
-            <h2 className="text-2xl font-bold mb-4 flex items-center gap-3 text-indigo-400">
-              <Map className="w-6 h-6" /> Governing Law
+            <h2 className="text-2xl font-bold mb-4 flex flex-wrap items-center gap-3 text-indigo-400">
+              <span className="flex items-center gap-2">
+                <Globe className="w-6 h-6 flex-shrink-0" />
+                <span>Governing Law</span>
+              </span>
             </h2>
             <div className="prose prose-invert max-w-none">
               <p className="text-gray-300">
@@ -285,8 +319,11 @@ function Terms() {
           </section>
 
           <section className="bg-gray-800 rounded-xl p-6">
-            <h2 className="text-2xl font-bold mb-4 flex items-center gap-3 text-indigo-400">
-              <RefreshCw className="w-6 h-6" /> Changes to These Terms
+            <h2 className="text-2xl font-bold mb-4 flex flex-wrap items-center gap-3 text-indigo-400">
+              <span className="flex items-center gap-2">
+                <RefreshCw className="w-6 h-6 flex-shrink-0" />
+                <span>Changes to These Terms</span>
+              </span>
             </h2>
             <div className="prose prose-invert max-w-none">
               <p className="text-gray-300">
@@ -297,8 +334,11 @@ function Terms() {
         </div>
 
         <div className="mt-12 bg-gray-800 rounded-xl p-6">
-          <h2 className="text-2xl font-bold mb-4 text-center flex items-center justify-center gap-3 text-indigo-400">
-            <Mail className="w-6 h-6" /> Contact Us
+          <h2 className="text-2xl font-bold mb-4 flex flex-wrap items-center justify-center gap-3 text-indigo-400">
+            <span className="flex items-center gap-2">
+              <Phone className="w-6 h-6 flex-shrink-0" />
+              <span>Contact Us</span>
+            </span>
           </h2>
           <p className="text-center text-gray-300 mb-6">
             If you have any questions or concerns about these Terms & Conditions, contact us at taskmasteroneai@gmail.com

@@ -136,9 +136,12 @@ function Terms() {
           </section>
 
           <section className="bg-gray-800 rounded-xl p-6">
-            <h2 className="text-2xl font-bold mb-4 flex items-center gap-3 text-indigo-400">
-              <Wrench className="w-6 h-6" /> Use of Services
-            </h2>
+<h2 className="text-2xl font-bold mb-4 flex flex-wrap items-center gap-3 text-indigo-400">
+  <span className="flex items-center gap-2">
+    <Wrench className="w-6 h-6 flex-shrink-0" />
+    <span>Use of Services</span>
+  </span>
+</h2>
             <div className="prose prose-invert max-w-none">
               <p className="text-gray-300">
                 TaskMaster AI provides tools for task management, AI-driven insights, and collaboration features. By using our services, you agree to:

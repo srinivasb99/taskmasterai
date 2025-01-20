@@ -2102,7 +2102,7 @@ h9 svg {
 
 
 
-    <!-- PDF Upload Modal -->
+  <!-- PDF Upload Modal -->
     <div class="modal4" id="pdfUploadModal">
         <div class="modal-content">
             <span class="close-button" onclick="closePdfUploadModal()">&times;</span>
@@ -2122,6 +2122,15 @@ h9 svg {
                 <div class="pdf-drag-area" id="pdfDragArea">
                     <p>Drag PDF file here, or <span class="file-select">click to select</span></p>
                     <input type="file" id="pdfFileInput" accept=".pdf" style="display:none">
+                </div>
+                <!-- Add progress container -->
+                <div class="upload-progress">
+                    <div id="uploading-text">Uploading<span id="ellipsis2"></span></div>
+                    <div class="progress-bar">
+                        <progress id="progressBar2" value="0" max="100"></progress>
+                    </div>
+                    <div id="estimated-time"></div>
+                    <div class="error-message2"></div>
                 </div>
             </div>
         </div>

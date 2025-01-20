@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2123,15 +2124,25 @@ h9 svg {
                 <input type="file" id="pdfFileInput" accept=".pdf" style="display:none">
             </div>
             
-            <!-- Hidden Progress Elements -->
-            <div class="upload-progress" style="display: none;">
-                <div id="uploading-text"><span id="ellipsis2"></span></div>
-                <div class="progress-bar">
-                    <progress id="progressBar2" value="0" max="100"></progress>
-                </div>
-                <div id="estimated-time"></div>
-                <div class="error-message2"></div>
-            </div>
+<!-- Progress bar -->
+<div class="upload-progress" style="display: none;">
+    <p id="uploading-text">
+        Uploading<span id="ellipsis2"></span> <!-- Ellipsis here -->
+    </p>
+    <p style="color: gray; font-size: 0.9em;">
+        Please wait a few moments to process large PDFs. If the file is too large, the operation may fail. Consider trying a smaller file if you encounter issues.
+    </p>
+    
+    <div class="progress-container" style="position: relative; width: 100%; max-width: 500px;">
+        <progress id="progressBar2" value="" max="100"></progress> <!-- Progress bar element -->
+        <span class="progress-percentage" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #000;">0%</span> <!-- Centered percentage display -->
+    </div>
+    
+    <!-- Estimated time remaining display -->
+    <p id="estimated-time" style="color: gray; font-size: 0.9em; margin-top: 10px; display: none;">
+        Estimated time remaining: <span id="time-remaining">Calculating...</span>
+    </p>
+</div>
         </div>
     </div>
 
@@ -2303,56 +2314,78 @@ function updateEstimatedTime(startTime, currentProgress, totalProgress) {
 
 
 
-        async function handleFileUpload(file) {
-            console.log('File upload started...');
-            
-            const progressBar = document.getElementById('progressBar2');
-            const progressContainer = document.querySelector('.upload-progress');
-            const uploadingText = document.getElementById('uploading-text');
-            const errorMessage = document.querySelector('.error-message2');
-            const estimatedTimeDisplay = document.getElementById('estimated-time');
+async function handleFileUpload(file) {
+    console.log('File upload started...');
+    
+    const progressBar = document.getElementById('progressBar2');
+    const percentageDisplay = document.createElement('span');
+    const uploadingText = document.getElementById('uploading-text');
+    const errorMessage = document.querySelector('.error-message2');
+    const estimatedTimeDisplay = document.getElementById('estimated-time'); // Get the element for estimated time
 
-            if (errorMessage) {
-                errorMessage.innerText = '';
-                errorMessage.style.display = 'none';
+    if (errorMessage) {
+        errorMessage.innerText = ''; // Clear any existing error message
+        errorMessage.style = ''; // Clear inline styles
+    }
+
+    // Show progress bar and estimated time display
+    progressContainer.style.display = 'block';
+    progressBar.value = 0;
+    percentageDisplay.innerText = '';
+    percentageDisplay.style = '';
+    estimatedTimeDisplay.style.display = 'block'; // Make sure it's visible
+
+    // Change "Uploading" to "Generating Note"
+    uploadingText.innerHTML = 'Uploading<span id="ellipsis2"></span>';
+
+    const startTime = Date.now(); // Capture the start time
+
+    // Read PDF file
+    const reader = new FileReader();
+    reader.readAsArrayBuffer(file);
+
+    reader.onload = async function () {
+        try {
+            console.log('PDF file read successfully, processing PDF...');
+            const pdfData = new Uint8Array(reader.result);
+            const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
+
+            let textContent = '';
+            const totalPages = pdf.numPages; // Total number of pages for progress tracking
+
+            const estimatedTimeDisplay = document.getElementById('estimated-time'); // Get the element for estimated time
+
+
+            // Process each page and update progress
+            for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+                console.log(`Processing page ${pageNum} of ${pdf.numPages}...`);
+                const page = await pdf.getPage(pageNum);
+                const text = await page.getTextContent();
+                textContent += text.items.map(item => item.str).join(' ');
+
+                // Update progress bar and estimated time after each page is processed
+                const progress = (pageNum / totalPages) * 100;
+                const percentageDisplay = document.createElement('span');
+                progressBar.value = progress;
+                percentageDisplay.innerText = `${Math.round(progress)}%`;
+                estimatedTimeDisplay.innerText = updateEstimatedTime(startTime, pageNum, totalPages);
+                percentageDisplay.style.color = 'white'; // Ensure the text color is white if needed
+                // Ensure the percentage display is positioned at the center of the progress bar
+                percentageDisplay.style.position = 'absolute'; // Set positioning to absolute
+                percentageDisplay.style.top = '50%'; // Center vertically
+                percentageDisplay.style.left = '50%'; // Center horizontally
+                percentageDisplay.style.transform = 'translate(-50%, -50%)'; // Offset for proper centering
+
             }
 
-            progressContainer.style.display = 'block';
-            progressBar.value = 0;
-            estimatedTimeDisplay.style.display = 'block';
-            uploadingText.innerHTML = 'Uploading<span id="ellipsis2"></span>';
+            console.log('Extracted text:', textContent); // Log extracted text
 
-            const startTime = Date.now();
+            if (!textContent) {
+                throw new Error('No text extracted from PDF.');
+            }
 
-            try {
-                const reader = new FileReader();
-                reader.readAsArrayBuffer(file);
+            console.log('PDF text extraction complete.');
 
-                reader.onload = async function() {
-                    try {
-                        console.log('PDF file read successfully, processing PDF...');
-                        const pdfData = new Uint8Array(reader.result);
-                        const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
-
-                        let textContent = '';
-                        const totalPages = pdf.numPages;
-
-                        for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
-                            console.log(`Processing page ${pageNum} of ${totalPages}...`);
-                            const page = await pdf.getPage(pageNum);
-                            const text = await page.getTextContent();
-                            textContent += text.items.map(item => item.str).join(' ');
-
-                            const progress = (pageNum / totalPages) * 100;
-                            progressBar.value = progress;
-                            estimatedTimeDisplay.innerText = updateEstimatedTime(startTime, pageNum, totalPages);
-                        }
-
-                        if (!textContent) {
-                            throw new Error('No text extracted from PDF.');
-                        }
-
-                        console.log('PDF text extraction complete.');
             // Change "Uploading" to "Generating Note"
             uploadingText.innerHTML = 'Processing PDF<span id="ellipsis2"></span>';
 

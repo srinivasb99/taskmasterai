@@ -1798,6 +1798,138 @@ h9 svg {
     display: none; /* Snowflakes hidden by default */
 }
 
+.yt-processing-interface {
+    display: none;
+    padding: 20px;
+    margin-top: 20px;
+    background: rgba(0, 0, 0, 0.03);
+    border-radius: 12px;
+}
+
+/* Status Container */
+.yt-status-container {
+    display: flex;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.yt-status-icon {
+    position: relative;
+    width: 24px;
+    height: 24px;
+    margin-right: 12px;
+}
+
+.yt-status-dot {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    background: #4f46e5;
+    border-radius: 50%;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.yt-pulse-ring {
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 2px solid #4f46e5;
+    animation: pulse 1.5s ease-out infinite;
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(0.5);
+        opacity: 1;
+    }
+    100% {
+        transform: scale(1.5);
+        opacity: 0;
+    }
+}
+
+.yt-status-text {
+    font-size: 0.95rem;
+    color: #4b5563;
+}
+
+.yt-status-dots {
+    display: inline-block;
+    width: 12px;
+    animation: statusDots 1.5s infinite;
+}
+
+@keyframes statusDots {
+    0% { content: ''; }
+    25% { content: '.'; }
+    50% { content: '..'; }
+    75% { content: '...'; }
+}
+
+/* Progress Track */
+.yt-progress-track {
+    position: relative;
+    height: 6px;
+    background: #e5e7eb;
+    border-radius: 8px;
+    overflow: hidden;
+    margin: 15px 0;
+}
+
+.yt-progress-bar {
+    position: relative;
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #4f46e5, #6366f1);
+    border-radius: 8px;
+    transition: width 0.3s ease;
+}
+
+.yt-progress-glow {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 30px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.6), transparent);
+    animation: progressGlow 2s linear infinite;
+}
+
+@keyframes progressGlow {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(400%); }
+}
+
+.yt-progress-label {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 0.75rem;
+    color: #4b5563;
+    font-weight: 500;
+}
+
+/* Time Estimate */
+.yt-time-estimate {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.85rem;
+    color: #6b7280;
+}
+
+.yt-clock-icon {
+    color: #6b7280;
+}
+
+.yt-remaining-time {
+    font-family: monospace;
+}
+
 
     </style>
 </head>
@@ -2145,7 +2277,7 @@ h9 svg {
         </div>
     </div>
 
- <!-- YouTube Upload Modal -->
+<!-- YouTube Upload Modal -->
 <div class="modal19" id="youtubeUploadModal">
     <div class="modalY-content">
         <span class="closeY-button" onclick="closeYoutubeUploadModal()">&times;</span>
@@ -2166,23 +2298,33 @@ h9 svg {
         <textarea id="youtubeLink" placeholder="Enter YouTube link here..." rows="4"></textarea>
         <button class="generate-youtube-notes-btn" onclick="generateNotes()">Generate Notes</button>
 
-        <!-- Progress bar -->
-        <div class="upload-progress" style="display: none;">
-            <p id="uploading-text">
-                Processing<span id="ellipsis2"></span>
-            </p>
-            <p style="color: gray; font-size: 0.9em;">
-                Please wait while we process the video. Longer videos may take more time.
-            </p>
-            
-            <div class="progress-container" style="position: relative; width: 100%; max-width: 500px; margin: 20px auto;">
-                <progress id="progressBar2" value="0" max="100" style="width: 100%;"></progress>
-                <span class="progress-percentage" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #000;">0%</span>
+        <!-- New Progress Interface -->
+        <div class="yt-processing-interface">
+            <div class="yt-status-container">
+                <div class="yt-status-icon">
+                    <div class="yt-pulse-ring"></div>
+                    <div class="yt-status-dot"></div>
+                </div>
+                <div class="yt-status-text">
+                    <span class="yt-current-status">Initializing</span>
+                    <span class="yt-status-dots"></span>
+                </div>
             </div>
-            
-            <p id="estimated-time" style="color: gray; font-size: 0.9em; margin-top: 10px;">
-                Estimated time remaining: <span id="time-remaining">Calculating...</span>
-            </p>
+
+            <div class="yt-progress-track">
+                <div class="yt-progress-bar">
+                    <div class="yt-progress-glow"></div>
+                </div>
+                <div class="yt-progress-label">0%</div>
+            </div>
+
+            <div class="yt-time-estimate">
+                <svg class="yt-clock-icon" viewBox="0 0 24 24" width="16" height="16">
+                    <path fill="currentColor" d="M12 2C6.486 2 2 6.486 2 12s4.486 10 10 10 10-4.486 10-10S17.514 2 12 2zm0 18c-4.411 0-8-3.589-8-8s3.589-8 8-8 8 3.589 8 8-3.589 8-8 8z"/>
+                    <path fill="currentColor" d="M13 7h-2v6l4.5 2.7.75-1.23-3.25-1.97z"/>
+                </svg>
+                <span class="yt-remaining-time">Calculating time...</span>
+            </div>
         </div>
     </div>
 </div>
@@ -2791,28 +2933,23 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs
 
   const YOUTUBE_API_KEY = 'AIzaSyD4iosX8Y1X4bOThSGhYyUfCmWKBEkc6x4';
 
-// Function to update progress bar and estimated time
-async function updateProgress(progress, status, startTime) {
-    const progressBar = document.getElementById('progressBar2');
-    const progressPercentage = document.querySelector('.progress-percentage');
-    const timeRemaining = document.getElementById('time-remaining');
-    const uploadingText = document.getElementById('uploading-text');
+// Function to update YouTube progress interface
+async function updateYouTubeProgress(progress, status, startTime) {
+    const interface = document.querySelector('.yt-processing-interface');
+    const progressBar = document.querySelector('.yt-progress-bar');
+    const progressLabel = document.querySelector('.yt-progress-label');
+    const currentStatus = document.querySelector('.yt-current-status');
+    const remainingTime = document.querySelector('.yt-remaining-time');
 
-    if (progressBar && progressPercentage && timeRemaining && uploadingText) {
-        progressBar.value = progress;
-        progressPercentage.textContent = `${Math.round(progress)}%`;
-        timeRemaining.textContent = updateEstimatedTime(startTime, progress, 100);
-        uploadingText.innerHTML = `${status}<span id="ellipsis2"></span>`;
+    if (!interface.style.display || interface.style.display === 'none') {
+        interface.style.display = 'block';
     }
 
-    // Add animated ellipsis
-    const ellipsis = document.getElementById('ellipsis2');
-    if (ellipsis) {
-        let dots = 0;
-        setInterval(() => {
-            ellipsis.textContent = '.'.repeat(dots % 4);
-            dots++;
-        }, 500);
+    if (progressBar && progressLabel && currentStatus && remainingTime) {
+        progressBar.style.width = `${progress}%`;
+        progressLabel.textContent = `${Math.round(progress)}%`;
+        currentStatus.textContent = status;
+        remainingTime.textContent = updateEstimatedTime(startTime, progress, 100);
     }
 }
 
@@ -2824,7 +2961,7 @@ async function getVideoId(url) {
 
 async function getVideoData(videoId, startTime) {
     try {
-        await updateProgress(20, 'Fetching video data', startTime);
+        await updateYouTubeProgress(20, 'Fetching video metadata', startTime);
         const videoResponse = await fetch(
             `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoId}&key=${YOUTUBE_API_KEY}`
         );
@@ -2833,13 +2970,13 @@ async function getVideoData(videoId, startTime) {
             throw new Error('Failed to fetch video data');
         }
 
-        await updateProgress(40, 'Processing video information', startTime);
+        await updateYouTubeProgress(40, 'Processing video information', startTime);
         const videoData = await videoResponse.json();
         
         if (videoData.items && videoData.items[0]) {
             const videoInfo = videoData.items[0].snippet;
             
-            await updateProgress(60, 'Fetching transcript', startTime);
+            await updateYouTubeProgress(60, 'Retrieving transcript', startTime);
             const transcriptResponse = await fetch(
                 `https://www.googleapis.com/youtube/v3/captions?part=snippet&videoId=${videoId}&key=${YOUTUBE_API_KEY}`
             );
@@ -2853,7 +2990,7 @@ async function getVideoData(videoId, startTime) {
                 };
             }
 
-            await updateProgress(80, 'Processing transcript', startTime);
+            await updateYouTubeProgress(80, 'Processing transcript data', startTime);
             const transcriptData = await transcriptResponse.json();
             let transcript = '';
 
@@ -2885,24 +3022,21 @@ async function getVideoData(videoId, startTime) {
 
 async function generateNotes() {
     const youtubeLink = document.getElementById('youtubeLink').value;
-    const progressContainer = document.querySelector('.upload-progress');
     const startTime = Date.now();
     
     try {
-        // Show progress bar and reset
-        progressContainer.style.display = 'block';
-        await updateProgress(0, 'Starting', startTime);
+        // Initialize progress interface
+        await updateYouTubeProgress(0, 'Initializing process', startTime);
 
         // Get video ID
         const videoId = await getVideoId(youtubeLink);
         if (!videoId) {
             throw new Error('Invalid YouTube URL');
         }
-        await updateProgress(20, 'Fetching video data', startTime);
 
-        // Get video data
-        const videoData = await getVideoData(videoId);
-        await updateProgress(40, 'Processing video content', startTime);
+        // Get video data with progress updates
+        const videoData = await getVideoData(videoId, startTime);
+        await updateYouTubeProgress(40, 'Analyzing content', startTime);
         
         // Prepare text for AI processing
         const textToProcess = `
@@ -2911,16 +3045,16 @@ async function generateNotes() {
             Transcript: ${videoData.transcript}
         `.trim();
         
-        await updateProgress(60, 'Generating summary', startTime);
+        await updateYouTubeProgress(60, 'Generating summary', startTime);
         
         // Generate summary
         const result = await generateSummary(textToProcess);
-        await updateProgress(80, 'Generating questions', startTime);
+        await updateYouTubeProgress(80, 'Creating study materials', startTime);
         
         // Generate questions based on key points
         const { questions, rawResponses } = await generateQuestions(result.keyPoints);
         
-        await updateProgress(90, 'Saving notes', startTime);
+        await updateYouTubeProgress(90, 'Saving your notes', startTime);
         
         // Save to Firestore
         await saveToFirestore4(
@@ -2930,22 +3064,24 @@ async function generateNotes() {
             rawResponses
         );
         
-        await updateProgress(100, 'Completed', startTime);
+        await updateYouTubeProgress(100, 'All done!', startTime);
         
-        // Hide progress bar after completion
+        // Clean up and close
         setTimeout(() => {
-            progressContainer.style.display = 'none';
+            document.querySelector('.yt-processing-interface').style.display = 'none';
             closeYoutubeUploadModal();
             if (typeof loadAllNotes === 'function') {
                 loadAllNotes();
             }
-        }, 1000);
+        }, 1500);
 
         return result;
 
     } catch (error) {
         console.error('Error generating notes:', error);
-        progressContainer.style.display = 'none';
+        document.querySelector('.yt-processing-interface').style.display = 'none';
+        // Show error message to user
+        alert('Failed to process video. Please check the URL and try again.');
         throw error;
     }
 }

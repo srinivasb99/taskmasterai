@@ -2959,23 +2959,33 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs
         }
 
         // Create progress interface if it doesn't exist
-        if (!document.querySelector('.yt-progress-container')) {
+        if (!document.querySelector('.yt-status-container')) {
             interface.innerHTML = `
-                <div class="pulse-ring"></div>
-                <div class="yt-progress-container">
-                    <div class="progress-track">
-                        <div class="yt-progress-bar" style="width: 0%"></div>
+                <div class="yt-status-container">
+                    <div class="yt-status-icon">
+                        <div class="yt-status-dot"></div>
+                        <div class="yt-pulse-ring"></div>
+                    </div>
+                    <div class="yt-status-text">
+                        ${status}<span class="yt-status-dots"></span>
+                    </div>
+                </div>
+                <div class="yt-progress-track">
+                    <div class="yt-progress-bar">
+                        <div class="yt-progress-glow"></div>
                     </div>
                     <div class="yt-progress-label">0%</div>
                 </div>
-                <div class="yt-current-status">Initializing...</div>
-                <div class="yt-remaining-time">Estimating...</div>
+                <div class="yt-time-estimate">
+                    <span class="yt-clock-icon">⏱</span>
+                    <span class="yt-remaining-time">Estimating...</span>
+                </div>
             `;
         }
 
         const progressBar = interface.querySelector('.yt-progress-bar');
         const progressLabel = interface.querySelector('.yt-progress-label');
-        const currentStatus = interface.querySelector('.yt-current-status');
+        const statusText = interface.querySelector('.yt-status-text');
         const remainingTime = interface.querySelector('.yt-remaining-time');
 
         // Ensure interface is visible
@@ -2988,13 +2998,14 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs
         if (progressLabel) {
             progressLabel.textContent = `${Math.round(progress)}%`;
         }
-        if (currentStatus) {
-            currentStatus.textContent = status;
+        if (statusText) {
+            statusText.innerHTML = `${status}<span class="yt-status-dots"></span>`;
         }
         if (remainingTime) {
             remainingTime.textContent = updateEstimatedTime(startTime, progress, 100);
         }
     }
+
 
 
     async function getVideoId(url) {

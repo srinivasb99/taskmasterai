@@ -2791,19 +2791,28 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs
 
   const YOUTUBE_API_KEY = 'AIzaSyD4iosX8Y1X4bOThSGhYyUfCmWKBEkc6x4';
 
-async function updateProgress(progress, phase, startTime) {
+// Function to update progress bar and estimated time
+async function updateProgress(progress, status, startTime) {
     const progressBar = document.getElementById('progressBar2');
     const progressPercentage = document.querySelector('.progress-percentage');
+    const timeRemaining = document.getElementById('time-remaining');
     const uploadingText = document.getElementById('uploading-text');
-    const estimatedTimeDisplay = document.getElementById('time-remaining');
-    
-    progressBar.value = progress;
-    progressPercentage.textContent = `${Math.round(progress)}%`;
-    uploadingText.innerHTML = `${phase}<span id="ellipsis2"></span>`;
-    
-    // Update estimated time
-    if (startTime) {
-        estimatedTimeDisplay.textContent = updateEstimatedTime(startTime, progress, 100);
+
+    if (progressBar && progressPercentage && timeRemaining && uploadingText) {
+        progressBar.value = progress;
+        progressPercentage.textContent = `${Math.round(progress)}%`;
+        timeRemaining.textContent = updateEstimatedTime(startTime, progress, 100);
+        uploadingText.innerHTML = `${status}<span id="ellipsis2"></span>`;
+    }
+
+    // Add animated ellipsis
+    const ellipsis = document.getElementById('ellipsis2');
+    if (ellipsis) {
+        let dots = 0;
+        setInterval(() => {
+            ellipsis.textContent = '.'.repeat(dots % 4);
+            dots++;
+        }, 500);
     }
 }
 
@@ -2877,12 +2886,11 @@ async function getVideoData(videoId, startTime) {
 async function generateNotes() {
     const youtubeLink = document.getElementById('youtubeLink').value;
     const progressContainer = document.querySelector('.upload-progress');
-    const startTime = Date.now(); // Capture start time
+    const startTime = Date.now();
     
     try {
-        // Show progress bar and reset estimated time
+        // Show progress bar and reset
         progressContainer.style.display = 'block';
-        document.getElementById('time-remaining').textContent = 'Calculating...';
         await updateProgress(0, 'Starting', startTime);
 
         // Get video ID
@@ -2890,11 +2898,11 @@ async function generateNotes() {
         if (!videoId) {
             throw new Error('Invalid YouTube URL');
         }
+        await updateProgress(20, 'Fetching video data', startTime);
 
         // Get video data
-        const videoData = await getVideoData(videoId, startTime);
-        
-        await updateProgress(90, 'Generating summary', startTime);
+        const videoData = await getVideoData(videoId);
+        await updateProgress(40, 'Processing video content', startTime);
         
         // Prepare text for AI processing
         const textToProcess = `
@@ -2903,11 +2911,16 @@ async function generateNotes() {
             Transcript: ${videoData.transcript}
         `.trim();
         
+        await updateProgress(60, 'Generating summary', startTime);
+        
         // Generate summary
         const result = await generateSummary(textToProcess);
+        await updateProgress(80, 'Generating questions', startTime);
         
         // Generate questions based on key points
         const { questions, rawResponses } = await generateQuestions(result.keyPoints);
+        
+        await updateProgress(90, 'Saving notes', startTime);
         
         // Save to Firestore
         await saveToFirestore4(
@@ -2922,9 +2935,7 @@ async function generateNotes() {
         // Hide progress bar after completion
         setTimeout(() => {
             progressContainer.style.display = 'none';
-            // Close the modal after saving
             closeYoutubeUploadModal();
-            // Reload the notes list if you have such functionality
             if (typeof loadAllNotes === 'function') {
                 loadAllNotes();
             }
@@ -3419,20 +3430,20 @@ async function saveToFirestore4(videoTitle, overview, keyPoints, rawGeneratedTex
     }
 
     try {
-        // Add the YouTube data to Firestore in the 'youtubenotes' collection
         await db.collection('youtubenotes').add({
             userId: userId,
-            videoTitle: videoTitle,         // Store the video title
-            overview: overview,             // Store the generated overview
-            keyPoints: keyPoints,           // Store the array of key points
-            rawQuestions: rawGeneratedTexts, // Store the array of raw generated texts (full responses)
-            timestamp: firebase.firestore.FieldValue.serverTimestamp() // Add timestamp
+            videoTitle: videoTitle,
+            overview: overview,
+            keyPoints: keyPoints,
+            rawQuestions: rawGeneratedTexts,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp()
         });
         console.log(`Overview, key points, and questions for ${videoTitle} saved successfully.`);
     } catch (error) {
         console.error("Error saving to Firestore: ", error);
     }
 }
+
 
 
 

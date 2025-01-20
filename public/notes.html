@@ -2359,6 +2359,7 @@ h9 svg {
     </body>
     <!-- Firebase App (the core Firebase SDK) is always required and must be listed first -->
     <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
+    
     <!-- Add Firebase products that you want to use -->
     <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-firestore.js"></script>
@@ -2865,21 +2866,23 @@ const closeButton = document.querySelector(".close-button");
             youtubeModal.style.display = "flex";
         }
 
-  function closeYoutubeUploadModal() {
-        const modal = document.getElementById('youtubeUploadModal');
-        const inputContainer = document.getElementById('youtubeInputContainer');
-        const processingContainer = document.getElementById('processingContainer');
-        const errorMessage = document.getElementById('errorMessage');
-        const youtubeLink = document.getElementById('youtubeLink');
+        function closeYoutubeUploadModal() {
+            const modal = document.getElementById('youtubeUploadModal');
+            const generateButton = document.querySelector('.generate-youtube-notes-btn');
+            const processingInterface = document.querySelector('.yt-processing-interface');
+            const errorMessage = document.querySelector('.error-message');
+            const youtubeLink = document.getElementById('youtubeLink');
 
-        // Reset the modal state
-        modal.style.display = 'none';
-        inputContainer.style.display = 'block';
-        processingContainer.style.display = 'none';
-        errorMessage.style.display = 'none';
-        errorMessage.textContent = '';
-        youtubeLink.value = '';
-    }
+            // Reset the modal state
+            modal.style.display = 'none';
+            generateButton.style.display = 'block';
+            processingInterface.style.display = 'none';
+            if (errorMessage) {
+                errorMessage.style.display = 'none';
+                errorMessage.textContent = '';
+            }
+            youtubeLink.value = '';
+        }
 
         // Close modals when clicking outside
         window.onclick = (event) => {
@@ -3030,16 +3033,19 @@ async function getVideoData(videoId, startTime) {
 
 async function generateNotes() {
     const youtubeLink = document.getElementById('youtubeLink').value;
+    const generateButton = document.querySelector('.generate-youtube-notes-btn');
+    const processingInterface = document.querySelector('.yt-processing-interface');
     const inputContainer = document.getElementById('youtubeInputContainer');
     const processingContainer = document.getElementById('processingContainer');
     const errorMessage = document.getElementById('errorMessage');
     const startTime = Date.now();
 
      // Hide the input container and show processing interface
+    generateButton.style.display = 'none';
+    processingInterface.style.display = 'block';
     inputContainer.style.display = 'none';
     processingContainer.style.display = 'block';
-    errorMessage.style.display = 'none';
-    
+    if (errorMessage) errorMessage.style.display = 'none';    
     
     try {
         // Initialize progress interface
@@ -3073,8 +3079,8 @@ async function generateNotes() {
         
         await updateYouTubeProgress(90, 'Saving your notes', startTime);
         
-            // Save to Firestore
-            await saveToFirestore4(result.title, result.overview, result.keyPoints, result.rawResponses);
+                // Save to Firestore
+                await saveToFirestore4(result.title, result.overview, result.keyPoints, result.rawResponses);
             
             // Close the modal after successful save
             closeYoutubeUploadModal();
@@ -3093,15 +3099,20 @@ async function generateNotes() {
         return result;
 
     } catch (error) {
-            console.error('Error generating notes:', error);
-            
-            // Show error message in modal
-            errorMessage.textContent = `Error: ${error.message}`;
-            errorMessage.style.display = 'block';
-            
-            // Reset the interface
-            inputContainer.style.display = 'block';
-            processingContainer.style.display = 'none';
+                console.error('Error generating notes:', error);
+                
+                // Show error message in modal
+                if (!errorMessage) {
+                    const errorDiv = document.createElement('div');
+                    errorDiv.className = 'error-message text-red-500 mt-4';
+                    document.querySelector('.modalY-content').appendChild(errorDiv);
+                }
+                errorMessage.textContent = `Error: ${error.message}`;
+                errorMessage.style.display = 'block';
+                
+                // Reset the interface
+                generateButton.style.display = 'block';
+                processingInterface.style.display = 'none';
         throw error;
     }
 }
@@ -3578,30 +3589,22 @@ async function saveToFirestore3(pdfId, questions) {
     }
 }
 
-async function saveToFirestore4(title, overview, keyPoints, rawResponses) {
-    try {
-        const db = getFirestore();
-        const notesCollection = collection(db, 'youtubenotes');
-        
-        // Create a new document with the timestamp at the top level
-        const docData = {
-            title,
-            overview,
-            keyPoints: Array.isArray(keyPoints) ? keyPoints : [],
-            rawResponses: Array.isArray(rawResponses) ? rawResponses : [],
-            createdAt: serverTimestamp(), // Timestamp at the top level
-            userId: auth.currentUser?.uid || 'anonymous'
-        };
-
-        // Add the document to Firestore
-        const docRef = await addDoc(notesCollection, docData);
-        console.log('Document written with ID: ', docRef.id);
-        return docRef;
-    } catch (error) {
-        console.error('Error saving to Firestore: ', error);
-        throw error;
-    }
-}
+      async function saveToFirestore4(title, overview, keyPoints, rawResponses) {
+            try {
+                const docRef = await firestore.collection('youtubenotes').add({
+                    title: title,
+                    overview: overview,
+                    keyPoints: keyPoints,
+                    rawResponses: rawResponses,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                console.log("Document written with ID: ", docRef.id);
+                return docRef;
+            } catch (error) {
+                console.error("Error saving to Firestore: ", error);
+                throw error;
+            }
+        }
 
 
 

@@ -2780,7 +2780,8 @@ pdfDragArea.addEventListener('drop', (e) => {
 // Set PDF.js worker source
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.worker.min.js';
 
-  const YOUTUBE_API_KEY = 'AIzaSyD4iosX8Y1X4bOThSGhYyUfCmWKBEkc6x4';
+     const YOUTUBE_API_KEY = 'AIzaSyD4iosX8Y1X4bOThSGhYyUfCmWKBEkc6x4';
+    let player;
 
     function showStatus(message, isError = false) {
         const statusDiv = document.getElementById('status');
@@ -2795,55 +2796,59 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs
         return match ? match[1] : null;
     }
 
-    async function getTranscript(videoId) {
-        try {
-            // First, get the caption tracks
-            const captionsResponse = await fetch(
-                `https://www.googleapis.com/youtube/v3/captions?part=snippet&videoId=${videoId}&key=${YOUTUBE_API_KEY}`
-            );
+    function onYouTubeIframeAPIReady() {
+        player = new YT.Player('player', {
+            height: '360',
+            width: '640',
+            playerVars: {
+                'cc_load_policy': 1,
+                'cc_lang_pref': 'en'
+            }
+        });
+    }
 
-            if (!captionsResponse.ok) {
-                throw new Error('Failed to fetch captions');
+    async function loadVideo(videoId) {
+        return new Promise((resolve, reject) => {
+            if (!player) {
+                reject(new Error('YouTube player not initialized'));
+                return;
             }
 
-            const captionsData = await captionsResponse.json();
+            player.loadVideoById(videoId);
             
-            if (!captionsData.items || captionsData.items.length === 0) {
-                console.log('No captions found');
-                return '';
+            player.addEventListener('onReady', () => {
+                player.pauseVideo(); // Pause the video immediately
+                resolve();
+            });
+
+            player.addEventListener('onError', (error) => {
+                reject(new Error('Error loading video: ' + error));
+            });
+        });
+    }
+
+    async function getCaptions() {
+        return new Promise((resolve) => {
+            const tracks = player.getOption('captions', 'tracklist') || [];
+            if (tracks.length === 0) {
+                resolve('');
+                return;
             }
 
-            // Find the English caption track (or the first available one)
-            const captionTrack = captionsData.items.find(
-                track => track.snippet.language === 'en'
-            ) || captionsData.items[0];
-
-            // Get the actual caption content
-            const transcriptResponse = await fetch(
-                `https://www.googleapis.com/youtube/v3/captions/${captionTrack.id}?key=${YOUTUBE_API_KEY}`,
-                {
-                    headers: {
-                        'Accept': 'application/json',
-                    }
-                }
-            );
-
-            if (!transcriptResponse.ok) {
-                throw new Error('Failed to fetch transcript');
-            }
-
-            const transcriptData = await transcriptResponse.text();
-            return transcriptData;
-
-        } catch (error) {
-            console.error('Error fetching transcript:', error);
-            return '';
-        }
+            // Get the first available track
+            const track = tracks[0];
+            player.loadModule('captions');
+            player.setOption('captions', 'track', track);
+            
+            // Get captions
+            const captions = player.getOption('captions', 'track') || {};
+            resolve(captions.text || '');
+        });
     }
 
     async function getVideoData(videoId) {
         try {
-            // Get video details
+            // Get video details using the Data API
             const videoResponse = await fetch(
                 `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoId}&key=${YOUTUBE_API_KEY}`
             );
@@ -2860,13 +2865,15 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs
 
             const videoInfo = videoData.items[0].snippet;
             
+            // Load video in player to get captions
+            await loadVideo(videoId);
             showStatus('Getting video transcript...');
-            const transcript = await getTranscript(videoId);
+            const captions = await getCaptions();
 
             return {
                 title: videoInfo.title,
                 description: videoInfo.description,
-                transcript: transcript
+                transcript: captions
             };
         } catch (error) {
             console.error('Error fetching video data:', error);

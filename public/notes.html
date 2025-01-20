@@ -2780,43 +2780,13 @@ pdfDragArea.addEventListener('drop', (e) => {
 // Set PDF.js worker source
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.worker.min.js';
 
- const YOUTUBE_API_KEY = 'AIzaSyD4iosX8Y1X4bOThSGhYyUfCmWKBEkc6x4';
-    let player;
-    let playerReady = false;
+  const YOUTUBE_API_KEY = 'AIzaSyD4iosX8Y1X4bOThSGhYyUfCmWKBEkc6x4';
 
     function showStatus(message, isError = false) {
         const statusDiv = document.getElementById('status');
         statusDiv.textContent = message;
         statusDiv.style.display = 'block';
         statusDiv.className = isError ? 'status-error' : 'status-info';
-    }
-
-    function onYouTubeIframeAPIReady() {
-        player = new YT.Player('player', {
-            height: '0',
-            width: '0',
-            playerVars: {
-                'cc_load_policy': 1
-            },
-            events: {
-                'onReady': onPlayerReady
-            }
-        });
-    }
-
-    function onPlayerReady() {
-        playerReady = true;
-        console.log('YouTube player is ready');
-    }
-
-    async function waitForPlayer(timeout = 10000) {
-        const startTime = Date.now();
-        while (!playerReady) {
-            if (Date.now() - startTime > timeout) {
-                throw new Error('Timeout waiting for YouTube player');
-            }
-            await new Promise(resolve => setTimeout(resolve, 100));
-        }
     }
 
     async function getVideoId(url) {
@@ -2826,57 +2796,54 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs
     }
 
     async function getTranscript(videoId) {
-        return new Promise((resolve, reject) => {
-            try {
-                player.loadVideoById(videoId);
-                player.stopVideo();
+        try {
+            // First, get the caption tracks
+            const captionsResponse = await fetch(
+                `https://www.googleapis.com/youtube/v3/captions?part=snippet&videoId=${videoId}&key=${YOUTUBE_API_KEY}`
+            );
 
-                // Wait for the video to load and try to get captions
-                setTimeout(async () => {
-                    try {
-                        const tracks = player.getOption('captions', 'tracklist') || [];
-                        if (tracks.length === 0) {
-                            console.log('No captions available');
-                            resolve('');
-                            return;
-                        }
-
-                        // Get the first available track (usually English)
-                        const track = tracks[0];
-                        player.setOption('captions', 'track', track);
-                        
-                        // Get the transcript
-                        const transcript = await new Promise(resolve => {
-                            player.getOption('captions', 'getCaptions', (captions) => {
-                                if (!captions) {
-                                    resolve('');
-                                    return;
-                                }
-                                
-                                // Combine all caption text
-                                const text = captions.map(caption => caption.text).join(' ');
-                                resolve(text);
-                            });
-                        });
-
-                        resolve(transcript);
-                    } catch (error) {
-                        console.error('Error getting transcript:', error);
-                        resolve('');
-                    }
-                }, 1000);
-            } catch (error) {
-                console.error('Error in getTranscript:', error);
-                resolve('');
+            if (!captionsResponse.ok) {
+                throw new Error('Failed to fetch captions');
             }
-        });
+
+            const captionsData = await captionsResponse.json();
+            
+            if (!captionsData.items || captionsData.items.length === 0) {
+                console.log('No captions found');
+                return '';
+            }
+
+            // Find the English caption track (or the first available one)
+            const captionTrack = captionsData.items.find(
+                track => track.snippet.language === 'en'
+            ) || captionsData.items[0];
+
+            // Get the actual caption content
+            const transcriptResponse = await fetch(
+                `https://www.googleapis.com/youtube/v3/captions/${captionTrack.id}?key=${YOUTUBE_API_KEY}`,
+                {
+                    headers: {
+                        'Accept': 'application/json',
+                    }
+                }
+            );
+
+            if (!transcriptResponse.ok) {
+                throw new Error('Failed to fetch transcript');
+            }
+
+            const transcriptData = await transcriptResponse.text();
+            return transcriptData;
+
+        } catch (error) {
+            console.error('Error fetching transcript:', error);
+            return '';
+        }
     }
 
     async function getVideoData(videoId) {
         try {
-            await waitForPlayer();
-
-            // Get video details using the API
+            // Get video details
             const videoResponse = await fetch(
                 `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoId}&key=${YOUTUBE_API_KEY}`
             );
@@ -2887,21 +2854,20 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs
 
             const videoData = await videoResponse.json();
             
-            if (videoData.items && videoData.items[0]) {
-                const videoInfo = videoData.items[0].snippet;
-                
-                showStatus('Getting video transcript...');
-                // Get transcript using the iframe player
-                const transcript = await getTranscript(videoId);
-
-                return {
-                    title: videoInfo.title,
-                    description: videoInfo.description,
-                    transcript: transcript
-                };
+            if (!videoData.items || !videoData.items[0]) {
+                throw new Error('Video data not found');
             }
 
-            throw new Error('Video data not found');
+            const videoInfo = videoData.items[0].snippet;
+            
+            showStatus('Getting video transcript...');
+            const transcript = await getTranscript(videoId);
+
+            return {
+                title: videoInfo.title,
+                description: videoInfo.description,
+                transcript: transcript
+            };
         } catch (error) {
             console.error('Error fetching video data:', error);
             throw error;
@@ -2914,20 +2880,17 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs
         console.log('Processing YouTube link:', youtubeLink);
 
         try {
-            // Get video ID from the URL
             const videoId = await getVideoId(youtubeLink);
             if (!videoId) {
                 showStatus('Invalid YouTube URL', true);
                 return;
             }
 
-            // Get video data
             const videoData = await getVideoData(videoId);
             console.log('Video data retrieved:', videoData);
 
             showStatus('Generating notes...');
 
-            // Prepare text for AI processing
             const textToProcess = `
                 Title: ${videoData.title}
                 
@@ -2936,10 +2899,8 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs
                 Transcript: ${videoData.transcript}
             `.trim();
             
-            // Generate summary using your existing AI code
             const result = await generateSummary(textToProcess);
             
-            // Log the results
             console.log('Generated Notes:');
             console.log('Overview:', result.overview);
             console.log('Key Points:', result.keyPoints);

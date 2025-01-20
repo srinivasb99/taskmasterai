@@ -1798,140 +1798,103 @@ h9 svg {
     display: none; /* Snowflakes hidden by default */
 }
 
-.yt-processing-interface {
-    display: none;
-    padding: 20px;
-    margin-top: 20px;
-    background: rgba(0, 0, 0, 0.8);
-    border-radius: 12px;
-}
+        .yt-processing-interface {
+            margin-top: 20px;
+            padding: 20px;
+            border-radius: 12px;
+            background: #1a1a1a;
+            color: white;
+            position: relative;
+            text-align: center;
+        }
 
-/* Status Container */
-.yt-status-container {
-    display: flex;
-    align-items: center;
-    margin-bottom: 15px;
-}
+        .pulse-ring {
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            width: 20px;
+            height: 20px;
+            background-color: #ff0000;
+            border-radius: 50%;
+            animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
 
-.yt-status-icon {
-    position: relative;
-    width: 28px;
-    height: 28px;
-    margin-right: 12px;
-}
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 0.5;
+                transform: scale(1.5);
+            }
+        }
 
-.yt-status-dot {
-    position: absolute;
-    width: 10px;
-    height: 10px;
-    background: var(--primary-color);
-    border-radius: 50%;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-}
+        .yt-progress-container {
+            margin: 20px 0;
+        }
 
-.yt-pulse-ring {
-    position: absolute;
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    border: 2px solid var(--primary-color);
-    animation: pulse 1.5s ease-out infinite;
-}
+        .progress-track {
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+            margin: 10px 0;
+        }
 
-@keyframes pulse {
-    0% {
-        transform: scale(0.5);
-        opacity: 1;
-    }
-    100% {
-        transform: scale(1.5);
-        opacity: 0;
-    }
-}
+        .yt-progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #ff0000, #ff4444);
+            border-radius: 4px;
+            transition: width 0.3s ease-in-out;
+            position: relative;
+            overflow: hidden;
+        }
 
-.yt-status-text {
-    font-size: 1.1rem;
-    color: #ffffff;
-}
+        .yt-progress-bar::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(
+                90deg,
+                rgba(255, 255, 255, 0) 0%,
+                rgba(255, 255, 255, 0.2) 50%,
+                rgba(255, 255, 255, 0) 100%
+            );
+            animation: shimmer 1.5s infinite;
+        }
 
-.yt-status-dots {
-    display: inline-block;
-    width: 15px;
-    animation: statusDots 1.5s infinite;
-}
+        @keyframes shimmer {
+            0% {
+                transform: translateX(-100%);
+            }
+            100% {
+                transform: translateX(100%);
+            }
+        }
 
-@keyframes statusDots {
-    0% { content: ''; }
-    25% { content: '.'; }
-    50% { content: '..'; }
-    75% { content: '...'; }
-}
+        .yt-progress-label {
+            font-size: 14px;
+            font-weight: bold;
+            margin: 8px 0;
+            color: #ffffff;
+        }
 
-/* Progress Track */
-.yt-progress-track {
-    position: relative;
-    height: 12px;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 10px;
-    overflow: hidden;
-    margin: 20px 0;
-}
+        .yt-current-status {
+            font-size: 16px;
+            font-weight: 500;
+            margin-bottom: 8px;
+            color: #ffffff;
+        }
 
-.yt-progress-bar {
-    position: relative;
-    height: 100%;
-    width: 0%;
-    background: linear-gradient(90deg, var(--primary-color), var(--primary-color));
-    border-radius: 10px;
-    transition: width 0.3s ease;
-}
-
-.yt-progress-glow {
-    position: absolute;
-    top: 0;
-    left: 0;
-    height: 100%;
-    width: 40px;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.6), transparent);
-    animation: progressGlow 2s linear infinite;
-}
-
-@keyframes progressGlow {
-    0% { transform: translateX(-100%); }
-    100% { transform: translateX(400%); }
-}
-
-.yt-progress-label {
-    position: absolute;
-    top: -20px;
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: 0.9rem;
-    color: #ffffff;
-    font-weight: 500;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
-}
-
-/* Time Estimate */
-.yt-time-estimate {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 0.95rem;
-    color: #ffffff;
-    margin-top: 15px;
-}
-
-.yt-clock-icon {
-    color: #ffffff;
-}
-
-.yt-remaining-time {
-    font-family: monospace;
-    color: #ffffff;
-}
+        .yt-remaining-time {
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.7);
+        }
 
 
     </style>
@@ -2961,12 +2924,15 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs
         // Create progress interface if it doesn't exist
         if (!document.querySelector('.yt-progress-container')) {
             interface.innerHTML = `
+                <div class="pulse-ring"></div>
                 <div class="yt-progress-container">
-                    <div class="yt-progress-bar" style="width: 0%"></div>
+                    <div class="progress-track">
+                        <div class="yt-progress-bar" style="width: 0%"></div>
+                    </div>
                     <div class="yt-progress-label">0%</div>
-                    <div class="yt-current-status">Initializing...</div>
-                    <div class="yt-remaining-time">Estimating...</div>
                 </div>
+                <div class="yt-current-status">Initializing...</div>
+                <div class="yt-remaining-time">Estimating...</div>
             `;
         }
 
@@ -2981,7 +2947,6 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs
         // Update progress elements
         if (progressBar) {
             progressBar.style.width = `${progress}%`;
-            progressBar.style.transition = 'width 0.5s ease-in-out';
         }
         if (progressLabel) {
             progressLabel.textContent = `${Math.round(progress)}%`;
@@ -2992,9 +2957,6 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs
         if (remainingTime) {
             remainingTime.textContent = updateEstimatedTime(startTime, progress, 100);
         }
-
-        // Force a reflow to ensure the animation works
-        progressBar?.offsetHeight;
     }
 
     async function getVideoId(url) {

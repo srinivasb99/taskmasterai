@@ -2122,17 +2122,17 @@ h9 svg {
                 <p>Drag PDF file here, or <span class="file-select">click to select</span></p>
                 <input type="file" id="pdfFileInput" accept=".pdf" style="display:none">
             </div>
+            
+            <!-- Hidden Progress Elements -->
+            <div class="upload-progress" style="display: none;">
+                <div id="uploading-text"><span id="ellipsis2"></span></div>
+                <div class="progress-bar">
+                    <progress id="progressBar2" value="0" max="100"></progress>
+                </div>
+                <div id="estimated-time"></div>
+                <div class="error-message2"></div>
+            </div>
         </div>
-    </div>
-
-    <!-- Progress Modal (Initially Hidden) -->
-    <div class="upload-progress">
-        <div id="uploading-text">Uploading<span id="ellipsis2"></span></div>
-        <div class="progress-bar">
-            <progress id="progressBar2" value="0" max="100"></progress>
-        </div>
-        <div id="estimated-time"></div>
-        <div class="error-message2"></div>
     </div>
 
   <!-- YouTube Upload Modal -->

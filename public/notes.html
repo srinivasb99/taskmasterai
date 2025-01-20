@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2146,28 +2145,47 @@ h9 svg {
         </div>
     </div>
 
-  <!-- YouTube Upload Modal -->
-    <div class="modal19" id="youtubeUploadModal">
-        <div class="modalY-content">
-            <span class="closeY-button" onclick="closeYoutubeUploadModal()">&times;</span>
-            <div class="youtube-icon-container">
-                <svg xmlns="http://www.w3.org/2000/svg" version="1.1" xmlns:xlink="http://www.w3.org/1999/xlink" width="42" height="42" viewBox="0 0 176 176">
-                    <g>
-                        <g data-name="Layer 2">
-                            <g data-name="02.youtube">
-                                <path fill="#e60000" d="M144.52 173a532.59 532.59 0 0 1-113 0A32.07 32.07 0 0 1 3 144.52a532.59 532.59 0 0 1 0-113A32.07 32.07 0 0 1 31.48 3a532.59 532.59 0 0 1 113 0A32.07 32.07 0 0 1 173 31.48a532.59 532.59 0 0 1 0 113A32.07 32.07 0 0 1 144.52 173z"></path>
-                                <path fill="#ffffff" d="M140.43 61.54c-2.2-6.77-9.48-10.87-16.18-11.81a343.16 343.16 0 0 0-72.5 0c-6.7.94-14 5-16.18 11.81a137.42 137.42 0 0 0 0 52.93c2.2 6.76 9.48 10.87 16.18 11.81a343.16 343.16 0 0 0 72.5 0c6.7-.94 14-5 16.18-11.81a137.42 137.42 0 0 0 0-52.93zm-65.59 47.54V66.92L109.16 88c-11.57 7.11-22.8 14-34.32 21.08z"></path>
-                            </g>
+ <!-- YouTube Upload Modal -->
+<div class="modal19" id="youtubeUploadModal">
+    <div class="modalY-content">
+        <span class="closeY-button" onclick="closeYoutubeUploadModal()">&times;</span>
+        <div class="youtube-icon-container">
+            <svg xmlns="http://www.w3.org/2000/svg" version="1.1" xmlns:xlink="http://www.w3.org/1999/xlink" width="42" height="42" viewBox="0 0 176 176">
+                <g>
+                    <g data-name="Layer 2">
+                        <g data-name="02.youtube">
+                            <path fill="#e60000" d="M144.52 173a532.59 532.59 0 0 1-113 0A32.07 32.07 0 0 1 3 144.52a532.59 532.59 0 0 1 0-113A32.07 32.07 0 0 1 31.48 3a532.59 532.59 0 0 1 113 0A32.07 32.07 0 0 1 173 31.48a532.59 532.59 0 0 1 0 113A32.07 32.07 0 0 1 144.52 173z"></path>
+                            <path fill="#ffffff" d="M140.43 61.54c-2.2-6.77-9.48-10.87-16.18-11.81a343.16 343.16 0 0 0-72.5 0c-6.7.94-14 5-16.18 11.81a137.42 137.42 0 0 0 0 52.93c2.2 6.76 9.48 10.87 16.18 11.81a343.16 343.16 0 0 0 72.5 0c6.7-.94 14-5 16.18-11.81a137.42 137.42 0 0 0 0-52.93zm-65.59 47.54V66.92L109.16 88c-11.57 7.11-22.8 14-34.32 21.08z"></path>
                         </g>
                     </g>
-                </svg>
+                </g>
+            </svg>
+        </div>
+        <h3 class="modalY-header">Youtube Upload</h3>
+        <p>Paste YouTube link below:</p>
+        <textarea id="youtubeLink" placeholder="Enter YouTube link here..." rows="4"></textarea>
+        <button class="generate-youtube-notes-btn" onclick="generateNotes()">Generate Notes</button>
+
+        <!-- Progress bar -->
+        <div class="upload-progress" style="display: none;">
+            <p id="uploading-text">
+                Processing<span id="ellipsis2"></span>
+            </p>
+            <p style="color: gray; font-size: 0.9em;">
+                Please wait while we process the video. Longer videos may take more time.
+            </p>
+            
+            <div class="progress-container" style="position: relative; width: 100%; max-width: 500px; margin: 20px auto;">
+                <progress id="progressBar2" value="0" max="100" style="width: 100%;"></progress>
+                <span class="progress-percentage" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #000;">0%</span>
             </div>
-            <h3 class="modalY-header">Youtube Upload</h3>
-            <p>Paste YouTube link below:</p>
-            <textarea id="youtubeLink" placeholder="Enter YouTube link here..." rows="4"></textarea>
-            <button class="generate-youtube-notes-btn" onclick="generateNotes()">Generate Notes</button>
+            
+            <p id="estimated-time" style="color: gray; font-size: 0.9em; margin-top: 10px;">
+                Estimated time remaining: <span id="time-remaining">Calculating...</span>
+            </p>
         </div>
     </div>
+</div>
 
 <!-- Progress bar -->
 <div class="upload-progress" style="display: none;">
@@ -2773,110 +2791,153 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs
 
   const YOUTUBE_API_KEY = 'AIzaSyD4iosX8Y1X4bOThSGhYyUfCmWKBEkc6x4';
 
-    async function getVideoId(url) {
-        const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
-        const match = url.match(regex);
-        return match ? match[1] : null;
+async function updateProgress(progress, phase, startTime) {
+    const progressBar = document.getElementById('progressBar2');
+    const progressPercentage = document.querySelector('.progress-percentage');
+    const uploadingText = document.getElementById('uploading-text');
+    const estimatedTimeDisplay = document.getElementById('time-remaining');
+    
+    progressBar.value = progress;
+    progressPercentage.textContent = `${Math.round(progress)}%`;
+    uploadingText.innerHTML = `${phase}<span id="ellipsis2"></span>`;
+    
+    // Update estimated time
+    if (startTime) {
+        estimatedTimeDisplay.textContent = updateEstimatedTime(startTime, progress, 100);
     }
+}
 
-    async function getVideoData(videoId) {
-        try {
-            // Get video details including title, description, and transcript
-            const videoResponse = await fetch(
-                `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoId}&key=${YOUTUBE_API_KEY}`
+async function getVideoId(url) {
+    const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
+    const match = url.match(regex);
+    return match ? match[1] : null;
+}
+
+async function getVideoData(videoId, startTime) {
+    try {
+        await updateProgress(20, 'Fetching video data', startTime);
+        const videoResponse = await fetch(
+            `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoId}&key=${YOUTUBE_API_KEY}`
+        );
+
+        if (!videoResponse.ok) {
+            throw new Error('Failed to fetch video data');
+        }
+
+        await updateProgress(40, 'Processing video information', startTime);
+        const videoData = await videoResponse.json();
+        
+        if (videoData.items && videoData.items[0]) {
+            const videoInfo = videoData.items[0].snippet;
+            
+            await updateProgress(60, 'Fetching transcript', startTime);
+            const transcriptResponse = await fetch(
+                `https://www.googleapis.com/youtube/v3/captions?part=snippet&videoId=${videoId}&key=${YOUTUBE_API_KEY}`
             );
 
-            if (!videoResponse.ok) {
-                throw new Error('Failed to fetch video data');
-            }
-
-            const videoData = await videoResponse.json();
-            
-            if (videoData.items && videoData.items[0]) {
-                const videoInfo = videoData.items[0].snippet;
-                
-                // Get video transcript using a different endpoint
-                const transcriptResponse = await fetch(
-                    `https://www.googleapis.com/youtube/v3/captions?part=snippet&videoId=${videoId}&key=${YOUTUBE_API_KEY}`
-                );
-
-                if (!transcriptResponse.ok) {
-                    // If transcript fetch fails, we'll still return the video info
-                    console.warn('Could not fetch transcript, proceeding with title and description only');
-                    return {
-                        title: videoInfo.title,
-                        description: videoInfo.description,
-                        transcript: ''
-                    };
-                }
-
-                const transcriptData = await transcriptResponse.json();
-                let transcript = '';
-
-                if (transcriptData.items && transcriptData.items.length > 0) {
-                    // Get the first available caption track
-                    const captionId = transcriptData.items[0].id;
-                    const captionResponse = await fetch(
-                        `https://www.googleapis.com/youtube/v3/captions/${captionId}?key=${YOUTUBE_API_KEY}`
-                    );
-
-                    if (captionResponse.ok) {
-                        const captionData = await captionResponse.json();
-                        transcript = captionData.snippet?.text || '';
-                    }
-                }
-
+            if (!transcriptResponse.ok) {
+                console.warn('Could not fetch transcript, proceeding with title and description only');
                 return {
                     title: videoInfo.title,
                     description: videoInfo.description,
-                    transcript: transcript
+                    transcript: ''
                 };
             }
 
-            throw new Error('Video data not found');
-        } catch (error) {
-            console.error('Error fetching video data:', error);
-            throw error;
-        }
-    }
+            await updateProgress(80, 'Processing transcript', startTime);
+            const transcriptData = await transcriptResponse.json();
+            let transcript = '';
 
-    async function generateNotes() {
-        const youtubeLink = document.getElementById('youtubeLink').value;
-        console.log('Processing YouTube link:', youtubeLink);
+            if (transcriptData.items && transcriptData.items.length > 0) {
+                const captionId = transcriptData.items[0].id;
+                const captionResponse = await fetch(
+                    `https://www.googleapis.com/youtube/v3/captions/${captionId}?key=${YOUTUBE_API_KEY}`
+                );
 
-        try {
-            // Get video ID from the URL
-            const videoId = await getVideoId(youtubeLink);
-            if (!videoId) {
-                console.error('Invalid YouTube URL');
-                return;
+                if (captionResponse.ok) {
+                    const captionData = await captionResponse.json();
+                    transcript = captionData.snippet?.text || '';
+                }
             }
 
-            // Get video data
-            const videoData = await getVideoData(videoId);
-            console.log('Video data retrieved:', videoData);
-
-            // Prepare text for AI processing
-            const textToProcess = `
-                Title: ${videoData.title}
-                
-                Description: ${videoData.description}
-                
-                Transcript: ${videoData.transcript}
-            `.trim();
-            
-            // Generate summary using your existing AI code
-            const result = await generateSummary(textToProcess);
-            
-            // Log the results
-            console.log('Generated Notes:');
-            console.log('Overview:', result.overview);
-            console.log('Key Points:', result.keyPoints);
-
-        } catch (error) {
-            console.error('Error generating notes:', error);
+            return {
+                title: videoInfo.title,
+                description: videoInfo.description,
+                transcript: transcript
+            };
         }
+
+        throw new Error('Video data not found');
+    } catch (error) {
+        console.error('Error fetching video data:', error);
+        throw error;
     }
+}
+
+async function generateNotes() {
+    const youtubeLink = document.getElementById('youtubeLink').value;
+    const progressContainer = document.querySelector('.upload-progress');
+    const startTime = Date.now(); // Capture start time
+    
+    try {
+        // Show progress bar and reset estimated time
+        progressContainer.style.display = 'block';
+        document.getElementById('time-remaining').textContent = 'Calculating...';
+        await updateProgress(0, 'Starting', startTime);
+
+        // Get video ID
+        const videoId = await getVideoId(youtubeLink);
+        if (!videoId) {
+            throw new Error('Invalid YouTube URL');
+        }
+
+        // Get video data
+        const videoData = await getVideoData(videoId, startTime);
+        
+        await updateProgress(90, 'Generating summary', startTime);
+        
+        // Prepare text for AI processing
+        const textToProcess = `
+            Title: ${videoData.title}
+            Description: ${videoData.description}
+            Transcript: ${videoData.transcript}
+        `.trim();
+        
+        // Generate summary
+        const result = await generateSummary(textToProcess);
+        
+        // Generate questions based on key points
+        const { questions, rawResponses } = await generateQuestions(result.keyPoints);
+        
+        // Save to Firestore
+        await saveToFirestore4(
+            videoData.title,
+            result.overview,
+            result.keyPoints,
+            rawResponses
+        );
+        
+        await updateProgress(100, 'Completed', startTime);
+        
+        // Hide progress bar after completion
+        setTimeout(() => {
+            progressContainer.style.display = 'none';
+            // Close the modal after saving
+            closeYoutubeUploadModal();
+            // Reload the notes list if you have such functionality
+            if (typeof loadAllNotes === 'function') {
+                loadAllNotes();
+            }
+        }, 1000);
+
+        return result;
+
+    } catch (error) {
+        console.error('Error generating notes:', error);
+        progressContainer.style.display = 'none';
+        throw error;
+    }
+}
     // Your existing helper functions and AI processing code remains the same...
 
 // Helper function to wait for a certain amount of time (in ms)
@@ -3350,7 +3411,28 @@ async function saveToFirestore3(pdfId, questions) {
     }
 }
 
+async function saveToFirestore4(videoTitle, overview, keyPoints, rawGeneratedTexts) {
+    const userId = firebase.auth().currentUser?.uid;
+    if (!userId) {
+        console.error("User not authenticated yet");
+        return;
+    }
 
+    try {
+        // Add the YouTube data to Firestore in the 'youtubenotes' collection
+        await db.collection('youtubenotes').add({
+            userId: userId,
+            videoTitle: videoTitle,         // Store the video title
+            overview: overview,             // Store the generated overview
+            keyPoints: keyPoints,           // Store the array of key points
+            rawQuestions: rawGeneratedTexts, // Store the array of raw generated texts (full responses)
+            timestamp: firebase.firestore.FieldValue.serverTimestamp() // Add timestamp
+        });
+        console.log(`Overview, key points, and questions for ${videoTitle} saved successfully.`);
+    } catch (error) {
+        console.error("Error saving to Firestore: ", error);
+    }
+}
 
 
 

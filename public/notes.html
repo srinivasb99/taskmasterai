@@ -2866,23 +2866,27 @@ const closeButton = document.querySelector(".close-button");
             youtubeModal.style.display = "flex";
         }
 
-        function closeYoutubeUploadModal() {
-            const modal = document.getElementById('youtubeUploadModal');
-            const generateButton = document.querySelector('.generate-youtube-notes-btn');
-            const processingInterface = document.querySelector('.yt-processing-interface');
-            const errorMessage = document.querySelector('.error-message');
-            const youtubeLink = document.getElementById('youtubeLink');
+ function closeYoutubeUploadModal() {
+        const modal = document.getElementById('youtubeUploadModal');
+        const generateButton = document.querySelector('.generate-youtube-notes-btn');
+        const processingInterface = document.querySelector('.yt-processing-interface');
+        const errorMessage = document.getElementById('errorMessage');
+        const youtubeLink = document.getElementById('youtubeLink');
+        const inputContainer = document.getElementById('youtubeInputContainer');
+        const processingContainer = document.getElementById('processingContainer');
 
-            // Reset the modal state
-            modal.style.display = 'none';
-            generateButton.style.display = 'block';
-            processingInterface.style.display = 'none';
-            if (errorMessage) {
-                errorMessage.style.display = 'none';
-                errorMessage.textContent = '';
-            }
-            youtubeLink.value = '';
+        // Reset the modal state
+        if (modal) modal.style.display = 'none';
+        if (generateButton) generateButton.style.display = 'block';
+        if (processingInterface) processingInterface.style.display = 'none';
+        if (errorMessage) {
+            errorMessage.style.display = 'none';
+            errorMessage.textContent = '';
         }
+        if (youtubeLink) youtubeLink.value = '';
+        if (inputContainer) inputContainer.style.display = 'block';
+        if (processingContainer) processingContainer.style.display = 'none';
+    }
 
         // Close modals when clicking outside
         window.onclick = (event) => {
@@ -2944,178 +2948,175 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs
 
   const YOUTUBE_API_KEY = 'AIzaSyD4iosX8Y1X4bOThSGhYyUfCmWKBEkc6x4';
 
-// Function to update YouTube progress interface
-async function updateYouTubeProgress(progress, status, startTime) {
-    const interface = document.querySelector('.yt-processing-interface');
-    const progressBar = document.querySelector('.yt-progress-bar');
-    const progressLabel = document.querySelector('.yt-progress-label');
-    const currentStatus = document.querySelector('.yt-current-status');
-    const remainingTime = document.querySelector('.yt-remaining-time');
+    // Function to update YouTube progress interface
+    async function updateYouTubeProgress(progress, status, startTime) {
+        const interface = document.querySelector('.yt-processing-interface');
+        const progressBar = document.querySelector('.yt-progress-bar');
+        const progressLabel = document.querySelector('.yt-progress-label');
+        const currentStatus = document.querySelector('.yt-current-status');
+        const remainingTime = document.querySelector('.yt-remaining-time');
 
-    if (!interface.style.display || interface.style.display === 'none') {
-        interface.style.display = 'block';
-    }
-
-    if (progressBar && progressLabel && currentStatus && remainingTime) {
-        progressBar.style.width = `${progress}%`;
-        progressLabel.textContent = `${Math.round(progress)}%`;
-        currentStatus.textContent = status;
-        remainingTime.textContent = updateEstimatedTime(startTime, progress, 100);
-    }
-}
-
-async function getVideoId(url) {
-    const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
-    const match = url.match(regex);
-    return match ? match[1] : null;
-}
-
-async function getVideoData(videoId, startTime) {
-    try {
-        await updateYouTubeProgress(20, 'Fetching video metadata', startTime);
-        const videoResponse = await fetch(
-            `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoId}&key=${YOUTUBE_API_KEY}`
-        );
-
-        if (!videoResponse.ok) {
-            throw new Error('Failed to fetch video data');
+        if (!interface || interface.style.display === 'none') {
+            interface.style.display = 'block';
         }
 
-        await updateYouTubeProgress(40, 'Processing video information', startTime);
-        const videoData = await videoResponse.json();
-        
-        if (videoData.items && videoData.items[0]) {
-            const videoInfo = videoData.items[0].snippet;
-            
-            await updateYouTubeProgress(60, 'Retrieving transcript', startTime);
-            const transcriptResponse = await fetch(
-                `https://www.googleapis.com/youtube/v3/captions?part=snippet&videoId=${videoId}&key=${YOUTUBE_API_KEY}`
+        if (progressBar && progressLabel && currentStatus && remainingTime) {
+            progressBar.style.width = `${progress}%`;
+            progressLabel.textContent = `${Math.round(progress)}%`;
+            currentStatus.textContent = status;
+            remainingTime.textContent = updateEstimatedTime(startTime, progress, 100);
+        }
+    }
+
+    async function getVideoId(url) {
+        const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
+        const match = url.match(regex);
+        return match ? match[1] : null;
+    }
+
+    async function getVideoData(videoId, startTime) {
+        try {
+            await updateYouTubeProgress(20, 'Fetching video metadata', startTime);
+            const videoResponse = await fetch(
+                `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoId}&key=${YOUTUBE_API_KEY}`
             );
 
-            if (!transcriptResponse.ok) {
-                console.warn('Could not fetch transcript, proceeding with title and description only');
+            if (!videoResponse.ok) {
+                throw new Error('Failed to fetch video data');
+            }
+
+            await updateYouTubeProgress(40, 'Processing video information', startTime);
+            const videoData = await videoResponse.json();
+            
+            if (videoData.items && videoData.items[0]) {
+                const videoInfo = videoData.items[0].snippet;
+                
+                await updateYouTubeProgress(60, 'Retrieving transcript', startTime);
+                const transcriptResponse = await fetch(
+                    `https://www.googleapis.com/youtube/v3/captions?part=snippet&videoId=${videoId}&key=${YOUTUBE_API_KEY}`
+                );
+
+                if (!transcriptResponse.ok) {
+                    console.warn('Could not fetch transcript, proceeding with title and description only');
+                    return {
+                        title: videoInfo.title,
+                        description: videoInfo.description,
+                        transcript: ''
+                    };
+                }
+
+                await updateYouTubeProgress(80, 'Processing transcript data', startTime);
+                const transcriptData = await transcriptResponse.json();
+                let transcript = '';
+
+                if (transcriptData.items && transcriptData.items.length > 0) {
+                    const captionId = transcriptData.items[0].id;
+                    const captionResponse = await fetch(
+                        `https://www.googleapis.com/youtube/v3/captions/${captionId}?key=${YOUTUBE_API_KEY}`
+                    );
+
+                    if (captionResponse.ok) {
+                        const captionData = await captionResponse.json();
+                        transcript = captionData.snippet?.text || '';
+                    }
+                }
+
                 return {
                     title: videoInfo.title,
                     description: videoInfo.description,
-                    transcript: ''
+                    transcript: transcript
                 };
             }
 
-            await updateYouTubeProgress(80, 'Processing transcript data', startTime);
-            const transcriptData = await transcriptResponse.json();
-            let transcript = '';
-
-            if (transcriptData.items && transcriptData.items.length > 0) {
-                const captionId = transcriptData.items[0].id;
-                const captionResponse = await fetch(
-                    `https://www.googleapis.com/youtube/v3/captions/${captionId}?key=${YOUTUBE_API_KEY}`
-                );
-
-                if (captionResponse.ok) {
-                    const captionData = await captionResponse.json();
-                    transcript = captionData.snippet?.text || '';
-                }
-            }
-
-            return {
-                title: videoInfo.title,
-                description: videoInfo.description,
-                transcript: transcript
-            };
+            throw new Error('Video data not found');
+        } catch (error) {
+            console.error('Error fetching video data:', error);
+            throw error;
         }
-
-        throw new Error('Video data not found');
-    } catch (error) {
-        console.error('Error fetching video data:', error);
-        throw error;
     }
-}
 
-async function generateNotes() {
-    const youtubeLink = document.getElementById('youtubeLink').value;
-    const generateButton = document.querySelector('.generate-youtube-notes-btn');
-    const processingInterface = document.querySelector('.yt-processing-interface');
-    const inputContainer = document.getElementById('youtubeInputContainer');
-    const processingContainer = document.getElementById('processingContainer');
-    const errorMessage = document.getElementById('errorMessage');
-    const startTime = Date.now();
+   async function generateNotes() {
+        const youtubeLink = document.getElementById('youtubeLink').value;
+        const generateButton = document.querySelector('.generate-youtube-notes-btn');
+        const processingInterface = document.querySelector('.yt-processing-interface');
+        const inputContainer = document.getElementById('youtubeInputContainer');
+        const processingContainer = document.getElementById('processingContainer');
+        const errorMessage = document.getElementById('errorMessage');
+        const startTime = Date.now();
 
-     // Hide the input container and show processing interface
-    generateButton.style.display = 'none';
-    processingInterface.style.display = 'block';
-    inputContainer.style.display = 'none';
-    processingContainer.style.display = 'block';
-    if (errorMessage) errorMessage.style.display = 'none';    
-    
-    try {
-        // Initialize progress interface
-        await updateYouTubeProgress(0, 'Initializing process', startTime);
+        // Hide the input container and show processing interface
+        generateButton.style.display = 'none';
+        if (inputContainer) inputContainer.style.display = 'none';
+        if (processingContainer) processingContainer.style.display = 'block';
+        if (errorMessage) errorMessage.style.display = 'none';
 
-        // Get video ID
-        const videoId = await getVideoId(youtubeLink);
-        if (!videoId) {
-            throw new Error('Invalid YouTube URL');
-        }
+        try {
+            // Initialize progress interface
+            await updateYouTubeProgress(0, 'Initializing process', startTime);
 
-        // Get video data with progress updates
-        const videoData = await getVideoData(videoId, startTime);
-        await updateYouTubeProgress(40, 'Analyzing content', startTime);
-        
-        // Prepare text for AI processing
-        const textToProcess = `
-            Title: ${videoData.title}
-            Description: ${videoData.description}
-            Transcript: ${videoData.transcript}
-        `.trim();
-        
-        await updateYouTubeProgress(60, 'Generating summary', startTime);
-        
-        // Generate summary
-        const result = await generateSummary(textToProcess);
-        await updateYouTubeProgress(80, 'Creating study materials', startTime);
-        
-        // Generate questions based on key points
-        const { questions, rawResponses } = await generateQuestions(result.keyPoints);
-        
-        await updateYouTubeProgress(90, 'Saving your notes', startTime);
-        
-                // Save to Firestore
-                await saveToFirestore4(result.title, result.overview, result.keyPoints, result.rawResponses);
-            
-            // Close the modal after successful save
-            closeYoutubeUploadModal();
-        
-        await updateYouTubeProgress(100, 'All done!', startTime);
-        
-        // Clean up and close
-        setTimeout(() => {
-            document.querySelector('.yt-processing-interface').style.display = 'none';
-            closeYoutubeUploadModal();
-            if (typeof loadAllNotes === 'function') {
-                loadAllNotes();
+            // Get video ID
+            const videoId = await getVideoId(youtubeLink);
+            if (!videoId) {
+                throw new Error('Invalid YouTube URL');
             }
-        }, 1500);
 
-        return result;
-
-    } catch (error) {
-                console.error('Error generating notes:', error);
-                
-                // Show error message in modal
-                if (!errorMessage) {
-                    const errorDiv = document.createElement('div');
-                    errorDiv.className = 'error-message text-red-500 mt-4';
-                    document.querySelector('.modalY-content').appendChild(errorDiv);
+            // Get video data with progress updates
+            const videoData = await getVideoData(videoId, startTime);
+            await updateYouTubeProgress(40, 'Analyzing content', startTime);
+            
+            // Prepare text for AI processing
+            const textToProcess = `
+                Title: ${videoData.title}
+                Description: ${videoData.description}
+                Transcript: ${videoData.transcript}
+            `.trim();
+            
+            await updateYouTubeProgress(60, 'Generating summary', startTime);
+            
+            // Generate summary
+            const result = await generateSummary(textToProcess);
+            await updateYouTubeProgress(80, 'Creating study materials', startTime);
+            
+            // Generate questions based on key points
+            const { questions, rawResponses } = await generateQuestions(result.keyPoints);
+            
+            await updateYouTubeProgress(90, 'Saving your notes', startTime);
+            
+            // Save to Firestore
+            await saveToFirestore4(result.title, result.overview, result.keyPoints, result.rawResponses);
+            
+            await updateYouTubeProgress(100, 'All done!', startTime);
+            
+            // Clean up and close
+            setTimeout(() => {
+                if (processingInterface) processingInterface.style.display = 'none';
+                closeYoutubeUploadModal();
+                if (typeof loadAllNotes === 'function') {
+                    loadAllNotes();
                 }
+            }, 1500);
+
+            return result;
+
+        } catch (error) {
+            console.error('Error generating notes:', error);
+            
+            // Show error message in modal
+            if (errorMessage) {
                 errorMessage.textContent = `Error: ${error.message}`;
                 errorMessage.style.display = 'block';
-                
-                // Reset the interface
-                generateButton.style.display = 'block';
-                processingInterface.style.display = 'none';
-        throw error;
+            }
+            
+            // Reset the interface
+            if (generateButton) generateButton.style.display = 'block';
+            if (processingInterface) processingInterface.style.display = 'none';
+            if (inputContainer) inputContainer.style.display = 'block';
+            if (processingContainer) processingContainer.style.display = 'none';
+            
+            throw error;
+        }
     }
-}
+
     // Your existing helper functions and AI processing code remains the same...
 
 // Helper function to wait for a certain amount of time (in ms)
@@ -3589,23 +3590,26 @@ async function saveToFirestore3(pdfId, questions) {
     }
 }
 
-      async function saveToFirestore4(title, overview, keyPoints, rawResponses) {
-            try {
-                const docRef = await firestore.collection('youtubenotes').add({
-                    title: title,
-                    overview: overview,
-                    keyPoints: keyPoints,
-                    rawResponses: rawResponses,
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                });
-                console.log("Document written with ID: ", docRef.id);
-                return docRef;
-            } catch (error) {
-                console.error("Error saving to Firestore: ", error);
-                throw error;
-            }
+    async function saveToFirestore4(title, overview, keyPoints, rawResponses) {
+        if (!title || !overview || !keyPoints || !rawResponses) {
+            throw new Error('Missing required fields for saving notes');
         }
 
+        try {
+            const docRef = await firestore.collection('youtubenotes').add({
+                title: title,
+                overview: overview,
+                keyPoints: keyPoints,
+                rawResponses: rawResponses,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            console.log("Document written with ID: ", docRef.id);
+            return docRef;
+        } catch (error) {
+            console.error("Error saving to Firestore: ", error);
+            throw error;
+        }
+    }
 
 
 

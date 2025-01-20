@@ -3591,18 +3591,19 @@ async function saveToFirestore3(pdfId, questions) {
 }
 
     async function saveToFirestore4(title, overview, keyPoints, rawResponses) {
-        if (!title || !overview || !keyPoints || !rawResponses) {
-            throw new Error('Missing required fields for saving notes');
-        }
+        console.log('Saving to Firestore with:', { title, overview, keyPoints, rawResponses });
+        
+        // Provide default values if any field is undefined
+        const data = {
+            title: title || 'Untitled',
+            overview: overview || '',
+            keyPoints: Array.isArray(keyPoints) ? keyPoints : [],
+            rawResponses: rawResponses || {},
+            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        };
 
         try {
-            const docRef = await firestore.collection('youtubenotes').add({
-                title: title,
-                overview: overview,
-                keyPoints: keyPoints,
-                rawResponses: rawResponses,
-                timestamp: firebase.firestore.FieldValue.serverTimestamp()
-            });
+            const docRef = await firestore.collection('youtubenotes').add(data);
             console.log("Document written with ID: ", docRef.id);
             return docRef;
         } catch (error) {

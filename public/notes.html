@@ -2297,36 +2297,29 @@ h9 svg {
             </svg>
         </div>
         <h3 class="modalY-header">Youtube Upload</h3>
-        <p>Paste YouTube link below:</p>
-        <textarea id="youtubeLink" placeholder="Enter YouTube link here..." rows="4"></textarea>
-        <button class="generate-youtube-notes-btn" onclick="generateNotes()">Generate Notes</button>
-
-        <!-- New Progress Interface -->
-        <div class="yt-processing-interface">
+        <div id="youtubeInputContainer">
+            <p>Paste YouTube link below:</p>
+            <textarea id="youtubeLink" placeholder="Enter YouTube link here..." rows="4"></textarea>
+            <button class="generate-youtube-notes-btn" onclick="generateNotes()">Generate Notes</button>
+            <p id="errorMessage" class="error-message" style="color: #ff4444; margin-top: 10px; display: none;"></p>
+        </div>
+        <div id="processingContainer" class="yt-processing-interface">
             <div class="yt-status-container">
                 <div class="yt-status-icon">
-                    <div class="yt-pulse-ring"></div>
                     <div class="yt-status-dot"></div>
+                    <div class="yt-pulse-ring"></div>
                 </div>
-                <div class="yt-status-text">
-                    <span class="yt-current-status">Initializing</span>
-                    <span class="yt-status-dots"></span>
-                </div>
+                <span class="yt-status-text">Generating notes<span class="yt-status-dots"></span></span>
             </div>
-
             <div class="yt-progress-track">
                 <div class="yt-progress-bar">
                     <div class="yt-progress-glow"></div>
                 </div>
-                <div class="yt-progress-label">0%</div>
+                <span class="yt-progress-label">0%</span>
             </div>
-
             <div class="yt-time-estimate">
-                <svg class="yt-clock-icon" viewBox="0 0 24 24" width="16" height="16">
-                    <path fill="currentColor" d="M12 2C6.486 2 2 6.486 2 12s4.486 10 10 10 10-4.486 10-10S17.514 2 12 2zm0 18c-4.411 0-8-3.589-8-8s3.589-8 8-8 8 3.589 8 8-3.589 8-8 8z"/>
-                    <path fill="currentColor" d="M13 7h-2v6l4.5 2.7.75-1.23-3.25-1.97z"/>
-                </svg>
-                <span class="yt-remaining-time">Calculating time...</span>
+                <span class="yt-clock-icon">⏱</span>
+                <span class="yt-remaining-time">Estimating time...</span>
             </div>
         </div>
     </div>
@@ -2872,9 +2865,21 @@ const closeButton = document.querySelector(".close-button");
             youtubeModal.style.display = "flex";
         }
 
-        function closeYoutubeUploadModal() {
-            youtubeModal.style.display = "none";
-        }
+  function closeYoutubeUploadModal() {
+        const modal = document.getElementById('youtubeUploadModal');
+        const inputContainer = document.getElementById('youtubeInputContainer');
+        const processingContainer = document.getElementById('processingContainer');
+        const errorMessage = document.getElementById('errorMessage');
+        const youtubeLink = document.getElementById('youtubeLink');
+
+        // Reset the modal state
+        modal.style.display = 'none';
+        inputContainer.style.display = 'block';
+        processingContainer.style.display = 'none';
+        errorMessage.style.display = 'none';
+        errorMessage.textContent = '';
+        youtubeLink.value = '';
+    }
 
         // Close modals when clicking outside
         window.onclick = (event) => {
@@ -3025,7 +3030,16 @@ async function getVideoData(videoId, startTime) {
 
 async function generateNotes() {
     const youtubeLink = document.getElementById('youtubeLink').value;
+    const inputContainer = document.getElementById('youtubeInputContainer');
+    const processingContainer = document.getElementById('processingContainer');
+    const errorMessage = document.getElementById('errorMessage');
     const startTime = Date.now();
+
+     // Hide the input container and show processing interface
+    inputContainer.style.display = 'none';
+    processingContainer.style.display = 'block';
+    errorMessage.style.display = 'none';
+    
     
     try {
         // Initialize progress interface
@@ -3059,13 +3073,11 @@ async function generateNotes() {
         
         await updateYouTubeProgress(90, 'Saving your notes', startTime);
         
-        // Save to Firestore
-        await saveToFirestore4(
-            videoData.title,
-            result.overview,
-            result.keyPoints,
-            rawResponses
-        );
+            // Save to Firestore
+            await saveToFirestore4(result.title, result.overview, result.keyPoints, result.rawResponses);
+            
+            // Close the modal after successful save
+            closeYoutubeUploadModal();
         
         await updateYouTubeProgress(100, 'All done!', startTime);
         
@@ -3081,10 +3093,15 @@ async function generateNotes() {
         return result;
 
     } catch (error) {
-        console.error('Error generating notes:', error);
-        document.querySelector('.yt-processing-interface').style.display = 'none';
-        // Show error message to user
-        alert('Failed to process video. Please check the URL and try again.');
+            console.error('Error generating notes:', error);
+            
+            // Show error message in modal
+            errorMessage.textContent = `Error: ${error.message}`;
+            errorMessage.style.display = 'block';
+            
+            // Reset the interface
+            inputContainer.style.display = 'block';
+            processingContainer.style.display = 'none';
         throw error;
     }
 }
@@ -3561,40 +3578,28 @@ async function saveToFirestore3(pdfId, questions) {
     }
 }
 
-async function saveToFirestore4(videoTitle, overview, keyPoints, rawResponses) {
-    const userId = firebase.auth().currentUser?.uid;
-    if (!userId) {
-        console.error("User not authenticated");
-        return;
-    }
-
+async function saveToFirestore4(title, overview, keyPoints, rawResponses) {
     try {
-        // Format key points and raw responses to be Firestore-compatible
-        const formattedKeyPoints = keyPoints.map(point => ({
-            text: point,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp()
-        }));
+        const db = getFirestore();
+        const notesCollection = collection(db, 'youtubenotes');
+        
+        // Create a new document with the timestamp at the top level
+        const docData = {
+            title,
+            overview,
+            keyPoints: Array.isArray(keyPoints) ? keyPoints : [],
+            rawResponses: Array.isArray(rawResponses) ? rawResponses : [],
+            createdAt: serverTimestamp(), // Timestamp at the top level
+            userId: auth.currentUser?.uid || 'anonymous'
+        };
 
-        const formattedRawResponses = rawResponses.map(response => ({
-            text: response,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp()
-        }));
-
-        // Add the YouTube data to Firestore
-        await db.collection('youtubenotes').add({
-            userId: userId,
-            videoTitle: videoTitle,
-            overview: overview,
-            keyPoints: formattedKeyPoints,
-            rawResponses: formattedRawResponses,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-            type: 'youtube'  // To distinguish from other note types
-        });
-
-        console.log(`Notes for video "${videoTitle}" saved successfully`);
+        // Add the document to Firestore
+        const docRef = await addDoc(notesCollection, docData);
+        console.log('Document written with ID: ', docRef.id);
+        return docRef;
     } catch (error) {
-        console.error("Error saving to Firestore: ", error);
-        throw error; // Propagate error to handle it in the calling function
+        console.error('Error saving to Firestore: ', error);
+        throw error;
     }
 }
 

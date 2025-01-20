@@ -2950,22 +2950,51 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs
 
     // Function to update YouTube progress interface
     async function updateYouTubeProgress(progress, status, startTime) {
+        console.log('Updating progress:', { progress, status });
+        
         const interface = document.querySelector('.yt-processing-interface');
-        const progressBar = document.querySelector('.yt-progress-bar');
-        const progressLabel = document.querySelector('.yt-progress-label');
-        const currentStatus = document.querySelector('.yt-current-status');
-        const remainingTime = document.querySelector('.yt-remaining-time');
-
-        if (!interface || interface.style.display === 'none') {
-            interface.style.display = 'block';
+        if (!interface) {
+            console.error('Processing interface not found');
+            return;
         }
 
-        if (progressBar && progressLabel && currentStatus && remainingTime) {
+        // Create progress interface if it doesn't exist
+        if (!document.querySelector('.yt-progress-container')) {
+            interface.innerHTML = `
+                <div class="yt-progress-container">
+                    <div class="yt-progress-bar" style="width: 0%"></div>
+                    <div class="yt-progress-label">0%</div>
+                    <div class="yt-current-status">Initializing...</div>
+                    <div class="yt-remaining-time">Estimating...</div>
+                </div>
+            `;
+        }
+
+        const progressBar = interface.querySelector('.yt-progress-bar');
+        const progressLabel = interface.querySelector('.yt-progress-label');
+        const currentStatus = interface.querySelector('.yt-current-status');
+        const remainingTime = interface.querySelector('.yt-remaining-time');
+
+        // Ensure interface is visible
+        interface.style.display = 'block';
+
+        // Update progress elements
+        if (progressBar) {
             progressBar.style.width = `${progress}%`;
+            progressBar.style.transition = 'width 0.5s ease-in-out';
+        }
+        if (progressLabel) {
             progressLabel.textContent = `${Math.round(progress)}%`;
+        }
+        if (currentStatus) {
             currentStatus.textContent = status;
+        }
+        if (remainingTime) {
             remainingTime.textContent = updateEstimatedTime(startTime, progress, 100);
         }
+
+        // Force a reflow to ensure the animation works
+        progressBar?.offsetHeight;
     }
 
     async function getVideoId(url) {

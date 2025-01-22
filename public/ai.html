@@ -457,7 +457,12 @@ body.night-mode {
     color: rgba(255, 255, 255, 0.5);
 }
 
-.send-button {
+.chat-input:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.send-button, .stop-button {
     background: linear-gradient(135deg, var(--accent-color), #FF1493);
     border: none;
     border-radius: 50%;
@@ -483,6 +488,10 @@ body.night-mode {
         opacity: 1;
         transform: translateY(0);
     }
+}
+
+.stop-button:hover {
+    background: rgba(239, 68, 68, 0.2);
 }
 
 .typing-container {
@@ -839,16 +848,26 @@ body.night-mode {
                 </div>
             </div>
         </div>
-        <div class="chat-input-container">
-            <div class="chat-input-wrapper">
-                <input type="text" class="chat-input" id="userInput" placeholder="Type your message..." />
-                <button class="send-button" id="sendMessage">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M22 2L11 13M22 2L15 22L11 13M11 13L2 9L22 2" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                </button>
-            </div>
-        </div>
+<div class="chat-input-container">
+    <div class="chat-input-wrapper">
+        <input 
+            type="text" 
+            class="chat-input" 
+            id="userInput" 
+            placeholder="Type your message..." 
+        />
+        <button class="send-button" id="sendButton">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M22 2L11 13M22 2L15 22L11 13M11 13L2 9L22 2" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </button>
+        <button class="stop-button" id="stopButton" style="display: none;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="6" y="6" width="12" height="12" fill="#EF4444"/>
+            </svg>
+        </button>
+    </div>
+</div>
     </div>
 </div>
 
@@ -1534,7 +1553,7 @@ async function queryHuggingFaceAPI(userInput, userData = null, username = null) 
         return handleActionCommand(normalizedAction, normalizedType, actionMatch.content, userData?.user?.uid);
     }
 
-    const formattedHistory = conversationHistory.slice(-2).map(msg => 
+    const formattedHistory = conversationHistory.slice(-5).map(msg => 
         `${msg.role}: ${msg.content}`
     ).join('\n');
 
@@ -1627,7 +1646,7 @@ Respond concisely to: ${userInput}
             body: JSON.stringify({
                 inputs: systemPrompt,
                 parameters: {
-                    max_new_tokens: 150,
+                    max_new_tokens: 500,
                     temperature: 0.5,
                     top_p: 0.9,
                     return_full_text: false,
@@ -1720,40 +1739,62 @@ async function fetchCollectionData(collection, user, relevantCollections) {
     if (collection === 'users') return null;
 
     const limit = relevantCollections.includes(collection) ? 10 : 5;
+    let results = [];
     
-    try {
-        const querySnapshot = await db.collection(collection)
-            .where('userId', '==', user.uid)
-            .orderBy('createdAt', 'desc')
-            .limit(limit)
-            .get();
+    // Try all possible field and orderBy combinations
+    const fieldCombinations = [
+        { idField: 'userId', orderBy: 'timestamp' },
+        { idField: 'userId', orderBy: 'createdAt' },
+        { idField: 'uid', orderBy: 'timestamp' },
+        { idField: 'uid', orderBy: 'createdAt' }
+    ];
 
-        if (!querySnapshot.empty) {
-            return querySnapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            }));
+    for (const { idField, orderBy } of fieldCombinations) {
+        try {
+            const querySnapshot = await db.collection(collection)
+                .where(idField, '==', user.uid)
+                .orderBy(orderBy, 'desc')
+                .limit(limit)
+                .get();
+
+            if (!querySnapshot.empty) {
+                const docs = querySnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+                results = [...results, ...docs];
+                
+                // If we found documents, break the loop
+                if (results.length > 0) break;
+            }
+        } catch (error) {
+            // If error is about missing index, continue to next combination
+            if (error.code === 'failed-precondition') continue;
+            console.error(`Error fetching ${collection} with ${idField}/${orderBy}:`, error);
         }
-
-        // Fallback to uid if userId doesn't work
-        const fallbackSnapshot = await db.collection(collection)
-            .where('uid', '==', user.uid)
-            .limit(limit)
-            .get();
-
-        return fallbackSnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-        }));
-    } catch (error) {
-        console.error(`Error fetching ${collection}:`, error);
-        return [];
     }
+
+    // Remove duplicates based on document ID
+    return Array.from(new Map(results.map(item => [item.id, item])).values());
 }
 
+
+let isProcessing = false;
+let currentController = null;
+
 async function handleUserMessage() {
+    if (isProcessing) return;
+    
     const message = userInput.value.trim();
     if (!message) return;
+    
+    isProcessing = true;
+    currentController = new AbortController();
+    
+    // Update UI state
+    userInput.disabled = true;
+    document.getElementById('sendButton').style.display = 'none';
+    document.getElementById('stopButton').style.display = 'flex';
     
     userInput.value = '';
     addMessage(message, true);
@@ -1805,7 +1846,8 @@ async function handleUserMessage() {
         console.log('Fetched user data:', userData);
         console.log('Relevant collections:', relevantCollections);
 
-        const aiResponse = await queryHuggingFaceAPI(message, userData, username);
+        // Pass the AbortController signal to the API call
+        const aiResponse = await queryHuggingFaceAPI(message, userData, username, currentController.signal);
         conversationHistory.push({ role: 'Assistant', content: aiResponse });
         
         // Clear the interval and remove the indicator
@@ -1819,23 +1861,48 @@ async function handleUserMessage() {
         // Clear the interval and remove the indicator in case of error
         clearInterval(messageRotation);
         indicator.remove();
-        addMessage("I apologize, but I'm having trouble processing your request. Please try again later.");
+        
+        if (error.name === 'AbortError') {
+            addMessage("Message was stopped by user.", false, 'system');
+        } else {
+            addMessage("I apologize, but I'm having trouble processing your request. Please try again later.");
+        }
+    } finally {
+        // Reset UI state
+        isProcessing = false;
+        currentController = null;
+        userInput.disabled = false;
+        document.getElementById('stopButton').style.display = 'none';
+        document.getElementById('sendButton').style.display = 'flex';
+    }
+}
+
+function stopMessage() {
+    if (currentController) {
+        currentController.abort();
     }
 }
 
 // Event listeners
 document.addEventListener('DOMContentLoaded', () => {
-    userInput = document.getElementById('user-input');
-    chatMessages = document.getElementById('chat-messages');
+    const userInput = document.getElementById('userInput');
+    const sendButton = document.getElementById('sendButton');
+    const stopButton = document.getElementById('stopButton');
     
     userInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
+        if (e.key === 'Enter' && !e.shiftKey && !isProcessing) {
             e.preventDefault();
             handleUserMessage();
         }
     });
     
-    document.getElementById('send-button').addEventListener('click', handleUserMessage);
+    sendButton.addEventListener('click', () => {
+        if (!isProcessing) {
+            handleUserMessage();
+        }
+    });
+    
+    stopButton.addEventListener('click', stopMessage);
 });
 
 // Initialize the chatbot when the page loads
@@ -1848,14 +1915,6 @@ document.addEventListener('DOMContentLoaded', function() {
             window.location.href = "login";
         }
     });
-});
-
-// Event listeners for user input
-sendButton.addEventListener('click', handleUserMessage);
-userInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-        handleUserMessage();
-    }
 });
 </script>
 

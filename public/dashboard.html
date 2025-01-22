@@ -4354,10 +4354,10 @@ function renderSections(summaryData) {
             '<strong>$1</strong>: $2'
         );
 
-        // Move "Action Step:" and its content to a new line
+        // Move "Action Step:" and its content to appear on the same line
         content = content.replace(
-            /\b(Action Step):(.+?)(?=\n|$)/gi, // Matches "Action Step: text"
-            '<br><strong class="key-term">$1:</strong><br>$2'
+            /\b(Action Step):\s*(.+?)(?=\n|$)/gi, // Matches "Action Step: text"
+            '<strong class="key-term">$1:</strong> $2'
         );
 
         return content;

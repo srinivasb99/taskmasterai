@@ -1449,120 +1449,6 @@ scrollbar-thumb {
 }
 
 
-    .loading-state {
-            position: relative;
-            padding: 20px;
-            background: rgba(0, 123, 255, 0.05);
-            border-radius: 8px;
-            overflow: hidden;
-        }
-
-        /* Shimmer Effect */
-        .loading-state::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 200%;
-            height: 100%;
-            background: linear-gradient(
-                90deg,
-                transparent 0%,
-                rgba(255, 255, 255, 0.05) 50%,
-                transparent 100%
-            );
-            animation: shimmer var(--animation-duration) infinite linear;
-        }
-
-        @keyframes shimmer {
-            to {
-                transform: translateX(50%);
-            }
-        }
-
-        /* Pulse Animation */
-        .pulse {
-            display: inline-block;
-            width: 8px;
-            height: 8px;
-            background-color: var(--primary-color);
-            border-radius: 50%;
-            margin: 0 4px;
-            animation: pulse 1.5s infinite;
-        }
-
-        .pulse:nth-child(2) {
-            animation-delay: 0.2s;
-        }
-
-        .pulse:nth-child(3) {
-            animation-delay: 0.4s;
-        }
-
-        @keyframes pulse {
-            0% {
-                transform: scale(0.8);
-                opacity: 0.5;
-            }
-            20% {
-                transform: scale(1.2);
-                opacity: 1;
-            }
-            40%, 100% {
-                transform: scale(0.8);
-                opacity: 0.5;
-            }
-        }
-
-        .loading-text {
-            color: var(--text-color);
-            font-size: 1.1rem;
-            margin: 0;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        /* Placeholder Lines Animation */
-        .placeholder-lines {
-            margin-top: 20px;
-        }
-
-        .placeholder-line {
-            height: 12px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 6px;
-            margin: 12px 0;
-            animation: placeholderPulse 2s infinite;
-        }
-
-        .placeholder-line:nth-child(1) { width: 90%; }
-        .placeholder-line:nth-child(2) { width: 75%; }
-        .placeholder-line:nth-child(3) { width: 60%; }
-
-        @keyframes placeholderPulse {
-            0% {
-                opacity: 0.6;
-            }
-            50% {
-                opacity: 0.3;
-            }
-            100% {
-                opacity: 0.6;
-            }
-        }
-
-        @keyframes sparkle {
-            0%, 100% {
-                transform: scale(1) rotate(0deg);
-                opacity: 1;
-            }
-            50% {
-                transform: scale(1.1) rotate(180deg);
-                opacity: 0.8;
-            }
-        }
-
 /* General styling for SVG icons in the AI Summary section */
 .header-section svg.icon2,
 .header-section button svg {
@@ -1811,38 +1697,24 @@ scrollbar-thumb {
     </div>
 
 <!-- AI Summary Section -->
-    <div id="ai-summary-section" class="header-section ai-assistant-section">
-        <div class="ai-assistant-card">
-            <h2>
-                <div class="ai-generated-tag">
-                    <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="-5.0 -10.0 110.0 135.0" style="width: 1.2em; height: 2em; vertical-align: middle;">
-                        <path d="m74.773 57.645c-17.676 5.8398-23.562 11.727-29.402 29.402-0.48047 1.4531-2.5352 1.4531-3.0156 0-5.8398-17.676-11.727-23.562-29.402-29.402-1.4531-0.48047-1.4531-2.5352 0-3.0156 17.676-5.8398 23.562-11.727 29.402-29.402 0.48047-1.4531 2.5352-1.4531 3.0156 0 5.8398 17.676 11.727 23.562 29.402 29.402 1.4531 0.48047 1.4531 2.5352 0 3.0156z"/>
-                        <path d="m87.594 28.617c-8.8359 2.918-11.781 5.8633-14.703 14.703-0.23828 0.72656-1.2656 0.72656-1.5078 0-2.918-8.8359-5.8633-11.781-14.703-14.703-0.72656-0.23828-0.72656-1.2656 0-1.5078 8.8359-2.918 11.781-5.8633 14.703-14.703 0.23828-0.72656 1.2656-0.72656 1.5078 0 2.918 8.8359 5.8633 11.781 14.703 14.703 0.72656 0.23828 0.72656 1.2656 0 1.5078z"/>
-                    </svg>
-                    Your Smart Overview <span class="beta-tag">BETA</span>   <span style="font-size: 12px; color: #777777; margin-left: 10px; display: inline-block; vertical-align: middle;">TaskMaster can make mistakes. Verify details.</span>
-                </div>
-            </h2>
+<div id="ai-summary-section" class="header-section ai-assistant-section">
+    <div class="ai-assistant-card">
+        <h2>
+            <div class="ai-generated-tag">
+                <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="-5.0 -10.0 110.0 135.0" style="width: 1.2em; height: 2em; vertical-align: middle;">
+                    <path d="m74.773 57.645c-17.676 5.8398-23.562 11.727-29.402 29.402-0.48047 1.4531-2.5352 1.4531-3.0156 0-5.8398-17.676-11.727-23.562-29.402-29.402-1.4531-0.48047-1.4531-2.5352 0-3.0156 17.676-5.8398 23.562-11.727 29.402-29.402 0.48047-1.4531 2.5352-1.4531 3.0156 0 5.8398 17.676 11.727 23.562 29.402 29.402 1.4531 0.48047 1.4531 2.5352 0 3.0156z"/>
+                    <path d="m87.594 28.617c-8.8359 2.918-11.781 5.8633-14.703 14.703-0.23828 0.72656-1.2656 0.72656-1.5078 0-2.918-8.8359-5.8633-11.781-14.703-14.703-0.72656-0.23828-0.72656-1.2656 0-1.5078 8.8359-2.918 11.781-5.8633 14.703-14.703 0.23828-0.72656 1.2656-0.72656 1.5078 0 2.918 8.8359 5.8633 11.781 14.703 14.703 0.72656 0.23828 0.72656 1.2656 0 1.5078z"/>
+                </svg>
+                Your Smart Overview <span class="beta-tag">BETA</span>   <span style="font-size: 12px; color: #777777; margin-left: 10px; display: inline-block; vertical-align: middle;">TaskMaster can make mistakes. Verify details.</span>
+        </h2>
 
-            <div class="loading-state">
-                <p class="loading-text">
-                    Generating your smart overview
-                    <span class="pulse"></span>
-                    <span class="pulse"></span>
-                    <span class="pulse"></span>
-                </p>
-                <div class="placeholder-lines">
-                    <div class="placeholder-line"></div>
-                    <div class="placeholder-line"></div>
-                    <div class="placeholder-line"></div>
-                </div>
-            </div>
-
-            <div class="summary-section">
-                <h3>Loading...</h3>
-                <p id="today-tasks-summary">Loading...</p>
-            </div>
+        <div class="summary-section">
+            <h3>Loading...</h3>
+            <p id="today-tasks-summary"> Loading...</p>
         </div>
+
     </div>
+</div>
 
 
 
@@ -4300,7 +4172,7 @@ async function generateSection(data, instructions, sectionType) {
     const basePrompt = `You are TaskMaster, an advanced AI productivity assistant specializing in Smart Overviews. Your core purpose is to analyze productivity data and generate actionable, personalized insights.
 
 CONTEXT:
-This data represents a user's productivity items including tasks, goals, projects, and plans. Each item has a type and may or may not have a due date. Your role is to create a meaningful ${sectionType} summary that helps the user stay organized and motivated.
+This data represents a user's productivity items including tasks, goals, projects, and plans. Each item has a type and may or may not have a due date. Your role is to create a meaningful ${sectionType} overview that helps the user stay organized and motivated.
 
 DATA:
 ${optimizedData}
@@ -4404,17 +4276,20 @@ async function generateAISummary(data) {
 
     try {
         // Enhanced section generation with more detailed instructions
-        const sections = {
-            overview: await generateSection(formattedData,
-                `Create a personalized strategic overview:
-                • Analyze patterns across all items
-                • Provide 3-4 data-driven recommendations
-                • Include specific action steps for each recommendation
-                • Add a personalized motivation message for ${displayName}
-                Maximum 200 words.`,
-                'overview'
-            )
-        };
+const sections = {
+    overview: await generateSection(
+        formattedData,
+        `Create a personalized strategic overview:
+        1. Start with a warm introduction for ${displayName}, making it personal and engaging.
+        2. Analyze patterns across all items.
+        3. Provide 3-4 data-driven recommendations based on the analysis.
+        4. Include specific action steps for each recommendation.
+        5. Add a personalized motivation message for ${displayName} to encourage their progress.
+        Ensure the tone remains professional but encouraging.`,
+        'overview'
+    )
+};
+
 
         console.log('✅ Enhanced Smart Overview generated successfully');
         return sections;
@@ -4438,13 +4313,36 @@ function renderSections(summaryData) {
     // Remove existing sections
     existingSections.forEach(section => section.remove());
 
+    // Helper function to format content with structured text
+    function formatContent(content) {
+        // Detect and format bolded headers followed by text
+        content = content.replace(
+            /\*\*(.+?)\*\*:([^*]+)/g, // Matches "**Header**: text"
+            '<strong>$1</strong>: $2'
+        );
+
+        // Detect and convert bullet points (starting with `* ` or `- `)
+        content = content.replace(
+            /(^|\n)[*-] (.+)/g, // Matches "* text" or "- text"
+            '<li>$2</li>'
+        );
+
+        // Wrap list items in <ul> tags
+        content = content.replace(
+            /(<li>.*?<\/li>)+/g, // Matches consecutive <li> elements
+            '<ul>$&</ul>'
+        );
+
+        return content;
+    }
+
     // Render new sections with animation
     Object.values(summaryData).forEach(({ title, content }, index) => {
         const sectionElement = document.createElement('div');
         sectionElement.className = 'summary-section hidden'; // Add "hidden" class initially
 
         const sanitizedTitle = sanitizeTitle(title);
-        const sanitizedContent = sanitizeContent(content);
+        const sanitizedContent = sanitizeContent(formatContent(content)); // Format content for structured display
 
         sectionElement.innerHTML = `
             <h3 class="section-title">${sanitizedTitle}</h3>
@@ -4459,6 +4357,7 @@ function renderSections(summaryData) {
         }, index * 300); // Adjust delay as needed (e.g., 300ms between sections)
     });
 }
+
 
 
 
@@ -4597,31 +4496,19 @@ return lines.length
 
 
 // Show loading state
-      function showLoading() {
-            const aiSummarySection = document.getElementById('ai-summary-section');
-            const summaryContainer = aiSummarySection.querySelector('.ai-assistant-card');
-            
-            // Clear existing sections
-            const existingSections = summaryContainer.querySelectorAll('.summary-section');
-            existingSections.forEach(section => section.remove());
+function showLoading() {
+    const aiSummarySection = document.getElementById('ai-summary-section');
+    const summaryContainer = aiSummarySection.querySelector('.ai-assistant-card');
+    
+    // Clear existing sections
+    const existingSections = summaryContainer.querySelectorAll('.summary-section');
+    existingSections.forEach(section => section.remove());
 
-            const loadingSection = document.createElement('div');
-            loadingSection.className = 'loading-state';
-            loadingSection.innerHTML = `
-                <p class="loading-text">
-                    Generating your smart overview
-                    <span class="pulse"></span>
-                    <span class="pulse"></span>
-                    <span class="pulse"></span>
-                </p>
-                <div class="placeholder-lines">
-                    <div class="placeholder-line"></div>
-                    <div class="placeholder-line"></div>
-                    <div class="placeholder-line"></div>
-                </div>
-            `;
-            summaryContainer.appendChild(loadingSection);
-        }
+    const loadingSection = document.createElement('div');
+    loadingSection.className = 'summary-section loading-state';
+    loadingSection.innerHTML = '<p>Generating your smart overview...</p>';
+    summaryContainer.appendChild(loadingSection);
+}
 
 // Main function to update the summary
 async function updateAISummary(userId) {

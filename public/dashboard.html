@@ -1593,7 +1593,7 @@ scrollbar-thumb {
 
 .step-number {
     font-weight: bold;
-    color: #ffffff;
+    color: #ffd700;
     margin-right: 10px;
 }
 
@@ -1602,7 +1602,7 @@ scrollbar-thumb {
 }
 
 .key-term {
-    color: #ff4500;
+    color: #ffffff;
     font-weight: bold;
     text-transform: uppercase;
 }
@@ -4326,7 +4326,6 @@ const sections = {
 
 // Function to render the sections with left-to-right fade-in animation and proper spacing
 // Function to render the sections with cleaner formatting and emphasis on key terms
-// Function to render the sections with cleaner formatting and emphasis on key terms
 function renderSections(summaryData) {
     const aiSummarySection = document.getElementById('ai-summary-section');
     const summaryContainer = aiSummarySection.querySelector('.ai-assistant-card');
@@ -4343,10 +4342,10 @@ function renderSections(summaryData) {
             `<div class="step"><span class="step-number">$1.</span> <span class="step-content">$2</span></div>`
         );
 
-        // Move "ACTION STEP" to its own line and remove emphasis formatting (**)
+        // Emphasize key terms like "Action Step"
         content = content.replace(
-            /(ACTION STEP:)(.+?)(?=\d+\.|$)/gis, // Matches "ACTION STEP: text"
-            `<div class="action-step"><strong>$1</strong><br>$2</div>`
+            /\b(Action Step):/gi, // Matches "Action Step:"
+            '<strong class="key-term">$1:</strong>'
         );
 
         return content;
@@ -4373,7 +4372,6 @@ function renderSections(summaryData) {
         }, index * 300); // Adjust delay as needed (e.g., 300ms between sections)
     });
 }
-
 
 
 

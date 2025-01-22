@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -807,7 +808,7 @@ body.night-mode {
                 <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM12 4C14.21 4 16 5.79 16 8C16 10.21 14.21 12 12 12C9.79 12 8 10.21 8 8C8 5.79 9.79 4 12 4ZM12 20C9.33 20 6.34 18.87 4.63 16.74C5.91 15.43 8.39 14.5 12 14.5C15.61 14.5 18.09 15.43 19.37 16.74C17.66 18.87 14.67 20 12 20Z" fill="currentColor"/>
             </svg>
         </div>
-                <div id="username">Loading...</div>
+                <div id="username">User Name</div>
                 <div class="menu-dots">
                     <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M12 13C12.5523 13 13 12.5523 13 12C13 11.4477 12.5523 11 12 11C11.4477 11 11 11.4477 11 12C11 12.5523 11.4477 13 12 13Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -1393,51 +1394,84 @@ function showTypingIndicator() {
 async function fetchCollectionData(collection, user, relevantCollections) {
     // Check cache first
     const now = Date.now();
-    if (userDataCache.data && 
-        userDataCache.data[collection] && 
-        (now - userDataCache.timestamp) < userDataCache.ttl) {
-        return userDataCache.data[collection];
-    }
-
-    if (collection === 'users') return null;
-
-    const limit = relevantCollections.includes(collection) ? 10 : 5;
-    let results = [];
+    const cacheKey = `${collection}_${user.uid}`;
     
-    const fieldCombinations = [
-        { idField: 'userId', orderBy: 'timestamp' },
-        { idField: 'userId', orderBy: 'createdAt' },
-        { idField: 'uid', orderBy: 'timestamp' },
-        { idField: 'uid', orderBy: 'createdAt' }
-    ];
-
-    for (const { idField, orderBy } of fieldCombinations) {
-        try {
-            const querySnapshot = await db.collection(collection)
-                .where(idField, '==', user.uid)
-                .orderBy(orderBy, 'desc')
-                .limit(limit)
-                .get();
-
-            if (!querySnapshot.empty) {
-                results = querySnapshot.docs.map(doc => ({
-                    id: doc.id,
-                    ...doc.data()
-                }));
-                break;
-            }
-        } catch (error) {
-            if (error.code === 'failed-precondition') continue;
-            console.error(`Error fetching ${collection}:`, error);
-        }
+    if (userDataCache.data && 
+        userDataCache.data[cacheKey] && 
+        (now - userDataCache.timestamp) < userDataCache.ttl) {
+        return userDataCache.data[cacheKey];
     }
 
-    // Update cache
-    if (!userDataCache.data) userDataCache.data = {};
-    userDataCache.data[collection] = results;
-    userDataCache.timestamp = now;
+    let results = [];
 
-    return results;
+    try {
+        if (collection === 'users') {
+            const userDoc = await db.collection('users').doc(user.uid).get();
+            results = userDoc.exists ? [{ id: userDoc.id, ...userDoc.data() }] : [];
+        } else {
+            const limit = relevantCollections.includes(collection) ? 10 : 5;
+            
+            // Try different field combinations
+            const fieldCombinations = [
+                { idField: 'userId', orderBy: 'timestamp' },
+                { idField: 'userId', orderBy: 'createdAt' },
+                { idField: 'uid', orderBy: 'timestamp' },
+                { idField: 'uid', orderBy: 'createdAt' }
+            ];
+
+            for (const { idField, orderBy } of fieldCombinations) {
+                try {
+                    let query = db.collection(collection).where(idField, '==', user.uid);
+                    
+                    // Add orderBy only if the field exists in the schema
+                    if (COLLECTION_SCHEMAS[collection][orderBy]) {
+                        query = query.orderBy(orderBy, 'desc');
+                    }
+                    
+                    const querySnapshot = await query.limit(limit).get();
+
+                    if (!querySnapshot.empty) {
+                        results = querySnapshot.docs.map(doc => ({
+                            id: doc.id,
+                            ...doc.data()
+                        }));
+                        break;
+                    }
+                } catch (error) {
+                    if (error.code !== 'failed-precondition') {
+                        console.error(`Error fetching ${collection} with ${idField}/${orderBy}:`, error);
+                    }
+                    continue;
+                }
+            }
+
+            // Fallback: try without orderBy if no results
+            if (results.length === 0) {
+                const querySnapshot = await db.collection(collection)
+                    .where('userId', '==', user.uid)
+                    .limit(limit)
+                    .get();
+
+                if (!querySnapshot.empty) {
+                    results = querySnapshot.docs.map(doc => ({
+                        id: doc.id,
+                        ...doc.data()
+                    }));
+                }
+            }
+        }
+
+        // Update cache with collection-specific data
+        if (!userDataCache.data) userDataCache.data = {};
+        userDataCache.data[cacheKey] = results;
+        userDataCache.timestamp = now;
+
+        return results;
+
+    } catch (error) {
+        console.error(`Error in fetchCollectionData for ${collection}:`, error);
+        return [];
+    }
 }
 
 // Optimized API query function
@@ -1528,6 +1562,13 @@ Respond naturally and concisely to: ${userInput}
     }
 }
 
+// Initialize cache with TTL
+const userDataCache = {
+    data: null,
+    timestamp: 0,
+    ttl: 30000 // 30 seconds cache
+};
+
 // Optimized message handler
 async function handleUserMessage() {
     const message = userInput.value.trim();
@@ -1550,10 +1591,9 @@ async function handleUserMessage() {
         const username = user.displayName || user.email;
         const messageLower = message.toLowerCase();
         
-        // Initialize userData
         let userData = {};
         
-        // Fetch user profile data
+        // Fetch user profile data first
         const userDoc = await db.collection('users').doc(user.uid).get();
         if (userDoc.exists) {
             userData.user = userDoc.data();
@@ -1569,7 +1609,7 @@ async function handleUserMessage() {
             relevantCollections.push('users');
         }
 
-        // Fetch data from all collections
+        // Fetch data from all collections in parallel
         const collectionPromises = Object.keys(COLLECTION_SCHEMAS)
             .map(async (collection) => {
                 const data = await fetchCollectionData(collection, user, relevantCollections);
@@ -1580,21 +1620,15 @@ async function handleUserMessage() {
 
         await Promise.all(collectionPromises);
 
-        console.log('Fetched user data:', userData);
-        console.log('Relevant collections:', relevantCollections);
-
         const aiResponse = await queryHuggingFaceAPI(message, userData, username);
         conversationHistory.push({ role: 'Assistant', content: aiResponse });
         
-        // Clear the interval and remove the indicator
         clearInterval(messageRotation);
         indicator.remove();
-        
         addMessage(aiResponse);
 
     } catch (error) {
         console.error('Error in handleUserMessage:', error);
-        // Clear the interval and remove the indicator in case of error
         clearInterval(messageRotation);
         indicator.remove();
         addMessage("I apologize, but I'm having trouble processing your request. Please try again later.");

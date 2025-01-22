@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1417,9 +1418,9 @@ const COLLECTION_KEYWORDS = {
     events: ['event', 'meeting', 'appointment'],
     uploads: ['file', 'upload', 'document'],
     generatedpdfs: [
-        'pdf', 'generated', 'summary', 'notes', 'note', 'document', 
+        'pdf', 'generated', 'summary', 'notes', 'document', 
         'key points', 'overview', 'questions', 'study', 'learn',
-        'transformer', 'transformers', 'study material', 'study notes', 'study materials'
+        'transformer', 'transformers', 'study material', 'study notes'
     ],
     replies: ['reply', 'message', 'response']
 };
@@ -1477,7 +1478,7 @@ Instructions:
 
 Respond naturally and concisely to: ${userInput}
 <|im_end|>
-<|im_start|>`;
+<|im_start|>assistant`;
 
     try {
         const response = await fetch(MODEL_ENDPOINT, {
@@ -1504,7 +1505,7 @@ Respond naturally and concisely to: ${userInput}
         const result = await response.json();
         const cleanResponse = result[0].generated_text
             .replace(systemPrompt, '')
-            .replace(/<\|im_start\|>/g, '')
+            .replace(/<\|im_start\|>assistant/g, '')
             .replace(/<\|im_end\|>/g, '')
             .trim();
 

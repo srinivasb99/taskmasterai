@@ -4354,10 +4354,10 @@ function renderSections(summaryData) {
             '<strong>$1</strong>: $2'
         );
 
-        // Move "Action Step:" and its content to appear on the same line
+        // Move "Action Step:" and its content to the next line, but keep them on the same line
         content = content.replace(
             /\b(Action Step):\s*(.+?)(?=\n|$)/gi, // Matches "Action Step: text"
-            '<strong class="key-term">$1:</strong> $2'
+            '<br><strong class="key-term">$1:</strong> $2'
         );
 
         return content;
@@ -4384,7 +4384,6 @@ function renderSections(summaryData) {
         }, index * 300); // Adjust delay as needed (e.g., 300ms between sections)
     });
 }
-
 
 
 

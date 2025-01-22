@@ -4220,18 +4220,18 @@ Content: [Provide detailed, actionable content following the instructions]`;
                 'Authorization': `Bearer ${huggingFaceApiKey}`,
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ 
-                inputs: basePrompt,
-                parameters: {
-                    max_new_tokens: 200, // Increased for more detailed responses
-                    temperature: 0.7,    // Increased for more creative responses
-                    top_p: 0.9,         // Adjusted for better quality
-                    repetition_penalty: 1.2,
-                    return_full_text: false,
-                    do_sample: true     // Enable sampling for better quality
-                }
-            }),
-        });
+body: JSON.stringify({ 
+    inputs: basePrompt,
+    parameters: {
+        max_new_tokens: 100, // Reduced for faster response
+        temperature: 0.5,    // Lowered for more deterministic results
+        top_p: 0.95,         // Slightly higher for diverse but accurate outputs
+        repetition_penalty: 1.1, // Lower penalty to avoid slowing down decoding
+        return_full_text: false,
+        do_sample: false     // Disabled sampling for faster inference
+    }
+}),
+
 
         if (!response.ok) throw new Error('API request failed');
 

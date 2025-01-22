@@ -1421,7 +1421,7 @@ scrollbar-thumb {
     display: flex;
     align-items: center;
     font-size: 18px; /* Adjust font size if needed */
-    color: #ffffff;  
+    color: #007bff;  
 }
 
 
@@ -4209,7 +4209,6 @@ ANALYSIS REQUIREMENTS:
 ${instructions}
 
 Format response exactly as:
-Title: [Create a unique, context-appropriate title]
 Content: [Provide detailed, actionable content following the instructions]`;
 
     try {
@@ -4242,21 +4241,17 @@ Content: [Provide detailed, actionable content following the instructions]`;
             .replace(/\[\/INST\]|\[INST\]|<\/?s>|<\/?p>/g, '')
             .trim();
 
-        const titleMatch = cleanedResponse.match(/Title:\s*(.*?)(?=\nContent:|$)/s);
         const contentMatch = cleanedResponse.match(/Content:\s*([\s\S]*?)$/s);
 
-        if (!titleMatch || !contentMatch) throw new Error('Invalid response format');
 
-        const title = titleMatch[1].trim();
         const content = contentMatch[1].trim();
 
         console.log(`✅ ${sectionType} section generated successfully`);
-        return { title, content };
+        return {content };
 
     } catch (error) {
         console.error(`❌ ${sectionType} section generation failed:`, error);
         return {
-            title: `${sectionType.charAt(0).toUpperCase() + sectionType.slice(1)} Overview`,
             content: "Unable to generate section. Please try again."
         };
     }
@@ -4364,15 +4359,14 @@ function renderSections(summaryData) {
     }
 
     // Render new sections with structured formatting
-    Object.values(summaryData).forEach(({ title, content }, index) => {
+    Object.values(summaryData).forEach(({ content }, index) => {
         const sectionElement = document.createElement('div');
         sectionElement.className = 'summary-section hidden'; // Add "hidden" class initially
 
-        const sanitizedTitle = sanitizeTitle(title);
         const sanitizedContent = sanitizeContent(formatContent(content)); // Apply structured formatting
 
         sectionElement.innerHTML = `
-            <h3 class="section-title">${sanitizedTitle}</h3>
+            
             <div class="section-content">${sanitizedContent}</div>
         `;
 

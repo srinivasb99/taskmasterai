@@ -462,9 +462,22 @@ body.night-mode {
     cursor: not-allowed;
 }
 
-.send-button, .stop-button {
+.send-button, {
     background: linear-gradient(135deg, var(--accent-color), #FF1493);
     border: none;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+.stop-button {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: rgba(239, 68, 68, 0.2);
     border-radius: 50%;
     width: 40px;
     height: 40px;
@@ -491,6 +504,7 @@ body.night-mode {
 }
 
 .stop-button:hover {
+    transform: scale(1.05);
     background: rgba(239, 68, 68, 0.2);
 }
 
@@ -863,7 +877,7 @@ body.night-mode {
         </button>
         <button class="stop-button" id="stopButton" style="display: none;">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect x="6" y="6" width="12" height="12" fill="#EF4444"/>
+                <rect x="6" y="6" width="12" height="12" fill="#FFFFFF"/>
             </svg>
         </button>
     </div>

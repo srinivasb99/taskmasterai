@@ -4359,6 +4359,12 @@ function renderSections(summaryData) {
             '<strong class="key-term">$1:</strong>'
         );
 
+        // Move "ACTION STEP" to its own line and remove emphasis formatting (**)
+        content = content.replace(
+            /(ACTION STEP:)(.+?)(?=\d+\.|$)/gis, // Matches "ACTION STEP: text"
+            `<div class="action-step"><strong>$1</strong><br>$2</div>`
+        );
+
         return content;
     }
 

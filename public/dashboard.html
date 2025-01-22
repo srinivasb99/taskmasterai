@@ -4315,8 +4315,8 @@ Content: [Provide detailed, actionable content following the instructions]`;
     } catch (error) {
         console.error(`❌ ${sectionType} section generation failed:`, error);
         return {
-            title: `${sectionType.charAt(0).toUpperCase() + sectionType.slice(1)} Overview`,
-            content: "Unable to generate section. Please try again."
+            title: `${sectionType.charAt(0).toUpperCase() + sectionType.slice(1)} Maintenance`,
+            content: "TaskMaster is under maintenance. Smart Overview is currently unavailable."
         };
     }
 }

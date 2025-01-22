@@ -1664,8 +1664,7 @@ Respond concisely to: ${userInput}
         const result = await response.json();
         return result[0].generated_text
             .replace(systemPrompt, '')
-            .replace(/<\|im_start\|>assistant/g, '')
-            .replace(/<\|im_end\|>/g, '')
+            .replace(/<\|im_(start|end)\|>assistant|<\|im_end\|>|<\|start_header_id\|>assistant<\|end_header_id\|>/g, '')
             .trim();
     } catch (error) {
         if (error.name === 'AbortError') {

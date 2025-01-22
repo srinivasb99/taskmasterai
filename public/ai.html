@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -683,7 +684,7 @@ body.night-mode {
         
         .important {
             font-weight: 500;
-            color: #ffffff;
+            color: var(--accent-color, #F50057);
         }
         
         .inline-code {
@@ -1417,9 +1418,9 @@ const COLLECTION_KEYWORDS = {
     events: ['event', 'meeting', 'appointment'],
     uploads: ['file', 'upload', 'document'],
     generatedpdfs: [
-        'pdf', 'generated', 'summary', 'notes', 'document', 
+        'pdf', 'generated', 'summary', 'notes', 'note', 'document', 
         'key points', 'overview', 'questions', 'study', 'learn',
-        'transformer', 'transformers', 'study material', 'study notes'
+        'transformer', 'transformers', 'study material', 'study notes', 'study materials'
     ],
     replies: ['reply', 'message', 'response']
 };
@@ -1475,7 +1476,9 @@ Instructions:
 4. For questions about study materials, reference both the overview and specific key points.
 5. If asked about questions or quizzes, use the stored questions and answers.
 
-Respond naturally and concisely to: ${userInput}`;
+Respond naturally and concisely to: ${userInput}
+<|im_end|>
+<|im_start|>`;
 
     try {
         const response = await fetch(MODEL_ENDPOINT, {
@@ -1487,7 +1490,7 @@ Respond naturally and concisely to: ${userInput}`;
             body: JSON.stringify({
                 inputs: systemPrompt,
                 parameters: {
-                    max_new_tokens: 350, // Increased from 200 to 400 to allow for longer responses
+                    max_new_tokens: 400, // Increased from 200 to 400 to allow for longer responses
                     temperature: 0.7,
                     top_p: 0.9,
                     return_full_text: false,

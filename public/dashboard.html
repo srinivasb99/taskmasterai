@@ -1609,58 +1609,31 @@ scrollbar-thumb {
 
 .loading-state {
     display: flex;
-    flex-direction: column;
-    align-items: center;
     justify-content: center;
+    align-items: center;
     height: 100%;
     font-family: Arial, sans-serif;
     color: #555;
-}
-
-.ellipsis-text {
     font-size: 18px;
     font-weight: bold;
-    position: relative;
-    margin-bottom: 20px;
     text-align: center;
+}
+
+.loading-text {
+    position: relative;
+    animation: fade-in-out 3s infinite;
+    transition: opacity 0.5s ease-in-out;
 }
 
 .ellipsis {
     display: inline-block;
-    animation: ellipsis-animation 1.5s infinite;
 }
 
-@keyframes ellipsis-animation {
-    0% { content: ""; }
-    33% { content: "."; }
-    66% { content: ".."; }
-    100% { content: "..."; }
+@keyframes fade-in-out {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
 }
 
-.dynamic-text {
-    overflow: hidden;
-    height: 30px; /* Adjust based on font size */
-    position: relative;
-    text-align: center;
-}
-
-.phrase {
-    font-size: 16px;
-    position: absolute;
-    bottom: -40px; /* Start off-screen */
-    opacity: 0;
-    transition: all 0.5s ease-in-out;
-}
-
-.phrase.animate-in {
-    bottom: 0; /* Move into view */
-    opacity: 1;
-}
-
-.phrase.animate-out {
-    bottom: -40px; /* Move out of view */
-    opacity: 0;
-}
 
 
     </style>
@@ -3451,8 +3424,49 @@ const quotes = [
     "Dream it. Wish it. Do it.",
     "Act as if what you do makes a difference. It does.",
     "The key to success is to focus on goals, not obstacles.",
-    "Don’t count the days; make the days count."
+    "Don’t count the days; make the days count.",
+    "Success doesn’t happen overnight, but persistence pays off.",
+    "Effort is the ignition key to accomplishment.",
+    "Do more of what makes you happy and fulfilled.",
+    "Your actions today are your future's foundation.",
+    "Start each day with a positive thought and a grateful heart.",
+    "A little progress each day adds up to big results.",
+    "Set a goal so big that you can't achieve it until you grow into the person who can.",
+    "Motivation is what gets you started. Habit is what keeps you going.",
+    "Success is a journey, not a destination.",
+    "You are what you repeatedly do. Excellence is not an act, but a habit.",
+    "Opportunities don’t happen, you create them.",
+    "Success isn’t about luck; it’s about preparation meeting opportunity.",
+    "You don’t find the time, you make it.",
+    "Work hard, dream big, stay focused.",
+    "Success comes from consistency, not from talent.",
+    "Energy flows where attention goes.",
+    "The best way to predict the future is to create it.",
+    "Don't wish for it; work for it.",
+    "One step at a time is still forward progress.",
+    "Success is measured in the lives we impact.",
+    "Hustle beats talent when talent doesn't hustle.",
+    "Take the risk or lose the chance.",
+    "Perseverance is failing 19 times and succeeding the 20th.",
+    "Winners never quit, and quitters never win.",
+    "Your breakthrough is on the other side of your comfort zone.",
+    "Make your passion your paycheck.",
+    "The only failure is not to try.",
+    "Turn your setbacks into setups for your comebacks.",
+    "Learn from yesterday, live for today, hope for tomorrow.",
+    "Good things happen to those who work for it.",
+    "You’re never a loser until you quit trying.",
+    "Ambition is the path to success, and persistence is the vehicle you arrive in.",
+    "Believe in your infinite potential.",
+    "Fall seven times, stand up eight.",
+    "Start small. Think big. Act now.",
+    "Be the hardest worker in the room.",
+    "When you focus on possibilities, you'll have more opportunities.",
+    "Hardships often prepare ordinary people for an extraordinary destiny.",
+    "There’s no traffic on the extra mile.",
+    "Every day is a new opportunity to be better."
 ];
+
 
 
 // Function to display a random quote with italics and quotation marks
@@ -4572,63 +4586,52 @@ return lines.length
 
 
 
+// Show loading state
 function showLoading() {
     const aiSummarySection = document.getElementById('ai-summary-section');
     const summaryContainer = aiSummarySection.querySelector('.ai-assistant-card');
-    
+
     // Clear existing sections
     const existingSections = summaryContainer.querySelectorAll('.summary-section');
     existingSections.forEach(section => section.remove());
 
     const loadingSection = document.createElement('div');
     loadingSection.className = 'summary-section loading-state';
-
-    // Initial loading text with ellipsis animation
     loadingSection.innerHTML = `
-        <div class="loading-animation">
-            <p class="ellipsis-text">Generating your Smart Overview<span class="ellipsis">...</span></p>
-            <div class="dynamic-text"></div>
-        </div>
+        <p class="loading-text">
+            Generating your smart overview<span class="ellipsis">...</span>
+        </p>
     `;
-
     summaryContainer.appendChild(loadingSection);
 
-    // General phrases for dynamic loading
+    // List of phrases to display
     const phrases = [
         "Analyzing information...",
         "Compiling key insights...",
         "Refining the overview...",
-        "Ensuring accuracy...",
-        "Almost ready..."
+        "Ensuring accuracy..."
     ];
 
-    // Rotate phrases with animation
-    const dynamicTextDiv = loadingSection.querySelector('.dynamic-text');
+    // Reference to the loading text
+    const loadingText = loadingSection.querySelector('.loading-text');
+
+    // Ellipsis animation
+    const ellipsis = loadingSection.querySelector('.ellipsis');
+    setInterval(() => {
+        ellipsis.textContent = ellipsis.textContent.length < 3 ? ellipsis.textContent + '.' : '';
+    }, 500);
+
+    // Rotate through phrases
     let index = 0;
-
-    setTimeout(() => {
-        // Start rotating phrases after initial phrase
-        setInterval(() => {
-            // Create and animate new phrase
-            const phrase = document.createElement('p');
-            phrase.className = 'phrase';
-            phrase.textContent = phrases[index];
-            dynamicTextDiv.appendChild(phrase);
-
-            // Animate phrase in
-            phrase.classList.add('animate-in');
-
-            // Remove previous phrase after animation
-            setTimeout(() => {
-                if (dynamicTextDiv.firstChild) {
-                    dynamicTextDiv.removeChild(dynamicTextDiv.firstChild);
-                }
-            }, 3000); // Match the duration of the animation
-
-            // Update index
-            index = (index + 1) % phrases.length;
-        }, 3000); // Adjust interval as needed
-    }, 3000); // Delay before showing the first dynamic phrase
+    setInterval(() => {
+        const phrase = phrases[index];
+        loadingText.style.opacity = 0; // Fade out
+        setTimeout(() => {
+            loadingText.innerHTML = `${phrase} <span class="ellipsis">...</span>`;
+            loadingText.style.opacity = 1; // Fade in
+            index = (index + 1) % phrases.length; // Loop through phrases
+        }, 500); // Match fade-out duration
+    }, 3000); // Change phrase every 3 seconds
 }
 
 

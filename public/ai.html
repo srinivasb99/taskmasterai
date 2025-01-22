@@ -1557,21 +1557,22 @@ async function handleUserMessage() {
         if (userDoc.exists) {
             userData.user = userDoc.data();
         }
+
+        // Determine relevant collections based on message content
+        const relevantCollections = Object.entries(COLLECTION_KEYWORDS)
+            .filter(([_, keywords]) => keywords.some(keyword => messageLower.includes(keyword)))
+            .map(([collection]) => collection);
+
+        // Always include users collection
+        if (!relevantCollections.includes('users')) {
+            relevantCollections.push('users');
+        }
         
         // Check cache first
         const now = Date.now();
         if (userDataCache.data && (now - userDataCache.timestamp) < userDataCache.ttl) {
             userData = userDataCache.data;
-        } else {
-
-            // Determine relevant collections based on message content
-            const relevantCollections = Object.entries(COLLECTION_KEYWORDS)
-                .filter(([_, keywords]) => keywords.some(keyword => messageLower.includes(keyword)))
-                .map(([collection]) => collection);
-
-            if (!relevantCollections.includes('users')) {
-                relevantCollections.push('users');
-            }
+        } 
 
             // Fetch data from relevant collections in parallel
             const collectionPromises = relevantCollections.map(async (collection) => {

@@ -1799,8 +1799,8 @@ async function handleUserMessage() {
     
     // Update UI state
     userInput.disabled = true;
-    document.getElementById('sendMessage').style.display = 'none';
-    document.getElementById('stopMessage').style.display = 'flex';
+    document.getElementById('sendButton').style.display = 'none';
+    document.getElementById('stopButton').style.display = 'flex';
     
     userInput.value = '';
     addMessage(message, true);
@@ -1817,9 +1817,43 @@ async function handleUserMessage() {
         if (!user) throw new Error('User not authenticated');
 
         const username = user.displayName || user.email;
+        const messageLower = message.toLowerCase();
         
+        // Initialize userData
+        let userData = {};
+        
+        // Fetch user profile data
+        const userDoc = await db.collection('users').doc(user.uid).get();
+        if (userDoc.exists) {
+            userData.user = userDoc.data();
+        }
+
+        // Determine relevant collections based on message content
+        const relevantCollections = Object.entries(COLLECTION_KEYWORDS)
+            .filter(([_, keywords]) => keywords.some(keyword => messageLower.includes(keyword)))
+            .map(([collection]) => collection);
+
+        // Always include users collection
+        if (!relevantCollections.includes('users')) {
+            relevantCollections.push('users');
+        }
+
+        // Fetch data from all collections
+        const collectionPromises = Object.keys(COLLECTION_SCHEMAS)
+            .map(async (collection) => {
+                const data = await fetchCollectionData(collection, user, relevantCollections);
+                if (data && data.length > 0) {
+                    userData[collection] = data;
+                }
+            });
+
+        await Promise.all(collectionPromises);
+
+        console.log('Fetched user data:', userData);
+        console.log('Relevant collections:', relevantCollections);
+
         // Pass the AbortController signal to the API call
-        const aiResponse = await queryHuggingFaceAPI(message, null, username, currentController.signal);
+        const aiResponse = await queryHuggingFaceAPI(message, userData, username, currentController.signal);
         conversationHistory.push({ role: 'Assistant', content: aiResponse });
         
         // Clear the interval and remove the indicator
@@ -1835,7 +1869,7 @@ async function handleUserMessage() {
         indicator.remove();
         
         if (error.name === 'AbortError') {
-            addMessage("Message generation stopped.", false, 'system');
+            addMessage("Message was stopped by user.", false, 'system');
         } else {
             addMessage("I apologize, but I'm having trouble processing your request. Please try again later.");
         }
@@ -1844,10 +1878,11 @@ async function handleUserMessage() {
         isProcessing = false;
         currentController = null;
         userInput.disabled = false;
-        document.getElementById('stopMessage').style.display = 'none';
-        document.getElementById('sendMessage').style.display = 'flex';
+        document.getElementById('stopButton').style.display = 'none';
+        document.getElementById('sendButton').style.display = 'flex';
     }
 }
+
 
 function stopMessage() {
     if (currentController) {

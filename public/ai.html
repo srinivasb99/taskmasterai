@@ -1143,9 +1143,6 @@ const userInput = document.getElementById('userInput');
 const sendButton = document.getElementById('sendMessage');
 
 function formatMessage(text) {
-    // Store question IDs to maintain consistency between questions and their options
-    const questionIds = new Map();
-    
     // Format bullet points
     text = text.replace(/\n\s*\*\s+/g, '\n<li class="bullet-point">');
     text = text.replace(/\n\s*-\s+/g, '\n<li class="bullet-point">');
@@ -1157,23 +1154,12 @@ function formatMessage(text) {
     text = text.replace(/^(.+\?)\s*$/gm, (match, question) => {
         // Generate a unique ID for each question
         const questionId = 'q' + Math.random().toString(36).substr(2, 9);
-        questionIds.set(question.trim(), questionId);
         return `<div class="question" data-question-id="${questionId}">${question}</div>`;
     });
     
     // Format multiple choice options (A), B), C), D))
     text = text.replace(/^([A-D]\))\s*(.+)$/gm, (match, label, option) => {
-        // Find the closest question above this option
-        const questionText = text.split(match)[0]
-            .split('\n')
-            .reverse()
-            .find(line => line.trim().endsWith('?'));
-            
-        // Get the question ID or generate a new one if not found
-        const questionId = questionText ? 
-            questionIds.get(questionText.trim()) : 
-            'q' + Math.random().toString(36).substr(2, 9);
-            
+        const questionId = 'q' + Math.random().toString(36).substr(2, 9);
         return `<div class="option" data-option="${label.charAt(0)}" data-question-id="${questionId}">${label} ${option}</div>`;
     });
     
@@ -1185,29 +1171,6 @@ function formatMessage(text) {
     
     // Format code or technical terms (between `)
     text = text.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
-    
-    // Process AI responses with correct answers
-    const responsePattern = /(Correct Answer:\s*[A-D]\).*?)(?=\n|$)/gi;
-    const matches = text.matchAll(responsePattern);
-    
-    for (const match of matches) {
-        const responseText = match[0];
-        // Find the closest question above this response
-        const questionText = text.split(responseText)[0]
-            .split('\n')
-            .reverse()
-            .find(line => line.trim().endsWith('?'));
-            
-        if (questionText) {
-            const questionId = questionIds.get(questionText.trim());
-            if (questionId) {
-                // Create a container for the response
-                const container = processAIResponse(responseText, questionId);
-                // Replace the response text with the container
-                text = text.replace(responseText, container.outerHTML);
-            }
-        }
-    }
     
     // Add paragraphs for better spacing
     text = text.split('\n\n').map(para => 
@@ -1312,53 +1275,56 @@ function handleOptionClick(event) {
     // Add selected class
     option.classList.add('selected');
     
-    // Get the AI response element for this question
-    const aiResponseElement = document.querySelector(`[data-response-for="${questionId}"]`);
-    if (!aiResponseElement) {
-        console.error('AI response not found for question:', questionId);
-        return;
-    }
+    // Get correct answer from Firebase
+    const user = firebase.auth().currentUser;
+    if (user) {
+        db.collection('generatedpdfs')
+            .where('userId', '==', user.uid)
+            .orderBy('timestamp', 'desc')
+            .limit(1)
+            .get()
+            .then(snapshot => {
+                if (!snapshot.empty) {
+                    const doc = snapshot.docs[0];
+                    const data = doc.data();
+                    
+                    // Get the raw questions array
+                    const questions = data.rawQuestions || [];
+                    
+                    // Find the matching question by its text content
+                    const question = questions.find(q => 
+                        q.question && q.question.includes(document.querySelector(`[data-question-id="${questionId}"]`).textContent.trim())
+                    );
 
-    const aiResponse = aiResponseElement.textContent;
-    
-    // Extract correct answer from AI response using regex
-    const correctAnswerPattern = /Correct Answer:\s*([A-D])\)/i;
-    const match = aiResponse.match(correctAnswerPattern);
-    
-    if (match) {
-        const correctAnswer = match[1].toUpperCase();
-        console.log('Found correct answer:', correctAnswer);
-        
-        // Convert selected option to same case for comparison
-        const normalizedSelected = selectedOption.toUpperCase();
-        
-        // Compare and add appropriate classes
-        if (normalizedSelected === correctAnswer) {
-            option.classList.add('correct');
-        } else {
-            option.classList.add('incorrect');
-            // Show the correct answer
-            allOptions.forEach(opt => {
-                if (opt.dataset.option.toUpperCase() === correctAnswer) {
-                    opt.classList.add('correct');
+                    if (question && question.correctAnswer) {
+                        console.log('Question found:', question);
+                        console.log('Selected:', selectedOption, 'Correct:', question.correctAnswer);
+                        
+                        // Convert both to same case for comparison
+                        const normalizedSelected = selectedOption.toUpperCase();
+                        const normalizedCorrect = question.correctAnswer.toUpperCase();
+                        
+                        // Direct letter comparison
+                        if (normalizedSelected === normalizedCorrect) {
+                            option.classList.add('correct');
+                        } else {
+                            option.classList.add('incorrect');
+                            // Show the correct answer
+                            allOptions.forEach(opt => {
+                                if (opt.dataset.option.toUpperCase() === normalizedCorrect) {
+                                    opt.classList.add('correct');
+                                }
+                            });
+                        }
+                    } else {
+                        console.error('Question or correct answer not found:', questionId);
+                    }
                 }
+            })
+            .catch(error => {
+                console.error('Error checking answer:', error);
             });
-        }
-        
-        // Hide the correct answer in the AI response
-        const cleanedResponse = aiResponse.replace(/Correct Answer:\s*[A-D]\).*$/i, '');
-        aiResponseElement.textContent = cleanedResponse.trim();
-    } else {
-        console.error('Could not find correct answer pattern in AI response');
     }
-}
-
-// Helper function to process AI response and hide correct answer
-function processAIResponse(response, questionId) {
-    const container = document.createElement('div');
-    container.setAttribute('data-response-for', questionId);
-    container.textContent = response;
-    return container;
 }
 
 function showTypingIndicator() {
@@ -1960,13 +1926,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
     stopButton.addEventListener('click', stopMessage);
-});
-
-// Add event listeners for options
-document.addEventListener('click', function(event) {
-    if (event.target.closest('.option')) {
-        handleOptionClick(event);
-    }
 });
 
 // Initialize the chatbot when the page loads

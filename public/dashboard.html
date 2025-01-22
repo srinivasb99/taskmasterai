@@ -1593,7 +1593,7 @@ scrollbar-thumb {
 
 .step-number {
     font-weight: bold;
-    color: #ffd700;
+    color: #ffffff;
     margin-right: 10px;
 }
 
@@ -4342,10 +4342,28 @@ function renderSections(summaryData) {
             `<div class="step"><span class="step-number">$1.</span> <span class="step-content">$2</span></div>`
         );
 
-        // Emphasize key terms like "Action Step"
+        // Detect and format bolded headers followed by text
         content = content.replace(
-            /\b(Action Step):/gi, // Matches "Action Step:"
-            '<strong class="key-term">$1:</strong>'
+            /\*\*(.+?)\*\*:([^*]+)/g, // Matches "**Header**: text"
+            '<strong>$1</strong>: $2'
+        );
+
+        // Detect and convert bullet points (starting with `* ` or `- `)
+        content = content.replace(
+            /(^|\n)[*-] (.+)/g, // Matches "* text" or "- text"
+            '<li>$2</li>'
+        );
+
+        // Wrap list items in <ul> tags
+        content = content.replace(
+            /(<li>.*?<\/li>)+/g, // Matches consecutive <li> elements
+            '<ul>$&</ul>'
+        );
+
+        // Move "ACTION STEP" to its own line and remove emphasis formatting (**)
+        content = content.replace(
+            /(ACTION STEP:)(.+?)(?=\d+\.|$)/gis, // Matches "ACTION STEP: text"
+            `<div class="action-step"><strong>$1</strong><br>$2</div>`
         );
 
         return content;
@@ -4372,6 +4390,7 @@ function renderSections(summaryData) {
         }, index * 300); // Adjust delay as needed (e.g., 300ms between sections)
     });
 }
+
 
 
 

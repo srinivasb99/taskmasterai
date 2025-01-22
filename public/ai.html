@@ -1478,15 +1478,14 @@ async function queryHuggingFaceAPI(userInput, userData = null, username = null) 
     const userIdentityKeywords = ['who am i', 'what is my name', "what's my name", 'my name', 'who i am'];
     const isIdentityQuestion = userIdentityKeywords.some(keyword => userInput.toLowerCase().includes(keyword));
 
-    // Check for action commands
 const actionMatch = userInput.toLowerCase().match(
     /^(add|create|set|update|delete|schedule|make|plan)\s+(?:a|an|the|some|\d+\s+)?(task|goal|project|plan|timer|event)s?\s*(?:to|for|that|which|and|about)?\s*(.+)?$/i
 );
-
-if (actionMatch) {
-    const [_, action, type, content] = actionMatch; // Extract the components
-    return handleActionCommand(action, type, content?.trim(), userData?.user?.uid);
-}
+    
+    if (actionMatch) {
+        const [_, action, type, content] = actionMatch;
+        return handleActionCommand(action, type, content, userData?.user?.uid);
+    }
 
     const formattedHistory = conversationHistory.slice(-3).map(msg => 
         `${msg.role}: ${msg.content}`

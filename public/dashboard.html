@@ -4274,6 +4274,7 @@ Content: [Provide detailed, actionable content following the instructions]`;
         console.log('📤 Requesting model response...');
         const response = await fetch(modelEndpoint, {
             method: 'POST',
+            mode: 'no-cors', // This bypasses CORS but limits response data
             headers: {
                 'Authorization': `Bearer ${huggingFaceApiKey}`,
                 'Content-Type': 'application/json',

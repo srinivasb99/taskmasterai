@@ -1566,6 +1566,11 @@ async function queryHuggingFaceAPI(userInput, userData = null, username = null) 
                 const pdfDoc = pdfSnapshot.docs[0];
                 pdfData = pdfDoc.data();
                 
+                // Add the PDF data to userData if it exists
+                if (!userData) userData = {};
+                if (!userData.generatedpdfs) userData.generatedpdfs = [];
+                userData.generatedpdfs.push(pdfData);
+                
                 if (pdfData.rawQuestions) {
                     // Check if the user's question matches any quiz questions
                     const matchingQuestion = pdfData.rawQuestions.find(q => 
@@ -1593,36 +1598,21 @@ Available Actions:
 
 Types: task, goal, project, plan, timer, event
 
-Available Collections and their structures:
-${Object.entries(COLLECTION_SCHEMAS)
-    .map(([collection, schema]) => 
-        `${collection}: ${Object.entries(schema)
-            .map(([field, type]) => `${field} (${type})`)
-            .join(', ')}`)
-    .join('\n')}
-
-${userData?.generatedpdfs ? `
+${userData?.generatedpdfs?.length > 0 ? `
 Generated PDFs Information:
 ${userData.generatedpdfs.map(pdf => `
-Document: ${pdf.fileName}
-Overview: ${pdf.overview}
-Key Points:
-${pdf.keyPoints?.map((point, i) => `${i + 1}. ${point}`).join('\n')}
-Questions:
-${pdf.rawQuestions?.map((q, i) => {
-    const choices = pdf.choices?.[i] || [];
-    return `Q${i + 1}: ${q}
-Choices: ${choices.join(' | ')}
-Correct Answer: ${pdf.correctAnswer}
-Related Key Point: ${pdf.keyPoint}`;
-}).join('\n')}
+Document: ${pdf.fileName || 'Untitled'}
+Overview: ${pdf.overview || 'Not available'}
+${pdf.keyPoints ? `Key Points:\n${pdf.keyPoints.map((point, i) => `${i + 1}. ${point}`).join('\n')}` : ''}
+${pdf.rawQuestions ? `Questions:\n${pdf.rawQuestions.map((q, i) => {
+    if (typeof q === 'string') return `Q${i + 1}: ${q}`;
+    return `Q${i + 1}: ${q.question || q}\nAnswer: ${q.correctAnswer || 'Not available'}`;
+}).join('\n')}` : ''}
 `).join('\n')}
 ` : ''}
 
 Context:
 ${formattedHistory}
-
-${userData ? `User Data: ${JSON.stringify(userData)}` : ''}
 
 Instructions:
 1. If the user asks about their study materials or PDFs, reference the specific content from their generatedpdfs.

@@ -1680,7 +1680,7 @@ scrollbar-thumb {
 </svg>
     AI Chat Bot
 </div>
-            <button class="upgrade-btn" onclick="window.location.href='pricing.html'">
+            <button class="upgrade-btn" onclick="window.location.href='pricing'">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M2 8l10 14L22 8l-4-6H6L2 8z"/>
                     <path d="M2 8h20"/>
@@ -4354,10 +4354,10 @@ function renderSections(summaryData) {
             '<strong>$1</strong>: $2'
         );
 
-        // Emphasize key terms like "Action Step" and move it to a new line
+        // Move "Action Step:" and its content to a new line
         content = content.replace(
             /\b(Action Step):(.+?)(?=\n|$)/gi, // Matches "Action Step: text"
-            '<strong class="key-term">$1:</strong><br>$2'
+            '<br><strong class="key-term">$1:</strong><br>$2'
         );
 
         return content;

@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1113,6 +1112,240 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <script>
+const chatMessages = document.getElementById('chatMessages');
+const userInput = document.getElementById('userInput');
+const sendButton = document.getElementById('sendMessage');
+
+function formatMessage(text) {
+    // Format bullet points
+    text = text.replace(/\n\s*\*\s+/g, '\n<li class="bullet-point">');
+    text = text.replace(/\n\s*-\s+/g, '\n<li class="bullet-point">');
+    if (text.includes('<li class="bullet-point">')) {
+        text = '<ul class="bullet-list">' + text + '</ul>';
+    }
+    
+    // Format questions (lines ending with ?)
+    text = text.replace(/^(.+\?)\s*$/gm, (match, question) => {
+        // Generate a unique ID for each question
+        const questionId = 'q' + Math.random().toString(36).substr(2, 9);
+        return `<div class="question" data-question-id="${questionId}">${question}</div>`;
+    });
+    
+    // Format multiple choice options (A), B), C), D))
+    text = text.replace(/^([A-D]\))\s*(.+)$/gm, (match, label, option) => {
+        const questionId = 'q' + Math.random().toString(36).substr(2, 9);
+        return `<div class="option" data-option="${label.charAt(0)}" data-question-id="${questionId}">${label} ${option}</div>`;
+    });
+    
+    // Format headings (lines with : at the end)
+    text = text.replace(/^(.+):\s*$/gm, '<div class="heading">$1:</div>');
+    
+    // Format important text (between *)
+    text = text.replace(/\*([^*]+)\*/g, '<span class="important">$1</span>');
+    
+    // Format code or technical terms (between `)
+    text = text.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
+    
+    // Add paragraphs for better spacing
+    text = text.split('\n\n').map(para => 
+        para.trim() ? `<p class="paragraph">${para}</p>` : ''
+    ).join('');
+    
+    return text;
+}
+
+function addMessage(message, isUser = false) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${isUser ? 'user' : 'ai'}`;
+    
+    const avatar = document.createElement('div');
+    avatar.className = 'message-avatar';
+    
+    if (isUser) {
+        // For user messages, check Firebase for profile picture
+        const currentUser = firebase.auth().currentUser;
+        if (currentUser) {
+            const uid = currentUser.uid;
+            const userDocRef = firestore.collection('users').doc(uid);
+            
+            userDocRef.get().then(doc => {
+                if (doc.exists && doc.data().profilePicture) {
+                    avatar.innerHTML = `<img src="${doc.data().profilePicture}" alt="Profile Picture">`;
+                } else {
+                    // Use default avatar if no profile picture
+                    avatar.innerHTML = `
+                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM12 5C13.66 5 15 6.34 15 8C15 9.66 13.66 11 12 11C10.34 11 9 9.66 9 8C9 6.34 10.34 5 12 5ZM12 19.2C9.5 19.2 7.29 17.92 6 15.98C6.03 13.99 10 12.9 12 12.9C13.99 12.9 17.97 13.99 18 15.98C16.71 17.92 14.5 19.2 12 19.2Z" fill="#FFFFFF"/>
+                        </svg>
+                    `;
+                }
+            }).catch(error => {
+                console.error("Error loading profile picture:", error);
+                // Use default avatar on error
+                avatar.innerHTML = `
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM12 5C13.66 5 15 6.34 15 8C15 9.66 13.66 11 12 11C10.34 11 9 9.66 9 8C9 6.34 10.34 5 12 5ZM12 19.2C9.5 19.2 7.29 17.92 6 15.98C6.03 13.99 10 12.9 12 12.9C13.99 12.9 17.97 13.99 18 15.98C16.71 17.92 14.5 19.2 12 19.2Z" fill="#FFFFFF"/>
+                    </svg>
+                `;
+            });
+        } else {
+            // Use default avatar if no user is logged in
+            avatar.innerHTML = `
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM12 5C13.66 5 15 6.34 15 8C15 9.66 13.66 11 12 11C10.34 11 9 9.66 9 8C9 6.34 10.34 5 12 5ZM12 19.2C9.5 19.2 7.29 17.92 6 15.98C6.03 13.99 10 12.9 12 12.9C13.99 12.9 17.97 13.99 18 15.98C16.71 17.92 14.5 19.2 12 19.2Z" fill="#FFFFFF"/>
+                </svg>
+            `;
+        }
+    } else {
+        // AI avatar remains unchanged
+        avatar.innerHTML = `
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 3V4M12 20V21M4 12H3M6.31412 6.31412L5.5 5.5M17.6859 6.31412L18.5 5.5M6.31412 17.69L5.5 18.5001M17.6859 17.69L18.5 18.5001M21 12H20M16 12C16 14.2091 14.2091 16 12 16C9.79086 16 8 14.2091 8 12C8 9.79086 9.79086 8 12 8C14.2091 8 16 9.79086 16 12Z" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+            </svg>
+        `;
+    }
+
+    const content = document.createElement('div');
+    content.className = 'message-content';
+    
+    const text = document.createElement('div');
+    text.className = 'message-text';
+    text.innerHTML = isUser ? message : formatMessage(message);
+    
+    // Add click handlers for options if this is an AI message
+    if (!isUser) {
+        text.querySelectorAll('.option').forEach(option => {
+            option.addEventListener('click', handleOptionClick);
+        });
+    }
+    
+    const time = document.createElement('div');
+    time.className = 'message-time';
+    time.textContent = 'Just now';
+    
+    content.appendChild(text);
+    content.appendChild(time);
+    
+    messageDiv.appendChild(avatar);
+    messageDiv.appendChild(content);
+    
+    chatMessages.appendChild(messageDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function handleOptionClick(event) {
+    const option = event.currentTarget;
+    const questionId = option.dataset.questionId;
+    const selectedOption = option.dataset.option;
+    
+    // Get all options for this question
+    const allOptions = document.querySelectorAll(`.option[data-question-id="${questionId}"]`);
+    
+    // Remove previous selections
+    allOptions.forEach(opt => {
+        opt.classList.remove('correct', 'incorrect', 'selected');
+    });
+    
+    // Add selected class
+    option.classList.add('selected');
+    
+    // Get correct answer from Firebase
+    const user = firebase.auth().currentUser;
+    if (user) {
+        db.collection('generatedpdfs')
+            .where('userId', '==', user.uid)
+            .orderBy('timestamp', 'desc')
+            .limit(1)
+            .get()
+            .then(snapshot => {
+                if (!snapshot.empty) {
+                    const doc = snapshot.docs[0];
+                    const data = doc.data();
+                    
+                    // Get the raw questions array
+                    const questions = data.rawQuestions || [];
+                    
+                    // Find the matching question by its text content
+                    const question = questions.find(q => 
+                        q.question && q.question.includes(document.querySelector(`[data-question-id="${questionId}"]`).textContent.trim())
+                    );
+
+                    if (question && question.correctAnswer) {
+                        console.log('Question found:', question);
+                        console.log('Selected:', selectedOption, 'Correct:', question.correctAnswer);
+                        
+                        // Convert both to same case for comparison
+                        const normalizedSelected = selectedOption.toUpperCase();
+                        const normalizedCorrect = question.correctAnswer.toUpperCase();
+                        
+                        // Direct letter comparison
+                        if (normalizedSelected === normalizedCorrect) {
+                            option.classList.add('correct');
+                        } else {
+                            option.classList.add('incorrect');
+                            // Show the correct answer
+                            allOptions.forEach(opt => {
+                                if (opt.dataset.option.toUpperCase() === normalizedCorrect) {
+                                    opt.classList.add('correct');
+                                }
+                            });
+                        }
+                    } else {
+                        console.error('Question or correct answer not found:', questionId);
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error checking answer:', error);
+            });
+    }
+}
+
+function showTypingIndicator() {
+    const thinkingMessages = [
+        "Gathering thoughts...",
+        "Ensuring accuracy...",
+        "Processing information...",
+        "Analyzing context...",
+        "Formulating response...",
+        "Checking sources...",
+        "Organizing ideas..."
+    ];
+    
+    const indicator = document.createElement('div');
+    indicator.className = 'message ai';
+    indicator.innerHTML = `
+        <div class="message-avatar">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 3V4M12 20V21M4 12H3M6.31412 6.31412L5.5 5.5M17.6859 6.31412L18.5 5.5M6.31412 17.69L5.5 18.5001M17.6859 17.69L18.5 18.5001M21 12H20M16 12C16 14.2091 14.2091 16 12 16C9.79086 16 8 14.2091 8 12C8 9.79086 9.79086 8 12 8C14.2091 8 16 9.79086 16 12Z" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+            </svg>
+        </div>
+        <div class="typing-container">
+            <div class="thinking-text">${thinkingMessages[Math.floor(Math.random() * thinkingMessages.length)]}</div>
+            <div class="typing-indicator">
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+            </div>
+        </div>
+    `;
+    chatMessages.appendChild(indicator);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+
+    // Rotate through thinking messages every 2 seconds
+    let messageIndex = 0;
+    const thinkingText = indicator.querySelector('.thinking-text');
+    const messageRotation = setInterval(() => {
+        messageIndex = (messageIndex + 1) % thinkingMessages.length;
+        if (thinkingText) {
+            thinkingText.textContent = thinkingMessages[messageIndex];
+        }
+    }, 2000);
+
+    // Return both the indicator and the interval so we can clear it later
+    return { indicator, messageRotation };
+}
+
 // Constants for API and collections
 const HUGGING_FACE_API_KEY = "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";
 const MODEL_ENDPOINT = "https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct";
@@ -1226,249 +1459,8 @@ const COLLECTION_KEYWORDS = {
     replies: ['reply', 'message', 'response']
 };
 
-// Cache frequently used DOM elements
-const chatMessages = document.getElementById('chatMessages');
-const userInput = document.getElementById('userInput');
-const sendButton = document.getElementById('sendMessage');
-
-// Initialize conversation history
 let conversationHistory = [];
 
-
-// Debounce utility to prevent rapid-fire API calls
-function debounce(func, wait) {
-    let timeout;
-    return function executedFunction(...args) {
-        const later = () => {
-            clearTimeout(timeout);
-            func(...args);
-        };
-        clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
-    };
-}
-
-// Message formatting function
-function formatMessage(text) {
-    // Format bullet points
-    text = text.replace(/\n\s*\*\s+/g, '\n<li class="bullet-point">');
-    text = text.replace(/\n\s*-\s+/g, '\n<li class="bullet-point">');
-    if (text.includes('<li class="bullet-point">')) {
-        text = '<ul class="bullet-list">' + text + '</ul>';
-    }
-    
-    // Format questions (lines ending with ?)
-    text = text.replace(/^(.+\?)\s*$/gm, (match, question) => {
-        const questionId = 'q' + Math.random().toString(36).substr(2, 9);
-        return `<div class="question" data-question-id="${questionId}">${question}</div>`;
-    });
-    
-    // Format multiple choice options
-    text = text.replace(/^([A-D]\))\s*(.+)$/gm, (match, label, option) => {
-        const questionId = 'q' + Math.random().toString(36).substr(2, 9);
-        return `<div class="option" data-option="${label.charAt(0)}" data-question-id="${questionId}">${label} ${option}</div>`;
-    });
-    
-    // Format headings
-    text = text.replace(/^(.+):\s*$/gm, '<div class="heading">$1:</div>');
-    
-    // Format important text
-    text = text.replace(/\*([^*]+)\*/g, '<span class="important">$1</span>');
-    
-    // Format code
-    text = text.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
-    
-    // Add paragraphs
-    text = text.split('\n\n').map(para => 
-        para.trim() ? `<p class="paragraph">${para}</p>` : ''
-    ).join('');
-    
-    return text;
-}
-
-// Message display function
-function addMessage(message, isUser = false) {
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${isUser ? 'user' : 'ai'}`;
-    
-    const avatar = document.createElement('div');
-    avatar.className = 'message-avatar';
-    
-    if (isUser) {
-        const currentUser = firebase.auth().currentUser;
-        if (currentUser?.photoURL) {
-            avatar.innerHTML = `<img src="${currentUser.photoURL}" alt="Profile Picture">`;
-        } else {
-            avatar.innerHTML = `
-                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM12 5C13.66 5 15 6.34 15 8C15 9.66 13.66 11 12 11C10.34 11 9 9.66 9 8C9 6.34 10.34 5 12 5ZM12 19.2C9.5 19.2 7.29 17.92 6 15.98C6.03 13.99 10 12.9 12 12.9C13.99 12.9 17.97 13.99 18 15.98C16.71 17.92 14.5 19.2 12 19.2Z" fill="#FFFFFF"/>
-                </svg>
-            `;
-        }
-    } else {
-        avatar.innerHTML = `
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 3V4M12 20V21M4 12H3M6.31412 6.31412L5.5 5.5M17.6859 6.31412L18.5 5.5M6.31412 17.69L5.5 18.5001M17.6859 17.69L18.5 18.5001M21 12H20M16 12C16 14.2091 14.2091 16 12 16C9.79086 16 8 14.2091 8 12C8 9.79086 9.79086 8 12 8C14.2091 8 16 9.79086 16 12Z" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-            </svg>
-        `;
-    }
-
-    const content = document.createElement('div');
-    content.className = 'message-content';
-    
-    const text = document.createElement('div');
-    text.className = 'message-text';
-    text.innerHTML = isUser ? message : formatMessage(message);
-    
-    if (!isUser) {
-        text.querySelectorAll('.option').forEach(option => {
-            option.addEventListener('click', handleOptionClick);
-        });
-    }
-    
-    const time = document.createElement('div');
-    time.className = 'message-time';
-    time.textContent = 'Just now';
-    
-    content.appendChild(text);
-    content.appendChild(time);
-    
-    messageDiv.appendChild(avatar);
-    messageDiv.appendChild(content);
-    
-    chatMessages.appendChild(messageDiv);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-}
-
-// Typing indicator function
-function showTypingIndicator() {
-    const thinkingMessages = [
-        "Gathering thoughts...",
-        "Ensuring accuracy...",
-        "Processing information...",
-        "Analyzing context...",
-        "Formulating response...",
-        "Checking sources...",
-        "Organizing ideas..."
-    ];
-    
-    const indicator = document.createElement('div');
-    indicator.className = 'message ai';
-    indicator.innerHTML = `
-        <div class="message-avatar">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 3V4M12 20V21M4 12H3M6.31412 6.31412L5.5 5.5M17.6859 6.31412L18.5 5.5M6.31412 17.69L5.5 18.5001M17.6859 17.69L18.5 18.5001M21 12H20M16 12C16 14.2091 14.2091 16 12 16C9.79086 16 8 14.2091 8 12C8 9.79086 9.79086 8 12 8C14.2091 8 16 9.79086 16 12Z" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-            </svg>
-        </div>
-        <div class="typing-container">
-            <div class="thinking-text">${thinkingMessages[Math.floor(Math.random() * thinkingMessages.length)]}</div>
-            <div class="typing-indicator">
-                <div class="typing-dot"></div>
-                <div class="typing-dot"></div>
-                <div class="typing-dot"></div>
-            </div>
-        </div>
-    `;
-    chatMessages.appendChild(indicator);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-
-    let messageIndex = 0;
-    const thinkingText = indicator.querySelector('.thinking-text');
-    const messageRotation = setInterval(() => {
-        messageIndex = (messageIndex + 1) % thinkingMessages.length;
-        if (thinkingText) {
-            thinkingText.textContent = thinkingMessages[messageIndex];
-        }
-    }, 2000);
-
-    return { indicator, messageRotation };
-}
-
-// Optimized fetch collection data with caching
-async function fetchCollectionData(collection, user, relevantCollections) {
-    // Check cache first
-    const now = Date.now();
-    const cacheKey = `${collection}_${user.uid}`;
-    
-    if (userDataCache.data && 
-        userDataCache.data[cacheKey] && 
-        (now - userDataCache.timestamp) < userDataCache.ttl) {
-        return userDataCache.data[cacheKey];
-    }
-
-    let results = [];
-
-    try {
-        if (collection === 'users') {
-            const userDoc = await db.collection('users').doc(user.uid).get();
-            results = userDoc.exists ? [{ id: userDoc.id, ...userDoc.data() }] : [];
-        } else {
-            const limit = relevantCollections.includes(collection) ? 10 : 5;
-            
-            // Try different field combinations
-            const fieldCombinations = [
-                { idField: 'userId', orderBy: 'timestamp' },
-                { idField: 'userId', orderBy: 'createdAt' },
-                { idField: 'uid', orderBy: 'timestamp' },
-                { idField: 'uid', orderBy: 'createdAt' }
-            ];
-
-            for (const { idField, orderBy } of fieldCombinations) {
-                try {
-                    let query = db.collection(collection).where(idField, '==', user.uid);
-                    
-                    // Add orderBy only if the field exists in the schema
-                    if (COLLECTION_SCHEMAS[collection][orderBy]) {
-                        query = query.orderBy(orderBy, 'desc');
-                    }
-                    
-                    const querySnapshot = await query.limit(limit).get();
-
-                    if (!querySnapshot.empty) {
-                        results = querySnapshot.docs.map(doc => ({
-                            id: doc.id,
-                            ...doc.data()
-                        }));
-                        break;
-                    }
-                } catch (error) {
-                    if (error.code !== 'failed-precondition') {
-                        console.error(`Error fetching ${collection} with ${idField}/${orderBy}:`, error);
-                    }
-                    continue;
-                }
-            }
-
-            // Fallback: try without orderBy if no results
-            if (results.length === 0) {
-                const querySnapshot = await db.collection(collection)
-                    .where('userId', '==', user.uid)
-                    .limit(limit)
-                    .get();
-
-                if (!querySnapshot.empty) {
-                    results = querySnapshot.docs.map(doc => ({
-                        id: doc.id,
-                        ...doc.data()
-                    }));
-                }
-            }
-        }
-
-        // Update cache with collection-specific data
-        if (!userDataCache.data) userDataCache.data = {};
-        userDataCache.data[cacheKey] = results;
-        userDataCache.timestamp = now;
-
-        return results;
-
-    } catch (error) {
-        console.error(`Error in fetchCollectionData for ${collection}:`, error);
-        return [];
-    }
-}
-
-// Optimized API query function
 async function queryHuggingFaceAPI(userInput, userData = null, username = null) {
     const userIdentityKeywords = ['who am i', 'what is my name', "what's my name", 'my name', 'who i am'];
     const isIdentityQuestion = userIdentityKeywords.some(keyword => userInput.toLowerCase().includes(keyword));
@@ -1532,12 +1524,12 @@ Respond naturally and concisely to: ${userInput}
             body: JSON.stringify({
                 inputs: systemPrompt,
                 parameters: {
-                    max_new_tokens: 500,
+                    max_new_tokens: 500, // Increased from 200 to 400 to allow for longer responses
                     temperature: 0.7,
                     top_p: 0.9,
                     return_full_text: false,
                     stop: ["<|im_end|>", "<|im_start|>"],
-                    repetition_penalty: 1.1
+                    repetition_penalty: 1.1 // Added to help prevent repetitive text
                 }
             })
         });
@@ -1545,25 +1537,62 @@ Respond naturally and concisely to: ${userInput}
         if (!response.ok) throw new Error('API request failed');
 
         const result = await response.json();
-        return result[0].generated_text
+        const cleanResponse = result[0].generated_text
             .replace(systemPrompt, '')
             .replace(/<\|im_start\|>assistant/g, '')
             .replace(/<\|im_end\|>/g, '')
             .trim();
+
+        return cleanResponse;
     } catch (error) {
         console.error('Error querying Hugging Face API:', error);
         throw error;
     }
 }
 
-// Initialize cache with TTL
-const userDataCache = {
-    data: null,
-    timestamp: 0,
-    ttl: 30000 // 30 seconds cache
-};
+async function fetchCollectionData(collection, user, relevantCollections) {
+    if (collection === 'users') return null;
 
-// Optimized message handler
+    const limit = relevantCollections.includes(collection) ? 10 : 5;
+    let results = [];
+    
+    // Try all possible field and orderBy combinations
+    const fieldCombinations = [
+        { idField: 'userId', orderBy: 'timestamp' },
+        { idField: 'userId', orderBy: 'createdAt' },
+        { idField: 'uid', orderBy: 'timestamp' },
+        { idField: 'uid', orderBy: 'createdAt' }
+    ];
+
+    for (const { idField, orderBy } of fieldCombinations) {
+        try {
+            const querySnapshot = await db.collection(collection)
+                .where(idField, '==', user.uid)
+                .orderBy(orderBy, 'desc')
+                .limit(limit)
+                .get();
+
+            if (!querySnapshot.empty) {
+                const docs = querySnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+                results = [...results, ...docs];
+                
+                // If we found documents, break the loop
+                if (results.length > 0) break;
+            }
+        } catch (error) {
+            // If error is about missing index, continue to next combination
+            if (error.code === 'failed-precondition') continue;
+            console.error(`Error fetching ${collection} with ${idField}/${orderBy}:`, error);
+        }
+    }
+
+    // Remove duplicates based on document ID
+    return Array.from(new Map(results.map(item => [item.id, item])).values());
+}
+
 async function handleUserMessage() {
     const message = userInput.value.trim();
     if (!message) return;
@@ -1585,9 +1614,10 @@ async function handleUserMessage() {
         const username = user.displayName || user.email;
         const messageLower = message.toLowerCase();
         
+        // Initialize userData
         let userData = {};
         
-        // Fetch user profile data first
+        // Fetch user profile data
         const userDoc = await db.collection('users').doc(user.uid).get();
         if (userDoc.exists) {
             userData.user = userDoc.data();
@@ -1603,7 +1633,7 @@ async function handleUserMessage() {
             relevantCollections.push('users');
         }
 
-        // Fetch data from all collections in parallel
+        // Fetch data from all collections
         const collectionPromises = Object.keys(COLLECTION_SCHEMAS)
             .map(async (collection) => {
                 const data = await fetchCollectionData(collection, user, relevantCollections);
@@ -1614,77 +1644,32 @@ async function handleUserMessage() {
 
         await Promise.all(collectionPromises);
 
+        console.log('Fetched user data:', userData);
+        console.log('Relevant collections:', relevantCollections);
+
         const aiResponse = await queryHuggingFaceAPI(message, userData, username);
         conversationHistory.push({ role: 'Assistant', content: aiResponse });
         
+        // Clear the interval and remove the indicator
         clearInterval(messageRotation);
         indicator.remove();
+        
         addMessage(aiResponse);
 
     } catch (error) {
         console.error('Error in handleUserMessage:', error);
+        // Clear the interval and remove the indicator in case of error
         clearInterval(messageRotation);
         indicator.remove();
         addMessage("I apologize, but I'm having trouble processing your request. Please try again later.");
     }
 }
 
-// Option click handler
-function handleOptionClick(event) {
-    const option = event.currentTarget;
-    const questionId = option.dataset.questionId;
-    const selectedOption = option.dataset.option;
-    
-    const allOptions = document.querySelectorAll(`.option[data-question-id="${questionId}"]`);
-    allOptions.forEach(opt => {
-        opt.classList.remove('correct', 'incorrect', 'selected');
-    });
-    
-    option.classList.add('selected');
-    
-    const user = firebase.auth().currentUser;
-    if (user) {
-        db.collection('generatedpdfs')
-            .where('userId', '==', user.uid)
-            .orderBy('timestamp', 'desc')
-            .limit(1)
-            .get()
-            .then(snapshot => {
-                if (!snapshot.empty) {
-                    const doc = snapshot.docs[0];
-                    const data = doc.data();
-                    const questions = data.rawQuestions || [];
-                    const question = questions.find(q => 
-                        q.question && q.question.includes(
-                            document.querySelector(`[data-question-id="${questionId}"]`).textContent.trim()
-                        )
-                    );
-
-                    if (question?.correctAnswer) {
-                        const normalizedSelected = selectedOption.toUpperCase();
-                        const normalizedCorrect = question.correctAnswer.toUpperCase();
-                        
-                        if (normalizedSelected === normalizedCorrect) {
-                            option.classList.add('correct');
-                        } else {
-                            option.classList.add('incorrect');
-                            allOptions.forEach(opt => {
-                                if (opt.dataset.option.toUpperCase() === normalizedCorrect) {
-                                    opt.classList.add('correct');
-                                }
-                            });
-                        }
-                    }
-                }
-            })
-            .catch(error => {
-                console.error('Error checking answer:', error);
-            });
-    }
-}
-
 // Event listeners
 document.addEventListener('DOMContentLoaded', () => {
+    userInput = document.getElementById('user-input');
+    chatMessages = document.getElementById('chat-messages');
+    
     userInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
@@ -1692,9 +1677,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     
-    sendButton.addEventListener('click', handleUserMessage);
+    document.getElementById('send-button').addEventListener('click', handleUserMessage);
+});
 
-    // Initialize Firebase auth state
+// Initialize the chatbot when the page loads
+document.addEventListener('DOMContentLoaded', function() {
     firebase.auth().onAuthStateChanged(async function(user) {
         if (user) {
             const username = user.displayName || user.email;
@@ -1703,6 +1690,14 @@ document.addEventListener('DOMContentLoaded', () => {
             window.location.href = "login";
         }
     });
+});
+
+// Event listeners for user input
+sendButton.addEventListener('click', handleUserMessage);
+userInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        handleUserMessage();
+    }
 });
 </script>
 

@@ -1234,12 +1234,6 @@ const sendButton = document.getElementById('sendMessage');
 // Initialize conversation history
 let conversationHistory = [];
 
-// Cache for user data to reduce Firebase queries
-let userDataCache = {
-    data: null,
-    timestamp: 0,
-    ttl: 5 * 60 * 1000 // 5 minutes TTL
-};
 
 // Debounce utility to prevent rapid-fire API calls
 function debounce(func, wait) {

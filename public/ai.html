@@ -1112,10 +1112,126 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <script>
+// Constants for API and collections
+const HUGGING_FACE_API_KEY = "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";
+const MODEL_ENDPOINT = "https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct";
+
+// Collection Schemas
+const COLLECTION_SCHEMAS = {
+    users: {
+        acceptedFriends: 'array',
+        displayName: 'string',
+        email: 'string',
+        firstName: 'string',
+        lastName: 'string',
+        lastSeen: 'timestamp',
+        nightMode: 'string',
+        online: 'boolean',
+        profilePicture: 'string',
+        uid: 'string',
+        recentEmojis: 'array',
+        createdAt: 'timestamp'
+    },
+    uploads: {
+        fileName: 'string',
+        fileUrl: 'string',
+        uploaderId: 'string',
+        uploaderName: 'string'
+    },
+    timers: {
+        createdAt: 'timestamp',
+        name: 'string',
+        time: 'number',
+        userId: 'string'
+    },
+    tasks: {
+        createdAt: 'timestamp',
+        dueDate: 'timestamp',
+        task: 'string',
+        userId: 'string'
+    },
+    goals: {
+        createdAt: 'timestamp',
+        dueDate: 'timestamp',
+        goal: 'string',
+        userId: 'string'
+    },
+    plans: {
+        createdAt: 'timestamp',
+        dueDate: 'timestamp',
+        plan: 'string',
+        userId: 'string'
+    },
+    projects: {
+        createdAt: 'timestamp',
+        dueDate: 'timestamp',
+        project: 'string',
+        userId: 'string'
+    },
+    replies: {
+        chatId: 'string',
+        messageId: 'string',
+        replyText: 'string',
+        sender: 'string',
+        timestamp: 'timestamp'
+    },
+    generatedpdfs: {
+        fileName: 'string',
+        keyPoints: 'array',
+        overview: 'string',
+        rawQuestions: 'array',
+        choices: 'array',
+        correctAnswer: 'string',
+        keyPoint: 'string',
+        question: 'string',
+        timestamp: 'timestamp',
+        userId: 'string'
+    },
+    events: {
+        day: 'number',
+        description: 'string',
+        endTime: 'string',
+        month: 'number',
+        startTime: 'string',
+        title: 'string',
+        uid: 'string',
+        year: 'number'
+    }
+};
+
+// Collection mappings for related data
+const COLLECTIONS = {
+    productivity: ['tasks', 'goals', 'projects', 'plans'],
+    time: ['timers', 'events'],
+    content: ['uploads', 'generatedpdfs'],
+    communication: ['replies'],
+    user: ['users']
+};
+
+// Keywords for identifying collection context
+const COLLECTION_KEYWORDS = {
+    tasks: ['task', 'todo', 'to-do', 'to do'],
+    goals: ['goal', 'target', 'objective'],
+    projects: ['project', 'initiative'],
+    plans: ['plan', 'schedule', 'agenda'],
+    timers: ['timer', 'countdown', 'reminder'],
+    events: ['event', 'meeting', 'appointment'],
+    uploads: ['file', 'upload', 'document'],
+    generatedpdfs: [
+        'pdf', 'generated', 'summary', 'notes', 'document', 
+        'key points', 'overview', 'questions', 'study', 'learn',
+        'transformer', 'transformers', 'study material', 'study notes'
+    ],
+    replies: ['reply', 'message', 'response']
+};
+
 // Cache frequently used DOM elements
 const chatMessages = document.getElementById('chatMessages');
 const userInput = document.getElementById('userInput');
 const sendButton = document.getElementById('sendMessage');
+
+// Initialize conversation history
+let conversationHistory = [];
 
 // Cache for user data to reduce Firebase queries
 let userDataCache = {
@@ -1124,10 +1240,7 @@ let userDataCache = {
     ttl: 5 * 60 * 1000 // 5 minutes TTL
 };
 
-// Debounced version of handleUserMessage to prevent rapid-fire requests
-const debouncedHandleMessage = debounce(handleUserMessage, 300);
-
-// Implement debounce utility
+// Debounce utility to prevent rapid-fire API calls
 function debounce(func, wait) {
     let timeout;
     return function executedFunction(...args) {
@@ -1140,26 +1253,161 @@ function debounce(func, wait) {
     };
 }
 
-// Optimized fetchCollectionData with caching
-const collectionCache = new Map();
-async function fetchCollectionData(collection, user, relevantCollections) {
-    if (collection === 'users') return null;
-
-    const cacheKey = `${collection}-${user.uid}`;
-    const now = Date.now();
-    const cached = collectionCache.get(cacheKey);
-
-    // Return cached data if it's less than 5 minutes old
-    if (cached && (now - cached.timestamp) < 300000) {
-        return cached.data;
+// Message formatting function
+function formatMessage(text) {
+    // Format bullet points
+    text = text.replace(/\n\s*\*\s+/g, '\n<li class="bullet-point">');
+    text = text.replace(/\n\s*-\s+/g, '\n<li class="bullet-point">');
+    if (text.includes('<li class="bullet-point">')) {
+        text = '<ul class="bullet-list">' + text + '</ul>';
     }
+    
+    // Format questions (lines ending with ?)
+    text = text.replace(/^(.+\?)\s*$/gm, (match, question) => {
+        const questionId = 'q' + Math.random().toString(36).substr(2, 9);
+        return `<div class="question" data-question-id="${questionId}">${question}</div>`;
+    });
+    
+    // Format multiple choice options
+    text = text.replace(/^([A-D]\))\s*(.+)$/gm, (match, label, option) => {
+        const questionId = 'q' + Math.random().toString(36).substr(2, 9);
+        return `<div class="option" data-option="${label.charAt(0)}" data-question-id="${questionId}">${label} ${option}</div>`;
+    });
+    
+    // Format headings
+    text = text.replace(/^(.+):\s*$/gm, '<div class="heading">$1:</div>');
+    
+    // Format important text
+    text = text.replace(/\*([^*]+)\*/g, '<span class="important">$1</span>');
+    
+    // Format code
+    text = text.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
+    
+    // Add paragraphs
+    text = text.split('\n\n').map(para => 
+        para.trim() ? `<p class="paragraph">${para}</p>` : ''
+    ).join('');
+    
+    return text;
+}
+
+// Message display function
+function addMessage(message, isUser = false) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${isUser ? 'user' : 'ai'}`;
+    
+    const avatar = document.createElement('div');
+    avatar.className = 'message-avatar';
+    
+    if (isUser) {
+        const currentUser = firebase.auth().currentUser;
+        if (currentUser?.photoURL) {
+            avatar.innerHTML = `<img src="${currentUser.photoURL}" alt="Profile Picture">`;
+        } else {
+            avatar.innerHTML = `
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM12 5C13.66 5 15 6.34 15 8C15 9.66 13.66 11 12 11C10.34 11 9 9.66 9 8C9 6.34 10.34 5 12 5ZM12 19.2C9.5 19.2 7.29 17.92 6 15.98C6.03 13.99 10 12.9 12 12.9C13.99 12.9 17.97 13.99 18 15.98C16.71 17.92 14.5 19.2 12 19.2Z" fill="#FFFFFF"/>
+                </svg>
+            `;
+        }
+    } else {
+        avatar.innerHTML = `
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 3V4M12 20V21M4 12H3M6.31412 6.31412L5.5 5.5M17.6859 6.31412L18.5 5.5M6.31412 17.69L5.5 18.5001M17.6859 17.69L18.5 18.5001M21 12H20M16 12C16 14.2091 14.2091 16 12 16C9.79086 16 8 14.2091 8 12C8 9.79086 9.79086 8 12 8C14.2091 8 16 9.79086 16 12Z" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+            </svg>
+        `;
+    }
+
+    const content = document.createElement('div');
+    content.className = 'message-content';
+    
+    const text = document.createElement('div');
+    text.className = 'message-text';
+    text.innerHTML = isUser ? message : formatMessage(message);
+    
+    if (!isUser) {
+        text.querySelectorAll('.option').forEach(option => {
+            option.addEventListener('click', handleOptionClick);
+        });
+    }
+    
+    const time = document.createElement('div');
+    time.className = 'message-time';
+    time.textContent = 'Just now';
+    
+    content.appendChild(text);
+    content.appendChild(time);
+    
+    messageDiv.appendChild(avatar);
+    messageDiv.appendChild(content);
+    
+    chatMessages.appendChild(messageDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+// Typing indicator function
+function showTypingIndicator() {
+    const thinkingMessages = [
+        "Gathering thoughts...",
+        "Ensuring accuracy...",
+        "Processing information...",
+        "Analyzing context...",
+        "Formulating response...",
+        "Checking sources...",
+        "Organizing ideas..."
+    ];
+    
+    const indicator = document.createElement('div');
+    indicator.className = 'message ai';
+    indicator.innerHTML = `
+        <div class="message-avatar">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 3V4M12 20V21M4 12H3M6.31412 6.31412L5.5 5.5M17.6859 6.31412L18.5 5.5M6.31412 17.69L5.5 18.5001M17.6859 17.69L18.5 18.5001M21 12H20M16 12C16 14.2091 14.2091 16 12 16C9.79086 16 8 14.2091 8 12C8 9.79086 9.79086 8 12 8C14.2091 8 16 9.79086 16 12Z" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+            </svg>
+        </div>
+        <div class="typing-container">
+            <div class="thinking-text">${thinkingMessages[Math.floor(Math.random() * thinkingMessages.length)]}</div>
+            <div class="typing-indicator">
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+            </div>
+        </div>
+    `;
+    chatMessages.appendChild(indicator);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+
+    let messageIndex = 0;
+    const thinkingText = indicator.querySelector('.thinking-text');
+    const messageRotation = setInterval(() => {
+        messageIndex = (messageIndex + 1) % thinkingMessages.length;
+        if (thinkingText) {
+            thinkingText.textContent = thinkingMessages[messageIndex];
+        }
+    }, 2000);
+
+    return { indicator, messageRotation };
+}
+
+// Optimized fetch collection data with caching
+async function fetchCollectionData(collection, user, relevantCollections) {
+    // Check cache first
+    const now = Date.now();
+    if (userDataCache.data && 
+        userDataCache.data[collection] && 
+        (now - userDataCache.timestamp) < userDataCache.ttl) {
+        return userDataCache.data[collection];
+    }
+
+    if (collection === 'users') return null;
 
     const limit = relevantCollections.includes(collection) ? 10 : 5;
     let results = [];
     
-    // Optimized field combinations
     const fieldCombinations = [
         { idField: 'userId', orderBy: 'timestamp' },
+        { idField: 'userId', orderBy: 'createdAt' },
+        { idField: 'uid', orderBy: 'timestamp' },
         { idField: 'uid', orderBy: 'createdAt' }
     ];
 
@@ -1184,42 +1432,65 @@ async function fetchCollectionData(collection, user, relevantCollections) {
         }
     }
 
-    // Cache the results
-    collectionCache.set(cacheKey, {
-        data: results,
-        timestamp: now
-    });
+    // Update cache
+    if (!userDataCache.data) userDataCache.data = {};
+    userDataCache.data[collection] = results;
+    userDataCache.timestamp = now;
 
     return results;
 }
 
-// Optimized queryHuggingFaceAPI
+// Optimized API query function
 async function queryHuggingFaceAPI(userInput, userData = null, username = null) {
-    const isIdentityQuestion = /\b(who am i|what is my name|what's my name|my name|who i am)\b/i.test(userInput);
+    const userIdentityKeywords = ['who am i', 'what is my name', "what's my name", 'my name', 'who i am'];
+    const isIdentityQuestion = userIdentityKeywords.some(keyword => userInput.toLowerCase().includes(keyword));
 
-    // Only include recent and relevant conversation history
-    const relevantHistory = conversationHistory
-        .slice(-3)
-        .map(msg => `${msg.role}: ${msg.content}`)
-        .join('\n');
+    const formattedHistory = conversationHistory.slice(-5).map(msg => 
+        `${msg.role}: ${msg.content}`
+    ).join('\n');
 
-    // Streamlined system prompt
     const systemPrompt = `<|im_start|>system
 You are TaskMaster AI, a helpful productivity assistant. ${isIdentityQuestion ? `The user's name is ${username}.` : ''}
 
+Available Collections and their structures:
+${Object.entries(COLLECTION_SCHEMAS)
+    .map(([collection, schema]) => 
+        `${collection}: ${Object.entries(schema)
+            .map(([field, type]) => `${field} (${type})`)
+            .join(', ')}`)
+    .join('\n')}
+
 ${userData?.generatedpdfs ? `
-Recent Documents:
-${userData.generatedpdfs.slice(0, 3).map(pdf => `
-${pdf.fileName}:
-${pdf.overview}
-Key Points: ${pdf.keyPoints?.slice(0, 3).join(', ')}
+Generated PDFs Information:
+${userData.generatedpdfs.map(pdf => `
+Document: ${pdf.fileName}
+Overview: ${pdf.overview}
+Key Points:
+${pdf.keyPoints?.map((point, i) => `${i + 1}. ${point}`).join('\n')}
+Questions:
+${pdf.rawQuestions?.map((q, i) => {
+    const choices = pdf.choices?.[i] || [];
+    return `Q${i + 1}: ${q}
+Choices: ${choices.join(' | ')}
+Correct Answer: ${pdf.correctAnswer}
+Related Key Point: ${pdf.keyPoint}`;
+}).join('\n')}
 `).join('\n')}
 ` : ''}
 
 Context:
-${relevantHistory}
+${formattedHistory}
 
-Respond concisely to: ${userInput}
+${userData ? `User Data: ${JSON.stringify(userData)}` : ''}
+
+Instructions:
+1. If the user asks about their study materials or PDFs, reference the specific content from their generatedpdfs.
+2. When discussing key points, cite them directly from the stored documents.
+3. If asked about specific topics, check the overviews and key points for relevant information.
+4. For questions about study materials, reference both the overview and specific key points.
+5. If asked about questions or quizzes, use the stored questions and answers.
+
+Respond naturally and concisely to: ${userInput}
 <|im_end|>
 <|im_start|>assistant`;
 
@@ -1233,11 +1504,12 @@ Respond concisely to: ${userInput}
             body: JSON.stringify({
                 inputs: systemPrompt,
                 parameters: {
-                    max_new_tokens: 300,
+                    max_new_tokens: 500,
                     temperature: 0.7,
                     top_p: 0.9,
                     return_full_text: false,
-                    stop: ["<|im_end|>", "<|im_start|>"]
+                    stop: ["<|im_end|>", "<|im_start|>"],
+                    repetition_penalty: 1.1
                 }
             })
         });
@@ -1256,7 +1528,7 @@ Respond concisely to: ${userInput}
     }
 }
 
-// Optimized handleUserMessage
+// Optimized message handler
 async function handleUserMessage() {
     const message = userInput.value.trim();
     if (!message) return;
@@ -1264,11 +1536,10 @@ async function handleUserMessage() {
     userInput.value = '';
     addMessage(message, true);
     
-    // Maintain a fixed-size conversation history
-    if (conversationHistory.length >= 6) {
-        conversationHistory = conversationHistory.slice(-5);
-    }
     conversationHistory.push({ role: 'User', content: message });
+    if (conversationHistory.length > 10) {
+        conversationHistory = conversationHistory.slice(-10);
+    }
     
     const { indicator, messageRotation } = showTypingIndicator();
     
@@ -1279,8 +1550,9 @@ async function handleUserMessage() {
         const username = user.displayName || user.email;
         const messageLower = message.toLowerCase();
         
-        // Use cached user data if available
         let userData = {};
+        
+        // Check cache first
         const now = Date.now();
         if (userDataCache.data && (now - userDataCache.timestamp) < userDataCache.ttl) {
             userData = userDataCache.data;
@@ -1291,32 +1563,28 @@ async function handleUserMessage() {
                 userData.user = userDoc.data();
             }
 
-            // Only fetch from relevant collections based on message content
+            // Determine relevant collections based on message content
             const relevantCollections = Object.entries(COLLECTION_KEYWORDS)
                 .filter(([_, keywords]) => keywords.some(keyword => messageLower.includes(keyword)))
                 .map(([collection]) => collection);
 
-            // Parallel fetch from relevant collections
-            const collectionData = await Promise.all(
-                relevantCollections.map(async (collection) => {
-                    const data = await fetchCollectionData(collection, user, relevantCollections);
-                    return { collection, data };
-                })
-            );
+            if (!relevantCollections.includes('users')) {
+                relevantCollections.push('users');
+            }
 
-            // Update userData with fetched data
-            collectionData.forEach(({ collection, data }) => {
-                if (data?.length > 0) {
+            // Fetch data from relevant collections in parallel
+            const collectionPromises = relevantCollections.map(async (collection) => {
+                const data = await fetchCollectionData(collection, user, relevantCollections);
+                if (data && data.length > 0) {
                     userData[collection] = data;
                 }
             });
 
+            await Promise.all(collectionPromises);
+
             // Update cache
-            userDataCache = {
-                data: userData,
-                timestamp: now,
-                ttl: 5 * 60 * 1000
-            };
+            userDataCache.data = userData;
+            userDataCache.timestamp = now;
         }
 
         const aiResponse = await queryHuggingFaceAPI(message, userData, username);
@@ -1334,26 +1602,80 @@ async function handleUserMessage() {
     }
 }
 
+// Option click handler
+function handleOptionClick(event) {
+    const option = event.currentTarget;
+    const questionId = option.dataset.questionId;
+    const selectedOption = option.dataset.option;
+    
+    const allOptions = document.querySelectorAll(`.option[data-question-id="${questionId}"]`);
+    allOptions.forEach(opt => {
+        opt.classList.remove('correct', 'incorrect', 'selected');
+    });
+    
+    option.classList.add('selected');
+    
+    const user = firebase.auth().currentUser;
+    if (user) {
+        db.collection('generatedpdfs')
+            .where('userId', '==', user.uid)
+            .orderBy('timestamp', 'desc')
+            .limit(1)
+            .get()
+            .then(snapshot => {
+                if (!snapshot.empty) {
+                    const doc = snapshot.docs[0];
+                    const data = doc.data();
+                    const questions = data.rawQuestions || [];
+                    const question = questions.find(q => 
+                        q.question && q.question.includes(
+                            document.querySelector(`[data-question-id="${questionId}"]`).textContent.trim()
+                        )
+                    );
+
+                    if (question?.correctAnswer) {
+                        const normalizedSelected = selectedOption.toUpperCase();
+                        const normalizedCorrect = question.correctAnswer.toUpperCase();
+                        
+                        if (normalizedSelected === normalizedCorrect) {
+                            option.classList.add('correct');
+                        } else {
+                            option.classList.add('incorrect');
+                            allOptions.forEach(opt => {
+                                if (opt.dataset.option.toUpperCase() === normalizedCorrect) {
+                                    opt.classList.add('correct');
+                                }
+                            });
+                        }
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error checking answer:', error);
+            });
+    }
+}
+
 // Event listeners
 document.addEventListener('DOMContentLoaded', () => {
     userInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
-            debouncedHandleMessage();
+            handleUserMessage();
         }
     });
     
-    sendButton.addEventListener('click', debouncedHandleMessage);
-});
+    sendButton.addEventListener('click', handleUserMessage);
 
-// Initialize Firebase auth listener
-firebase.auth().onAuthStateChanged(user => {
-    if (user) {
-        const username = user.displayName || user.email;
-        document.getElementById('username').textContent = username;
-    } else {
-        window.location.href = "login";
-    }
+    // Initialize Firebase auth state
+    firebase.auth().onAuthStateChanged(async function(user) {
+        if (user) {
+            const username = user.displayName || user.email;
+            document.getElementById('username').textContent = username;
+        } else {
+            window.location.href = "login";
+        }
+    });
 });
 </script>
 

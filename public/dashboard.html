@@ -4267,6 +4267,7 @@ ANALYSIS REQUIREMENTS:
 ${instructions}
 
 Format response exactly as:
+Title: [Create a unique, context-appropriate title]
 Content: [Provide detailed, actionable content following the instructions]`;
 
     try {
@@ -4280,12 +4281,12 @@ Content: [Provide detailed, actionable content following the instructions]`;
             body: JSON.stringify({ 
                 inputs: basePrompt,
                 parameters: {
-                    max_new_tokens: 200, // Increased for more detailed responses
-                    temperature: 0.5,    // Increased for more creative responses
-                    top_p: 0.95,         // Adjusted for better quality
-                    repetition_penalty: 1.1,
+                    max_new_tokens: 300, // Increased for more detailed responses
+                    temperature: 0.7,    // Increased for more creative responses
+                    top_p: 0.9,         // Adjusted for better quality
+                    repetition_penalty: 1.2,
                     return_full_text: false,
-                    do_sample: false     // Enable sampling for better quality
+                    do_sample: true     // Enable sampling for better quality
                 }
             }),
         });
@@ -4299,18 +4300,22 @@ Content: [Provide detailed, actionable content following the instructions]`;
             .replace(/\[\/INST\]|\[INST\]|<\/?s>|<\/?p>/g, '')
             .trim();
 
+        const titleMatch = cleanedResponse.match(/Title:\s*(.*?)(?=\nContent:|$)/s);
         const contentMatch = cleanedResponse.match(/Content:\s*([\s\S]*?)$/s);
 
+        if (!titleMatch || !contentMatch) throw new Error('Invalid response format');
 
+        const title = titleMatch[1].trim();
         const content = contentMatch[1].trim();
 
         console.log(`✅ ${sectionType} section generated successfully`);
-        return {content };
+        return { title, content };
 
     } catch (error) {
         console.error(`❌ ${sectionType} section generation failed:`, error);
         return {
-            content: "Unable to generate Smart Overview. Please try again later."
+            title: `${sectionType.charAt(0).toUpperCase() + sectionType.slice(1)} Overview`,
+            content: "Unable to generate section. Please try again."
         };
     }
 }
@@ -4417,14 +4422,15 @@ function renderSections(summaryData) {
     }
 
     // Render new sections with structured formatting
-    Object.values(summaryData).forEach(({ content }, index) => {
+    Object.values(summaryData).forEach(({ title, content }, index) => {
         const sectionElement = document.createElement('div');
         sectionElement.className = 'summary-section hidden'; // Add "hidden" class initially
 
+        const sanitizedTitle = sanitizeTitle(title);
         const sanitizedContent = sanitizeContent(formatContent(content)); // Apply structured formatting
 
         sectionElement.innerHTML = `
-            
+            <h3 class="section-title">${sanitizedTitle}</h3>
             <div class="section-content">${sanitizedContent}</div>
         `;
 
@@ -4436,6 +4442,7 @@ function renderSections(summaryData) {
         }, index * 300); // Adjust delay as needed (e.g., 300ms between sections)
     });
 }
+
 
 
 

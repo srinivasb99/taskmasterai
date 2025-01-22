@@ -1475,9 +1475,7 @@ Instructions:
 4. For questions about study materials, reference both the overview and specific key points.
 5. If asked about questions or quizzes, use the stored questions and answers.
 
-Respond naturally and concisely to: ${userInput}
-<|im_end|>
-<|im_start|>assistant`;
+Respond naturally and concisely to: ${userInput}`;
 
     try {
         const response = await fetch(MODEL_ENDPOINT, {
@@ -1493,7 +1491,7 @@ Respond naturally and concisely to: ${userInput}
                     temperature: 0.7,
                     top_p: 0.9,
                     return_full_text: false,
-                    stop: ["<|im_end|>", "<|im_start|>assistant"],
+                    stop: ["<|im_end|>", "<|im_start|>"],
                     repetition_penalty: 1.1 // Added to help prevent repetitive text
                 }
             })

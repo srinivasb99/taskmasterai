@@ -1478,13 +1478,73 @@ async function queryHuggingFaceAPI(userInput, userData = null, username = null) 
     const userIdentityKeywords = ['who am i', 'what is my name', "what's my name", 'my name', 'who i am'];
     const isIdentityQuestion = userIdentityKeywords.some(keyword => userInput.toLowerCase().includes(keyword));
 
-const actionMatch = userInput.toLowerCase().match(
-    /^(add|create|set|update|delete|schedule|make|plan)\s+(?:a|an|the|some|\d+\s+)?(task|goal|project|plan|timer|event)s?\s*(?:to|for|that|which|and|about)?\s*(.+)?$/i
-);
-    
+    // Action keywords and patterns
+    const actionPatterns = {
+        add: ['add', 'create', 'make', 'set up', 'start', 'begin'],
+        update: ['update', 'modify', 'change', 'edit', 'revise'],
+        delete: ['delete', 'remove', 'cancel', 'eliminate']
+    };
+
+    const typePatterns = {
+        task: ['task', 'todo', 'to-do', 'to do', 'assignment'],
+        goal: ['goal', 'objective', 'target', 'aim'],
+        project: ['project', 'initiative', 'work'],
+        plan: ['plan', 'schedule', 'agenda', 'strategy'],
+        timer: ['timer', 'countdown', 'reminder'],
+        event: ['event', 'meeting', 'appointment']
+    };
+
+    // Convert patterns to regex-safe strings
+    const actionRegexStr = Object.entries(actionPatterns)
+        .map(([action, patterns]) => `(?<action>${patterns.join('|')})`)
+        .join('|');
+
+    const typeRegexStr = Object.entries(typePatterns)
+        .map(([type, patterns]) => `(?<type>${patterns.join('|')})`)
+        .join('|');
+
+    // Flexible pattern matching
+    const patterns = [
+        // "add a task to make a business plan"
+        new RegExp(`(?:${actionRegexStr})\\s+(?:a|an|the)?\\s*(?:${typeRegexStr})\\s+(?:to|for|about)?\\s*(?<content>.+)`, 'i'),
+        
+        // "create 5 plans that will reach my goals"
+        new RegExp(`(?:${actionRegexStr})\\s+(?:\\d+\\s+)?(?:${typeRegexStr})s?\\s+(?:that|which|to|for)?\\s*(?<content>.+)`, 'i'),
+        
+        // "i need to add a new task: finish homework"
+        new RegExp(`(?:i\\s+(?:need|want|would like)\\s+to\\s+)?(?:${actionRegexStr})\\s+(?:a|an|the|some|new)?\\s*(?:${typeRegexStr})s?(?::|,)?\\s*(?<content>.+)`, 'i'),
+        
+        // "can you create a task for me to finish homework"
+        new RegExp(`(?:can|could)\\s+you\\s+(?:${actionRegexStr})\\s+(?:a|an|the)?\\s*(?:${typeRegexStr})\\s+(?:for\\s+me\\s+)?(?:to|about)?\\s*(?<content>.+)`, 'i'),
+        
+        // "please add this task: finish homework"
+        new RegExp(`(?:please\\s+)?(?:${actionRegexStr})\\s+(?:this|a|an|the)?\\s*(?:${typeRegexStr})(?::|,)?\\s*(?<content>.+)`, 'i')
+    ];
+
+    // Try each pattern
+    let actionMatch = null;
+    for (const pattern of patterns) {
+        const match = userInput.toLowerCase().match(pattern);
+        if (match?.groups) {
+            actionMatch = {
+                action: match.groups.action,
+                type: match.groups.type,
+                content: match.groups.content.trim()
+            };
+            break;
+        }
+    }
+
     if (actionMatch) {
-        const [_, action, type, content] = actionMatch;
-        return handleActionCommand(action, type, content, userData?.user?.uid);
+        // Normalize action type
+        const normalizedAction = Object.entries(actionPatterns)
+            .find(([_, patterns]) => patterns.includes(actionMatch.action))?.[0] || actionMatch.action;
+
+        // Normalize item type
+        const normalizedType = Object.entries(typePatterns)
+            .find(([_, patterns]) => patterns.includes(actionMatch.type))?.[0] || actionMatch.type;
+
+        return handleActionCommand(normalizedAction, normalizedType, actionMatch.content, userData?.user?.uid);
     }
 
     const formattedHistory = conversationHistory.slice(-3).map(msg => 

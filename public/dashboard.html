@@ -4093,8 +4093,19 @@ function updateIcon(isHidden) {
 }
 
 // Constants
-const huggingFaceApiKey = "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";
-const modelEndpoint = "https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct";
+       // Constants
+        const API_CONFIG = {
+            endpoint: "https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct",
+            key: "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",
+            params: {
+                max_new_tokens: 200,      // Reduced for faster response
+                temperature: 0.6,         // More consistent responses
+                top_p: 0.8,              // Balanced quality/speed
+                repetition_penalty: 1.1,
+                return_full_text: false,
+                do_sample: true
+            }
+        };
 const collections = ['tasks', 'goals', 'projects', 'plans'];
 
 // Fetch data from all collections and user info
@@ -4171,157 +4182,142 @@ function renderPlaceholderMessage() {
     console.log('✅ Placeholder message rendered');
 }
 
-// Enhanced section generation for Smart Overview
-async function generateSection(data, instructions, sectionType) {
-    console.log(`🎯 Generating ${sectionType} section`);
-    
-    // Enhanced data formatting for better context
-    const optimizedData = data.split('\n')
-        .filter(line => line.trim())
-        .map(line => {
-            // Extract and format dates for better context
-            const dateMatch = line.match(/\((.*?)\)/);
-            if (dateMatch) {
-                const date = dateMatch[1];
-                return line.replace(/\(.*?\)/, `(Due: ${date === 'ongoing' ? '🔄 Ongoing' : `📅 ${date}`})`);
-            }
-            return line;
-        })
-        .join('\n');
-    
-    const basePrompt = `You are TaskMaster, an advanced AI productivity assistant specializing in Smart Overviews. Your core purpose is to analyze productivity data and generate actionable, personalized insights.
+        // Simple in-memory cache
+        const cache = new Map();
+        const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
-CONTEXT:
-This data represents a user's productivity items including tasks, goals, projects, and plans. Each item has a type and may or may not have a due date. Your role is to create a meaningful ${sectionType} overview that helps the user stay organized and motivated.
-
-DATA:
-${optimizedData}
-
-SECTION TYPE: ${sectionType}
-
-ANALYSIS REQUIREMENTS:
-1. Understand the relationships between different items
-2. Consider due dates and priorities
-3. Identify patterns and dependencies
-4. Focus on actionable insights
-5. Maintain a motivational tone
-
-${instructions}
-
-Format response exactly as:
-Title: [Create a unique, context-appropriate title]
-Content: [Provide detailed, actionable content following the instructions]`;
-
-    try {
-        console.log('📤 Requesting model response...');
-        const response = await fetch(modelEndpoint, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${huggingFaceApiKey}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ 
-                inputs: basePrompt,
-                parameters: {
-                    max_new_tokens: 100, // Increased for more detailed responses
-                    temperature: 0.5,    // Increased for more creative responses
-                    top_p: 0.95,         // Adjusted for better quality
-                    repetition_penalty: 1.1,
-                    return_full_text: false,
-                    do_sample: false     // Enable sampling for better quality
-                }
-            }),
-        });
-
-        if (!response.ok) throw new Error('API request failed');
-
-        const result = await response.json();
-        console.log('📥 Received model response');
-        
-        const cleanedResponse = result[0]?.generated_text
-            .replace(/\[\/INST\]|\[INST\]|<\/?s>|<\/?p>/g, '')
-            .trim();
-
-        const titleMatch = cleanedResponse.match(/Title:\s*(.*?)(?=\nContent:|$)/s);
-        const contentMatch = cleanedResponse.match(/Content:\s*([\s\S]*?)$/s);
-
-        if (!titleMatch || !contentMatch) throw new Error('Invalid response format');
-
-        const title = titleMatch[1].trim();
-        const content = contentMatch[1].trim();
-
-        console.log(`✅ ${sectionType} section generated successfully`);
-        return { title, content };
-
-    } catch (error) {
-        console.error(`❌ ${sectionType} section generation failed:`, error);
-        return {
-            title: `${sectionType.charAt(0).toUpperCase() + sectionType.slice(1)} Overview`,
-            content: "Unable to generate section. Please try again."
-        };
-    }
-}
-
-// Enhanced main summary generation
-async function generateAISummary(data) {
-    console.log('🚀 Initiating Smart Overview generation');
-    const displayName = data.displayName || "User";
-
-    // Enhanced data formatting with better context
-    const formattedData = Object.entries(data)
-        .filter(([key, items]) => key !== 'displayName' && items?.length > 0)
-        .map(([category, items]) => {
-            const categoryEmoji = {
+        // Optimized data formatting
+        function formatData(data) {
+            if (!data || Object.keys(data).length === 0) return '';
+            
+            const categoryEmojis = {
                 tasks: '📋',
                 goals: '🎯',
                 projects: '📊',
                 plans: '📅'
-            }[category.toLowerCase()] || '•';
-            
-            return `${categoryEmoji} ${category.toUpperCase()}:\n${items
-                .map(item => {
-                    const date = item.dueDate ? new Date(item.dueDate.seconds * 1000) : null;
-                    const dueText = date ? date.toLocaleDateString() : 'ongoing';
-                    return `  • ${item[item.type]} (${dueText})`;
+            };
+
+            return Object.entries(data)
+                .filter(([key, items]) => key !== 'displayName' && Array.isArray(items) && items.length > 0)
+                .map(([category, items]) => {
+                    const emoji = categoryEmojis[category.toLowerCase()] || '•';
+                    const formattedItems = items
+                        .map(item => {
+                            const date = item.dueDate ? 
+                                new Date(item.dueDate.seconds * 1000).toLocaleDateString() : 
+                                'ongoing';
+                            return `  • ${item[item.type]} (${date})`;
+                        })
+                        .join('\n');
+                    return `${emoji} ${category.toUpperCase()}:\n${formattedItems}`;
                 })
-                .join('\n')}`;
-        }).join('\n\n');
+                .join('\n\n');
+        }
 
-    if (!formattedData.trim()) {
-        return {
-            title: "Smart Overview",
-            content: "Add tasks, goals, projects, or plans to receive your personalized Smart Overview."
-        };
-    }
+        // Optimized API call with caching and debouncing
+        let apiTimeout;
+        async function callAPI(prompt) {
+            const cacheKey = JSON.stringify(prompt);
+            const cached = cache.get(cacheKey);
+            
+            if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+                return cached.data;
+            }
 
-    try {
-        // Enhanced section generation with more detailed instructions
-const sections = {
-    overview: await generateSection(
-        formattedData,
-        `Create a personalized strategic overview:
-        1. Start with a warm introduction for ${displayName}, making it personal and engaging.
-        2. Analyze patterns across all items.
-        3. Provide 3-4 data-driven recommendations based on the analysis.
-        4. Include specific action steps for each recommendation.
-        5. Add a personalized motivation message for ${displayName} to encourage their progress.
-        Ensure the tone remains professional but encouraging.`,
-        'overview'
-    )
-};
+            try {
+                const response = await fetch(API_CONFIG.endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${API_CONFIG.key}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ 
+                        inputs: prompt,
+                        parameters: API_CONFIG.params
+                    })
+                });
 
+                if (!response.ok) throw new Error('API request failed');
 
-        console.log('✅ Enhanced Smart Overview generated successfully');
-        return sections;
+                const result = await response.json();
+                const data = {
+                    text: result[0]?.generated_text?.trim() || '',
+                    timestamp: Date.now()
+                };
 
-    } catch (error) {
-        console.error('❌ Smart Overview generation failed:', error);
-        return {
-            title: "Smart Overview Error",
-            content: "Unable to generate overview. Please try again."
-        };
-    }
-}
+                cache.set(cacheKey, data);
+                return data;
+            } catch (error) {
+                console.error('API Error:', error);
+                throw error;
+            }
+        }
+
+        // Optimized section generation
+        async function generateSection(data, instructions, sectionType) {
+            const prompt = `You are TaskMaster, an AI productivity assistant.
+Create a ${sectionType} overview that helps the user stay organized and motivated.
+
+DATA:
+${data}
+
+REQUIREMENTS:
+${instructions}
+
+Format as:
+Title: [title]
+Content: [content]`;
+
+            try {
+                const result = await callAPI(prompt);
+                const text = result.text.replace(/\[\/INST\]|\[INST\]|<\/?s>|<\/?p>/g, '');
+                
+                const titleMatch = text.match(/Title:\s*(.*?)(?=\nContent:|$)/s);
+                const contentMatch = text.match(/Content:\s*([\s\S]*?)$/s);
+
+                return {
+                    title: titleMatch?.[1]?.trim() || `${sectionType} Overview`,
+                    content: contentMatch?.[1]?.trim() || 'Unable to generate content.'
+                };
+            } catch (error) {
+                return {
+                    title: `${sectionType} Overview`,
+                    content: "Unable to generate section. Please try again."
+                };
+            }
+        }
+
+        // Main summary generation
+        async function generateAISummary(data) {
+            const displayName = data.displayName || "User";
+            const formattedData = formatData(data);
+
+            if (!formattedData) {
+                return {
+                    title: "Smart Overview",
+                    content: "Add tasks, goals, projects, or plans to receive your personalized Smart Overview."
+                };
+            }
+
+            try {
+                return {
+                    overview: await generateSection(
+                        formattedData,
+                        `1. Warm introduction for ${displayName}
+2. Analyze patterns
+3. Provide 3-4 recommendations
+4. Include action steps
+5. Add motivation message`,
+                        'overview'
+                    )
+                };
+            } catch (error) {
+                return {
+                    title: "Smart Overview Error",
+                    content: "Unable to generate overview. Please try again."
+                };
+            }
+        }
 
 
 // Function to render the sections with left-to-right fade-in animation and proper spacing

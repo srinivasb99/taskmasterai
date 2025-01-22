@@ -485,22 +485,31 @@ body.night-mode {
     }
 }
 
+.typing-container {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.thinking-text {
+    color: #a3a3a3;
+    font-size: 0.9em;
+    font-style: italic;
+}
+
 .typing-indicator {
     display: flex;
     gap: 4px;
-    padding: 8px 12px;
-    background-color: var(--glass-bg);
-    border-radius: 12px;
-    width: fit-content;
-    margin-top: 8px;
 }
 
 .typing-dot {
     width: 8px;
     height: 8px;
-    background-color: var(--text-color);
+    background: #ffffff;
     border-radius: 50%;
-    animation: typingAnimation 1.4s infinite ease-in-out;
+    opacity: 0.6;
+    animation: typingAnimation 1.4s infinite;
 }
 
 .typing-dot:nth-child(2) {
@@ -512,14 +521,15 @@ body.night-mode {
 }
 
 @keyframes typingAnimation {
-    0%, 60%, 100% {
+    0%, 100% {
         transform: translateY(0);
+        opacity: 0.6;
     }
-    30% {
+    50% {
         transform: translateY(-4px);
+        opacity: 1;
     }
 }
-
 /* Existing styles */
 .sidebar-toggle {
     display: none;
@@ -1292,6 +1302,16 @@ function handleOptionClick(event) {
 }
 
 function showTypingIndicator() {
+    const thinkingMessages = [
+        "Gathering thoughts...",
+        "Ensuring accuracy...",
+        "Processing information...",
+        "Analyzing context...",
+        "Formulating response...",
+        "Checking sources...",
+        "Organizing ideas..."
+    ];
+    
     const indicator = document.createElement('div');
     indicator.className = 'message ai';
     indicator.innerHTML = `
@@ -1300,15 +1320,30 @@ function showTypingIndicator() {
                 <path d="M12 3V4M12 20V21M4 12H3M6.31412 6.31412L5.5 5.5M17.6859 6.31412L18.5 5.5M6.31412 17.69L5.5 18.5001M17.6859 17.69L18.5 18.5001M21 12H20M16 12C16 14.2091 14.2091 16 12 16C9.79086 16 8 14.2091 8 12C8 9.79086 9.79086 8 12 8C14.2091 8 16 9.79086 16 12Z" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
             </svg>
         </div>
-        <div class="typing-indicator">
-            <div class="typing-dot"></div>
-            <div class="typing-dot"></div>
-            <div class="typing-dot"></div>
+        <div class="typing-container">
+            <div class="thinking-text">${thinkingMessages[Math.floor(Math.random() * thinkingMessages.length)]}</div>
+            <div class="typing-indicator">
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+            </div>
         </div>
     `;
     chatMessages.appendChild(indicator);
     chatMessages.scrollTop = chatMessages.scrollHeight;
-    return indicator;
+
+    // Rotate through thinking messages every 2 seconds
+    let messageIndex = 0;
+    const thinkingText = indicator.querySelector('.thinking-text');
+    const messageRotation = setInterval(() => {
+        messageIndex = (messageIndex + 1) % thinkingMessages.length;
+        if (thinkingText) {
+            thinkingText.textContent = thinkingMessages[messageIndex];
+        }
+    }, 2000);
+
+    // Return both the indicator and the interval so we can clear it later
+    return { indicator, messageRotation };
 }
 
 // Constants for API and collections

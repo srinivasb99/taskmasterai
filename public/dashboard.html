@@ -1713,20 +1713,6 @@ scrollbar-thumb {
             <p id="today-tasks-summary"> Loading...</p>
         </div>
 
-        <div class="summary-section">
-            <h3>Loading...</h3>
-            <p id="upcoming-deadlines-summary">Loading...</p>
-        </div>
-
-        <div class="summary-section">
-            <h3>Loading...</h3>
-            <p id="priority-tasks-summary">Loading...</p>
-        </div>
-
-        <div class="summary-section">
-            <h3>Loading...</h3>
-            <p id="completed-tasks-summary">Loading...</p>
-        </div>
     </div>
 </div>
 
@@ -4186,7 +4172,7 @@ async function generateSection(data, instructions, sectionType) {
     const basePrompt = `You are TaskMaster, an advanced AI productivity assistant specializing in Smart Overviews. Your core purpose is to analyze productivity data and generate actionable, personalized insights.
 
 CONTEXT:
-This data represents a user's productivity items including tasks, goals, projects, and plans. Each item has a type and due date. Your role is to create a meaningful ${sectionType} summary that helps the user stay organized and motivated.
+This data represents a user's productivity items including tasks, goals, projects, and plans. Each item has a type and may or may not have a due date. Your role is to create a meaningful ${sectionType} summary that helps the user stay organized and motivated.
 
 DATA:
 ${optimizedData}
@@ -4217,7 +4203,7 @@ Content: [Provide detailed, actionable content following the instructions]`;
             body: JSON.stringify({ 
                 inputs: basePrompt,
                 parameters: {
-                    max_new_tokens: 300, // Increased for more detailed responses
+                    max_new_tokens: 100, // Increased for more detailed responses
                     temperature: 0.7,    // Increased for more creative responses
                     top_p: 0.9,         // Adjusted for better quality
                     repetition_penalty: 1.2,
@@ -4291,36 +4277,6 @@ async function generateAISummary(data) {
     try {
         // Enhanced section generation with more detailed instructions
         const sections = {
-            urgent: await generateSection(formattedData, 
-                `Create a detailed urgent items analysis:
-                • Prioritize items due within 3 days (🚨) with specific action steps
-                • Highlight items due within 14 days (⏰) with preparation tips
-                • Consider dependencies between items
-                • Suggest time management strategies
-                Maximum 200 words.`, 
-                'urgent'
-            ),
-
-            inProgress: await generateSection(formattedData,
-                `Create a comprehensive progress analysis:
-                • Analyze current status of ongoing items
-                • Identify potential bottlenecks or dependencies
-                • Provide specific next steps for each major item
-                • Suggest efficiency improvements
-                Maximum 200 words.`,
-                'progress'
-            ),
-
-            comingUp: await generateSection(formattedData,
-                `Create a strategic upcoming items analysis:
-                • Analyze items due within the next 30 days
-                • Identify preparation needs and dependencies
-                • Suggest resource allocation and timing
-                • Provide risk mitigation strategies
-                Maximum 200 words.`,
-                'upcoming'
-            ),
-
             overview: await generateSection(formattedData,
                 `Create a personalized strategic overview:
                 • Analyze patterns across all items

@@ -452,6 +452,7 @@ body.night-mode {
     padding: 8px;
     resize: none; /* Prevent users from resizing the textarea */
     outline: none;
+    font-family: 'Poppins', sans-serif;
 }
 
 .chat-input::placeholder {
@@ -1629,14 +1630,26 @@ ${pdf.rawQuestions?.length > 0 ? `Questions:\n${pdf.rawQuestions.map((q, i) => {
 You are TaskMaster AI, a helpful productivity assistant. ${isIdentityQuestion ? `The user's name is ${username}.` : ''}
 ${pdfInfo}
 
+Available Collections and their structures:
+${Object.entries(COLLECTION_SCHEMAS)
+    .map(([collection, schema]) => 
+        `${collection}: ${Object.entries(schema)
+            .map(([field, type]) => `${field} (${type})`)
+            .join(', ')}`)
+    .join('\n')}
+
 Context:
 ${formattedHistory}
 
+${userData ? `User Data: ${JSON.stringify(userData)}` : ''}
+
+
 Instructions:
-1. Keep responses concise and direct
-2. Reference specific content from PDFs when relevant
-3. Use exact quotes from documents when possible
-4. For questions about study materials, cite specific sections
+1. If the user asks about their study materials or PDFs, reference the specific content from their generatedpdfs.
+2. When discussing key points, cite them directly from the stored documents.
+3. If asked about specific topics, check the overviews and key points for relevant information.
+4. For questions about study materials, reference both the overview and specific key points.
+5. If asked about questions or quizzes, use the stored questions and answers.
 
 Respond concisely to: ${userInput}
 <|im_end|>

@@ -450,6 +450,7 @@ body.night-mode {
     color: var(--text-color);
     font-size: 1rem;
     padding: 8px;
+    resize: none; /* Prevent users from resizing the textarea */
     outline: none;
 }
 
@@ -852,12 +853,15 @@ body.night-mode {
         </div>
 <div class="chat-input-container">
     <div class="chat-input-wrapper">
-        <input 
-            type="text" 
+        <textarea 
             class="chat-input" 
             id="userInput" 
             placeholder="Type your message..." 
-        />
+            spellcheck="true" 
+            autocomplete="on" 
+            autocorrect="on" 
+            autocapitalize="on"
+        ></textarea>
         <button class="send-button" id="sendButton">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M22 2L11 13M22 2L15 22L11 13M11 13L2 9L22 2" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>

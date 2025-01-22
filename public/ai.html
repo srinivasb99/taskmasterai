@@ -1452,9 +1452,9 @@ const COLLECTION_KEYWORDS = {
     events: ['event', 'meeting', 'appointment'],
     uploads: ['file', 'upload', 'document'],
     generatedpdfs: [
-        'pdf', 'generated', 'summary', 'notes', 'document', 
+        'pdf', 'generated', 'summary', 'notes', 'note', 'document', 
         'key points', 'overview', 'questions', 'study', 'learn',
-        'transformer', 'transformers', 'study material', 'study notes'
+        'transformer', 'transformers', 'study material', 'study notes', 'study materials', 
     ],
     replies: ['reply', 'message', 'response']
 };
@@ -1505,19 +1505,10 @@ async function queryHuggingFaceAPI(userInput, userData = null, username = null) 
 
     // Flexible pattern matching
     const patterns = [
-        // "add a task to make a business plan"
         new RegExp(`(?:${actionRegexStr})\\s+(?:a|an|the)?\\s*(?:${typeRegexStr})\\s+(?:to|for|about)?\\s*(?<content>.+)`, 'i'),
-        
-        // "create 5 plans that will reach my goals"
         new RegExp(`(?:${actionRegexStr})\\s+(?:\\d+\\s+)?(?:${typeRegexStr})s?\\s+(?:that|which|to|for)?\\s*(?<content>.+)`, 'i'),
-        
-        // "i need to add a new task: finish homework"
         new RegExp(`(?:i\\s+(?:need|want|would like)\\s+to\\s+)?(?:${actionRegexStr})\\s+(?:a|an|the|some|new)?\\s*(?:${typeRegexStr})s?(?::|,)?\\s*(?<content>.+)`, 'i'),
-        
-        // "can you create a task for me to finish homework"
         new RegExp(`(?:can|could)\\s+you\\s+(?:${actionRegexStr})\\s+(?:a|an|the)?\\s*(?:${typeRegexStr})\\s+(?:for\\s+me\\s+)?(?:to|about)?\\s*(?<content>.+)`, 'i'),
-        
-        // "please add this task: finish homework"
         new RegExp(`(?:please\\s+)?(?:${actionRegexStr})\\s+(?:this|a|an|the)?\\s*(?:${typeRegexStr})(?::|,)?\\s*(?<content>.+)`, 'i')
     ];
 
@@ -1536,92 +1527,93 @@ async function queryHuggingFaceAPI(userInput, userData = null, username = null) 
     }
 
     if (actionMatch) {
-        // Normalize action type
         const normalizedAction = Object.entries(actionPatterns)
             .find(([_, patterns]) => patterns.includes(actionMatch.action))?.[0] || actionMatch.action;
-
-        // Normalize item type
         const normalizedType = Object.entries(typePatterns)
             .find(([_, patterns]) => patterns.includes(actionMatch.type))?.[0] || actionMatch.type;
-
         return handleActionCommand(normalizedAction, normalizedType, actionMatch.content, userData?.user?.uid);
     }
 
-    const formattedHistory = conversationHistory.slice(-3).map(msg => 
+    const formattedHistory = conversationHistory.slice(-2).map(msg => 
         `${msg.role}: ${msg.content}`
     ).join('\n');
 
     // Get user's PDF data
-    let pdfData = null;
+    let pdfData = [];
     const user = firebase.auth().currentUser;
     if (user) {
         try {
+            // Get all PDFs for the user, limited to last 5 for performance
             const pdfSnapshot = await db.collection('generatedpdfs')
                 .where('userId', '==', user.uid)
                 .orderBy('timestamp', 'desc')
-                .limit(1)
+                .limit(50)
                 .get();
 
             if (!pdfSnapshot.empty) {
-                const pdfDoc = pdfSnapshot.docs[0];
-                pdfData = pdfDoc.data();
-                
-                // Add the PDF data to userData if it exists
-                if (!userData) userData = {};
-                if (!userData.generatedpdfs) userData.generatedpdfs = [];
-                userData.generatedpdfs.push(pdfData);
-                
-                if (pdfData.rawQuestions) {
-                    // Check if the user's question matches any quiz questions
-                    const matchingQuestion = pdfData.rawQuestions.find(q => 
-                        q.question && userInput.toLowerCase().includes(q.question.toLowerCase())
-                    );
+                pdfData = pdfSnapshot.docs.map(doc => {
+                    const data = doc.data();
+                    return {
+                        fileName: data.fileName,
+                        overview: data.overview,
+                        keyPoints: data.keyPoints || [],
+                        rawQuestions: data.rawQuestions || [],
+                        choices: data.choices || [],
+                        correctAnswers: data.correctAnswers || [],
+                        timestamp: data.timestamp
+                    };
+                });
 
-                    if (matchingQuestion) {
-                        return `Based on the generated quiz, the answer is ${matchingQuestion.correctAnswer}`;
+                // Check for direct question matches first
+                for (const pdf of pdfData) {
+                    if (pdf.rawQuestions) {
+                        const matchingQuestion = pdf.rawQuestions.find(q => {
+                            const question = typeof q === 'string' ? q : q.question;
+                            return question && userInput.toLowerCase().includes(question.toLowerCase());
+                        });
+
+                        if (matchingQuestion) {
+                            const answer = typeof matchingQuestion === 'string' 
+                                ? pdf.correctAnswers[pdf.rawQuestions.indexOf(matchingQuestion)]
+                                : matchingQuestion.correctAnswer;
+                            return `Based on your study materials, the answer is ${answer}`;
+                        }
                     }
                 }
             }
         } catch (error) {
-            console.error('Error checking PDF data:', error);
+            console.error('Error fetching PDF data:', error);
         }
     }
 
+    // Prepare PDF information for the prompt
+    const pdfInfo = pdfData.length > 0 ? `
+Generated PDFs Information:
+${pdfData.map(pdf => `
+Document: ${pdf.fileName || 'Untitled'}
+${pdf.overview ? `Overview: ${pdf.overview}` : ''}
+${pdf.keyPoints?.length > 0 ? `Key Points:\n${pdf.keyPoints.map((point, i) => `${i + 1}. ${point}`).join('\n')}` : ''}
+${pdf.rawQuestions?.length > 0 ? `Questions:\n${pdf.rawQuestions.map((q, i) => {
+    const question = typeof q === 'string' ? q : q.question;
+    const answer = typeof q === 'string' ? pdf.correctAnswers[i] : q.correctAnswer;
+    return `Q${i + 1}: ${question}\nA: ${answer}`;
+}).join('\n')}` : ''}
+`).join('\n')}` : '';
+
     const systemPrompt = `<|im_start|>system
 You are TaskMaster AI, a helpful productivity assistant. ${isIdentityQuestion ? `The user's name is ${username}.` : ''}
-
-Available Actions:
-- Add items using "add [type], [content]" (e.g., "add task, finish homework")
-- Create items using "create [type], [content]"
-- Update items using "update [type], [content]"
-- Delete items using "delete [type], [content]"
-
-Types: task, goal, project, plan, timer, event
-
-${userData?.generatedpdfs?.length > 0 ? `
-Generated PDFs Information:
-${userData.generatedpdfs.map(pdf => `
-Document: ${pdf.fileName || 'Untitled'}
-Overview: ${pdf.overview || 'Not available'}
-${pdf.keyPoints ? `Key Points:\n${pdf.keyPoints.map((point, i) => `${i + 1}. ${point}`).join('\n')}` : ''}
-${pdf.rawQuestions ? `Questions:\n${pdf.rawQuestions.map((q, i) => {
-    if (typeof q === 'string') return `Q${i + 1}: ${q}`;
-    return `Q${i + 1}: ${q.question || q}\nAnswer: ${q.correctAnswer || 'Not available'}`;
-}).join('\n')}` : ''}
-`).join('\n')}
-` : ''}
+${pdfInfo}
 
 Context:
 ${formattedHistory}
 
 Instructions:
-1. If the user asks about their study materials or PDFs, reference the specific content from their generatedpdfs.
-2. When discussing key points, cite them directly from the stored documents.
-3. If asked about specific topics, check the overviews and key points for relevant information.
-4. For questions about study materials, reference both the overview and specific key points.
-5. If asked about questions or quizzes, use the stored questions and answers.
+1. Keep responses concise and direct
+2. Reference specific content from PDFs when relevant
+3. Use exact quotes from documents when possible
+4. For questions about study materials, cite specific sections
 
-Respond naturally and concisely to: ${userInput}
+Respond concisely to: ${userInput}
 <|im_end|>
 <|im_start|>assistant`;
 
@@ -1635,11 +1627,12 @@ Respond naturally and concisely to: ${userInput}
             body: JSON.stringify({
                 inputs: systemPrompt,
                 parameters: {
-                    max_new_tokens: 250,
-                    temperature: 0.7,
+                    max_new_tokens: 150,
+                    temperature: 0.5,
                     top_p: 0.9,
                     return_full_text: false,
-                    stop: ["<|im_end|>", "<|im_start|>"]
+                    stop: ["<|im_end|>", "<|im_start|>"],
+                    repetition_penalty: 1.2
                 }
             })
         });
@@ -1721,6 +1714,7 @@ async function handleActionCommand(action, type, content, userId) {
         return `Failed to ${action} ${type}. Please try again.`;
     }
 }
+
 
 async function fetchCollectionData(collection, user, relevantCollections) {
     if (collection === 'users') return null;

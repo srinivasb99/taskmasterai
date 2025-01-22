@@ -1551,17 +1551,18 @@ async function handleUserMessage() {
         const messageLower = message.toLowerCase();
         
         let userData = {};
+
+        // Fetch user profile data
+        const userDoc = await db.collection('users').doc(user.uid).get();
+        if (userDoc.exists) {
+            userData.user = userDoc.data();
+        }
         
         // Check cache first
         const now = Date.now();
         if (userDataCache.data && (now - userDataCache.timestamp) < userDataCache.ttl) {
             userData = userDataCache.data;
         } else {
-            // Fetch user profile data
-            const userDoc = await db.collection('users').doc(user.uid).get();
-            if (userDoc.exists) {
-                userData.user = userDoc.data();
-            }
 
             // Determine relevant collections based on message content
             const relevantCollections = Object.entries(COLLECTION_KEYWORDS)

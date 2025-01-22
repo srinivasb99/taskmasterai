@@ -807,7 +807,7 @@ body.night-mode {
                 <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM12 4C14.21 4 16 5.79 16 8C16 10.21 14.21 12 12 12C9.79 12 8 10.21 8 8C8 5.79 9.79 4 12 4ZM12 20C9.33 20 6.34 18.87 4.63 16.74C5.91 15.43 8.39 14.5 12 14.5C15.61 14.5 18.09 15.43 19.37 16.74C17.66 18.87 14.67 20 12 20Z" fill="currentColor"/>
             </svg>
         </div>
-                <div id="username">User Name</div>
+                <div id="username">Loading...</div>
                 <div class="menu-dots">
                     <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M12 13C12.5523 13 13 12.5523 13 12C13 11.4477 12.5523 11 12 11C11.4477 11 11 11.4477 11 12C11 12.5523 11.4477 13 12 13Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -1550,8 +1550,9 @@ async function handleUserMessage() {
         const username = user.displayName || user.email;
         const messageLower = message.toLowerCase();
         
+        // Initialize userData
         let userData = {};
-
+        
         // Fetch user profile data
         const userDoc = await db.collection('users').doc(user.uid).get();
         if (userDoc.exists) {
@@ -1567,37 +1568,33 @@ async function handleUserMessage() {
         if (!relevantCollections.includes('users')) {
             relevantCollections.push('users');
         }
-        
-        // Check cache first
-        const now = Date.now();
-        if (userDataCache.data && (now - userDataCache.timestamp) < userDataCache.ttl) {
-            userData = userDataCache.data;
-        } 
 
-            // Fetch data from relevant collections in parallel
-            const collectionPromises = relevantCollections.map(async (collection) => {
+        // Fetch data from all collections
+        const collectionPromises = Object.keys(COLLECTION_SCHEMAS)
+            .map(async (collection) => {
                 const data = await fetchCollectionData(collection, user, relevantCollections);
                 if (data && data.length > 0) {
                     userData[collection] = data;
                 }
             });
 
-            await Promise.all(collectionPromises);
+        await Promise.all(collectionPromises);
 
-            // Update cache
-            userDataCache.data = userData;
-            userDataCache.timestamp = now;
-        }
+        console.log('Fetched user data:', userData);
+        console.log('Relevant collections:', relevantCollections);
 
         const aiResponse = await queryHuggingFaceAPI(message, userData, username);
         conversationHistory.push({ role: 'Assistant', content: aiResponse });
         
+        // Clear the interval and remove the indicator
         clearInterval(messageRotation);
         indicator.remove();
+        
         addMessage(aiResponse);
 
     } catch (error) {
         console.error('Error in handleUserMessage:', error);
+        // Clear the interval and remove the indicator in case of error
         clearInterval(messageRotation);
         indicator.remove();
         addMessage("I apologize, but I'm having trouble processing your request. Please try again later.");

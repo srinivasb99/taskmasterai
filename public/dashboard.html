@@ -4342,6 +4342,12 @@ function renderSections(summaryData) {
             `<div class="step"><span class="step-number">$1.</span> <span class="step-content">$2</span></div>`
         );
 
+        // Detect and convert bullet points (starting with `* ` or `- `)
+        content = content.replace(
+            /(^|\n)[*-] (.+)/g, // Matches "* text" or "- text"
+            '<li>$2</li>'
+        );
+
         // Emphasize key terms like "Action Step"
         content = content.replace(
             /\b(Action Step):/gi, // Matches "Action Step:"

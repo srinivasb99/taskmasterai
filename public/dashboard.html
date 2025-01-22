@@ -1608,7 +1608,6 @@ scrollbar-thumb {
 }
 
 .loading-text {
-    position: relative;
     animation: fade-in-out 3s infinite;
     transition: opacity 0.5s ease-in-out;
 }
@@ -4281,12 +4280,12 @@ Content: [Provide detailed, actionable content following the instructions]`;
             body: JSON.stringify({ 
                 inputs: basePrompt,
                 parameters: {
-                    max_new_tokens: 300, // Increased for more detailed responses
-                    temperature: 0.7,    // Increased for more creative responses
-                    top_p: 0.9,         // Adjusted for better quality
-                    repetition_penalty: 1.2,
+                    max_new_tokens: 200, // Increased for more detailed responses
+                    temperature: 0.5,    // Increased for more creative responses
+                    top_p: 0.95,         // Adjusted for better quality
+                    repetition_penalty: 1.1,
                     return_full_text: false,
-                    do_sample: true     // Enable sampling for better quality
+                    do_sample: false     // Enable sampling for better quality
                 }
             }),
         });
@@ -4575,7 +4574,6 @@ return lines.length
 
 
 
-// Show loading state
 function showLoading() {
     const aiSummarySection = document.getElementById('ai-summary-section');
     const summaryContainer = aiSummarySection.querySelector('.ai-assistant-card');
@@ -4605,10 +4603,15 @@ function showLoading() {
     const loadingText = loadingSection.querySelector('.loading-text');
 
     // Ellipsis animation
-    const ellipsis = loadingSection.querySelector('.ellipsis');
-    setInterval(() => {
-        ellipsis.textContent = ellipsis.textContent.length < 3 ? ellipsis.textContent + '.' : '';
-    }, 500);
+    let ellipsisInterval;
+    function startEllipsisAnimation() {
+        const ellipsis = loadingText.querySelector('.ellipsis');
+        clearInterval(ellipsisInterval); // Clear previous interval
+        ellipsisInterval = setInterval(() => {
+            ellipsis.textContent = ellipsis.textContent.length < 3 ? ellipsis.textContent + '.' : '';
+        }, 500);
+    }
+    startEllipsisAnimation(); // Start the animation for the initial phrase
 
     // Rotate through phrases
     let index = 0;
@@ -4616,12 +4619,14 @@ function showLoading() {
         const phrase = phrases[index];
         loadingText.style.opacity = 0; // Fade out
         setTimeout(() => {
-            loadingText.innerHTML = `${phrase} <span class="ellipsis">...</span>`;
+            loadingText.innerHTML = `${phrase}<span class="ellipsis">...</span>`;
             loadingText.style.opacity = 1; // Fade in
+            startEllipsisAnimation(); // Restart ellipsis animation for the new phrase
             index = (index + 1) % phrases.length; // Loop through phrases
         }, 500); // Match fade-out duration
     }, 3000); // Change phrase every 3 seconds
 }
+
 
 
 // Main function to update the summary

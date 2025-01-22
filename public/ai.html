@@ -1605,7 +1605,7 @@ async function handleUserMessage() {
         conversationHistory = conversationHistory.slice(-10);
     }
     
-    const typingIndicator = showTypingIndicator();
+    const { indicator, messageRotation } = showTypingIndicator();
     
     try {
         const user = firebase.auth().currentUser;
@@ -1650,12 +1650,17 @@ async function handleUserMessage() {
         const aiResponse = await queryHuggingFaceAPI(message, userData, username);
         conversationHistory.push({ role: 'Assistant', content: aiResponse });
         
-        typingIndicator.remove();
+        // Clear the interval and remove the indicator
+        clearInterval(messageRotation);
+        indicator.remove();
+        
         addMessage(aiResponse);
 
     } catch (error) {
         console.error('Error in handleUserMessage:', error);
-        typingIndicator.remove();
+        // Clear the interval and remove the indicator in case of error
+        clearInterval(messageRotation);
+        indicator.remove();
         addMessage("I apologize, but I'm having trouble processing your request. Please try again later.");
     }
 }

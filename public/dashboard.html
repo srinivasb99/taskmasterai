@@ -4326,6 +4326,7 @@ const sections = {
 
 // Function to render the sections with left-to-right fade-in animation and proper spacing
 // Function to render the sections with cleaner formatting and emphasis on key terms
+// Function to render the sections with cleaner formatting and emphasis on key terms
 function renderSections(summaryData) {
     const aiSummarySection = document.getElementById('ai-summary-section');
     const summaryContainer = aiSummarySection.querySelector('.ai-assistant-card');
@@ -4353,16 +4354,10 @@ function renderSections(summaryData) {
             '<strong>$1</strong>: $2'
         );
 
-        // Emphasize key terms like "Action Step"
+        // Emphasize key terms like "Action Step" and move it to a new line
         content = content.replace(
-            /\b(Action Step):/gi, // Matches "Action Step:"
-            '<strong class="key-term">$1:</strong>'
-        );
-
-        // Move "ACTION STEP" to its own line and remove emphasis formatting (**)
-        content = content.replace(
-            /(ACTION STEP:)(.+?)(?=\d+\.|$)/gis, // Matches "ACTION STEP: text"
-            `<div class="action-step"><strong>$1</strong><br>$2</div>`
+            /\b(Action Step):(.+?)(?=\n|$)/gi, // Matches "Action Step: text"
+            '<strong class="key-term">$1:</strong><br>$2'
         );
 
         return content;
@@ -4389,6 +4384,7 @@ function renderSections(summaryData) {
         }, index * 300); // Adjust delay as needed (e.g., 300ms between sections)
     });
 }
+
 
 
 

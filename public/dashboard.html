@@ -1585,7 +1585,27 @@ scrollbar-thumb {
     display: none; /* Snowflakes hidden by default */
 }
 
+.step {
+    margin-bottom: 15px;
+    display: flex;
+    align-items: flex-start;
+}
 
+.step-number {
+    font-weight: bold;
+    color: #ffd700;
+    margin-right: 10px;
+}
+
+.step-content {
+    flex: 1;
+}
+
+.key-term {
+    color: #ff4500;
+    font-weight: bold;
+    text-transform: uppercase;
+}
 
     </style>
 </head>
@@ -4305,6 +4325,7 @@ const sections = {
 
 
 // Function to render the sections with left-to-right fade-in animation and proper spacing
+// Function to render the sections with cleaner formatting and emphasis on key terms
 function renderSections(summaryData) {
     const aiSummarySection = document.getElementById('ai-summary-section');
     const summaryContainer = aiSummarySection.querySelector('.ai-assistant-card');
@@ -4313,36 +4334,30 @@ function renderSections(summaryData) {
     // Remove existing sections
     existingSections.forEach(section => section.remove());
 
-    // Helper function to format content with structured text
+    // Helper function to format content with structured text and key term emphasis
     function formatContent(content) {
-        // Detect and format bolded headers followed by text
+        // Break into numbered sections for better readability
         content = content.replace(
-            /\*\*(.+?)\*\*:([^*]+)/g, // Matches "**Header**: text"
-            '<strong>$1</strong>: $2'
+            /(\d+)\.\s*(.+?)(?=\d+\.|$)/gs, // Matches "1. text" and splits by numbers
+            `<div class="step"><span class="step-number">$1.</span> <span class="step-content">$2</span></div>`
         );
 
-        // Detect and convert bullet points (starting with `* ` or `- `)
+        // Emphasize key terms like "Action Step"
         content = content.replace(
-            /(^|\n)[*-] (.+)/g, // Matches "* text" or "- text"
-            '<li>$2</li>'
-        );
-
-        // Wrap list items in <ul> tags
-        content = content.replace(
-            /(<li>.*?<\/li>)+/g, // Matches consecutive <li> elements
-            '<ul>$&</ul>'
+            /\b(Action Step):/gi, // Matches "Action Step:"
+            '<strong class="key-term">$1:</strong>'
         );
 
         return content;
     }
 
-    // Render new sections with animation
+    // Render new sections with structured formatting
     Object.values(summaryData).forEach(({ title, content }, index) => {
         const sectionElement = document.createElement('div');
         sectionElement.className = 'summary-section hidden'; // Add "hidden" class initially
 
         const sanitizedTitle = sanitizeTitle(title);
-        const sanitizedContent = sanitizeContent(formatContent(content)); // Format content for structured display
+        const sanitizedContent = sanitizeContent(formatContent(content)); // Apply structured formatting
 
         sectionElement.innerHTML = `
             <h3 class="section-title">${sanitizedTitle}</h3>

@@ -19,7 +19,7 @@ function SplashScreen() {
       icon: LayoutDashboard,
       title: 'Dashboard',
       description: 'Your command center for peak productivity. Seamlessly manage tasks, set goals, and track projects with intelligent due dates that automatically sync to your calendar. The dashboard includes customizable timers, including our signature Pomodoro timer with adjustable work/break intervals. Monitor your productivity trends, set daily/weekly targets, and celebrate your achievements with our built-in progress tracking.',
-      isNew: false,
+      isNew: true,
       link: '/dashboard.html'
     },
     {
@@ -33,14 +33,14 @@ function SplashScreen() {
       icon: Users,
       title: 'Friends',
       description: 'Elevate your collaborative experience with our advanced social features. Create individual and group chats with real-time messaging, share files with drag-and-drop simplicity, and organize conversations with smart pinning. Reply to specific messages, react with custom emojis, and use threaded discussions for organized conversations. Share notes directly, collaborate on projects, and sync schedules for seamless teamwork.',
-      isNew: false,
+      isNew: true,
       link: '/friends.html'
     },
     {
       icon: Bot,
       title: 'AI Chat Bot',
       description: 'Your personal productivity assistant powered by advanced AI. Get instant answers to complex questions, receive suggestions for task optimization, and get help with time management. The AI learns from your work patterns to provide personalized productivity tips, helps break down large projects into manageable tasks, and can even draft responses or summarize long content for you. With access to your notes, it can answer your questions, help you organize and retrieve information, and assist with your tasks, goals, projects, plans, and events—anything you need to stay on top of your life. Available 24/7 for everything from quick queries to deep problem-solving, it’s your ultimate tool for productivity and organization.',
-      isNew: false,
+      isNew: true,
       link: '/ai.html'
     },
     {
@@ -54,7 +54,7 @@ function SplashScreen() {
       icon: Focus,
       title: 'Distraction Control',
       description: 'Take command of your focus with our comprehensive distraction management system. Block distracting websites and apps with customizable schedules, create focus profiles for different activities, and use our smart notification management to filter only essential alerts. Enhance your concentration with our curated collection of ambient sounds, including nature sounds, white noise, and focus-optimized music. Track your focus sessions and receive insights to improve your productivity patterns.',
-      isNew: true,
+      isNew: false,
       link: '/features.html'
     }
   ];

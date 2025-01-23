@@ -2027,6 +2027,81 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
+// Function to add a user message to the chat
+function addUserMessage(text) {
+    const chatMessages = document.getElementById('chatMessages');
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'message user';
+    
+    const timestamp = new Date();
+    const timeString = timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    
+    messageDiv.innerHTML = `
+        <div class="message-avatar">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+        </div>
+        <div class="message-content">
+            <div class="message-text">${text}</div>
+            <div class="message-time">${timeString}</div>
+        </div>
+    `;
+    
+    chatMessages.appendChild(messageDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+// Function to add an AI message to the chat
+function addAIMessage(text) {
+    const chatMessages = document.getElementById('chatMessages');
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'message ai';
+    
+    const timestamp = new Date();
+    const timeString = timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    
+    messageDiv.innerHTML = `
+        <div class="message-avatar">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 3V4M12 20V21M4 12H3M6.31412 6.31412L5.5 5.5M17.6859 6.31412L18.5 5.5M6.31412 17.69L5.5 18.5001M17.6859 17.69L18.5 18.5001M21 12H20M16 12C16 14.2091 14.2091 16 12 16C9.79086 16 8 14.2091 8 12C8 9.79086 9.79086 8 12 8C14.2091 8 16 9.79086 16 12Z" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+            </svg>
+        </div>
+        <div class="message-content">
+            <div class="message-text">${formatMessage(text)}</div>
+            <div class="message-time">${timeString}</div>
+        </div>
+    `;
+    
+    chatMessages.appendChild(messageDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+// Function to process user input
+async function processUserInput(message) {
+    try {
+        // Show typing indicator
+        showTypingIndicator();
+        
+        // Get the response from the API
+        const response = await queryHuggingFaceAPI(message);
+        
+        // Hide typing indicator
+        hideTypingIndicator();
+        
+        // Add AI response to chat
+        addAIMessage(response);
+        
+        // Generate new suggestions based on the context
+        generateDynamicSuggestions();
+    } catch (error) {
+        console.error('Error processing message:', error);
+        hideTypingIndicator();
+        addAIMessage("I apologize, but I encountered an error. Please try again.");
+    }
+}
+
 // Function to generate dynamic suggestions based on user data
 async function generateDynamicSuggestions() {
     const user = firebase.auth().currentUser;
@@ -2040,7 +2115,7 @@ async function generateDynamicSuggestions() {
         for (const collection of collections) {
             const snapshot = await db.collection(collection)
                 .where('userId', '==', user.uid)
-                .orderBy('timestamp', 'desc')
+                .orderBy('createdAt', 'desc')
                 .limit(5)
                 .get();
 
@@ -2072,8 +2147,8 @@ async function generateDynamicSuggestions() {
         const activeGoals = collectionsData.goals.filter(goal => !goal.completed);
         if (activeGoals.length > 0) {
             suggestions.push({
-                icon: `<path d="M20 12V8h-4m4 4v4h-4m4-4H4m0-4h4m-4 4v4h4m-4-4h4"/>`,
-                text: `Check your goals progress`,
+                icon: `<path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/>`,
+                text: `Check your goals progress (${activeGoals.length})`,
                 action: 'check_goals'
             });
         } else {
@@ -2088,8 +2163,8 @@ async function generateDynamicSuggestions() {
         const activeProjects = collectionsData.projects.filter(project => !project.completed);
         if (activeProjects.length > 0) {
             suggestions.push({
-                icon: `<path d="M3 3h18v18H3zM8 12h8"/>`,
-                text: `View your active projects`,
+                icon: `<path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>`,
+                text: `View your active projects (${activeProjects.length})`,
                 action: 'view_projects'
             });
         } else {
@@ -2101,7 +2176,15 @@ async function generateDynamicSuggestions() {
         }
 
         // Update the suggestions in the UI
-        const suggestionsContainer = document.querySelector('.message-suggestions');
+        const firstMessage = document.querySelector('.message.ai');
+        let suggestionsContainer = firstMessage.querySelector('.message-suggestions');
+        
+        if (!suggestionsContainer) {
+            suggestionsContainer = document.createElement('div');
+            suggestionsContainer.className = 'message-suggestions';
+            firstMessage.querySelector('.message-content').appendChild(suggestionsContainer);
+        }
+
         suggestionsContainer.innerHTML = suggestions.map(suggestion => `
             <div class="option" data-action="${suggestion.action}">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -2146,23 +2229,18 @@ function handleSuggestionClick(action) {
     }
 
     if (message) {
-        // Add the message to the chat
-        addMessage(message);
-        // Process the message
+        addUserMessage(message);
         processUserInput(message);
     }
 }
 
-// Initialize suggestions
+// Initialize suggestions when the page loads
 document.addEventListener('DOMContentLoaded', () => {
-    generateDynamicSuggestions();
-});
-
-// Update suggestions when user logs in
-firebase.auth().onAuthStateChanged(user => {
-    if (user) {
-        generateDynamicSuggestions();
-    }
+    firebase.auth().onAuthStateChanged(user => {
+        if (user) {
+            generateDynamicSuggestions();
+        }
+    });
 });
 </script>
 

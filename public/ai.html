@@ -738,6 +738,54 @@ body.night-mode {
     display: none; /* Snowflakes hidden by default */
 }
 
+
+.message-suggestions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+.suggestion-button {
+    background: rgba(79, 70, 229, 0.1);
+    border: 1px solid rgba(79, 70, 229, 0.2);
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    color: #fff;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.suggestion-button:hover {
+    background: rgba(79, 70, 229, 0.2);
+    transform: translateX(4px);
+}
+
+.suggestion-icon {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+}
+
+.suggestion-text {
+    flex-grow: 1;
+}
+
+.suggestion-arrow {
+    width: 16px;
+    height: 16px;
+    opacity: 0.5;
+    transition: opacity 0.2s;
+}
+
+.suggestion-button:hover .suggestion-arrow {
+    opacity: 1;
+}
+
     </style>
 </head>
 <body>
@@ -834,23 +882,26 @@ body.night-mode {
     <div class="snowflakes">
         <!-- Snowflakes will be dynamically created here -->
     </div>
-    <div class="chatbot-container">
-        <div class="chatbot-header">
-            <h2>TaskMaster AI</h2>
-        </div>
-        <div class="chat-messages" id="chatMessages">
-            <!-- Messages will be dynamically added here -->
-            <div class="message ai">
-                <div class="message-avatar">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M12 3V4M12 20V21M4 12H3M6.31412 6.31412L5.5 5.5M17.6859 6.31412L18.5 5.5M6.31412 17.69L5.5 18.5001M17.6859 17.69L18.5 18.5001M21 12H20M16 12C16 14.2091 14.2091 16 12 16C9.79086 16 8 14.2091 8 12C8 9.79086 9.79086 8 12 8C14.2091 8 16 9.79086 16 12Z" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-                    </svg>
-                </div>
-                <div class="message-content">
-                    <div class="message-text">Hello! I'm TaskMaster AI. How can I assist you today?</div>
-                    <div class="message-time">Just now</div>
-                </div>
+<div class="chatbot-container">
+    <div class="chatbot-header">
+        <h2>TaskMaster AI</h2>
+    </div>
+    <div class="chat-messages" id="chatMessages">
+        <!-- Initial AI message with dynamic suggestions -->
+        <div class="message ai">
+            <div class="message-avatar">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 3V4M12 20V21M4 12H3M6.31412 6.31412L5.5 5.5M17.6859 6.31412L18.5 5.5M6.31412 17.69L5.5 18.5001M17.6859 17.69L18.5 18.5001M21 12H20M16 12C16 14.2091 14.2091 16 12 16C9.79086 16 8 14.2091 8 12C8 9.79086 9.79086 8 12 8C14.2091 8 16 9.79086 16 12Z" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                </svg>
             </div>
+            <div class="message-content">
+                <div class="message-text">Hello! I'm TaskMaster, your productivity assistant. How can I assist you today?</div>
+                <div class="message-suggestions" id="messageSuggestions">
+                    <!-- Dynamic suggestions will be inserted here -->
+                </div>
+                <div class="message-time">Just now</div>
+            </div>
+        </div>
         </div>
 <div class="chat-input-container">
     <div class="chat-input-wrapper">

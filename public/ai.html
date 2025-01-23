@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1363,15 +1362,39 @@ function processAIResponse(response, questionId) {
 }
 
 function showTypingIndicator() {
-    const thinkingMessages = [
-        "Gathering thoughts...",
-        "Ensuring accuracy...",
-        "Processing information...",
-        "Analyzing context...",
-        "Formulating response...",
-        "Checking sources...",
-        "Organizing ideas..."
-    ];
+const thinkingMessages = (username) => [
+    `Gathering thoughts...`,
+    `Ensuring accuracy...`,
+    `Processing information...`,
+    `Analyzing context...`,
+    `Formulating response...`,
+    `Checking sources...`,
+    `Organizing ideas...`,
+    `Evaluating possibilities...`,
+    `Sifting through data...`,
+    `Synthesizing concepts...`,
+    `Reviewing patterns...`,
+    `Cross-referencing details...`,
+    `Comparing options...`,
+    `Deliberating outcomes...`,
+    `Generating insights...`,
+    `Consolidating information...`,
+    `Seeking clarity...`,
+    `Building a response...`,
+    `Exploring solutions...`,
+    `Verifying facts...`,
+    `Validating assumptions...`,
+    `Compiling thoughts...`,
+    `Finding the right words...`,
+    `Contemplating answers...`,
+    `Aligning ideas...`,
+    `Tailoring response for ${username}...`,
+    `Personalizing solution for ${username}...`,
+    `Adapting context for ${username}...`,
+    `Fine-tuning message for ${username}...`,
+    `Crafting a custom reply for ${username}...`,
+    `Customizing feedback for ${username}...`
+];
     
     const indicator = document.createElement('div');
     indicator.className = 'message ai';
@@ -1700,7 +1723,7 @@ Respond concisely to: ${userInput}
             body: JSON.stringify({
                 inputs: systemPrompt,
                 parameters: {
-                    max_new_tokens: 1000,
+                    max_new_tokens: 500,
                     temperature: 0.5,
                     top_p: 0.9,
                     return_full_text: false,

@@ -2032,19 +2032,24 @@ document.addEventListener('DOMContentLoaded', function() {
 async function processUserInput(message) {
     try {
         // Add user message to chat
-        addMessage(message, 'user');
-        
+        addMessage(message, true); // true for user message
+
+        const { indicator, messageRotation } = showTypingIndicator();
+
         // Get the response from the API
         const response = await queryHuggingFaceAPI(message);
         
-        // Add AI response to chat
-        addMessage(response, 'ai');
+        // Clear the interval and remove the indicator
+        clearInterval(messageRotation);
+        indicator.remove();
+        
+        addMessage(aiResponse);
         
         // Generate new suggestions based on the context
         generateDynamicSuggestions();
     } catch (error) {
         console.error('Error processing message:', error);
-        addMessage("I apologize, but I encountered an error. Please try again.", 'ai');
+        addMessage("I apologize, but I encountered an error. Please try again.", false);
     }
 }
 

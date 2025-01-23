@@ -339,13 +339,14 @@ body.night-mode {
     padding: 16px;
     text-align: center;
     flex-shrink: 0; /* Prevent header from shrinking */
-    font-family: 'Poppins', sans-serif;
+    font-family: 'Playfair Display', serif;
     font-weight: 600;
     letter-spacing: 0.5px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Add subtle shadow for depth */
-    position: relative; /* For positioning child elements */
-    overflow: hidden; /* Hide any overflow from decorative elements */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    position: relative;
+    overflow: hidden;
+    animation: shimmer 3s infinite;
 }
 
 .chatbot-header::before {
@@ -355,15 +356,39 @@ body.night-mode {
     left: -50%;
     width: 200%;
     height: 200%;
-    background: radial-gradient(circle, rgba(255,255,255,0.2) 20%, transparent 60%);
-    transform: rotate(25deg);
-    animation: rotateBackground 10s linear infinite; /* Subtle background animation */
-    z-index: 0; /* Ensure it stays behind content */
+    background: radial-gradient(
+        circle,
+        rgba(255,255,255,0.2) 10%,
+        rgba(255,255,255,0.1) 20%,
+        transparent 60%
+    );
+    transform-origin: center;
+    animation: pulseAndRotate 8s ease-in-out infinite;
+    z-index: 0;
 }
 
-@keyframes rotateBackground {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+@keyframes pulseAndRotate {
+    0% {
+        transform: rotate(0deg) scale(1);
+        opacity: 0.5;
+    }
+    50% {
+        transform: rotate(180deg) scale(1.2);
+        opacity: 0.8;
+    }
+    100% {
+        transform: rotate(360deg) scale(1);
+        opacity: 0.5;
+    }
+}
+
+@keyframes shimmer {
+    0% {
+        background-position: -200% center;
+    }
+    100% {
+        background-position: 200% center;
+    }
 }
 
 .chatbot-header h2 {
@@ -373,8 +398,20 @@ body.night-mode {
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    z-index: 1; /* Ensure text stays above background elements */
-    position: relative; /* So text isn't affected by parent overflow */
+    z-index: 1;
+    position: relative;
+    animation: fadeInUp 0.5s ease-out;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .chatbot-header .logo {
@@ -399,7 +436,6 @@ body.night-mode {
     background: linear-gradient(90deg, rgba(255,255,255,0.3), transparent);
     border-radius: 4px;
 }
-
 
 
 .message {

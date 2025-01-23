@@ -36,7 +36,7 @@ export function useSignUpAuth() {
         });
       }
       
-      window.location.href = '/splashscreen.html';
+      window.location.href = '/splashscreen';
     } catch (err: any) {
       // Provide more specific error messages
       let errorMessage = 'Failed to create account';
@@ -74,7 +74,7 @@ export function useSignUpAuth() {
         });
       }
       
-      window.location.href = '/splashscreen.html';
+      window.location.href = '/splashscreen';
     } catch (err: any) {
       let errorMessage = 'Failed to sign up with Google';
       if (err.code === 'auth/popup-closed-by-user') {

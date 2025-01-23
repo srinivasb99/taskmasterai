@@ -343,6 +343,27 @@ body.night-mode {
     font-weight: 600;
     letter-spacing: 0.5px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Add subtle shadow for depth */
+    position: relative; /* For positioning child elements */
+    overflow: hidden; /* Hide any overflow from decorative elements */
+}
+
+.chatbot-header::before {
+    content: "";
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255,255,255,0.2) 20%, transparent 60%);
+    transform: rotate(25deg);
+    animation: rotateBackground 10s linear infinite; /* Subtle background animation */
+    z-index: 0; /* Ensure it stays behind content */
+}
+
+@keyframes rotateBackground {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
 
 .chatbot-header h2 {
@@ -352,7 +373,33 @@ body.night-mode {
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    z-index: 1; /* Ensure text stays above background elements */
+    position: relative; /* So text isn't affected by parent overflow */
 }
+
+.chatbot-header .logo {
+    position: absolute;
+    top: 50%;
+    left: 16px;
+    transform: translateY(-50%);
+    height: 40px;
+    width: 40px;
+    background: url('logo.svg') no-repeat center center;
+    background-size: contain;
+    z-index: 1;
+}
+
+.chatbot-header .decorative-line {
+    position: absolute;
+    bottom: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 80%;
+    height: 4px;
+    background: linear-gradient(90deg, rgba(255,255,255,0.3), transparent);
+    border-radius: 4px;
+}
+
 
 
 .message {

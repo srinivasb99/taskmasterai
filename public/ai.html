@@ -2043,7 +2043,8 @@ async function processUserInput(message) {
         clearInterval(messageRotation);
         indicator.remove();
         
-        addMessage(aiResponse);
+        // Add AI response to chat
+        addMessage(response, false); // false for AI message
         
         // Generate new suggestions based on the context
         generateDynamicSuggestions();
@@ -2108,9 +2109,7 @@ async function generateDynamicSuggestions() {
             );
         } else {
             // Suggestion 1: Based on upcoming tasks/deadlines
-            const upcomingTasks = collectionsData.tasks.filter(task => 
-                task.dueDate && task.dueDate.toDate() > new Date() && !task.completed
-            );
+            const upcomingTasks = collectionsData.tasks.filter(task => !task.completed);
             if (upcomingTasks.length > 0) {
                 suggestions.push({
                     icon: `<path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>`,
@@ -2130,7 +2129,7 @@ async function generateDynamicSuggestions() {
             if (activeGoals.length > 0) {
                 suggestions.push({
                     icon: `<path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/>`,
-                    text: `Check your goals progress (${activeGoals.length})`,
+                    text: `Check your current goals (${activeGoals.length})`,
                     action: 'check_goals'
                 });
             } else {
@@ -2211,7 +2210,7 @@ function handleSuggestionClick(action, type) {
             message = 'I want to add a new task';
             break;
         case 'check_goals':
-            message = 'Show me my goals progress';
+            message = 'Show me current goals';
             break;
         case 'set_goal':
             message = 'I want to set a new goal';

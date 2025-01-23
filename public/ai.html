@@ -353,18 +353,83 @@ body.night-mode {
 .chatbot-header::before {
     content: "";
     position: absolute;
-    top: -50%;
-    left: -50%;
-    width: 200%;
-    height: 200%;
-    background: radial-gradient(
-        circle at center,
-        rgba(255,255,255,0.2) 0%,
-        rgba(255,255,255,0.1) 30%,
-        transparent 70%
-    );
-    animation: galaxyRotate 20s linear infinite;
+    inset: 0;
+    background: 
+        radial-gradient(circle at 20% 20%, rgba(255,255,255,0.1) 0%, transparent 10%),
+        radial-gradient(circle at 80% 80%, rgba(255,255,255,0.1) 0%, transparent 10%),
+        radial-gradient(circle at 50% 50%, rgba(255,255,255,0.1) 0%, transparent 20%),
+        linear-gradient(45deg, transparent 48%, rgba(255,255,255,0.05) 50%, transparent 52%),
+        linear-gradient(-45deg, transparent 48%, rgba(255,255,255,0.05) 50%, transparent 52%);
+    background-size: 
+        100px 100px,
+        120px 120px,
+        200px 200px,
+        60px 60px,
+        60px 60px;
+    animation: 
+        neuralPulse1 4s linear infinite,
+        neuralPulse2 6s linear infinite,
+        neuralPulse3 8s linear infinite,
+        gridFlow 20s linear infinite;
     z-index: 0;
+}
+
+@keyframes neuralPulse1 {
+    0%, 100% {
+        background-position: 
+            0 0,
+            80px 80px,
+            0 0,
+            0 0,
+            0 0;
+        opacity: 0.3;
+    }
+    50% {
+        background-position: 
+            20px 20px,
+            100px 100px,
+            20px 20px,
+            0 0,
+            0 0;
+        opacity: 0.6;
+    }
+}
+
+@keyframes neuralPulse2 {
+    0%, 100% {
+        filter: hue-rotate(0deg) brightness(1);
+    }
+    50% {
+        filter: hue-rotate(90deg) brightness(1.2);
+    }
+}
+
+@keyframes neuralPulse3 {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.1);
+    }
+}
+
+@keyframes gridFlow {
+    0% {
+        background-position: 
+            0 0,
+            0 0,
+            0 0,
+            0 0,
+            0 0;
+    }
+    100% {
+        background-position: 
+            100px 100px,
+            120px 120px,
+            200px 200px,
+            60px 60px,
+            60px 60px;
+    }
 }
 
 .chatbot-header::after {
@@ -392,24 +457,6 @@ body.night-mode {
     }
     100% {
         background-position: 0% 50%;
-    }
-}
-
-@keyframes galaxyRotate {
-    0% {
-        transform: rotate(0deg) scale(1);
-    }
-    25% {
-        transform: rotate(90deg) scale(1.1);
-    }
-    50% {
-        transform: rotate(180deg) scale(1);
-    }
-    75% {
-        transform: rotate(270deg) scale(1.1);
-    }
-    100% {
-        transform: rotate(360deg) scale(1);
     }
 }
 
@@ -513,7 +560,6 @@ body.night-mode {
         width: 60%;
     }
 }
-
 
 .message {
     display: flex;

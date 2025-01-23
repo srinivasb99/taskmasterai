@@ -413,7 +413,7 @@ body.night-mode {
 
 .message.user .message-content {
     border-top-right-radius: 4px;
-    background: linear-gradient(135deg, var(--accent-color), #FF1493);
+    background: linear-gradient(135deg, var(--accent-color);
 }
 
 .message-text {
@@ -465,7 +465,7 @@ body.night-mode {
 }
 
 .send-button, .stop-button{
-    background: linear-gradient(135deg, var(--accent-color), #FF1493);
+    background: linear-gradient(135deg, var(--accent-color);
     border: none;
     border-radius: 50%;
     width: 40px;
@@ -2094,6 +2094,9 @@ async function processUserInput(message) {
         generateDynamicSuggestions();
     } catch (error) {
         console.error('Error processing message:', error);
+        // Clear the interval and remove the indicator
+        clearInterval(messageRotation);
+        indicator.remove();
         addMessage("I apologize, but I encountered an error. Please try again.", false);
     }
 }

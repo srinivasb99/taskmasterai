@@ -2081,7 +2081,7 @@ async function processUserInput(message) {
         console.log('Relevant collections:', relevantCollections);
 
         // Pass the AbortController signal to the API call
-        const aiResponse = await queryHuggingFaceAPI(message, userData, username, currentController.signal);
+        const aiResponse = await queryHuggingFaceAPI(message, userData, username);
         conversationHistory.push({ role: 'Assistant', content: aiResponse });
         
         // Clear the interval and remove the indicator

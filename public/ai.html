@@ -739,52 +739,6 @@ body.night-mode {
 }
 
 
-.message-suggestions {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    margin-top: 1rem;
-}
-
-.suggestion-button {
-    background: rgba(79, 70, 229, 0.1);
-    border: 1px solid rgba(79, 70, 229, 0.2);
-    border-radius: 6px;
-    padding: 0.75rem 1rem;
-    color: #fff;
-    text-align: left;
-    cursor: pointer;
-    transition: all 0.2s;
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-}
-
-.suggestion-button:hover {
-    background: rgba(79, 70, 229, 0.2);
-    transform: translateX(4px);
-}
-
-.suggestion-icon {
-    width: 20px;
-    height: 20px;
-    flex-shrink: 0;
-}
-
-.suggestion-text {
-    flex-grow: 1;
-}
-
-.suggestion-arrow {
-    width: 16px;
-    height: 16px;
-    opacity: 0.5;
-    transition: opacity 0.2s;
-}
-
-.suggestion-button:hover .suggestion-arrow {
-    opacity: 1;
-}
 
     </style>
 </head>
@@ -896,12 +850,28 @@ body.night-mode {
             </div>
             <div class="message-content">
                 <div class="message-text">Hello! I'm TaskMaster, your productivity assistant. How can I assist you today?</div>
-                <div class="message-suggestions" id="messageSuggestions">
-                    <!-- Dynamic suggestions will be inserted here -->
+                <div class="message-suggestions">
+                    <div class="option" data-action="show_upcoming_tasks">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        Review your upcoming tasks
+                    </div>
+                    <div class="option" data-action="set_goal">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/>
+                        </svg>
+                        Set a new goal
+                    </div>
+                    <div class="option" data-action="new_project">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 5v14m-7-7h14"/>
+                        </svg>
+                        Start a new project
+                    </div>
                 </div>
                 <div class="message-time">Just now</div>
             </div>
-        </div>
         </div>
 <div class="chat-input-container">
     <div class="chat-input-wrapper">
@@ -2053,6 +2023,144 @@ document.addEventListener('DOMContentLoaded', function() {
             window.location.href = "login";
         }
     });
+});
+
+// Function to generate dynamic suggestions based on user data
+async function generateDynamicSuggestions() {
+    const user = firebase.auth().currentUser;
+    if (!user) return;
+
+    try {
+        // Fetch data from all collections
+        const collections = ['tasks', 'goals', 'projects', 'plans'];
+        const collectionsData = {};
+
+        for (const collection of collections) {
+            const snapshot = await db.collection(collection)
+                .where('userId', '==', user.uid)
+                .orderBy('timestamp', 'desc')
+                .limit(5)
+                .get();
+
+            collectionsData[collection] = snapshot.docs.map(doc => doc.data());
+        }
+
+        // Generate suggestions based on the data
+        const suggestions = [];
+
+        // Suggestion 1: Based on upcoming tasks/deadlines
+        const upcomingTasks = collectionsData.tasks.filter(task => 
+            task.dueDate && new Date(task.dueDate.seconds * 1000) > new Date()
+        );
+        if (upcomingTasks.length > 0) {
+            suggestions.push({
+                icon: `<path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>`,
+                text: `Review your ${upcomingTasks.length} upcoming tasks`,
+                action: 'show_upcoming_tasks'
+            });
+        } else {
+            suggestions.push({
+                icon: `<path d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"/>`,
+                text: "Add your first task",
+                action: 'add_task'
+            });
+        }
+
+        // Suggestion 2: Based on goals progress
+        const activeGoals = collectionsData.goals.filter(goal => !goal.completed);
+        if (activeGoals.length > 0) {
+            suggestions.push({
+                icon: `<path d="M20 12V8h-4m4 4v4h-4m4-4H4m0-4h4m-4 4v4h4m-4-4h4"/>`,
+                text: `Check your goals progress`,
+                action: 'check_goals'
+            });
+        } else {
+            suggestions.push({
+                icon: `<path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/>`,
+                text: "Set a new goal",
+                action: 'set_goal'
+            });
+        }
+
+        // Suggestion 3: Based on active projects
+        const activeProjects = collectionsData.projects.filter(project => !project.completed);
+        if (activeProjects.length > 0) {
+            suggestions.push({
+                icon: `<path d="M3 3h18v18H3zM8 12h8"/>`,
+                text: `View your active projects`,
+                action: 'view_projects'
+            });
+        } else {
+            suggestions.push({
+                icon: `<path d="M12 5v14m-7-7h14"/>`,
+                text: "Start a new project",
+                action: 'new_project'
+            });
+        }
+
+        // Update the suggestions in the UI
+        const suggestionsContainer = document.querySelector('.message-suggestions');
+        suggestionsContainer.innerHTML = suggestions.map(suggestion => `
+            <div class="option" data-action="${suggestion.action}">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    ${suggestion.icon}
+                </svg>
+                ${suggestion.text}
+            </div>
+        `).join('');
+
+        // Add click handlers for suggestions
+        suggestionsContainer.querySelectorAll('.option').forEach(button => {
+            button.addEventListener('click', () => handleSuggestionClick(button.dataset.action));
+        });
+
+    } catch (error) {
+        console.error('Error generating suggestions:', error);
+    }
+}
+
+// Handle suggestion clicks
+function handleSuggestionClick(action) {
+    let message = '';
+    switch (action) {
+        case 'show_upcoming_tasks':
+            message = 'Show me my upcoming tasks';
+            break;
+        case 'add_task':
+            message = 'I want to add a new task';
+            break;
+        case 'check_goals':
+            message = 'Show me my goals progress';
+            break;
+        case 'set_goal':
+            message = 'I want to set a new goal';
+            break;
+        case 'view_projects':
+            message = 'Show me my active projects';
+            break;
+        case 'new_project':
+            message = 'I want to start a new project';
+            break;
+    }
+
+    if (message) {
+        // Add the message to the chat
+        addUserMessage(message);
+        // Process the message
+        processUserInput(message);
+    }
+}
+
+// Initialize suggestions
+document.addEventListener('DOMContentLoaded', () => {
+    generateDynamicSuggestions();
+});
+
+// Update suggestions when user logs in
+firebase.auth().onAuthStateChanged(user => {
+    if (user) {
+        generateDynamicSuggestions();
+    }
 });
 </script>
 

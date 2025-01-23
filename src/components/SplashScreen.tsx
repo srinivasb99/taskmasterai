@@ -39,7 +39,7 @@ function SplashScreen() {
     {
       icon: Bot,
       title: 'AI Chat Bot',
-      description: 'Your personal productivity assistant powered by advanced AI. Get instant answers to complex questions, receive suggestions for task optimization, and get help with time management. The AI learns from your work patterns to provide personalized productivity tips, helps break down large projects into manageable tasks, and can even draft responses or summarize long content for you. Available 24/7 for everything from quick queries to deep problem-solving.',
+      description: 'Your personal productivity assistant powered by advanced AI. Get instant answers to complex questions, receive suggestions for task optimization, and get help with time management. The AI learns from your work patterns to provide personalized productivity tips, helps break down large projects into manageable tasks, and can even draft responses or summarize long content for you. With access to your notes, it can answer your questions, help you organize and retrieve information, and assist with your tasks, goals, projects, plans, and events—anything you need to stay on top of your life. Available 24/7 for everything from quick queries to deep problem-solving, it’s your ultimate tool for productivity and organization.',
       isNew: false,
       link: '/ai.html'
     },
@@ -102,12 +102,12 @@ function SplashScreen() {
         </svg>
         <h1 className="text-3xl md:text-4xl font-bold text-white mb-3 animate-slide-up">
           Welcome to{' '}
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400 animate-gradient">
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-indigo-400 animate-gradient glow-text">
             TaskMaster AI
           </span>
         </h1>
         <p className="text-base md:text-lg text-gray-300 animate-fade-in-delay">
-          Here's what I can do to supercharge your productivity
+          Here's what I can do to <span className="font-bold">supercharge</span> your productivity
         </p>
       </div>
 
@@ -127,14 +127,14 @@ function SplashScreen() {
                 </h3>
                 <a
                   href={features[currentFeatureIndex].link}
-                  className="px-3 py-1 text-xs font-medium text-indigo-400 bg-indigo-500/10 rounded-full hover:bg-indigo-500/20 transition-colors"
+                  className="px-3 py-1 text-xs font-medium text-white bg-indigo-500 rounded-full hover:bg-indigo-600 transition-all duration-300"
                 >
                   Try Now
                 </a>
               </div>
             </div>
             {features[currentFeatureIndex].isNew && (
-              <span className="px-2 py-1 text-xs font-semibold text-indigo-400 bg-indigo-500/10 rounded-full">
+              <span className="px-2 py-1 text-xs font-bold text-transparent bg-clip-text bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 rounded-full beta-tag">
                 BETA
               </span>
             )}
@@ -226,6 +226,28 @@ function SplashScreen() {
           }
         }
 
+        @keyframes glow {
+          0%, 100% {
+            text-shadow: 0 0 20px rgba(129, 140, 248, 0.5),
+                         0 0 40px rgba(129, 140, 248, 0.2);
+          }
+          50% {
+            text-shadow: 0 0 30px rgba(129, 140, 248, 0.8),
+                         0 0 60px rgba(129, 140, 248, 0.4);
+          }
+        }
+
+        @keyframes beta-pulse {
+          0%, 100% {
+            box-shadow: 0 0 15px rgba(236, 72, 153, 0.3),
+                       0 0 30px rgba(168, 85, 247, 0.2);
+          }
+          50% {
+            box-shadow: 0 0 25px rgba(236, 72, 153, 0.5),
+                       0 0 50px rgba(168, 85, 247, 0.3);
+          }
+        }
+
         .animate-slide-up {
           animation: slide-up 0.6s ease-out forwards;
         }
@@ -242,6 +264,23 @@ function SplashScreen() {
         .animate-gradient {
           background-size: 200% 200%;
           animation: gradient 4s ease infinite;
+        }
+
+        .glow-text {
+          animation: glow 2s ease-in-out infinite;
+        }
+
+        .beta-tag {
+          position: relative;
+          animation: beta-pulse 2s ease-in-out infinite;
+          background: linear-gradient(45deg, #EC4899, #A855F7, #6366F1);
+          background-size: 200% 200%;
+          animation: gradient 2s ease infinite, beta-pulse 2s ease-in-out infinite;
+          -webkit-background-clip: text;
+          padding: 0.25rem 0.75rem;
+          border-radius: 9999px;
+          font-weight: bold;
+          border: 1px solid rgba(236, 72, 153, 0.3);
         }
       `}</style>
     </div>

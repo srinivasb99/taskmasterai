@@ -2031,17 +2031,11 @@ document.addEventListener('DOMContentLoaded', function() {
 // Function to process user input
 async function processUserInput(message) {
     try {
-        // Show typing indicator
-        showTypingIndicator();
-        
         // Add user message to chat
         addMessage(message, 'user');
         
         // Get the response from the API
         const response = await queryHuggingFaceAPI(message);
-        
-        // Hide typing indicator
-        hideTypingIndicator();
         
         // Add AI response to chat
         addMessage(response, 'ai');
@@ -2050,7 +2044,6 @@ async function processUserInput(message) {
         generateDynamicSuggestions();
     } catch (error) {
         console.error('Error processing message:', error);
-        hideTypingIndicator();
         addMessage("I apologize, but I encountered an error. Please try again.", 'ai');
     }
 }

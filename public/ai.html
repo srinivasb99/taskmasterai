@@ -1361,43 +1361,39 @@ function processAIResponse(response, questionId) {
     return container;
 }
 
-function showTypingIndicator(user) {
-    // Dynamically retrieve username (if not already defined elsewhere)
-    const username = user.displayName || user.email;
-
-    const thinkingMessages = (username) => [
-        `Gathering thoughts...`,
-        `Ensuring accuracy...`,
-        `Processing information...`,
-        `Analyzing context...`,
-        `Formulating response...`,
-        `Checking sources...`,
-        `Organizing ideas...`,
-        `Evaluating possibilities...`,
-        `Sifting through data...`,
-        `Synthesizing concepts...`,
-        `Reviewing patterns...`,
-        `Cross-referencing details...`,
-        `Comparing options...`,
-        `Deliberating outcomes...`,
-        `Generating insights...`,
-        `Consolidating information...`,
-        `Seeking clarity...`,
-        `Building a response...`,
-        `Exploring solutions...`,
-        `Verifying facts...`,
-        `Validating assumptions...`,
-        `Compiling thoughts...`,
-        `Finding the right words...`,
-        `Contemplating answers...`,
-        `Aligning ideas...`,
-        `Tailoring response for ${username}...`,
-        `Personalizing solution for ${username}...`,
-        `Adapting context for ${username}...`,
-        `Fine-tuning message for ${username}...`,
-        `Crafting a custom reply for ${username}...`,
-        `Customizing feedback for ${username}...`
-    ];
+function showTypingIndicator() {
+const thinkingMessages = [
+    "Gathering thoughts...",
+    "Ensuring accuracy...",
+    "Processing information...",
+    "Analyzing context...",
+    "Formulating response...",
+    "Checking sources...",
+    "Organizing ideas...",
+    "Evaluating possibilities...",
+    "Sifting through data...",
+    "Synthesizing concepts...",
+    "Reviewing patterns...",
+    "Cross-referencing details...",
+    "Comparing options...",
+    "Deliberating outcomes...",
+    "Generating insights...",
+    "Consolidating information...",
+    "Seeking clarity...",
+    "Building a response...",
+    "Exploring solutions...",
+    "Verifying facts...",
+    "Validating assumptions...",
+    "Compiling thoughts...",
+    "Finding the right words...",
+    "Contemplating answers...",
+    "Aligning ideas...",
+    "Tailoring response...",
+    "Personalizing solution...",
+    "Adapting context...",
+    "Fine-tuning message...",
+    "Optimizing response..."
+];
 
     const indicator = document.createElement('div');
     indicator.className = 'message ai';
@@ -1408,7 +1404,7 @@ function showTypingIndicator(user) {
             </svg>
         </div>
         <div class="typing-container">
-            <div class="thinking-text">${thinkingMessages(username)[Math.floor(Math.random() * thinkingMessages(username).length)]}</div>
+            <div class="thinking-text">${thinkingMessages[Math.floor(Math.random() * thinkingMessages.length)]}</div>
             <div class="typing-indicator">
                 <div class="typing-dot"></div>
                 <div class="typing-dot"></div>
@@ -1416,9 +1412,6 @@ function showTypingIndicator(user) {
             </div>
         </div>
     `;
-    
-    // Append indicator to the chat messages container
-    const chatMessages = document.querySelector('.chat-messages');  // Make sure this is correctly referenced
     chatMessages.appendChild(indicator);
     chatMessages.scrollTop = chatMessages.scrollHeight;
 
@@ -1426,9 +1419,9 @@ function showTypingIndicator(user) {
     let messageIndex = 0;
     const thinkingText = indicator.querySelector('.thinking-text');
     const messageRotation = setInterval(() => {
-        messageIndex = (messageIndex + 1) % thinkingMessages(username).length;
+        messageIndex = (messageIndex + 1) % thinkingMessages.length;
         if (thinkingText) {
-            thinkingText.textContent = thinkingMessages(username)[messageIndex];
+            thinkingText.textContent = thinkingMessages[messageIndex];
         }
     }, 2000);
 
@@ -1729,7 +1722,7 @@ Respond concisely to: ${userInput}
             body: JSON.stringify({
                 inputs: systemPrompt,
                 parameters: {
-                    max_new_tokens: 500,
+                    max_new_tokens: 1000,
                     temperature: 0.5,
                     top_p: 0.9,
                     return_full_text: false,

@@ -396,7 +396,7 @@ body.night-mode {
 }
 
 .message.user .message-avatar {
-    background: linear-gradient(135deg, var(--accent-color), #FF1493);
+    background: linear-gradient(135deg, var(--accent-color), var(--accent-color));
 }
 
 .message-content {
@@ -413,7 +413,7 @@ body.night-mode {
 
 .message.user .message-content {
     border-top-right-radius: 4px;
-    background: linear-gradient(135deg, var(--accent-color);
+    background: linear-gradient(135deg, var(--accent-color), #FF1493);
 }
 
 .message-text {
@@ -465,7 +465,7 @@ body.night-mode {
 }
 
 .send-button, .stop-button{
-    background: linear-gradient(135deg, var(--accent-color);
+    background: linear-gradient(135deg, var(--accent-color), var(--accent-color));
     border: none;
     border-radius: 50%;
     width: 40px;
@@ -2093,10 +2093,10 @@ async function processUserInput(message) {
         // Generate new suggestions based on the context
         generateDynamicSuggestions();
     } catch (error) {
-        console.error('Error processing message:', error);
         // Clear the interval and remove the indicator
         clearInterval(messageRotation);
         indicator.remove();
+        console.error('Error processing message:', error);
         addMessage("I apologize, but I encountered an error. Please try again.", false);
     }
 }

@@ -2034,17 +2034,61 @@ async function processUserInput(message) {
         // Add user message to chat
         addMessage(message, true); // true for user message
 
+        conversationHistory.push({ role: 'User', content: message });
+        if (conversationHistory.length > 10) {
+        conversationHistory = conversationHistory.slice(-10);
+       }
+
         const { indicator, messageRotation } = showTypingIndicator();
 
-        // Get the response from the API
-        const response = await queryHuggingFaceAPI(message);
+       const user = firebase.auth().currentUser;
+        if (!user) throw new Error('User not authenticated');
+
+        const username = user.displayName || user.email;
+        const messageLower = message.toLowerCase();
+
+        // Initialize userData
+        let userData = {};
+
+        // Fetch user profile data
+        const userDoc = await db.collection('users').doc(user.uid).get();
+        if (userDoc.exists) {
+            userData.user = userDoc.data();
+        }
+
+        // Determine relevant collections based on message content
+        const relevantCollections = Object.entries(COLLECTION_KEYWORDS)
+            .filter(([_, keywords]) => keywords.some(keyword => messageLower.includes(keyword)))
+            .map(([collection]) => collection);
+
+        // Always include users collection
+        if (!relevantCollections.includes('users')) {
+            relevantCollections.push('users');
+        }
+
+        // Fetch data from all collections
+        const collectionPromises = Object.keys(COLLECTION_SCHEMAS)
+            .map(async (collection) => {
+                const data = await fetchCollectionData(collection, user, relevantCollections);
+                if (data && data.length > 0) {
+                    userData[collection] = data;
+                }
+            });
+
+        await Promise.all(collectionPromises);
+
+        console.log('Fetched user data:', userData);
+        console.log('Relevant collections:', relevantCollections);
+
+        // Pass the AbortController signal to the API call
+        const aiResponse = await queryHuggingFaceAPI(message, userData, username, currentController.signal);
+        conversationHistory.push({ role: 'Assistant', content: aiResponse });
         
         // Clear the interval and remove the indicator
         clearInterval(messageRotation);
         indicator.remove();
         
-        // Add AI response to chat
-        addMessage(response, false); // false for AI message
+        addMessage(aiResponse);
         
         // Generate new suggestions based on the context
         generateDynamicSuggestions();
@@ -2069,7 +2113,7 @@ async function generateDynamicSuggestions() {
             const snapshot = await firebase.firestore().collection(collection)
                 .where('userId', '==', user.uid)
                 .orderBy('dueDate', 'asc')
-                .limit(5)
+                .limit(100)
                 .get();
 
             collectionsData[collection] = snapshot.docs.map(doc => ({

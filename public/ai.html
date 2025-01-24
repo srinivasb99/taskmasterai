@@ -2300,7 +2300,7 @@ async function processUserInput(message) {
         // Generate new suggestions based on the context
         generateDynamicSuggestions();
     } catch (error) {
-        const { indicator, messageRotation } = showTypingIndicator();
+
 
         console.error('Error processing message:', error);
         // Clear the interval and remove the indicator

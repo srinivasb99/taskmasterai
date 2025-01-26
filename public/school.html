@@ -1,5 +1,3 @@
-
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -127,17 +125,17 @@
         <div class="status-bar" id="statusBar"></div>
         <div class="loader" id="loader"></div>
         <iframe 
-        id="proxyFrame"
-        sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals allow-presentation allow-downloads"
-        scrolling="yes"
-        allow="fullscreen"
-        crossorigin="anonymous"
-        style="width: 100%; height: 100vh; border: none; overflow: auto;"
-    ></iframe>
+            id="proxyFrame"
+            scrolling="yes"
+            allow="fullscreen"
+            crossorigin="anonymous"
+            style="width: 100%; height: 100vh; border: none; overflow: auto;">
+        </iframe>
     
     </div>
 
     <script>
+    
     const PROXY = 'https://api.allorigins.win/raw?url=';
     let frame = document.getElementById('proxyFrame');
     const statusBar = document.getElementById('statusBar');
@@ -145,6 +143,9 @@
 
     Object.defineProperty(navigator, 'webdriver', { value: false });
     Object.defineProperty(window, 'chrome', { value: undefined });
+
+    // Set a cookie in the parent site (to allow cross-origin cookies)
+    document.cookie = "sessionToken=abc123; SameSite=None; Secure";
 
     async function fetchAndProcess(url) {
         const proxyUrl = PROXY + encodeURIComponent(url);
@@ -180,15 +181,21 @@
             
             const newFrame = document.createElement('iframe');
             newFrame.srcdoc = content;
-            newFrame.setAttribute('sandbox allow-same-origin allow-scripts allow-forms allow-popups allow-modals allow-presentation allow-downloads allow-storage-access-by-user-activation', frame.getAttribute('sandbox allow-same-origin allow-scripts allow-forms allow-popups allow-modals allow-presentation allow-downloads allow-storage-access-by-user-activation'));
             newFrame.setAttribute('allow', frame.getAttribute('allow'));
             newFrame.style.cssText = frame.style.cssText;
             
+            // Set a cookie inside the iframe content (this should be added dynamically in the iframe)
             newFrame.onload = () => {
                 loader.style.display = 'none';
                 statusBar.style.display = 'none';
                 
                 try {
+                    // In the iframe's content, add this script to set the cookie:
+                    const script = document.createElement('script');
+                    script.textContent = `document.cookie = "userToken=xyz789; SameSite=None; Secure";`;
+                    newFrame.contentWindow.document.head.appendChild(script);
+
+                    // Process links inside the iframe
                     newFrame.contentDocument.querySelectorAll('a').forEach(link => {
                         link.onclick = (e) => {
                             e.preventDefault();

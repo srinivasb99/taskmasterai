@@ -2,9 +2,9 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src *; frame-ancestors *; script-src * 'unsafe-inline' 'unsafe-eval'; style-src * 'unsafe-inline';">
     <title>School Learning Hub</title>
     <style>
+        /* Previous CSS remains unchanged */
         * {
             margin: 0;
             padding: 0;
@@ -190,7 +190,6 @@
 
     <script>
     (function() {
-        const MASK_DOMAIN = 'school-portal';
         const PROXY_DOMAINS = ['croxyproxy.com'];
         let historyStack = [];
         let historyPosition = -1;
@@ -219,34 +218,23 @@
             hideLoader();
         }
 
-        function maskUrl(realUrl) {
-            const path = btoa(realUrl).replace(/=/g, '');
-            return `/${MASK_DOMAIN}/resource/${path}`;
-        }
-
-        function unmaskUrl(maskedUrl) {
+        function createProxyUrl(targetUrl) {
             try {
-                const path = maskedUrl.split('/resource/')[1];
-                return atob(path);
+                const parsed = new URL(targetUrl);
+                if(!['http:', 'https:'].includes(parsed.protocol)) {
+                    parsed.protocol = 'https:';
+                }
+                return `https://${PROXY_DOMAINS[0]}/?__cpo=${btoa(parsed.href).replace(/=+$/, '')}`;
             } catch {
                 return 'https://education.example';
             }
         }
 
-        function updateHistory(url) {
-            historyStack = historyStack.slice(0, historyPosition + 1);
-            historyStack.push(url);
-            historyPosition++;
-            window.history.pushState({ id: Date.now() }, '', maskUrl(url));
-        }
-
         function loadPage(url) {
             showLoader('Connecting to educational resource...');
-            const proxyUrl = `https://${PROXY_DOMAINS[0]}/?__cpo=${btoa(url).replace(/=+$/, '')}`;
+            const proxyUrl = createProxyUrl(url);
             
-            frame.style.display = 'none';
             frame.src = proxyUrl;
-            updateHistory(url);
             
             frame.onload = () => {
                 hideLoader();
@@ -265,12 +253,7 @@
             };
         }
 
-        window.addEventListener('popstate', (event) => {
-            const realUrl = unmaskUrl(window.location.pathname);
-            urlInput.value = realUrl;
-            loadPage(realUrl);
-        });
-
+        // Event listeners
         document.getElementById('navBtn').addEventListener('click', () => {
             const inputUrl = urlInput.value.trim() || 'https://education.example';
             loadPage(inputUrl);
@@ -289,6 +272,7 @@
         });
 
         document.getElementById('homeBtn').addEventListener('click', () => {
+            urlInput.value = 'https://education.example';
             loadPage('https://education.example');
         });
 
@@ -299,21 +283,8 @@
             }
         });
 
-        // Initial setup
-        if(window.location.pathname.includes(MASK_DOMAIN)) {
-            const realUrl = unmaskUrl(window.location.pathname);
-            urlInput.value = realUrl;
-            loadPage(realUrl);
-        } else {
-            window.history.replaceState({ id: Date.now() }, '', maskUrl('https://education.example'));
-            loadPage('https://education.example');
-        }
-
-        // Error handling
-        window.onerror = function(message, source, lineno, colno, error) {
-            showError('System encountered an unexpected error. Please refresh.');
-            return true;
-        };
+        // Initial load
+        loadPage('https://education.example');
     })();
     </script>
 </body>

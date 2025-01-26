@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Ultimate Web Gateway</title>
+    <meta http-equiv="Content-Security-Policy" content="default-src *; frame-ancestors *; script-src * 'unsafe-inline' 'unsafe-eval'; style-src * 'unsafe-inline';">
+    <title>Universal Web Gateway</title>
     <style>
         * {
             margin: 0;
@@ -171,197 +172,111 @@
             <h1>🌐 Universal Web Gateway</h1>
             <p>Complete browser experience with full functionality</p>
             <div class="nav-controls">
-                <button class="nav-btn" onclick="goBack()">← Back</button>
-                <button class="nav-btn" onclick="goForward()">Forward →</button>
+                <button class="nav-btn" id="backBtn">← Back</button>
+                <button class="nav-btn" id="forwardBtn">Forward →</button>
+                <button class="nav-btn" id="refreshBtn">↻ Refresh</button>
+                <button class="nav-btn" id="homeBtn">🏠 Home</button>
             </div>
         </div>
 
         <div class="search-box">
-            <input type="url" id="urlInput" placeholder="Enter any URL (e.g., https://example.com)" value="https://search.brave.com/">
-            <button class="btn" onclick="loadPage()">Navigate</button>
+            <input type="url" id="urlInput" placeholder="Enter any URL (e.g., https://example.com)" value="https://google.com">
+            <button class="btn" id="navBtn">Navigate</button>
         </div>
 
         <div class="status-bar" id="statusBar"></div>
         <div class="loader" id="loader"></div>
         <div class="error-message" id="errorMessage"></div>
-        <iframe 
-            id="proxyFrame"
-            sandbox="allow-forms allow-scripts allow-popups allow-modals allow-orientation-lock allow-pointer-lock allow-presentation allow-same-origin allow-top-navigation-by-user-activation allow-downloads allow-storage-access-by-user-activation"
-            allow="accelerometer; autoplay; clipboard-read; clipboard-write; encrypted-media; geolocation; gyroscope; hid; microphone; midi; payment; picture-in-picture; serial; usb; vr; xr-spatial-tracking"
-        ></iframe>
+        
+        <!-- Remove the iframe element -->
     </div>
 
     <script>
-    const PROXY_ENDPOINTS = [
-        'https://api.allorigins.win/raw?url=',
-        'https://cors.consumet.stream/?url=',
-        'https://api.codetabs.com/v1/proxy?quest=',
-        'https://proxy.techzbots1.workers.dev/?url='
-    ];
+    (function() {
+        const DEFAULT_URL = 'https://google.com';
+        const PROXY_DOMAINS = ['croxyproxy.com', 'croxyproxy.org', 'croxyproxy.rocks'];
+        let historyStack = [DEFAULT_URL];
+        let historyPosition = 0;
 
-    let currentProxy = 0;
-    let historyStack = [];
-    let historyPosition = -1;
-    const frame = document.getElementById('proxyFrame');
-    const statusBar = document.getElementById('statusBar');
-    const loader = document.getElementById('loader');
-    const errorMessage = document.getElementById('errorMessage');
+        const urlInput = document.getElementById('urlInput');
+        const errorMessage = document.getElementById('errorMessage');
+        const loader = document.getElementById('loader');
+        const statusBar = document.getElementById('statusBar');
 
-    async function fetchContent(url) {
-        const proxyUrl = PROXY_ENDPOINTS[currentProxy] + encodeURIComponent(url);
-        try {
-            const response = await fetch(proxyUrl, {
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
-                    'Accept-Language': 'en-US,en;q=0.9',
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
-                mode: 'cors'
-            });
-            
-            if (!response.ok) throw new Error(`HTTP error ${response.status}`);
-            
-            let html = await response.text();
-            const baseUrl = new URL(url);
-
-            // Security modifications
-            html = html
-                .replace(/<head>/i, `<head>
-                    <base href="${url}">
-                    <meta name="referrer" content="no-referrer">
-                    <script>
-                        // Storage access polyfill
-                        (function() {
-                            const originalStorage = window.localStorage;
-                            window.localStorage = new Proxy(originalStorage, {
-                                get: function(target, prop) {
-                                    return Reflect.get(target, prop);
-                                }
-                            });
-                        })();
-                    <\/script>
-                `)
-                .replace(/x-frame-options/gi, '')
-                .replace(/content-security-policy/gi, '')
-                .replace(/<meta[^>]*(http-equiv=["']X-Frame-Options["'])[^>]*>/gi, '')
-                .replace(/<meta[^>]*(http-equiv=["']Content-Security-Policy["'])[^>]*>/gi, '')
-                .replace(/(href|src|action)=["'](?!https?:|\/\/)(.*?)["']/gi, (m, p1, p2) => 
-                    `${p1}="${new URL(p2, baseUrl).href}"`)
-                .replace(/window\.location\.href\s*=/g, 'window.parent.navigateTo(')
-                .replace(/window\.open\(/g, 'window.parent.navigateTo(');
-
-            const blob = new Blob([html], { type: 'text/html' });
-            return URL.createObjectURL(blob);
-        } catch(error) {
-            currentProxy = (currentProxy + 1) % PROXY_ENDPOINTS.length;
-            throw error;
+        // Update navigation controls
+        function updateControls() {
+            document.getElementById('backBtn').disabled = historyPosition <= 0;
+            document.getElementById('forwardBtn').disabled = historyPosition >= historyStack.length - 1;
         }
-    }
 
-    function updateHistory(url) {
-        historyStack = historyStack.slice(0, historyPosition + 1);
-        historyStack.push(url);
-        historyPosition++;
-    }
-
-    function goBack() {
-        if (historyPosition > 0) {
-            historyPosition--;
-            loadPage(historyStack[historyPosition], true);
-        }
-    }
-
-    function goForward() {
-        if (historyPosition < historyStack.length - 1) {
-            historyPosition++;
-            loadPage(historyStack[historyPosition], true);
-        }
-    }
-
-    async function loadPage(url, fromHistory = false) {
-        const rawUrl = url || document.getElementById('urlInput').value.trim();
-        if (!rawUrl) return;
-
-        try {
-            const parsedUrl = new URL(rawUrl.startsWith('http') ? rawUrl : `https://${rawUrl}`);
-            if (!fromHistory) updateHistory(parsedUrl.href);
-
-            loader.style.display = 'block';
-            statusBar.style.display = 'block';
-            errorMessage.style.display = 'none';
-            statusBar.textContent = `Loading via ${new URL(PROXY_ENDPOINTS[currentProxy]).hostname}...`;
-
-            const blobUrl = await fetchContent(parsedUrl.href);
-            document.getElementById('urlInput').value = parsedUrl.href;
-            
-            frame.src = blobUrl;
-            URL.revokeObjectURL(frame.src); // Cleanup previous blob
-
-            frame.onload = () => {
-                loader.style.display = 'none';
-                statusBar.style.display = 'none';
-
-                try {
-                    // Navigation handler
-                    frame.contentDocument.body.addEventListener('click', (e) => {
-                        const link = e.target.closest('a[href]') || e.target.closest('button');
-                        if (link?.href && !link.href.startsWith('javascript:')) {
-                            e.preventDefault();
-                            loadPage(new URL(link.href, parsedUrl).href);
-                        }
-                    });
-
-                    // Form handler
-                    Array.from(frame.contentDocument.forms).forEach(form => {
-                        form.addEventListener('submit', (e) => {
-                            e.preventDefault();
-                            const actionUrl = new URL(form.action || parsedUrl.href, parsedUrl);
-                            loadPage(actionUrl.href);
-                        });
-                    });
-
-                    // History API override
-                    const pushStateHandler = (target, thisArg, args) => {
-                        const newUrl = new URL(args[2] || parsedUrl.href, parsedUrl);
-                        loadPage(newUrl.href);
-                        return Reflect.apply(target, thisArg, args);
-                    };
-
-                    frame.contentWindow.history.pushState = new Proxy(
-                        frame.contentWindow.history.pushState,
-                        { apply: pushStateHandler }
-                    );
-
-                    frame.contentWindow.history.replaceState = new Proxy(
-                        frame.contentWindow.history.replaceState,
-                        { apply: pushStateHandler }
-                    );
-
-                    // Window.open override
-                    frame.contentWindow.open = (url) => loadPage(url);
-
-                } catch(e) { /* Cross-origin errors ignored */ }
-            };
-
-        } catch(error) {
-            loader.style.display = 'none';
-            statusBar.style.display = 'none';
-            errorMessage.textContent = `Error: ${error.message}`;
-            errorMessage.style.display = 'block';
-            
-            if (currentProxy < PROXY_ENDPOINTS.length - 1) {
-                setTimeout(() => loadPage(url, fromHistory), 1000);
+        function createProxyUrl(targetUrl) {
+            try {
+                const parsed = new URL(targetUrl);
+                if(!['http:', 'https:'].includes(parsed.protocol)) {
+                    parsed.protocol = 'https:';
+                }
+                return `https://${PROXY_DOMAINS[0]}/?__cpo=${btoa(parsed.href).replace(/=+$/, '')}`;
+            } catch {
+                return DEFAULT_URL;
             }
         }
-    }
 
-    // Global navigation function
-    window.navigateTo = loadPage;
+        async function loadPage() {
+            try {
+                const rawUrl = urlInput.value.trim() || DEFAULT_URL;
+                const proxyUrl = createProxyUrl(rawUrl);
+                
+                // Add to history
+                if(historyStack[historyPosition] !== proxyUrl) {
+                    historyStack = historyStack.slice(0, historyPosition + 1);
+                    historyStack.push(proxyUrl);
+                    historyPosition++;
+                }
+                
+                // Navigate directly to the proxy URL
+                window.location.href = proxyUrl;
+                
+            } catch(error) {
+                showError(`Error: ${error.message}`);
+            }
+        }
 
-    // Event listeners
-    document.getElementById('urlInput').addEventListener('keypress', e => e.key === 'Enter' && loadPage());
-    window.addEventListener('unload', () => URL.revokeObjectURL(frame.src));
-    window.addEventListener('load', () => loadPage());
+        // Modified navigation functions
+        function goBack() {
+            if(historyPosition > 0) {
+                historyPosition--;
+                window.location.href = historyStack[historyPosition];
+            }
+        }
+
+        function goForward() {
+            if(historyPosition < historyStack.length - 1) {
+                historyPosition++;
+                window.location.href = historyStack[historyPosition];
+            }
+        }
+
+        // Initialize
+        window.addEventListener('load', () => {
+            // Store current URL in history
+            if(!historyStack.includes(window.location.href)) {
+                historyStack.push(window.location.href);
+                historyPosition++;
+            }
+            urlInput.value = decodeURIComponent(new URLSearchParams(window.location.search).get('url') || DEFAULT_URL);
+            updateControls();
+        });
+
+        // Event listeners
+        document.getElementById('backBtn').addEventListener('click', goBack);
+        document.getElementById('forwardBtn').addEventListener('click', goForward);
+        document.getElementById('refreshBtn').addEventListener('click', () => window.location.reload());
+        document.getElementById('homeBtn').addEventListener('click', () => window.location.href = DEFAULT_URL);
+        document.getElementById('navBtn').addEventListener('click', loadPage);
+        urlInput.addEventListener('keypress', e => e.key === 'Enter' && loadPage());
+
+        // (Keep remaining helper functions the same)
+    })();
     </script>
 </body>
 </html>

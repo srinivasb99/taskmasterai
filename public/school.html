@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta http-equiv="Content-Security-Policy" content="default-src *; frame-ancestors *; script-src * 'unsafe-inline' 'unsafe-eval'; style-src * 'unsafe-inline';">
-    <title>Universal Web Gateway</title>
+    <title>School Learning Hub</title>
     <style>
         * {
             margin: 0;
@@ -13,7 +13,7 @@
         }
 
         body {
-            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+            background: linear-gradient(135deg, #1a3650, #2a4a6d, #3b608d);
             color: #fff;
             min-height: 100vh;
         }
@@ -31,6 +31,7 @@
             background: rgba(255, 255, 255, 0.05);
             border-radius: 15px;
             position: relative;
+            backdrop-filter: blur(5px);
         }
 
         .nav-controls {
@@ -86,8 +87,8 @@
             padding: 1.2rem 2.5rem;
             border: none;
             border-radius: 50px;
-            background: linear-gradient(45deg, #00ff88, #00b4d8);
-            color: #000;
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: #fff;
             font-weight: bold;
             cursor: pointer;
             transition: all 0.3s ease;
@@ -97,17 +98,7 @@
 
         .btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 5px 25px rgba(0, 255, 136, 0.4);
-        }
-
-        #proxyFrame {
-            width: 100%;
-            height: 75vh;
-            border: none;
-            border-radius: 20px;
-            background: rgba(0, 0, 0, 0.3);
-            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
-            margin-top: 1rem;
+            box-shadow: 0 5px 25px rgba(76, 175, 80, 0.4);
         }
 
         .status-bar {
@@ -123,7 +114,7 @@
         .loader {
             display: none;
             border: 4px solid rgba(255, 255, 255, 0.1);
-            border-top: 4px solid #00ff88;
+            border-top: 4px solid #4CAF50;
             border-radius: 50%;
             width: 40px;
             height: 40px;
@@ -136,6 +127,10 @@
             padding: 1rem;
             border-radius: 10px;
             margin-top: 1rem;
+            display: none;
+        }
+
+        #proxyFrame {
             display: none;
         }
 
@@ -169,8 +164,8 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🌐 Universal Web Gateway</h1>
-            <p>Complete browser experience with full functionality</p>
+            <h1>🏫 School Learning Hub</h1>
+            <p>Secure Educational Resources Portal</p>
             <div class="nav-controls">
                 <button class="nav-btn" id="backBtn">← Back</button>
                 <button class="nav-btn" id="forwardBtn">Forward →</button>
@@ -180,102 +175,145 @@
         </div>
 
         <div class="search-box">
-            <input type="url" id="urlInput" placeholder="Enter any URL (e.g., https://example.com)" value="https://google.com">
-            <button class="btn" id="navBtn">Navigate</button>
+            <input type="url" id="urlInput" placeholder="Enter educational resource URL">
+            <button class="btn" id="navBtn">Access Resource</button>
         </div>
 
         <div class="status-bar" id="statusBar"></div>
         <div class="loader" id="loader"></div>
         <div class="error-message" id="errorMessage"></div>
-        
-        <!-- Remove the iframe element -->
+        <iframe 
+            id="proxyFrame"
+            sandbox="allow-forms allow-scripts allow-popups allow-modals allow-orientation-lock allow-pointer-lock allow-presentation allow-top-navigation allow-downloads allow-same-origin allow-popups-to-escape-sandbox"
+        ></iframe>
     </div>
 
     <script>
     (function() {
-        const DEFAULT_URL = 'https://google.com';
-        const PROXY_DOMAINS = ['croxyproxy.com', 'croxyproxy.org', 'croxyproxy.rocks'];
-        let historyStack = [DEFAULT_URL];
-        let historyPosition = 0;
+        const MASK_DOMAIN = 'school-portal';
+        const PROXY_DOMAINS = ['croxyproxy.com'];
+        let historyStack = [];
+        let historyPosition = -1;
 
+        const frame = document.getElementById('proxyFrame');
         const urlInput = document.getElementById('urlInput');
-        const errorMessage = document.getElementById('errorMessage');
         const loader = document.getElementById('loader');
         const statusBar = document.getElementById('statusBar');
+        const errorMessage = document.getElementById('errorMessage');
 
-        // Update navigation controls
-        function updateControls() {
-            document.getElementById('backBtn').disabled = historyPosition <= 0;
-            document.getElementById('forwardBtn').disabled = historyPosition >= historyStack.length - 1;
+        function showLoader(message = 'Securing connection...') {
+            loader.style.display = 'block';
+            statusBar.style.display = 'block';
+            statusBar.textContent = message;
+            errorMessage.style.display = 'none';
         }
 
-        function createProxyUrl(targetUrl) {
+        function hideLoader() {
+            loader.style.display = 'none';
+            statusBar.style.display = 'none';
+        }
+
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+            hideLoader();
+        }
+
+        function maskUrl(realUrl) {
+            const path = btoa(realUrl).replace(/=/g, '');
+            return `/${MASK_DOMAIN}/resource/${path}`;
+        }
+
+        function unmaskUrl(maskedUrl) {
             try {
-                const parsed = new URL(targetUrl);
-                if(!['http:', 'https:'].includes(parsed.protocol)) {
-                    parsed.protocol = 'https:';
-                }
-                return `https://${PROXY_DOMAINS[0]}/?__cpo=${btoa(parsed.href).replace(/=+$/, '')}`;
+                const path = maskedUrl.split('/resource/')[1];
+                return atob(path);
             } catch {
-                return DEFAULT_URL;
+                return 'https://education.example';
             }
         }
 
-        async function loadPage() {
-            try {
-                const rawUrl = urlInput.value.trim() || DEFAULT_URL;
-                const proxyUrl = createProxyUrl(rawUrl);
-                
-                // Add to history
-                if(historyStack[historyPosition] !== proxyUrl) {
-                    historyStack = historyStack.slice(0, historyPosition + 1);
-                    historyStack.push(proxyUrl);
-                    historyPosition++;
+        function updateHistory(url) {
+            historyStack = historyStack.slice(0, historyPosition + 1);
+            historyStack.push(url);
+            historyPosition++;
+            window.history.pushState({ id: Date.now() }, '', maskUrl(url));
+        }
+
+        function loadPage(url) {
+            showLoader('Connecting to educational resource...');
+            const proxyUrl = `https://${PROXY_DOMAINS[0]}/?__cpo=${btoa(url).replace(/=+$/, '')}`;
+            
+            frame.style.display = 'none';
+            frame.src = proxyUrl;
+            updateHistory(url);
+            
+            frame.onload = () => {
+                hideLoader();
+                try {
+                    const iframeUrl = frame.contentWindow.location.href;
+                    if(!iframeUrl.includes(PROXY_DOMAINS[0])) {
+                        urlInput.value = iframeUrl;
+                    }
+                } catch(e) {
+                    // Handle cross-origin errors
                 }
-                
-                // Navigate directly to the proxy URL
-                window.location.href = proxyUrl;
-                
-            } catch(error) {
-                showError(`Error: ${error.message}`);
-            }
+            };
+
+            frame.onerror = () => {
+                showError('Security verification failed. Please try another resource.');
+            };
         }
 
-        // Modified navigation functions
-        function goBack() {
-            if(historyPosition > 0) {
-                historyPosition--;
-                window.location.href = historyStack[historyPosition];
-            }
-        }
-
-        function goForward() {
-            if(historyPosition < historyStack.length - 1) {
-                historyPosition++;
-                window.location.href = historyStack[historyPosition];
-            }
-        }
-
-        // Initialize
-        window.addEventListener('load', () => {
-            // Store current URL in history
-            if(!historyStack.includes(window.location.href)) {
-                historyStack.push(window.location.href);
-                historyPosition++;
-            }
-            urlInput.value = decodeURIComponent(new URLSearchParams(window.location.search).get('url') || DEFAULT_URL);
-            updateControls();
+        window.addEventListener('popstate', (event) => {
+            const realUrl = unmaskUrl(window.location.pathname);
+            urlInput.value = realUrl;
+            loadPage(realUrl);
         });
 
-        // Event listeners
-        document.getElementById('backBtn').addEventListener('click', goBack);
-        document.getElementById('forwardBtn').addEventListener('click', goForward);
-        document.getElementById('refreshBtn').addEventListener('click', () => window.location.reload());
-        document.getElementById('homeBtn').addEventListener('click', () => window.location.href = DEFAULT_URL);
-        document.getElementById('navBtn').addEventListener('click', loadPage);
-        urlInput.addEventListener('keypress', e => e.key === 'Enter' && loadPage());
+        document.getElementById('navBtn').addEventListener('click', () => {
+            const inputUrl = urlInput.value.trim() || 'https://education.example';
+            loadPage(inputUrl);
+        });
 
-        // (Keep remaining helper functions the same)
+        document.getElementById('backBtn').addEventListener('click', () => {
+            window.history.back();
+        });
+
+        document.getElementById('forwardBtn').addEventListener('click', () => {
+            window.history.forward();
+        });
+
+        document.getElementById('refreshBtn').addEventListener('click', () => {
+            frame.contentWindow.location.reload();
+        });
+
+        document.getElementById('homeBtn').addEventListener('click', () => {
+            loadPage('https://education.example');
+        });
+
+        urlInput.addEventListener('keypress', e => {
+            if(e.key === 'Enter') {
+                const inputUrl = urlInput.value.trim() || 'https://education.example';
+                loadPage(inputUrl);
+            }
+        });
+
+        // Initial setup
+        if(window.location.pathname.includes(MASK_DOMAIN)) {
+            const realUrl = unmaskUrl(window.location.pathname);
+            urlInput.value = realUrl;
+            loadPage(realUrl);
+        } else {
+            window.history.replaceState({ id: Date.now() }, '', maskUrl('https://education.example'));
+            loadPage('https://education.example');
+        }
+
+        // Error handling
+        window.onerror = function(message, source, lineno, colno, error) {
+            showError('System encountered an unexpected error. Please refresh.');
+            return true;
+        };
     })();
     </script>
 </body>

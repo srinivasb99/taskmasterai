@@ -1,5 +1,3 @@
-
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -31,7 +29,7 @@
             flex-direction: column;
             padding: 15px;
             gap: 15px;
-            min-height: 100; /* Critical for flex children */
+            min-height: 100;
         }
 
         .header {
@@ -81,7 +79,7 @@
             border: none;
             border-radius: 8px;
             background: rgba(0, 0, 0, 0.3);
-            height: 100%; /* Critical for flex item */
+            height: 100%;
         }
 
         .status-bar {
@@ -109,7 +107,6 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-
     </style>
 </head>
 <body>
@@ -120,7 +117,7 @@
         </div>
 
         <div class="search-container">
-            <input type="url" id="urlInput" placeholder="https://example.com">
+            <input type="url" id="urlInput" placeholder="https://github.com">
             <button class="btn" onclick="loadPage()">Start Session</button>
         </div>
 
@@ -128,17 +125,16 @@
         <div class="loader" id="loader"></div>
         <iframe 
             id="proxyFrame"
-            sandbox="allow-forms allow-modals allow-orientation-lock allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-presentation allow-same-origin allow-scripts allow-top-navigation allow-top-navigation-by-user-activation allow-downloads"
+            sandbox="allow-forms allow-modals allow-orientation-lock allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-presentation allow-same-origin allow-scripts allow-top-navigation allow-top-navigation-by-user-activation allow-downloads allow-storage-access-by-user-activation"
             scrolling="yes"
             allow="*"
             crossorigin="use-credentials"
             style="width: 100%; height: 100vh; border: none; overflow: auto;"
         ></iframe>
-    
     </div>
 
     <script>
-    const PROXY = 'https://api.allorigins.win/raw?url=';
+    const PROXY = 'https://cors-anywhere.herokuapp.com/';
     let frame = document.getElementById('proxyFrame');
     const statusBar = document.getElementById('statusBar');
     const loader = document.getElementById('loader');
@@ -147,8 +143,15 @@
     Object.defineProperty(window, 'chrome', { value: undefined });
 
     async function fetchAndProcess(url) {
-        const proxyUrl = PROXY + encodeURIComponent(url);
-        const response = await fetch(proxyUrl);
+        const proxyUrl = PROXY + url;
+        const response = await fetch(proxyUrl, {
+            credentials: 'include',
+            headers: {
+                'Origin': window.location.origin,
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
+        
         if (!response.ok) throw new Error(`Proxy error: ${response.status}`);
         
         const html = await response.text();
@@ -157,7 +160,7 @@
             .replace(/(href|src|action)=("|')(.*?)\2/gi, (match, attr, quote, path) => {
                 try {
                     const absoluteUrl = new URL(path, url).href;
-                    return `${attr}=${quote}${PROXY}${encodeURIComponent(absoluteUrl)}${quote}`;
+                    return `${attr}=${quote}${PROXY}${absoluteUrl}${quote}`;
                 } catch {
                     return match;
                 }
@@ -180,8 +183,7 @@
             
             const newFrame = document.createElement('iframe');
             newFrame.srcdoc = content;
-            // Update sandbox and allow attributes for maximum permissions
-            newFrame.setAttribute('sandbox', 'allow-forms allow-modals allow-orientation-lock allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-presentation allow-same-origin allow-scripts allow-top-navigation allow-top-navigation-by-user-activation allow-downloads');
+            newFrame.setAttribute('sandbox', 'allow-forms allow-modals allow-orientation-lock allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-presentation allow-same-origin allow-scripts allow-top-navigation allow-top-navigation-by-user-activation allow-downloads allow-storage-access-by-user-activation');
             newFrame.setAttribute('allow', '*');
             newFrame.setAttribute('crossorigin', 'use-credentials');
             newFrame.style.cssText = frame.style.cssText;

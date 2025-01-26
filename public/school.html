@@ -142,7 +142,7 @@
         <div class="loader" id="loader"></div>
         <iframe 
             id="proxyFrame"
-            sandbox="allow-forms allow-scripts allow-popups allow-popups-to-escape-sandbox"
+            sandbox="allow-forms allow-scripts allow-popups allow-popups-to-escape-sandbox allow-same-origin"
             allow="fullscreen"
             crossorigin="anonymous"
         ></iframe>
@@ -169,21 +169,11 @@
         try {
             const response = await fetch(proxyUrl);
             if (!response.ok) throw new Error(`Proxy error: ${response.status}`);
-            return await response.text();
+            return proxyUrl; // Return proxy URL directly
         } catch(error) {
             currentProxy = (currentProxy + 1) % PROXY_ENDPOINTS.length;
             throw error;
         }
-    }
-
-    function sanitizeContent(html) {
-        return html
-            .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-            .replace(/document\.(cookie|domain|referrer)/gi, '')
-            .replace(/(local|session)Storage/gi, '')
-            .replace(/<iframe/gi, '<div')
-            .replace(/onload\s*=/gi, 'data-onload=')
-            .replace(/onerror\s*=/gi, 'data-onerror=');
     }
 
     async function loadPage() {
@@ -196,27 +186,27 @@
 
         try {
             const url = rawUrl.startsWith('http') ? rawUrl : `https://${rawUrl}`;
-            const content = await fetchContent(url);
-            const safeContent = sanitizeContent(content);
+            const proxyUrl = await fetchContent(url);
             
-            frame.srcdoc = `<!DOCTYPE html>
-                <html>
-                <head>
-                    <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline'; frame-ancestors 'self'">
-                    <base href="${new URL(PROXY_ENDPOINTS[currentProxy]).origin}">
-                </head>
-                <body>${safeContent}</body>
-                </html>`;
+            // Load content directly through proxy URL
+            frame.src = proxyUrl;
 
+            // Handle navigation within the iframe
             frame.onload = () => {
                 loader.style.display = 'none';
-                statusBar.textContent = 'Secure connection established';
-                setTimeout(() => statusBar.style.display = 'none', 2000);
+                statusBar.style.display = 'none';
                 
-                // Security measures
+                // Rebase links to go through our proxy
                 try {
-                    frame.contentWindow.eval = null;
-                    frame.contentDocument.$ = null;
+                    frame.contentDocument.querySelectorAll('a').forEach(link => {
+                        const originalHref = link.href;
+                        link.href = '#';
+                        link.onclick = () => {
+                            document.getElementById('urlInput').value = originalHref;
+                            loadPage();
+                            return false;
+                        };
+                    });
                 } catch(e) {}
             };
 

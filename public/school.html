@@ -150,9 +150,9 @@
 
     <script>
     const PROXY_ENDPOINTS = [
-        'https://api.allorigins.win/raw?url=',
+        'https://api.codetabs.com/v1/proxy/?quest=',
         'https://corsproxy.io/?',
-        'https://thingproxy.freeboard.io/fetch/'
+        'https://proxy.cors.sh/'
     ];
 
     let currentProxy = 0;
@@ -160,20 +160,43 @@
     const statusBar = document.getElementById('statusBar');
     const loader = document.getElementById('loader');
 
-    // Security hardening
-    Object.defineProperty(navigator, 'webdriver', { value: false });
-    Object.defineProperty(window, 'chrome', { value: undefined });
-
+    // Enhanced proxy handler with header management
     async function fetchContent(url) {
         const proxyUrl = PROXY_ENDPOINTS[currentProxy] + encodeURIComponent(url);
         try {
-            const response = await fetch(proxyUrl);
+            const response = await fetch(proxyUrl, {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Origin': new URL(proxyUrl).origin
+                },
+                mode: 'cors'
+            });
+            
             if (!response.ok) throw new Error(`Proxy error: ${response.status}`);
-            return proxyUrl; // Return proxy URL directly
+            return proxyUrl;
         } catch(error) {
             currentProxy = (currentProxy + 1) % PROXY_ENDPOINTS.length;
             throw error;
         }
+    }
+
+    // New: Intercept and modify iframe requests
+    function setupRequestInterceptor() {
+        frame.contentWindow.fetch = new Proxy(frame.contentWindow.fetch, {
+            apply: function(target, thisArg, args) {
+                const [url, config] = args;
+                const modifiedUrl = PROXY_ENDPOINTS[currentProxy] + encodeURIComponent(url);
+                
+                return target(modifiedUrl, {
+                    ...config,
+                    headers: {
+                        ...config?.headers,
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Origin': new URL(PROXY_ENDPOINTS[currentProxy]).origin
+                    }
+                });
+            }
+        });
     }
 
     async function loadPage() {
@@ -182,30 +205,27 @@
 
         loader.style.display = 'block';
         statusBar.style.display = 'block';
-        statusBar.textContent = `Connecting via Proxy ${currentProxy + 1}...`;
+        statusBar.textContent = `Connecting via ${PROXY_ENDPOINTS[currentProxy].split('/')[2]}...`;
 
         try {
             const url = rawUrl.startsWith('http') ? rawUrl : `https://${rawUrl}`;
             const proxyUrl = await fetchContent(url);
             
-            // Load content directly through proxy URL
             frame.src = proxyUrl;
-
-            // Handle navigation within the iframe
+            
             frame.onload = () => {
+                setupRequestInterceptor(); // Activate interceptor
                 loader.style.display = 'none';
                 statusBar.style.display = 'none';
                 
-                // Rebase links to go through our proxy
+                // Rebase all links to use our proxy system
                 try {
                     frame.contentDocument.querySelectorAll('a').forEach(link => {
-                        const originalHref = link.href;
-                        link.href = '#';
-                        link.onclick = () => {
-                            document.getElementById('urlInput').value = originalHref;
+                        link.addEventListener('click', (e) => {
+                            e.preventDefault();
+                            document.getElementById('urlInput').value = link.href;
                             loadPage();
-                            return false;
-                        };
+                        });
                     });
                 } catch(e) {}
             };
@@ -216,7 +236,7 @@
 
         } catch(error) {
             loader.style.display = 'none';
-            statusBar.textContent = `Error: ${error.message} - Retrying...`;
+            statusBar.textContent = `Error: ${error.message} - Switching proxy...`;
             setTimeout(loadPage, 500);
         }
     }

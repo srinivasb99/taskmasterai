@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -29,7 +30,7 @@
             flex-direction: column;
             padding: 15px;
             gap: 15px;
-            min-height: 100;
+            min-height: 100; /* Critical for flex children */
         }
 
         .header {
@@ -79,7 +80,7 @@
             border: none;
             border-radius: 8px;
             background: rgba(0, 0, 0, 0.3);
-            height: 100%;
+            height: 100%; /* Critical for flex item */
         }
 
         .status-bar {
@@ -124,36 +125,109 @@
 
         <div class="status-bar" id="statusBar"></div>
         <div class="loader" id="loader"></div>
-
         <iframe 
             id="proxyFrame"
             scrolling="yes"
             allow="fullscreen"
+            crossorigin="anonymous"
             style="width: 100%; height: 100vh; border: none; overflow: auto;">
         </iframe>
+    
     </div>
 
     <script>
-        async function loadPage() {
-            const rawUrl = document.getElementById('urlInput').value;
-            if (!rawUrl) return;
+    
+    const PROXY = 'https://api.allorigins.win/raw?url=';
+    let frame = document.getElementById('proxyFrame');
+    const statusBar = document.getElementById('statusBar');
+    const loader = document.getElementById('loader');
 
+    Object.defineProperty(navigator, 'webdriver', { value: false });
+    Object.defineProperty(window, 'chrome', { value: undefined });
+
+    // Set a cookie in the parent site (to allow cross-origin cookies)
+    document.cookie = "sessionToken=abc123; SameSite=None; Secure";
+
+    async function fetchAndProcess(url) {
+        const proxyUrl = PROXY + encodeURIComponent(url);
+        const response = await fetch(proxyUrl);
+        if (!response.ok) throw new Error(`Proxy error: ${response.status}`);
+        
+        const html = await response.text();
+        const processedHTML = html
+            .replace(/<head>/i, `<head><base href="${url}">`)
+            .replace(/(href|src|action)=("|')(.*?)\2/gi, (match, attr, quote, path) => {
+                try {
+                    const absoluteUrl = new URL(path, url).href;
+                    return `${attr}=${quote}${PROXY}${encodeURIComponent(absoluteUrl)}${quote}`;
+                } catch {
+                    return match;
+                }
+            });
+
+        return `<!DOCTYPE html>${processedHTML}`;
+    }
+
+    async function loadPage() {
+        const rawUrl = document.getElementById('urlInput').value;
+        if (!rawUrl) return;
+
+        loader.style.display = 'block';
+        statusBar.style.display = 'block';
+        statusBar.textContent = 'Initializing secure connection...';
+
+        try {
             const targetUrl = rawUrl.startsWith('http') ? rawUrl : `https://${rawUrl}`;
-            const encodedUrl = encodeURIComponent(targetUrl);
+            const content = await fetchAndProcess(targetUrl);
+            
+            const newFrame = document.createElement('iframe');
+            newFrame.srcdoc = content;
+            newFrame.setAttribute('allow', frame.getAttribute('allow'));
+            newFrame.style.cssText = frame.style.cssText;
+            
+            // Set a cookie inside the iframe content (this should be added dynamically in the iframe)
+            newFrame.onload = () => {
+                loader.style.display = 'none';
+                statusBar.style.display = 'none';
+                
+                try {
+                    // In the iframe's content, add this script to set the cookie:
+                    const script = document.createElement('script');
+                    script.textContent = `document.cookie = "userToken=xyz789; SameSite=None; Secure";`;
+                    newFrame.contentWindow.document.head.appendChild(script);
 
-            const proxyUrl = `https://www.croxyproxy.com/?${encodedUrl}`;
+                    // Process links inside the iframe
+                    newFrame.contentDocument.querySelectorAll('a').forEach(link => {
+                        link.onclick = (e) => {
+                            e.preventDefault();
+                            const target = new URL(link.href).searchParams.get('url');
+                            document.getElementById('urlInput').value = 
+                                decodeURIComponent(target);
+                            loadPage();
+                        };
+                    });
+                } catch(e) {
+                    console.log('Error processing links:', e);
+                }
+            };
 
-            // Masking the proxy URL by updating the address bar using the History API
-            history.pushState(null, "", "/school"); // "school" is the path on your domain
+            frame.replaceWith(newFrame);
+            frame = newFrame;
 
-            // Set the iframe's source to the CroxyProxy link
-            document.getElementById('proxyFrame').src = proxyUrl; 
+        } catch(error) {
+            loader.style.display = 'none';
+            statusBar.textContent = `Error: ${error.message} - Retrying...`;
+            setTimeout(loadPage, 1000);
         }
+    }
 
-        document.getElementById('urlInput').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') loadPage();
-        });
+    document.getElementById('urlInput').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') loadPage();
+    });
+
+    document.addEventListener('DOMContentLoaded', () => {
+        if (!window.chrome) window.chrome = { runtime: {} };
+    });
     </script>
 </body>
 </html>
-

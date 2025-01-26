@@ -136,88 +136,53 @@
     </div>
 
     <script>
-    const PROXY = 'https://api.allorigins.win/raw?url=';
-    let frame = document.getElementById('proxyFrame');
-    const statusBar = document.getElementById('statusBar');
-    const loader = document.getElementById('loader');
+const PROXY = 'https://taskmaster.one/api/proxy?url=';
+let frame = document.getElementById('proxyFrame');
+const statusBar = document.getElementById('statusBar');
+const loader = document.getElementById('loader');
 
-    Object.defineProperty(navigator, 'webdriver', { value: false });
-    Object.defineProperty(window, 'chrome', { value: undefined });
-
-    async function fetchAndProcess(url) {
-        const proxyUrl = PROXY + encodeURIComponent(url);
+async function fetchAndProcess(url) {
+    const proxyUrl = `${PROXY}${encodeURIComponent(url)}`;
+    try {
         const response = await fetch(proxyUrl);
         if (!response.ok) throw new Error(`Proxy error: ${response.status}`);
-        
-        const html = await response.text();
-        const processedHTML = html
-            .replace(/<head>/i, `<head><base href="${url}">`)
-            .replace(/(href|src|action)=("|')(.*?)\2/gi, (match, attr, quote, path) => {
-                try {
-                    const absoluteUrl = new URL(path, url).href;
-                    return `${attr}=${quote}${PROXY}${encodeURIComponent(absoluteUrl)}${quote}`;
-                } catch {
-                    return match;
-                }
-            });
-
-        return `<!DOCTYPE html>${processedHTML}`;
+        return await response.text(); // Return raw HTML
+    } catch (error) {
+        throw new Error(`Failed to fetch: ${error.message}`);
     }
+}
 
-    async function loadPage() {
-        const rawUrl = document.getElementById('urlInput').value;
-        if (!rawUrl) return;
+async function loadPage() {
+    const rawUrl = document.getElementById('urlInput').value;
+    if (!rawUrl) return;
 
-        loader.style.display = 'block';
-        statusBar.style.display = 'block';
-        statusBar.textContent = 'Initializing secure connection...';
+    loader.style.display = 'block';
+    statusBar.style.display = 'block';
+    statusBar.textContent = 'Initializing secure connection...';
 
-        try {
-            const targetUrl = rawUrl.startsWith('http') ? rawUrl : `https://${rawUrl}`;
-            const content = await fetchAndProcess(targetUrl);
-            
-            const newFrame = document.createElement('iframe');
-            newFrame.srcdoc = content;
-            newFrame.setAttribute('sandbox', frame.getAttribute('sandbox'));
-            newFrame.setAttribute('allow', frame.getAttribute('allow'));
-            newFrame.style.cssText = frame.style.cssText;
-            
-            newFrame.onload = () => {
-                loader.style.display = 'none';
-                statusBar.style.display = 'none';
-                
-                try {
-                    newFrame.contentDocument.querySelectorAll('a').forEach(link => {
-                        link.onclick = (e) => {
-                            e.preventDefault();
-                            const target = new URL(link.href).searchParams.get('url');
-                            document.getElementById('urlInput').value = 
-                                decodeURIComponent(target);
-                            loadPage();
-                        };
-                    });
-                } catch(e) {
-                    console.log('Error processing links:', e);
-                }
-            };
+    try {
+        const targetUrl = rawUrl.startsWith('http') ? rawUrl : `https://${rawUrl}`;
+        const content = await fetchAndProcess(targetUrl);
 
-            frame.replaceWith(newFrame);
-            frame = newFrame;
-
-        } catch(error) {
+        frame.srcdoc = content; // Set the raw HTML directly into the iframe
+        frame.onload = () => {
             loader.style.display = 'none';
-            statusBar.textContent = `Error: ${error.message} - Retrying...`;
-            setTimeout(loadPage, 1000);
-        }
+            statusBar.style.display = 'none';
+        };
+    } catch (error) {
+        loader.style.display = 'none';
+        statusBar.textContent = `Error: ${error.message}. Please try again.`;
     }
+}
 
-    document.getElementById('urlInput').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') loadPage();
-    });
+document.getElementById('urlInput').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') loadPage();
+});
 
-    document.addEventListener('DOMContentLoaded', () => {
-        if (!window.chrome) window.chrome = { runtime: {} };
-    });
+document.addEventListener('DOMContentLoaded', () => {
+    if (!window.chrome) window.chrome = { runtime: {} };
+});
+
     </script>
 </body>
 </html>

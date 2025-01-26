@@ -2,211 +2,222 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Secure Web Gateway</title>
     <style>
-        /* Previous CSS styles remain unchanged */
-        :root {
-            --bg-color: #1a1a1a;
-            --header-color: #2d2d2d;
-            --accent-color: #00cc88;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', sans-serif;
+        }
+
+        html, body {
+            height: 100%;
+            overflow: hidden;
         }
 
         body {
-            background: var(--bg-color);
+            background: #0a0e14;
             color: #fff;
-            height: 100vh;
-            margin: 0;
-            font-family: 'Segoe UI', sans-serif;
             display: flex;
             flex-direction: column;
         }
 
+        .container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 15px;
+            gap: 15px;
+            min-height: 100; /* Critical for flex children */
+        }
+
         .header {
-            background: var(--header-color);
+            text-align: center;
             padding: 1rem;
-            border-bottom: 1px solid #444;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 8px;
+            flex-shrink: 0;
         }
 
-        .controls {
+        .search-container {
             display: flex;
-            gap: 0.5rem;
-            margin-top: 1rem;
-        }
-
-        .nav-btn {
-            padding: 0.5rem 1rem;
-            background: #3a3a3a;
-            border: 1px solid #4a4a4a;
-            color: #fff;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .search-box {
-            padding: 1rem;
-            background: #252525;
-            display: flex;
-            gap: 0.5rem;
+            gap: 10px;
+            flex-shrink: 0;
         }
 
         #urlInput {
             flex: 1;
-            padding: 0.8rem;
-            background: #333;
-            border: 1px solid #444;
+            padding: 15px 20px;
+            border: none;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.05);
             color: #fff;
-            border-radius: 4px;
-            font-size: 1rem;
+            font-size: 16px;
+        }
+
+        #urlInput:focus {
+            outline: none;
+            background: rgba(255, 255, 255, 0.08);
+            box-shadow: 0 0 0 2px rgba(0, 255, 136, 0.3);
+        }
+
+        .btn {
+            padding: 15px 25px;
+            border: none;
+            border-radius: 6px;
+            background: linear-gradient(45deg, #00ff88, #00b4d8);
+            color: #000;
+            font-weight: 600;
+            cursor: pointer;
+            flex-shrink: 0;
         }
 
         #proxyFrame {
             flex: 1;
+            width: 100%;
             border: none;
-            background: #fff;
+            border-radius: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            height: 100%; /* Critical for flex item */
         }
 
         .status-bar {
-            padding: 0.5rem 1rem;
-            background: #252525;
-            color: #888;
+            text-align: center;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 6px;
+            display: none;
+            flex-shrink: 0;
         }
 
-        .error-message {
-            color: #ff4444;
-            padding: 1rem;
+        .loader {
             display: none;
-            text-align: center;
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-top: 3px solid #00ff88;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: auto;
+            flex-shrink: 0;
         }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>🔒 Secure Web Gateway</h1>
-        <div class="controls">
-            <button class="nav-btn" id="backBtn">← Back</button>
-            <button class="nav-btn" id="forwardBtn">Forward →</button>
-            <button class="nav-btn" id="refreshBtn">↻ Refresh</button>
-            <button class="nav-btn" id="newSessionBtn">🔄 New Session</button>
+    <div class="container">
+        <div class="header">
+            <h1>🔒 Secure Web Portal</h1>
+            <p>Enterprise-grade privacy protection</p>
         </div>
-    </div>
 
-    <div class="search-box">
-        <input type="url" id="urlInput" placeholder="Enter website URL (e.g., example.com)">
-        <button class="nav-btn" id="goBtn">Go</button>
-    </div>
+        <div class="search-container">
+            <input type="url" id="urlInput" placeholder="https://example.com">
+            <button class="btn" onclick="loadPage()">Start Session</button>
+        </div>
 
-    <div class="status-bar" id="statusBar">Ready</div>
-    <div class="error-message" id="errorMessage"></div>
-    <iframe 
+        <div class="status-bar" id="statusBar"></div>
+        <div class="loader" id="loader"></div>
+        <iframe 
         id="proxyFrame"
-        sandbox="allow-forms allow-scripts allow-same-origin allow-popups"
-        referrerpolicy="no-referrer-when-downgrade"
+        sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals allow-presentation allow-downloads"
+        scrolling="yes"
+        allow="fullscreen"
+        crossorigin="anonymous"
+        style="width: 100%; height: 100vh; border: none; overflow: auto;"
     ></iframe>
+    
+    </div>
 
     <script>
-    (function() {
-        const PROXY_BASE = 'https://croxyproxy.vip';
-        const iframe = document.getElementById('proxyFrame');
-        const urlInput = document.getElementById('urlInput');
-        const statusBar = document.getElementById('statusBar');
-        const errorMessage = document.getElementById('errorMessage');
+    const PROXY = 'https://api.allorigins.win/raw?url=';
+    let frame = document.getElementById('proxyFrame');
+    const statusBar = document.getElementById('statusBar');
+    const loader = document.getElementById('loader');
+
+    Object.defineProperty(navigator, 'webdriver', { value: false });
+    Object.defineProperty(window, 'chrome', { value: undefined });
+
+    async function fetchAndProcess(url) {
+        const proxyUrl = PROXY + encodeURIComponent(url);
+        const response = await fetch(proxyUrl);
+        if (!response.ok) throw new Error(`Proxy error: ${response.status}`);
         
-        let currentUrl = PROXY_BASE;
-        let historyStack = [PROXY_BASE];
-        let historyPointer = 0;
-
-        // Initialize proxy
-        function initProxy() {
-            iframe.src = PROXY_BASE;
-            updateStatus('Connected to proxy network');
-        }
-
-        // Handle navigation
-        function navigateToUrl(target) {
-            try {
-                const cleanUrl = target.startsWith('http') ? target : `https://${target}`;
-                const encodedUrl = btoa(cleanUrl).replace(/=+$/, '');
-                const proxyUrl = `${PROXY_BASE}/?__cpo=${encodedUrl}`;
-                
-                historyStack = historyStack.slice(0, historyPointer + 1);
-                historyStack.push(proxyUrl);
-                historyPointer++;
-                
-                iframe.src = proxyUrl;
-                updateStatus(`Loading: ${cleanUrl}`);
-                
-            } catch(error) {
-                showError('Invalid URL format');
-            }
-        }
-
-        // Update UI state
-        function updateStatus(message) {
-            statusBar.textContent = message;
-            errorMessage.style.display = 'none';
-        }
-
-        function showError(message) {
-            errorMessage.textContent = message;
-            errorMessage.style.display = 'block';
-            statusBar.textContent = 'Error occurred';
-        }
-
-        // Handle messages from proxy
-        window.addEventListener('message', (event) => {
-            try {
-                if (event.origin.startsWith(PROXY_BASE) || 
-                    event.origin.startsWith('https://') && event.data) {
-                    
-                    const currentProxyUrl = iframe.src;
-                    urlInput.value = new URL(currentProxyUrl).searchParams.get('__cpo') 
-                        ? atob(new URL(currentProxyUrl).searchParams.get('__cpo'))
-                        : currentProxyUrl;
+        const html = await response.text();
+        const processedHTML = html
+            .replace(/<head>/i, `<head><base href="${url}">`)
+            .replace(/(href|src|action)=("|')(.*?)\2/gi, (match, attr, quote, path) => {
+                try {
+                    const absoluteUrl = new URL(path, url).href;
+                    return `${attr}=${quote}${PROXY}${encodeURIComponent(absoluteUrl)}${quote}`;
+                } catch {
+                    return match;
                 }
-            } catch(error) {
-                console.warn('Message handling error:', error);
-            }
-        });
+            });
 
-        // Event listeners
-        document.getElementById('goBtn').addEventListener('click', () => {
-            const target = urlInput.value.trim();
-            if (target) navigateToUrl(target);
-        });
+        return `<!DOCTYPE html>${processedHTML}`;
+    }
 
-        document.getElementById('backBtn').addEventListener('click', () => {
-            if (historyPointer > 0) {
-                historyPointer--;
-                iframe.src = historyStack[historyPointer];
-                updateStatus('Navigating back');
-            }
-        });
+    async function loadPage() {
+        const rawUrl = document.getElementById('urlInput').value;
+        if (!rawUrl) return;
 
-        document.getElementById('forwardBtn').addEventListener('click', () => {
-            if (historyPointer < historyStack.length - 1) {
-                historyPointer++;
-                iframe.src = historyStack[historyPointer];
-                updateStatus('Navigating forward');
-            }
-        });
+        loader.style.display = 'block';
+        statusBar.style.display = 'block';
+        statusBar.textContent = 'Initializing secure connection...';
 
-        document.getElementById('refreshBtn').addEventListener('click', () => {
-            iframe.contentWindow.location.reload();
-            updateStatus('Refreshing page');
-        });
+        try {
+            const targetUrl = rawUrl.startsWith('http') ? rawUrl : `https://${rawUrl}`;
+            const content = await fetchAndProcess(targetUrl);
+            
+            const newFrame = document.createElement('iframe');
+            newFrame.srcdoc = content;
+            newFrame.setAttribute('sandbox', frame.getAttribute('sandbox'));
+            newFrame.setAttribute('allow', frame.getAttribute('allow'));
+            newFrame.style.cssText = frame.style.cssText;
+            
+            newFrame.onload = () => {
+                loader.style.display = 'none';
+                statusBar.style.display = 'none';
+                
+                try {
+                    newFrame.contentDocument.querySelectorAll('a').forEach(link => {
+                        link.onclick = (e) => {
+                            e.preventDefault();
+                            const target = new URL(link.href).searchParams.get('url');
+                            document.getElementById('urlInput').value = 
+                                decodeURIComponent(target);
+                            loadPage();
+                        };
+                    });
+                } catch(e) {
+                    console.log('Error processing links:', e);
+                }
+            };
 
-        document.getElementById('newSessionBtn').addEventListener('click', () => {
-            historyStack = [PROXY_BASE];
-            historyPointer = 0;
-            initProxy();
-            updateStatus('New session started');
-        });
+            frame.replaceWith(newFrame);
+            frame = newFrame;
 
-        // Initialize
-        initProxy();
-    })();
+        } catch(error) {
+            loader.style.display = 'none';
+            statusBar.textContent = `Error: ${error.message} - Retrying...`;
+            setTimeout(loadPage, 1000);
+        }
+    }
+
+    document.getElementById('urlInput').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') loadPage();
+    });
+
+    document.addEventListener('DOMContentLoaded', () => {
+        if (!window.chrome) window.chrome = { runtime: {} };
+    });
     </script>
 </body>
 </html>

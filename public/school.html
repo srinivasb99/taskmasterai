@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <title>Secure Web Gateway</title>
     <style>
-        /* Maintain previous premium styling */
         * {
             margin: 0;
             padding: 0;
@@ -135,15 +134,15 @@
         </div>
 
         <div class="search-box">
-            <input type="url" id="urlInput" placeholder="https://google.com" autofocus>
-            <button class="btn" onclick="launchSession()">Start Secure Session</button>
+            <input type="url" id="urlInput" placeholder="https://google.com">
+            <button class="btn" onclick="loadPage()">Start Secure Session</button>
         </div>
 
         <div class="status-bar" id="statusBar"></div>
         <div class="loader" id="loader"></div>
         <iframe 
             id="proxyFrame"
-            sandbox="allow-forms allow-scripts allow-modals"
+            sandbox="allow-forms allow-scripts"
             allow="fullscreen"
             crossorigin="anonymous"
         ></iframe>
@@ -161,9 +160,11 @@
     const statusBar = document.getElementById('statusBar');
     const loader = document.getElementById('loader');
 
-    // Security initialization
+    // Security hardening
     Object.defineProperty(navigator, 'webdriver', { value: false });
-    Object.defineProperty(window, 'chrome', { value: undefined });
+    if (window.chrome) {
+        delete window.chrome;
+    }
 
     async function fetchContent(url) {
         const proxyUrl = PROXY_ENDPOINTS[currentProxy] + encodeURIComponent(url);
@@ -180,28 +181,32 @@
     function sanitizeContent(html) {
         const sanitized = html
             .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-            .replace(/document\.cookie/gi, '')
-            .replace(/localStorage/gi, '')
-            .replace(/sessionStorage/gi, '');
+            .replace(/document\.(cookie|domain|referrer)/gi, '')
+            .replace(/(local|session)Storage/gi, '')
+            .replace(/<iframe/gi, '<div')
+            .replace(/onload\s*=/gi, 'data-onload=')
+            .replace(/onerror\s*=/gi, 'data-onerror=');
         
         return `<!DOCTYPE html>
             <html>
             <head>
-                <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval'; frame-ancestors 'self'">
-                <base href="${PROXY_ENDPOINTS[currentProxy]}">
+                <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline'; frame-ancestors 'self'">
+                <base href="${new URL(PROXY_ENDPOINTS[currentProxy]).origin}">
             </head>
             <body>${sanitized}</body>
             </html>`;
     }
 
     async function loadPage() {
-        const url = document.getElementById('urlInput').value;
-        if (!url) return;
+        const rawUrl = document.getElementById('urlInput').value;
+        if (!rawUrl) return;
 
         loader.style.display = 'block';
-        statusBar.textContent = `Loading via Proxy ${currentProxy + 1}...`;
+        statusBar.style.display = 'block';
+        statusBar.textContent = `Connecting via Proxy ${currentProxy + 1}...`;
 
         try {
+            const url = rawUrl.startsWith('http') ? rawUrl : `https://${rawUrl}`;
             const content = await fetchContent(url);
             const safeContent = sanitizeContent(content);
             
@@ -210,15 +215,13 @@
             frame.onload = () => {
                 loader.style.display = 'none';
                 statusBar.textContent = 'Secure connection established';
+                setTimeout(() => statusBar.style.display = 'none', 2000);
                 
-                // Security hardening
+                // Additional security measures
                 try {
-                    frame.contentWindow.eval = undefined;
+                    frame.contentWindow.eval = null;
+                    frame.contentDocument.$ = null;
                     frame.contentWindow.localStorage = undefined;
-                    frame.contentDocument.querySelectorAll('[onload], [onerror]').forEach(el => {
-                        el.removeAttribute('onload');
-                        el.removeAttribute('onerror');
-                    });
                 } catch(e) {}
             };
 
@@ -228,14 +231,21 @@
 
         } catch(error) {
             loader.style.display = 'none';
-            statusBar.textContent = `Switching to backup proxy...`;
+            statusBar.textContent = `Switching to Proxy ${currentProxy + 1}...`;
             setTimeout(loadPage, 500);
         }
     }
 
-    // Event listeners remain unchanged
+    // Event listeners
+    document.getElementById('urlInput').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') loadPage();
+    });
+
+    // Initial security setup
     document.addEventListener('DOMContentLoaded', () => {
-        loadPage();
+        if (!window.chrome) {
+            window.chrome = { runtime: {} };
+        }
     });
     </script>
 </body>

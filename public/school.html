@@ -106,6 +106,14 @@
             margin: 2rem auto;
         }
 
+        .error-message {
+            background: rgba(255, 0, 0, 0.1);
+            padding: 1rem;
+            border-radius: 10px;
+            margin-top: 1rem;
+            display: none;
+        }
+
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
@@ -134,110 +142,134 @@
         </div>
 
         <div class="search-box">
-            <input type="url" id="urlInput" placeholder="https://netflix.com">
+            <input type="url" id="urlInput" placeholder="Enter URL (e.g., example.com)" value="https://search.brave.com/">
             <button class="btn" onclick="loadPage()">Start Secure Session</button>
         </div>
 
         <div class="status-bar" id="statusBar"></div>
         <div class="loader" id="loader"></div>
+        <div class="error-message" id="errorMessage"></div>
         <iframe 
             id="proxyFrame"
-            sandbox="allow-forms allow-scripts allow-popups allow-popups-to-escape-sandbox allow-same-origin"
-            allow="fullscreen"
-            crossorigin="anonymous"
+            sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-modals allow-presentation allow-downloads allow-orientation-lock"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
         ></iframe>
     </div>
 
     <script>
     const PROXY_ENDPOINTS = [
-        'https://api.codetabs.com/v1/proxy/?quest=',
+        'https://api.allorigins.win/raw?url=',
         'https://corsproxy.io/?',
-        'https://proxy.cors.sh/'
+        'https://api.codetabs.com/v1/proxy?quest='
     ];
 
     let currentProxy = 0;
     const frame = document.getElementById('proxyFrame');
     const statusBar = document.getElementById('statusBar');
     const loader = document.getElementById('loader');
+    const errorMessage = document.getElementById('errorMessage');
 
-    // Enhanced proxy handler with header management
     async function fetchContent(url) {
         const proxyUrl = PROXY_ENDPOINTS[currentProxy] + encodeURIComponent(url);
         try {
             const response = await fetch(proxyUrl, {
                 headers: {
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'Origin': new URL(proxyUrl).origin
-                },
-                mode: 'cors'
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                    'Accept-Language': 'en-US,en;q=0.5',
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                }
             });
             
-            if (!response.ok) throw new Error(`Proxy error: ${response.status}`);
-            return proxyUrl;
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            
+            const html = await response.text();
+            
+            // Process HTML to fix relative URLs and styles
+            const processedHtml = html
+                .replace(/<base[^>]*>/g, '') // Remove existing base tags
+                .replace(/<head>/i, `<head>
+                    <base href="${url}">
+                    <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; frame-ancestors *;">
+                `) // Add new base tag and permissive CSP
+                .replace(/(href|src)="\/([^"]*)"/g, `$1="${new URL('/$2', url).href}"`) // Fix relative URLs
+                .replace(/x-frame-options/gi, 'removed-frame-options') // Remove X-Frame-Options
+                .replace(/frame-ancestors/gi, 'removed-ancestors') // Remove frame-ancestors
+                .replace(/content-security-policy/gi, 'removed-csp') // Remove CSP
+                // Fix script loading
+                .replace(/<script([^>]*)>/g, '<script$1 crossorigin="anonymous">');
+            
+            const blob = new Blob([processedHtml], { 
+                type: 'text/html'
+            });
+            return URL.createObjectURL(blob);
         } catch(error) {
             currentProxy = (currentProxy + 1) % PROXY_ENDPOINTS.length;
             throw error;
         }
     }
 
-    // New: Intercept and modify iframe requests
-    function setupRequestInterceptor() {
-        frame.contentWindow.fetch = new Proxy(frame.contentWindow.fetch, {
-            apply: function(target, thisArg, args) {
-                const [url, config] = args;
-                const modifiedUrl = PROXY_ENDPOINTS[currentProxy] + encodeURIComponent(url);
-                
-                return target(modifiedUrl, {
-                    ...config,
-                    headers: {
-                        ...config?.headers,
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'Origin': new URL(PROXY_ENDPOINTS[currentProxy]).origin
-                    }
-                });
-            }
-        });
+    function showError(message) {
+        errorMessage.style.display = 'block';
+        errorMessage.textContent = message;
+        setTimeout(() => {
+            errorMessage.style.display = 'none';
+        }, 5000);
     }
 
     async function loadPage() {
-        const rawUrl = document.getElementById('urlInput').value;
+        const rawUrl = document.getElementById('urlInput').value.trim() || 'https://search.brave.com/';
         if (!rawUrl) return;
 
         loader.style.display = 'block';
         statusBar.style.display = 'block';
-        statusBar.textContent = `Connecting via ${PROXY_ENDPOINTS[currentProxy].split('/')[2]}...`;
+        errorMessage.style.display = 'none';
+        statusBar.textContent = `Connecting via Proxy ${currentProxy + 1}...`;
 
         try {
             const url = rawUrl.startsWith('http') ? rawUrl : `https://${rawUrl}`;
-            const proxyUrl = await fetchContent(url);
             
-            frame.src = proxyUrl;
-            
+            // Check if the URL is in a blocked list
+            const blockedDomains = ['google.com', 'accounts.google.com', 'gmail.com', 'facebook.com', 'twitter.com'];
+            if (blockedDomains.some(domain => url.includes(domain))) {
+                throw new Error('This domain cannot be proxied due to security restrictions');
+            }
+
+            const blobUrl = await fetchContent(url);
+            frame.src = blobUrl;
+
             frame.onload = () => {
-                setupRequestInterceptor(); // Activate interceptor
                 loader.style.display = 'none';
                 statusBar.style.display = 'none';
                 
-                // Rebase all links to use our proxy system
                 try {
-                    frame.contentDocument.querySelectorAll('a').forEach(link => {
+                    // Handle clicks inside the iframe
+                    const frameDoc = frame.contentDocument || frame.contentWindow.document;
+                    frameDoc.querySelectorAll('a').forEach(link => {
                         link.addEventListener('click', (e) => {
                             e.preventDefault();
-                            document.getElementById('urlInput').value = link.href;
-                            loadPage();
+                            const href = link.href;
+                            if (href && !href.startsWith('javascript:')) {
+                                document.getElementById('urlInput').value = href;
+                                loadPage();
+                            }
                         });
                     });
-                } catch(e) {}
-            };
-
-            frame.onerror = () => {
-                throw new Error('Content blocked by security policies');
+                } catch(e) {
+                    // Ignore cross-origin errors
+                }
+                
+                // Clean up the blob URL
+                URL.revokeObjectURL(frame.src);
             };
 
         } catch(error) {
             loader.style.display = 'none';
-            statusBar.textContent = `Error: ${error.message} - Switching proxy...`;
-            setTimeout(loadPage, 500);
+            statusBar.style.display = 'none';
+            showError(`Error: ${error.message}`);
+            
+            if (currentProxy < PROXY_ENDPOINTS.length - 1) {
+                setTimeout(loadPage, 1000);
+            }
         }
     }
 
@@ -246,12 +278,15 @@
         if (e.key === 'Enter') loadPage();
     });
 
-    // Initial setup
-    document.addEventListener('DOMContentLoaded', () => {
-        if (!window.chrome) {
-            window.chrome = { runtime: {} };
+    // Cleanup on page unload
+    window.addEventListener('unload', () => {
+        if (frame.src.startsWith('blob:')) {
+            URL.revokeObjectURL(frame.src);
         }
     });
+
+    // Load default search engine on start
+    window.addEventListener('load', loadPage);
     </script>
 </body>
 </html>

@@ -1,5 +1,3 @@
-import axios from 'axios';
-
 export default async function handler(req, res) {
     const { url } = req.query;
 
@@ -8,15 +6,17 @@ export default async function handler(req, res) {
     }
 
     try {
-        const response = await axios.get(url, {
-            responseType: 'arraybuffer',
-        });
+        const targetUrl = decodeURIComponent(url);
+        const response = await fetch(targetUrl);
+        const content = await response.text();
 
-        // Set appropriate headers
-        res.setHeader('Content-Type', response.headers['content-type']);
+        // Add CORS headers
         res.setHeader('Access-Control-Allow-Origin', '*');
-        res.send(response.data);
+        res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+        return res.status(200).send(content);
     } catch (error) {
-        res.status(500).json({ error: `Error fetching the URL: ${error.message}` });
+        return res.status(500).json({ error: 'Error fetching the URL' });
     }
 }

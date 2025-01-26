@@ -190,9 +190,16 @@
 
     <script>
     (function() {
+        // Error suppression
+        const originalError = console.error;
+        console.error = function() {
+            if (arguments[0].includes('Blocked autofocusing')) return;
+            if (arguments[0].includes('frame sandbox')) return;
+            originalError.apply(console, arguments);
+        };
+
         const PROXY_DOMAINS = ['croxyproxy.com'];
-        let historyStack = [];
-        let historyPosition = -1;
+        let currentUrl = 'https://education.example';
 
         const frame = document.getElementById('proxyFrame');
         const urlInput = document.getElementById('urlInput');
@@ -232,6 +239,7 @@
 
         function loadPage(url) {
             showLoader('Connecting to educational resource...');
+            currentUrl = url;
             const proxyUrl = createProxyUrl(url);
             
             frame.src = proxyUrl;
@@ -244,7 +252,7 @@
                         urlInput.value = iframeUrl;
                     }
                 } catch(e) {
-                    // Handle cross-origin errors
+                    // Silent error handling for cross-origin
                 }
             };
 
@@ -268,7 +276,7 @@
         });
 
         document.getElementById('refreshBtn').addEventListener('click', () => {
-            frame.contentWindow.location.reload();
+            loadPage(currentUrl);
         });
 
         document.getElementById('homeBtn').addEventListener('click', () => {
@@ -285,6 +293,12 @@
 
         // Initial load
         loadPage('https://education.example');
+
+        // Global error handling
+        window.addEventListener('error', (e) => {
+            if(e.message.includes('Blocked a frame')) return;
+            showError('System encountered an unexpected error');
+        });
     })();
     </script>
 </body>

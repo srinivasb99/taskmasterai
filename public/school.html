@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -29,7 +30,7 @@
             flex-direction: column;
             padding: 15px;
             gap: 15px;
-            min-height: 100;
+            min-height: 100; /* Critical for flex children */
         }
 
         .header {
@@ -79,7 +80,7 @@
             border: none;
             border-radius: 8px;
             background: rgba(0, 0, 0, 0.3);
-            height: 100%;
+            height: 100%; /* Critical for flex item */
         }
 
         .status-bar {
@@ -107,6 +108,7 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
     </style>
 </head>
 <body>
@@ -123,102 +125,44 @@
 
         <div class="status-bar" id="statusBar"></div>
         <div class="loader" id="loader"></div>
-        <div id="frameContainer"></div>
+        <iframe 
+        id="proxyFrame"
+        sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals allow-presentation allow-downloads"
+        scrolling="yes"
+        allow="fullscreen"
+        crossorigin="anonymous"
+        style="width: 100%; height: 100vh; border: none; overflow: auto;"
+    ></iframe>
+    
     </div>
 
     <script>
-    const PROXY_SERVICES = [
-        'https://api.allorigins.win/raw?url=',
-        'https://api.codetabs.com/v1/proxy?quest=',
-        'https://cors-anywhere.herokuapp.com/',
-        'https://proxy.cors.sh/'
-    ];
-
-    let currentProxyIndex = 0;
-    const frameContainer = document.getElementById('frameContainer');
+    const PROXY = 'https://api.allorigins.win/raw?url=';
+    let frame = document.getElementById('proxyFrame');
     const statusBar = document.getElementById('statusBar');
     const loader = document.getElementById('loader');
 
-    function createSecureFrame() {
-        const frame = document.createElement('iframe');
-        frame.id = 'proxyFrame';
-        frame.setAttribute('sandbox', 'allow-same-origin allow-scripts allow-forms allow-popups allow-modals allow-presentation allow-downloads');
-        frame.setAttribute('allow', 'fullscreen');
-        frame.setAttribute('crossorigin', 'anonymous');
-        frame.style.cssText = 'width: 100%; height: 100vh; border: none; overflow: auto;';
-        return frame;
-    }
+    Object.defineProperty(navigator, 'webdriver', { value: false });
+    Object.defineProperty(window, 'chrome', { value: undefined });
 
-    async function checkFrameOptions(url) {
-        try {
-            const response = await fetch(url, { method: 'HEAD' });
-            const xFrameOptions = response.headers.get('X-Frame-Options');
-            const csp = response.headers.get('Content-Security-Policy');
-            
-            if (!xFrameOptions && !csp) return true;
-            
-            if (xFrameOptions) {
-                const option = xFrameOptions.toLowerCase();
-                if (option === 'deny' || option === 'sameorigin') {
-                    return false;
-                }
-            }
-            
-            if (csp && csp.includes('frame-ancestors')) {
-                if (csp.includes("frame-ancestors 'none'") || 
-                    csp.includes("frame-ancestors 'self'")) {
-                    return false;
-                }
-            }
-            
-            return true;
-        } catch (error) {
-            console.warn('Frame check failed:', error);
-            return true; // Proceed anyway if check fails
-        }
-    }
-
-    async function fetchWithProxy(url) {
-        const errors = [];
+    async function fetchAndProcess(url) {
+        const proxyUrl = PROXY + encodeURIComponent(url);
+        const response = await fetch(proxyUrl);
+        if (!response.ok) throw new Error(`Proxy error: ${response.status}`);
         
-        for (let i = 0; i < PROXY_SERVICES.length; i++) {
-            const proxyUrl = PROXY_SERVICES[currentProxyIndex] + encodeURIComponent(url);
-            try {
-                const response = await fetch(proxyUrl);
-                if (response.ok) {
-                    return await response.text();
-                }
-            } catch (error) {
-                errors.push(`Proxy ${currentProxyIndex + 1}: ${error.message}`);
-            }
-            
-            currentProxyIndex = (currentProxyIndex + 1) % PROXY_SERVICES.length;
-        }
-        
-        throw new Error(`All proxies failed: ${errors.join(', ')}`);
-    }
-
-    async function processHTML(html, baseUrl) {
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, 'text/html');
-        
-        // Add base tag
-        const base = doc.createElement('base');
-        base.href = baseUrl;
-        doc.head.insertBefore(base, doc.head.firstChild);
-        
-        // Process all URLs
-        const urlAttributes = ['src', 'href', 'action'];
-        urlAttributes.forEach(attr => {
-            doc.querySelectorAll(`[${attr}]`).forEach(el => {
+        const html = await response.text();
+        const processedHTML = html
+            .replace(/<head>/i, `<head><base href="${url}">`)
+            .replace(/(href|src|action)=("|')(.*?)\2/gi, (match, attr, quote, path) => {
                 try {
-                    const absoluteUrl = new URL(el.getAttribute(attr), baseUrl).href;
-                    el.setAttribute(attr, PROXY_SERVICES[currentProxyIndex] + encodeURIComponent(absoluteUrl));
-                } catch (e) {}
+                    const absoluteUrl = new URL(path, url).href;
+                    return `${attr}=${quote}${PROXY}${encodeURIComponent(absoluteUrl)}${quote}`;
+                } catch {
+                    return match;
+                }
             });
-        });
-        
-        return doc.documentElement.outerHTML;
+
+        return `<!DOCTYPE html>${processedHTML}`;
     }
 
     async function loadPage() {
@@ -231,50 +175,40 @@
 
         try {
             const targetUrl = rawUrl.startsWith('http') ? rawUrl : `https://${rawUrl}`;
+            const content = await fetchAndProcess(targetUrl);
             
-            // Check if direct framing is possible
-            const canFrame = await checkFrameOptions(targetUrl);
+            const newFrame = document.createElement('iframe');
+            newFrame.srcdoc = content;
+            newFrame.setAttribute('sandbox', frame.getAttribute('sandbox'));
+            newFrame.setAttribute('allow', frame.getAttribute('allow'));
+            newFrame.style.cssText = frame.style.cssText;
             
-            if (canFrame) {
-                // Try direct framing first
-                const frame = createSecureFrame();
-                frame.src = targetUrl;
-                frameContainer.innerHTML = '';
-                frameContainer.appendChild(frame);
-            } else {
-                // Fall back to proxy if framing is blocked
-                statusBar.textContent = 'Using secure proxy...';
-                const content = await fetchWithProxy(targetUrl);
-                const processedContent = await processHTML(content, targetUrl);
+            newFrame.onload = () => {
+                loader.style.display = 'none';
+                statusBar.style.display = 'none';
                 
-                const frame = createSecureFrame();
-                frame.srcdoc = processedContent;
-                
-                frameContainer.innerHTML = '';
-                frameContainer.appendChild(frame);
-                
-                frame.onload = () => {
-                    try {
-                        const doc = frame.contentDocument;
-                        doc.querySelectorAll('a').forEach(link => {
-                            link.onclick = (e) => {
-                                e.preventDefault();
-                                document.getElementById('urlInput').value = link.href;
-                                loadPage();
-                            };
-                        });
-                    } catch (e) {}
-                };
-            }
-            
-            loader.style.display = 'none';
-            statusBar.style.display = 'none';
+                try {
+                    newFrame.contentDocument.querySelectorAll('a').forEach(link => {
+                        link.onclick = (e) => {
+                            e.preventDefault();
+                            const target = new URL(link.href).searchParams.get('url');
+                            document.getElementById('urlInput').value = 
+                                decodeURIComponent(target);
+                            loadPage();
+                        };
+                    });
+                } catch(e) {
+                    console.log('Error processing links:', e);
+                }
+            };
 
-        } catch (error) {
-            console.error('Loading error:', error);
-            statusBar.textContent = `Error: ${error.message} - Retrying with next proxy...`;
-            currentProxyIndex = (currentProxyIndex + 1) % PROXY_SERVICES.length;
-            setTimeout(loadPage, 2000);
+            frame.replaceWith(newFrame);
+            frame = newFrame;
+
+        } catch(error) {
+            loader.style.display = 'none';
+            statusBar.textContent = `Error: ${error.message} - Retrying...`;
+            setTimeout(loadPage, 1000);
         }
     }
 
@@ -282,10 +216,8 @@
         if (e.key === 'Enter') loadPage();
     });
 
-    // Initialize
-    window.addEventListener('load', () => {
-        const frame = createSecureFrame();
-        frameContainer.appendChild(frame);
+    document.addEventListener('DOMContentLoaded', () => {
+        if (!window.chrome) window.chrome = { runtime: {} };
     });
     </script>
 </body>

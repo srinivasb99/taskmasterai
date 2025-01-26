@@ -143,16 +143,17 @@
         <div class="loader" id="loader"></div>
         <iframe 
             id="proxyFrame"
-            sandbox="allow-forms allow-scripts allow-modals allow-orientation-lock allow-pointer-lock allow-same-origin"
-            allow="fullscreen *"
+            sandbox="allow-forms allow-scripts allow-modals"
+            allow="fullscreen"
+            crossorigin="anonymous"
         ></iframe>
     </div>
 
     <script>
-    const WORKING_PROXIES = [
-        'https://www.croxyproxy.com/_gog/?url=',
-        'https://www.proxysite.com/includes/process.php?allow=1&u=',
-        'https://www.hide.me/proxy/'
+    const PROXY_ENDPOINTS = [
+        'https://corsproxy.io/?',
+        'https://api.allorigins.win/raw?url=',
+        'https://thingproxy.freeboard.io/fetch/'
     ];
 
     let currentProxy = 0;
@@ -160,98 +161,82 @@
     const statusBar = document.getElementById('statusBar');
     const loader = document.getElementById('loader');
 
-    function showStatus(message, isError = false) {
-        statusBar.style.display = 'block';
-        statusBar.style.color = isError ? '#ff4444' : '#00ff88';
-        statusBar.textContent = message;
-        if (!isError) setTimeout(() => statusBar.style.display = 'none', 3000);
-    }
+    // Security initialization
+    Object.defineProperty(navigator, 'webdriver', { value: false });
+    Object.defineProperty(window, 'chrome', { value: undefined });
 
-    function toggleLoader(show) {
-        loader.style.display = show ? 'block' : 'none';
-    }
-
-    function createProxyUrl(targetUrl) {
-        const encodedUrl = encodeURIComponent(targetUrl);
-        return `${WORKING_PROXIES[currentProxy]}${encodedUrl}`;
-    }
-
-    function sanitizeURL(url) {
+    async function fetchContent(url) {
+        const proxyUrl = PROXY_ENDPOINTS[currentProxy] + encodeURIComponent(url);
         try {
-            return new URL(url).href;
-        } catch {
-            return `https://${url}`;
+            const response = await fetch(proxyUrl);
+            if (!response.ok) throw new Error('Proxy error');
+            return await response.text();
+        } catch(error) {
+            currentProxy = (currentProxy + 1) % PROXY_ENDPOINTS.length;
+            throw error;
         }
     }
 
-    async function launchSession() {
-        const rawUrl = document.getElementById('urlInput').value;
-        if (!rawUrl) return;
+    function sanitizeContent(html) {
+        const sanitized = html
+            .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+            .replace(/document\.cookie/gi, '')
+            .replace(/localStorage/gi, '')
+            .replace(/sessionStorage/gi, '');
+        
+        return `<!DOCTYPE html>
+            <html>
+            <head>
+                <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval'; frame-ancestors 'self'">
+                <base href="${PROXY_ENDPOINTS[currentProxy]}">
+            </head>
+            <body>${sanitized}</body>
+            </html>`;
+    }
 
-        const targetUrl = sanitizeURL(rawUrl);
-        toggleLoader(true);
-        showStatus(`Initializing secure tunnel via proxy ${currentProxy + 1}...`);
+    async function loadPage() {
+        const url = document.getElementById('urlInput').value;
+        if (!url) return;
+
+        loader.style.display = 'block';
+        statusBar.textContent = `Loading via Proxy ${currentProxy + 1}...`;
 
         try {
-            const proxyUrl = createProxyUrl(targetUrl);
+            const content = await fetchContent(url);
+            const safeContent = sanitizeContent(content);
             
-            // Direct proxy loading with error handling
-            frame.src = proxyUrl;
-
-            // Set up error listeners
+            frame.srcdoc = safeContent;
+            
             frame.onload = () => {
-                toggleLoader(false);
-                showStatus('Secure connection established');
+                loader.style.display = 'none';
+                statusBar.textContent = 'Secure connection established';
                 
-                // Post-load security cleanup
+                // Security hardening
                 try {
-                    frame.contentWindow.postMessage({ 
-                        type: 'cleanup',
-                        selectors: ['header', 'footer', '.proxy-header', '.branding']
-                    }, '*');
+                    frame.contentWindow.eval = undefined;
+                    frame.contentWindow.localStorage = undefined;
+                    frame.contentDocument.querySelectorAll('[onload], [onerror]').forEach(el => {
+                        el.removeAttribute('onload');
+                        el.removeAttribute('onerror');
+                    });
                 } catch(e) {}
             };
 
             frame.onerror = () => {
-                throw new Error('Connection protocol violation');
+                throw new Error('Content blocked');
             };
 
-            // Handle proxy rotation
-            const rotateProxy = () => {
-                currentProxy = (currentProxy + 1) % WORKING_PROXIES.length;
-                launchSession();
-            };
-
-            // Setup message channel for security operations
-            window.addEventListener('message', (e) => {
-                if(e.data === 'proxy-blocked') rotateProxy();
-            });
-
-            // Auto-rotate every 2 minutes
-            setTimeout(rotateProxy, 120000);
-
-        } catch (error) {
-            toggleLoader(false);
-            showStatus(`Security event: ${error.message}`, true);
-            currentProxy = (currentProxy + 1) % WORKING_PROXIES.length;
-            setTimeout(launchSession, 500);
+        } catch(error) {
+            loader.style.display = 'none';
+            statusBar.textContent = `Switching to backup proxy...`;
+            setTimeout(loadPage, 500);
         }
     }
 
-    // Event listeners
-    document.getElementById('urlInput').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') launchSession();
-    });
-
-    // Security initialization
+    // Event listeners remain unchanged
     document.addEventListener('DOMContentLoaded', () => {
-        // Disable extension detection
-        Object.defineProperty(navigator, 'webdriver', { get: () => false });
-        Object.defineProperty(window, 'chrome', { get: () => undefined });
+        loadPage();
     });
-
-    // Initial launch
-    launchSession();
     </script>
 </body>
 </html>

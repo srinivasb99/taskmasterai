@@ -2,136 +2,138 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>School Learning Hub</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Universal Proxy Gateway</title>
     <style>
-        /* Previous CSS remains unchanged */
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: 'Segoe UI', sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
 
         body {
-            background: linear-gradient(135deg, #1a3650, #2a4a6d, #3b608d);
-            color: #fff;
-            min-height: 100vh;
+            background: #1a1a1a;
+            color: #ffffff;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
         }
 
         .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 2rem;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
         }
 
         .header {
-            text-align: center;
-            margin-bottom: 2rem;
-            padding: 2rem;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 15px;
-            position: relative;
-            backdrop-filter: blur(5px);
+            background: #2d2d2d;
+            padding: 1rem;
+            border-bottom: 1px solid #444;
+        }
+
+        .header h1 {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+            color: #00ff9d;
         }
 
         .nav-controls {
-            position: absolute;
-            right: 2rem;
-            top: 50%;
-            transform: translateY(-50%);
             display: flex;
-            gap: 1rem;
+            gap: 0.5rem;
+            margin-top: 1rem;
         }
 
         .nav-btn {
-            padding: 0.8rem 1.5rem;
-            border: none;
-            border-radius: 25px;
-            background: rgba(255, 255, 255, 0.1);
+            padding: 0.5rem 1rem;
+            background: #3a3a3a;
+            border: 1px solid #4a4a4a;
             color: #fff;
+            border-radius: 4px;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: all 0.2s ease;
         }
 
         .nav-btn:hover {
-            background: rgba(255, 255, 255, 0.2);
+            background: #4a4a4a;
+            border-color: #5a5a5a;
         }
 
         .search-box {
+            padding: 1rem;
+            background: #252525;
             display: flex;
-            gap: 1rem;
-            margin-bottom: 2rem;
-            max-width: 800px;
-            margin: 0 auto 2rem;
+            gap: 0.5rem;
         }
 
-        #urlInput {
+        #searchInput {
             flex: 1;
-            padding: 1.2rem;
-            border: none;
-            border-radius: 50px;
-            background: rgba(255, 255, 255, 0.1);
+            padding: 0.8rem;
+            background: #333;
+            border: 1px solid #444;
             color: #fff;
-            font-size: 1.1rem;
-            transition: all 0.3s ease;
-            backdrop-filter: blur(5px);
+            border-radius: 4px;
+            font-size: 1rem;
         }
 
-        #urlInput:focus {
-            outline: none;
-            background: rgba(255, 255, 255, 0.2);
-            box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+        #searchInput::placeholder {
+            color: #666;
         }
 
         .btn {
-            padding: 1.2rem 2.5rem;
+            padding: 0.8rem 1.5rem;
+            background: #00cc88;
             border: none;
-            border-radius: 50px;
-            background: linear-gradient(45deg, #4CAF50, #45a049);
             color: #fff;
-            font-weight: bold;
+            border-radius: 4px;
             cursor: pointer;
-            transition: all 0.3s ease;
-            text-transform: uppercase;
-            letter-spacing: 1px;
+            font-weight: bold;
+            transition: background 0.2s ease;
         }
 
         .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 25px rgba(76, 175, 80, 0.4);
+            background: #00b877;
+        }
+
+        .browser-bar {
+            padding: 0.5rem 1rem;
+            background: #333;
+            border-bottom: 1px solid #444;
+        }
+
+        #browserInput {
+            width: 100%;
+            padding: 0.5rem;
+            background: transparent;
+            border: none;
+            color: #888;
+            font-family: monospace;
+            font-size: 0.9rem;
+        }
+
+        #proxyFrame {
+            flex: 1;
+            border: none;
+            background: #ffffff;
         }
 
         .status-bar {
-            text-align: center;
-            padding: 1.2rem;
-            background: rgba(255, 255, 255, 0.08);
-            border-radius: 10px;
-            margin: 1.5rem 0;
+            padding: 0.5rem 1rem;
+            background: #252525;
+            color: #888;
+            font-size: 0.9rem;
             display: none;
-            backdrop-filter: blur(5px);
         }
 
         .loader {
             display: none;
-            border: 4px solid rgba(255, 255, 255, 0.1);
-            border-top: 4px solid #4CAF50;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #00cc88;
             border-radius: 50%;
-            width: 40px;
-            height: 40px;
+            width: 24px;
+            height: 24px;
             animation: spin 1s linear infinite;
-            margin: 2rem auto;
-        }
-
-        .error-message {
-            background: rgba(255, 0, 0, 0.1);
-            padding: 1rem;
-            border-radius: 10px;
-            margin-top: 1rem;
-            display: none;
-        }
-
-        #proxyFrame {
-            display: none;
+            margin: 1rem auto;
         }
 
         @keyframes spin {
@@ -139,33 +141,18 @@
             100% { transform: rotate(360deg); }
         }
 
-        @media (max-width: 768px) {
-            .container {
-                padding: 1rem;
-            }
-            
-            .search-box {
-                flex-direction: column;
-            }
-            
-            .btn {
-                width: 100%;
-            }
-
-            .nav-controls {
-                position: static;
-                transform: none;
-                justify-content: center;
-                margin-top: 1rem;
-            }
+        .error-message {
+            display: none;
+            color: #ff4444;
+            padding: 1rem;
+            text-align: center;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>🏫 School Learning Hub</h1>
-            <p>Secure Educational Resources Portal</p>
+            <h1>🌐 Universal Proxy Gateway</h1>
             <div class="nav-controls">
                 <button class="nav-btn" id="backBtn">← Back</button>
                 <button class="nav-btn" id="forwardBtn">Forward →</button>
@@ -175,131 +162,108 @@
         </div>
 
         <div class="search-box">
-            <input type="url" id="urlInput" placeholder="Enter educational resource URL">
-            <button class="btn" id="navBtn">Access Resource</button>
+            <input type="url" id="searchInput" placeholder="Enter website URL (e.g., google.com)">
+            <button class="btn" id="goBtn">Go</button>
+        </div>
+
+        <div class="browser-bar">
+            <input type="url" id="browserInput" readonly>
         </div>
 
         <div class="status-bar" id="statusBar"></div>
         <div class="loader" id="loader"></div>
         <div class="error-message" id="errorMessage"></div>
+
         <iframe 
             id="proxyFrame"
-            sandbox="allow-forms allow-scripts allow-popups allow-modals allow-orientation-lock allow-pointer-lock allow-presentation allow-top-navigation allow-downloads allow-same-origin allow-popups-to-escape-sandbox"
+            sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-modals"
+            allowfullscreen
+            referrerpolicy="no-referrer-when-downgrade"
         ></iframe>
     </div>
 
     <script>
-    (function() {
-        // Error suppression
-        const originalError = console.error;
-        console.error = function() {
-            if (arguments[0].includes('Blocked autofocusing')) return;
-            if (arguments[0].includes('frame sandbox')) return;
-            originalError.apply(console, arguments);
-        };
+        (function() {
+            const ENTRY_POINT = 'https://croxyproxy.com';
+            const iframe = document.getElementById('proxyFrame');
+            const browserInput = document.getElementById('browserInput');
 
-        const PROXY_DOMAINS = ['croxyproxy.com'];
-        let currentUrl = 'https://education.example';
+            // Initialize with CroxyProxy's official domain
+            iframe.src = ENTRY_POINT;
+            browserInput.value = ENTRY_POINT;
 
-        const frame = document.getElementById('proxyFrame');
-        const urlInput = document.getElementById('urlInput');
-        const loader = document.getElementById('loader');
-        const statusBar = document.getElementById('statusBar');
-        const errorMessage = document.getElementById('errorMessage');
+            // Enhanced IP validation regex
+            const validIPRegex = /^(\d{1,3}\.){3}\d{1,3}$/;
 
-        function showLoader(message = 'Securing connection...') {
-            loader.style.display = 'block';
-            statusBar.style.display = 'block';
-            statusBar.textContent = message;
-            errorMessage.style.display = 'none';
-        }
-
-        function hideLoader() {
-            loader.style.display = 'none';
-            statusBar.style.display = 'none';
-        }
-
-        function showError(message) {
-            errorMessage.textContent = message;
-            errorMessage.style.display = 'block';
-            hideLoader();
-        }
-
-        function createProxyUrl(targetUrl) {
-            try {
-                const parsed = new URL(targetUrl);
-                if(!['http:', 'https:'].includes(parsed.protocol)) {
-                    parsed.protocol = 'https:';
-                }
-                return `https://${PROXY_DOMAINS[0]}/?__cpo=${btoa(parsed.href).replace(/=+$/, '')}`;
-            } catch {
-                return 'https://education.example';
-            }
-        }
-
-        function loadPage(url) {
-            showLoader('Connecting to educational resource...');
-            currentUrl = url;
-            const proxyUrl = createProxyUrl(url);
-            
-            frame.src = proxyUrl;
-            
-            frame.onload = () => {
-                hideLoader();
+            window.addEventListener('message', (e) => {
                 try {
-                    const iframeUrl = frame.contentWindow.location.href;
-                    if(!iframeUrl.includes(PROXY_DOMAINS[0])) {
-                        urlInput.value = iframeUrl;
+                    // Validate message origin
+                    if (e.origin.startsWith('https://croxyproxy') || validIPRegex.test(new URL(e.origin).hostname)) {
+                        const data = JSON.parse(e.data);
+                        
+                        if (data.type === 'navigationUpdate') {
+                            // Validate received URL
+                            const url = new URL(data.url);
+                            
+                            // Update browser bar with sanitized URL
+                            browserInput.value = url.hostname.includes('croxyproxy') 
+                                ? url.href 
+                                : `${url.protocol}//${url.hostname}`;
+                        }
                     }
-                } catch(e) {
-                    // Silent error handling for cross-origin
+                } catch(err) {
+                    console.warn('Secure message error:', err);
                 }
-            };
+            });
 
-            frame.onerror = () => {
-                showError('Security verification failed. Please try another resource.');
-            };
-        }
+            // Modified navigation handler
+            document.getElementById('goBtn').addEventListener('click', () => {
+                const rawInput = searchInput.value.trim();
+                if (!rawInput) return;
 
-        // Event listeners
-        document.getElementById('navBtn').addEventListener('click', () => {
-            const inputUrl = urlInput.value.trim() || 'https://education.example';
-            loadPage(inputUrl);
-        });
+                try {
+                    // Validate user input
+                    const targetUrl = new URL(
+                        rawInput.startsWith('http') ? rawInput : `https://${rawInput}`
+                    );
+                    
+                    // Encode for CroxyProxy
+                    const proxyUrl = `${ENTRY_POINT}/?__cpo=${btoa(targetUrl.href)}`;
+                    
+                    // Update iframe
+                    iframe.src = proxyUrl;
+                    browserInput.value = proxyUrl;
+                    
+                } catch(err) {
+                    showError(`Invalid URL: ${err.message}`);
+                }
+            });
 
-        document.getElementById('backBtn').addEventListener('click', () => {
-            window.history.back();
-        });
+            // Enhanced error handling
+            iframe.addEventListener('error', () => {
+                const currentUrl = new URL(iframe.src);
+                
+                if (validIPRegex.test(currentUrl.hostname)) {
+                    showError(`Proxy server ${currentUrl.hostname} refused connection`);
+                } else {
+                    showError('Connection failed - try another site');
+                }
+            });
 
-        document.getElementById('forwardBtn').addEventListener('click', () => {
-            window.history.forward();
-        });
-
-        document.getElementById('refreshBtn').addEventListener('click', () => {
-            loadPage(currentUrl);
-        });
-
-        document.getElementById('homeBtn').addEventListener('click', () => {
-            urlInput.value = 'https://education.example';
-            loadPage('https://education.example');
-        });
-
-        urlInput.addEventListener('keypress', e => {
-            if(e.key === 'Enter') {
-                const inputUrl = urlInput.value.trim() || 'https://education.example';
-                loadPage(inputUrl);
+            // IP format validation function
+            function sanitizeIP(ipString) {
+                const octets = ipString.split('.').slice(0, 4);
+                return octets.join('.');
             }
-        });
 
-        // Initial load
-        loadPage('https://education.example');
-
-        // Global error handling
-        window.addEventListener('error', (e) => {
-            if(e.message.includes('Blocked a frame')) return;
-            showError('System encountered an unexpected error');
-        });
-    })();
-    </script>
+            // Update loader messages
+            function showLoader(message) {
+                loader.style.display = 'block';
+                statusBar.textContent = message;
+                statusBar.style.display = 'block';
+            }
+        })();
+        </script>
+    </div>
 </body>
 </html>

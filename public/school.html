@@ -134,7 +134,7 @@
         </div>
 
         <div class="search-box">
-            <input type="url" id="urlInput" placeholder="https://google.com">
+            <input type="url" id="urlInput" placeholder="https://netflix.com">
             <button class="btn" onclick="loadPage()">Start Secure Session</button>
         </div>
 
@@ -142,7 +142,7 @@
         <div class="loader" id="loader"></div>
         <iframe 
             id="proxyFrame"
-            sandbox="allow-forms allow-scripts"
+            sandbox="allow-forms allow-scripts allow-popups allow-popups-to-escape-sandbox"
             allow="fullscreen"
             crossorigin="anonymous"
         ></iframe>
@@ -150,8 +150,8 @@
 
     <script>
     const PROXY_ENDPOINTS = [
-        'https://corsproxy.io/?',
         'https://api.allorigins.win/raw?url=',
+        'https://corsproxy.io/?',
         'https://thingproxy.freeboard.io/fetch/'
     ];
 
@@ -162,15 +162,13 @@
 
     // Security hardening
     Object.defineProperty(navigator, 'webdriver', { value: false });
-    if (window.chrome) {
-        delete window.chrome;
-    }
+    Object.defineProperty(window, 'chrome', { value: undefined });
 
     async function fetchContent(url) {
         const proxyUrl = PROXY_ENDPOINTS[currentProxy] + encodeURIComponent(url);
         try {
             const response = await fetch(proxyUrl);
-            if (!response.ok) throw new Error('Proxy error');
+            if (!response.ok) throw new Error(`Proxy error: ${response.status}`);
             return await response.text();
         } catch(error) {
             currentProxy = (currentProxy + 1) % PROXY_ENDPOINTS.length;
@@ -179,22 +177,13 @@
     }
 
     function sanitizeContent(html) {
-        const sanitized = html
+        return html
             .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
             .replace(/document\.(cookie|domain|referrer)/gi, '')
             .replace(/(local|session)Storage/gi, '')
             .replace(/<iframe/gi, '<div')
             .replace(/onload\s*=/gi, 'data-onload=')
             .replace(/onerror\s*=/gi, 'data-onerror=');
-        
-        return `<!DOCTYPE html>
-            <html>
-            <head>
-                <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline'; frame-ancestors 'self'">
-                <base href="${new URL(PROXY_ENDPOINTS[currentProxy]).origin}">
-            </head>
-            <body>${sanitized}</body>
-            </html>`;
     }
 
     async function loadPage() {
@@ -210,28 +199,34 @@
             const content = await fetchContent(url);
             const safeContent = sanitizeContent(content);
             
-            frame.srcdoc = safeContent;
-            
+            frame.srcdoc = `<!DOCTYPE html>
+                <html>
+                <head>
+                    <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline'; frame-ancestors 'self'">
+                    <base href="${new URL(PROXY_ENDPOINTS[currentProxy]).origin}">
+                </head>
+                <body>${safeContent}</body>
+                </html>`;
+
             frame.onload = () => {
                 loader.style.display = 'none';
                 statusBar.textContent = 'Secure connection established';
                 setTimeout(() => statusBar.style.display = 'none', 2000);
                 
-                // Additional security measures
+                // Security measures
                 try {
                     frame.contentWindow.eval = null;
                     frame.contentDocument.$ = null;
-                    frame.contentWindow.localStorage = undefined;
                 } catch(e) {}
             };
 
             frame.onerror = () => {
-                throw new Error('Content blocked');
+                throw new Error('Content blocked by security policies');
             };
 
         } catch(error) {
             loader.style.display = 'none';
-            statusBar.textContent = `Switching to Proxy ${currentProxy + 1}...`;
+            statusBar.textContent = `Error: ${error.message} - Retrying...`;
             setTimeout(loadPage, 500);
         }
     }
@@ -241,7 +236,7 @@
         if (e.key === 'Enter') loadPage();
     });
 
-    // Initial security setup
+    // Initial setup
     document.addEventListener('DOMContentLoaded', () => {
         if (!window.chrome) {
             window.chrome = { runtime: {} };

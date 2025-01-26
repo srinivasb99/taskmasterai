@@ -143,8 +143,8 @@
         <div class="loader" id="loader"></div>
         <iframe 
             id="proxyFrame"
-            sandbox="allow-forms allow-scripts allow-modals allow-orientation-lock allow-pointer-lock"
-            allow="fullscreen *; geolocation *"
+            sandbox="allow-forms allow-scripts allow-modals allow-orientation-lock allow-pointer-lock allow-same-origin"
+            allow="fullscreen *"
         ></iframe>
     </div>
 
@@ -152,7 +152,7 @@
     const WORKING_PROXIES = [
         'https://www.croxyproxy.com/_gog/?url=',
         'https://www.proxysite.com/includes/process.php?allow=1&u=',
-        'https://www.hidemyass.com/proxy/'
+        'https://www.hide.me/proxy/'
     ];
 
     let currentProxy = 0;
@@ -171,68 +171,83 @@
         loader.style.display = show ? 'block' : 'none';
     }
 
-    async function launchSession() {
-        const targetUrl = document.getElementById('urlInput').value;
-        if (!targetUrl) return;
+    function createProxyUrl(targetUrl) {
+        const encodedUrl = encodeURIComponent(targetUrl);
+        return `${WORKING_PROXIES[currentProxy]}${encodedUrl}`;
+    }
 
+    function sanitizeURL(url) {
+        try {
+            return new URL(url).href;
+        } catch {
+            return `https://${url}`;
+        }
+    }
+
+    async function launchSession() {
+        const rawUrl = document.getElementById('urlInput').value;
+        if (!rawUrl) return;
+
+        const targetUrl = sanitizeURL(rawUrl);
         toggleLoader(true);
         showStatus(`Initializing secure tunnel via proxy ${currentProxy + 1}...`);
 
         try {
-            // Use direct proxy URL construction
-            const proxyUrl = WORKING_PROXIES[currentProxy] + encodeURIComponent(targetUrl);
+            const proxyUrl = createProxyUrl(targetUrl);
             
-            // Intermediate page to bypass CSP
-            frame.srcdoc = `
-                <!DOCTYPE html>
-                <html>
-                    <head>
-                        <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval'">
-                        <script>
-                            window.location.href = '${proxyUrl}';
-                        <\/script>
-                    </head>
-                </html>
-            `;
+            // Direct proxy loading with error handling
+            frame.src = proxyUrl;
 
+            // Set up error listeners
             frame.onload = () => {
                 toggleLoader(false);
                 showStatus('Secure connection established');
                 
-                // Inject CSS to remove proxy branding
+                // Post-load security cleanup
                 try {
-                    const style = document.createElement('style');
-                    style.textContent = `
-                        header, footer, .proxy-header, 
-                        .branding, .disclaimer { display: none !important; }
-                    `;
-                    frame.contentDocument.head.appendChild(style);
-                } catch (e) {
-                    // Silent fail for security restrictions
-                }
+                    frame.contentWindow.postMessage({ 
+                        type: 'cleanup',
+                        selectors: ['header', 'footer', '.proxy-header', '.branding']
+                    }, '*');
+                } catch(e) {}
             };
 
             frame.onerror = () => {
                 throw new Error('Connection protocol violation');
             };
 
-            // Rotate proxy every 5 minutes
-            setTimeout(() => {
+            // Handle proxy rotation
+            const rotateProxy = () => {
                 currentProxy = (currentProxy + 1) % WORKING_PROXIES.length;
                 launchSession();
-            }, 300000);
+            };
+
+            // Setup message channel for security operations
+            window.addEventListener('message', (e) => {
+                if(e.data === 'proxy-blocked') rotateProxy();
+            });
+
+            // Auto-rotate every 2 minutes
+            setTimeout(rotateProxy, 120000);
 
         } catch (error) {
             toggleLoader(false);
-            showStatus(`Security event: Switching to proxy ${currentProxy + 1}...`, true);
+            showStatus(`Security event: ${error.message}`, true);
             currentProxy = (currentProxy + 1) % WORKING_PROXIES.length;
-            setTimeout(launchSession, 1000);
+            setTimeout(launchSession, 500);
         }
     }
 
     // Event listeners
     document.getElementById('urlInput').addEventListener('keypress', (e) => {
         if (e.key === 'Enter') launchSession();
+    });
+
+    // Security initialization
+    document.addEventListener('DOMContentLoaded', () => {
+        // Disable extension detection
+        Object.defineProperty(navigator, 'webdriver', { get: () => false });
+        Object.defineProperty(window, 'chrome', { get: () => undefined });
     });
 
     // Initial launch

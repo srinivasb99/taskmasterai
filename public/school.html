@@ -125,33 +125,34 @@
         <div class="loader" id="loader"></div>
         <iframe 
             id="proxyFrame"
-            sandbox="allow-forms allow-modals allow-orientation-lock allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-presentation allow-same-origin allow-scripts allow-top-navigation allow-top-navigation-by-user-activation allow-downloads allow-storage-access-by-user-activation"
+            sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals allow-presentation allow-downloads allow-storage-access-by-user-activation"
             scrolling="yes"
             allow="*"
-            crossorigin="use-credentials"
+            crossorigin="anonymous"
             style="width: 100%; height: 100vh; border: none; overflow: auto;"
         ></iframe>
     </div>
 
     <script>
-    const PROXY = 'https://cors-anywhere.herokuapp.com/';
+    const PROXY = 'https://api.codetabs.com/v1/proxy/?quest=';
     let frame = document.getElementById('proxyFrame');
     const statusBar = document.getElementById('statusBar');
     const loader = document.getElementById('loader');
 
     Object.defineProperty(navigator, 'webdriver', { value: false });
-    Object.defineProperty(window, 'chrome', { value: undefined });
+    Object.defineProperty(window, 'chrome', { value: { runtime: {} } });
 
     async function fetchAndProcess(url) {
-        const proxyUrl = PROXY + url;
+        const proxyUrl = PROXY + encodeURIComponent(url);
         const response = await fetch(proxyUrl, {
-            credentials: 'include',
             headers: {
-                'Origin': window.location.origin,
-                'X-Requested-With': 'XMLHttpRequest'
-            }
+                'X-Requested-With': 'XMLHttpRequest',
+                'Origin': window.location.origin
+            },
+            mode: 'cors',
+            credentials: 'omit'
         });
-        
+
         if (!response.ok) throw new Error(`Proxy error: ${response.status}`);
         
         const html = await response.text();
@@ -160,7 +161,7 @@
             .replace(/(href|src|action)=("|')(.*?)\2/gi, (match, attr, quote, path) => {
                 try {
                     const absoluteUrl = new URL(path, url).href;
-                    return `${attr}=${quote}${PROXY}${absoluteUrl}${quote}`;
+                    return `${attr}=${quote}${PROXY}${encodeURIComponent(absoluteUrl)}${quote}`;
                 } catch {
                     return match;
                 }
@@ -183,9 +184,8 @@
             
             const newFrame = document.createElement('iframe');
             newFrame.srcdoc = content;
-            newFrame.setAttribute('sandbox', 'allow-forms allow-modals allow-orientation-lock allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-presentation allow-same-origin allow-scripts allow-top-navigation allow-top-navigation-by-user-activation allow-downloads allow-storage-access-by-user-activation');
+            newFrame.setAttribute('sandbox', 'allow-same-origin allow-scripts allow-forms allow-popups allow-modals allow-presentation allow-downloads allow-storage-access-by-user-activation');
             newFrame.setAttribute('allow', '*');
-            newFrame.setAttribute('crossorigin', 'use-credentials');
             newFrame.style.cssText = frame.style.cssText;
             
             newFrame.onload = () => {
@@ -196,9 +196,7 @@
                     newFrame.contentDocument.querySelectorAll('a').forEach(link => {
                         link.onclick = (e) => {
                             e.preventDefault();
-                            const target = new URL(link.href).searchParams.get('url');
-                            document.getElementById('urlInput').value = 
-                                decodeURIComponent(target);
+                            document.getElementById('urlInput').value = link.href;
                             loadPage();
                         };
                     });
@@ -217,6 +215,7 @@
         }
     }
 
+    // Keep previous event listeners
     document.getElementById('urlInput').addEventListener('keypress', (e) => {
         if (e.key === 'Enter') loadPage();
     });

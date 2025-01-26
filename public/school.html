@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Universal Frame Bypass</title>
+    <title>Ultimate Web Gateway</title>
     <style>
         * {
             margin: 0;
@@ -29,6 +29,30 @@
             padding: 2rem;
             background: rgba(255, 255, 255, 0.05);
             border-radius: 15px;
+            position: relative;
+        }
+
+        .nav-controls {
+            position: absolute;
+            right: 2rem;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            gap: 1rem;
+        }
+
+        .nav-btn {
+            padding: 0.8rem 1.5rem;
+            border: none;
+            border-radius: 25px;
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .nav-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
         }
 
         .search-box {
@@ -131,19 +155,30 @@
             .btn {
                 width: 100%;
             }
+
+            .nav-controls {
+                position: static;
+                transform: none;
+                justify-content: center;
+                margin-top: 1rem;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>🚀 Universal Frame Bypass</h1>
-            <p>Access any website without restrictions</p>
+            <h1>🌐 Universal Web Gateway</h1>
+            <p>Complete browser experience with full functionality</p>
+            <div class="nav-controls">
+                <button class="nav-btn" onclick="goBack()">← Back</button>
+                <button class="nav-btn" onclick="goForward()">Forward →</button>
+            </div>
         </div>
 
         <div class="search-box">
-            <input type="url" id="urlInput" placeholder="Enter restricted URL (e.g., https://mail.google.com)" value="https://search.brave.com/">
-            <button class="btn" onclick="loadPage()">Unlock Content</button>
+            <input type="url" id="urlInput" placeholder="Enter any URL (e.g., https://example.com)" value="https://search.brave.com/">
+            <button class="btn" onclick="loadPage()">Navigate</button>
         </div>
 
         <div class="status-bar" id="statusBar"></div>
@@ -151,20 +186,22 @@
         <div class="error-message" id="errorMessage"></div>
         <iframe 
             id="proxyFrame"
-            sandbox="allow-forms allow-scripts allow-popups allow-modals allow-orientation-lock allow-pointer-lock allow-presentation allow-same-origin allow-top-navigation-by-user-activation allow-downloads"
+            sandbox="allow-forms allow-scripts allow-popups allow-modals allow-orientation-lock allow-pointer-lock allow-presentation allow-same-origin allow-top-navigation-by-user-activation allow-downloads allow-storage-access-by-user-activation"
             allow="accelerometer; autoplay; clipboard-read; clipboard-write; encrypted-media; geolocation; gyroscope; hid; microphone; midi; payment; picture-in-picture; serial; usb; vr; xr-spatial-tracking"
         ></iframe>
     </div>
 
     <script>
     const PROXY_ENDPOINTS = [
-        'https://corsproxy.io/?',
         'https://api.allorigins.win/raw?url=',
+        'https://cors.consumet.stream/?url=',
         'https://api.codetabs.com/v1/proxy?quest=',
-        'https://thingproxy.freeboard.io/fetch/'
+        'https://proxy.techzbots1.workers.dev/?url='
     ];
 
     let currentProxy = 0;
+    let historyStack = [];
+    let historyPosition = -1;
     const frame = document.getElementById('proxyFrame');
     const statusBar = document.getElementById('statusBar');
     const loader = document.getElementById('loader');
@@ -178,30 +215,40 @@
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
                     'Accept-Language': 'en-US,en;q=0.9',
                     'X-Requested-With': 'XMLHttpRequest'
-                }
+                },
+                mode: 'cors'
             });
             
             if (!response.ok) throw new Error(`HTTP error ${response.status}`);
             
             let html = await response.text();
-            const baseUrl = new URL(url).origin;
+            const baseUrl = new URL(url);
 
-            // Critical security header removal
+            // Security modifications
             html = html
                 .replace(/<head>/i, `<head>
                     <base href="${url}">
                     <meta name="referrer" content="no-referrer">
                     <script>
-                        Object.defineProperty(window, 'top', {value: window, configurable: false});
-                        Object.defineProperty(window, 'frameElement', {value: null, configurable: false});
+                        // Storage access polyfill
+                        (function() {
+                            const originalStorage = window.localStorage;
+                            window.localStorage = new Proxy(originalStorage, {
+                                get: function(target, prop) {
+                                    return Reflect.get(target, prop);
+                                }
+                            });
+                        })();
                     <\/script>
                 `)
                 .replace(/x-frame-options/gi, '')
-                .replace(/<meta[^>]*(http-equiv=["']X-Frame-Options["'])[^>]*>/gi, '')
                 .replace(/content-security-policy/gi, '')
-                .replace(/window\.location\.href/gi, 'window.parent.navigate')
+                .replace(/<meta[^>]*(http-equiv=["']X-Frame-Options["'])[^>]*>/gi, '')
+                .replace(/<meta[^>]*(http-equiv=["']Content-Security-Policy["'])[^>]*>/gi, '')
                 .replace(/(href|src|action)=["'](?!https?:|\/\/)(.*?)["']/gi, (m, p1, p2) => 
-                    `${p1}="${new URL(p2, baseUrl).href}"`);
+                    `${p1}="${new URL(p2, baseUrl).href}"`)
+                .replace(/window\.location\.href\s*=/g, 'window.parent.navigateTo(')
+                .replace(/window\.open\(/g, 'window.parent.navigateTo(');
 
             const blob = new Blob([html], { type: 'text/html' });
             return URL.createObjectURL(blob);
@@ -211,77 +258,109 @@
         }
     }
 
-    function showError(message) {
-        errorMessage.style.display = 'block';
-        errorMessage.textContent = message;
-        setTimeout(() => errorMessage.style.display = 'none', 5000);
+    function updateHistory(url) {
+        historyStack = historyStack.slice(0, historyPosition + 1);
+        historyStack.push(url);
+        historyPosition++;
     }
 
-    async function loadPage() {
-        const rawUrl = document.getElementById('urlInput').value.trim();
+    function goBack() {
+        if (historyPosition > 0) {
+            historyPosition--;
+            loadPage(historyStack[historyPosition], true);
+        }
+    }
+
+    function goForward() {
+        if (historyPosition < historyStack.length - 1) {
+            historyPosition++;
+            loadPage(historyStack[historyPosition], true);
+        }
+    }
+
+    async function loadPage(url, fromHistory = false) {
+        const rawUrl = url || document.getElementById('urlInput').value.trim();
         if (!rawUrl) return;
 
-        loader.style.display = 'block';
-        statusBar.style.display = 'block';
-        errorMessage.style.display = 'none';
-        statusBar.textContent = `Bypassing security via ${new URL(PROXY_ENDPOINTS[currentProxy]).hostname}...`;
-
         try {
-            const url = new URL(rawUrl.startsWith('http') ? rawUrl : `https://${rawUrl}`);
+            const parsedUrl = new URL(rawUrl.startsWith('http') ? rawUrl : `https://${rawUrl}`);
+            if (!fromHistory) updateHistory(parsedUrl.href);
+
+            loader.style.display = 'block';
+            statusBar.style.display = 'block';
+            errorMessage.style.display = 'none';
+            statusBar.textContent = `Loading via ${new URL(PROXY_ENDPOINTS[currentProxy]).hostname}...`;
+
+            const blobUrl = await fetchContent(parsedUrl.href);
+            document.getElementById('urlInput').value = parsedUrl.href;
             
-            const blobUrl = await fetchContent(url.href);
             frame.src = blobUrl;
+            URL.revokeObjectURL(frame.src); // Cleanup previous blob
 
             frame.onload = () => {
                 loader.style.display = 'none';
                 statusBar.style.display = 'none';
-                URL.revokeObjectURL(blobUrl);
-                
+
                 try {
-                    // Universal navigation handler
+                    // Navigation handler
                     frame.contentDocument.body.addEventListener('click', (e) => {
                         const link = e.target.closest('a[href]') || e.target.closest('button');
-                        if (link && link.href && !link.href.startsWith('javascript:')) {
+                        if (link?.href && !link.href.startsWith('javascript:')) {
                             e.preventDefault();
-                            document.getElementById('urlInput').value = new URL(link.href, url).href;
-                            loadPage();
+                            loadPage(new URL(link.href, parsedUrl).href);
                         }
                     });
 
-                    // Form submission handler
+                    // Form handler
                     Array.from(frame.contentDocument.forms).forEach(form => {
                         form.addEventListener('submit', (e) => {
                             e.preventDefault();
-                            const formUrl = new URL(form.action || url.href, url);
-                            document.getElementById('urlInput').value = formUrl.href;
-                            loadPage();
+                            const actionUrl = new URL(form.action || parsedUrl.href, parsedUrl);
+                            loadPage(actionUrl.href);
                         });
                     });
 
                     // History API override
-                    const originalPushState = frame.contentWindow.history.pushState;
-                    frame.contentWindow.history.pushState = function(state, title, url) {
-                        document.getElementById('urlInput').value = new URL(url, window.location.href).href;
-                        loadPage();
+                    const pushStateHandler = (target, thisArg, args) => {
+                        const newUrl = new URL(args[2] || parsedUrl.href, parsedUrl);
+                        loadPage(newUrl.href);
+                        return Reflect.apply(target, thisArg, args);
                     };
 
-                } catch {}
+                    frame.contentWindow.history.pushState = new Proxy(
+                        frame.contentWindow.history.pushState,
+                        { apply: pushStateHandler }
+                    );
+
+                    frame.contentWindow.history.replaceState = new Proxy(
+                        frame.contentWindow.history.replaceState,
+                        { apply: pushStateHandler }
+                    );
+
+                    // Window.open override
+                    frame.contentWindow.open = (url) => loadPage(url);
+
+                } catch(e) { /* Cross-origin errors ignored */ }
             };
 
         } catch(error) {
             loader.style.display = 'none';
             statusBar.style.display = 'none';
-            showError(`Failed to bypass: ${error.message}`);
+            errorMessage.textContent = `Error: ${error.message}`;
+            errorMessage.style.display = 'block';
             
             if (currentProxy < PROXY_ENDPOINTS.length - 1) {
-                setTimeout(loadPage, 1000);
+                setTimeout(() => loadPage(url, fromHistory), 1000);
             }
         }
     }
 
+    // Global navigation function
+    window.navigateTo = loadPage;
+
     // Event listeners
     document.getElementById('urlInput').addEventListener('keypress', e => e.key === 'Enter' && loadPage());
-    window.addEventListener('unload', () => frame.src.startsWith('blob:') && URL.revokeObjectURL(frame.src));
+    window.addEventListener('unload', () => URL.revokeObjectURL(frame.src));
     window.addEventListener('load', () => loadPage());
     </script>
 </body>

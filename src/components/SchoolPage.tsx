@@ -196,10 +196,10 @@ const SchoolPage = () => {
       </NavBar>
 
       <IframeContainer>
-        <iframe
-          src={`https://taskmaster.one/api/proxy?url=${encodeURIComponent(url)}`}
-          title="proxy-frame"
-        />
+<iframe
+  src={`/api/proxy?url=${encodeURIComponent(url)}`}
+  title="proxy-frame"
+/>
       </IframeContainer>
     </Container>
   );

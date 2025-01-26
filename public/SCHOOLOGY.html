@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Secure Web Gateway</title>
+    <style>
+        /* Maintain previous premium styling */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+            color: #fff;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+            padding: 2rem;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+        }
+
+        .search-box {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            max-width: 800px;
+            margin: 0 auto 2rem;
+        }
+
+        #urlInput {
+            flex: 1;
+            padding: 1.2rem;
+            border: none;
+            border-radius: 50px;
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            font-size: 1.1rem;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(5px);
+        }
+
+        #urlInput:focus {
+            outline: none;
+            background: rgba(255, 255, 255, 0.2);
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+        }
+
+        .btn {
+            padding: 1.2rem 2.5rem;
+            border: none;
+            border-radius: 50px;
+            background: linear-gradient(45deg, #00ff88, #00b4d8);
+            color: #000;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 25px rgba(0, 255, 136, 0.4);
+        }
+
+        #proxyFrame {
+            width: 100%;
+            height: 75vh;
+            border: none;
+            border-radius: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
+            margin-top: 1rem;
+        }
+
+        .status-bar {
+            text-align: center;
+            padding: 1.2rem;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            margin: 1.5rem 0;
+            display: none;
+            backdrop-filter: blur(5px);
+        }
+
+        .loader {
+            display: none;
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-top: 4px solid #00ff88;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 2rem auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+            
+            .search-box {
+                flex-direction: column;
+            }
+            
+            .btn {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔐 Secure Web Portal</h1>
+            <p>Enterprise-grade privacy protection</p>
+        </div>
+
+        <div class="search-box">
+            <input type="url" id="urlInput" placeholder="https://google.com" autofocus>
+            <button class="btn" onclick="launchSession()">Start Secure Session</button>
+        </div>
+
+        <div class="status-bar" id="statusBar"></div>
+        <div class="loader" id="loader"></div>
+        <iframe 
+            id="proxyFrame"
+            sandbox="allow-forms allow-scripts allow-modals allow-orientation-lock allow-pointer-lock"
+            allow="fullscreen *; geolocation *"
+        ></iframe>
+    </div>
+
+    <script>
+    const WORKING_PROXIES = [
+        'https://www.croxyproxy.com/_gog/?url=',
+        'https://www.proxysite.com/includes/process.php?allow=1&u=',
+        'https://www.hidemyass.com/proxy/'
+    ];
+
+    let currentProxy = 0;
+    const frame = document.getElementById('proxyFrame');
+    const statusBar = document.getElementById('statusBar');
+    const loader = document.getElementById('loader');
+
+    function showStatus(message, isError = false) {
+        statusBar.style.display = 'block';
+        statusBar.style.color = isError ? '#ff4444' : '#00ff88';
+        statusBar.textContent = message;
+        if (!isError) setTimeout(() => statusBar.style.display = 'none', 3000);
+    }
+
+    function toggleLoader(show) {
+        loader.style.display = show ? 'block' : 'none';
+    }
+
+    async function launchSession() {
+        const targetUrl = document.getElementById('urlInput').value;
+        if (!targetUrl) return;
+
+        toggleLoader(true);
+        showStatus(`Initializing secure tunnel via proxy ${currentProxy + 1}...`);
+
+        try {
+            // Use direct proxy URL construction
+            const proxyUrl = WORKING_PROXIES[currentProxy] + encodeURIComponent(targetUrl);
+            
+            // Intermediate page to bypass CSP
+            frame.srcdoc = `
+                <!DOCTYPE html>
+                <html>
+                    <head>
+                        <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval'">
+                        <script>
+                            window.location.href = '${proxyUrl}';
+                        <\/script>
+                    </head>
+                </html>
+            `;
+
+            frame.onload = () => {
+                toggleLoader(false);
+                showStatus('Secure connection established');
+                
+                // Inject CSS to remove proxy branding
+                try {
+                    const style = document.createElement('style');
+                    style.textContent = `
+                        header, footer, .proxy-header, 
+                        .branding, .disclaimer { display: none !important; }
+                    `;
+                    frame.contentDocument.head.appendChild(style);
+                } catch (e) {
+                    // Silent fail for security restrictions
+                }
+            };
+
+            frame.onerror = () => {
+                throw new Error('Connection protocol violation');
+            };
+
+            // Rotate proxy every 5 minutes
+            setTimeout(() => {
+                currentProxy = (currentProxy + 1) % WORKING_PROXIES.length;
+                launchSession();
+            }, 300000);
+
+        } catch (error) {
+            toggleLoader(false);
+            showStatus(`Security event: Switching to proxy ${currentProxy + 1}...`, true);
+            currentProxy = (currentProxy + 1) % WORKING_PROXIES.length;
+            setTimeout(launchSession, 1000);
+        }
+    }
+
+    // Event listeners
+    document.getElementById('urlInput').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') launchSession();
+    });
+
+    // Initial launch
+    launchSession();
+    </script>
+</body>
+</html>

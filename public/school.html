@@ -3,42 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Universal Proxy Gateway</title>
+    <title>Secure Web Gateway</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        /* Previous CSS styles remain unchanged */
+        :root {
+            --bg-color: #1a1a1a;
+            --header-color: #2d2d2d;
+            --accent-color: #00cc88;
         }
 
         body {
-            background: #1a1a1a;
-            color: #ffffff;
+            background: var(--bg-color);
+            color: #fff;
             height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .container {
-            flex: 1;
+            margin: 0;
+            font-family: 'Segoe UI', sans-serif;
             display: flex;
             flex-direction: column;
         }
 
         .header {
-            background: #2d2d2d;
+            background: var(--header-color);
             padding: 1rem;
             border-bottom: 1px solid #444;
         }
 
-        .header h1 {
-            font-size: 1.5rem;
-            margin-bottom: 0.5rem;
-            color: #00ff9d;
-        }
-
-        .nav-controls {
+        .controls {
             display: flex;
             gap: 0.5rem;
             margin-top: 1rem;
@@ -54,11 +44,6 @@
             transition: all 0.2s ease;
         }
 
-        .nav-btn:hover {
-            background: #4a4a4a;
-            border-color: #5a5a5a;
-        }
-
         .search-box {
             padding: 1rem;
             background: #252525;
@@ -66,7 +51,7 @@
             gap: 0.5rem;
         }
 
-        #searchInput {
+        #urlInput {
             flex: 1;
             padding: 0.8rem;
             background: #333;
@@ -76,194 +61,152 @@
             font-size: 1rem;
         }
 
-        #searchInput::placeholder {
-            color: #666;
-        }
-
-        .btn {
-            padding: 0.8rem 1.5rem;
-            background: #00cc88;
-            border: none;
-            color: #fff;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: bold;
-            transition: background 0.2s ease;
-        }
-
-        .btn:hover {
-            background: #00b877;
-        }
-
-        .browser-bar {
-            padding: 0.5rem 1rem;
-            background: #333;
-            border-bottom: 1px solid #444;
-        }
-
-        #browserInput {
-            width: 100%;
-            padding: 0.5rem;
-            background: transparent;
-            border: none;
-            color: #888;
-            font-family: monospace;
-            font-size: 0.9rem;
-        }
-
         #proxyFrame {
             flex: 1;
             border: none;
-            background: #ffffff;
+            background: #fff;
         }
 
         .status-bar {
             padding: 0.5rem 1rem;
             background: #252525;
             color: #888;
-            font-size: 0.9rem;
-            display: none;
-        }
-
-        .loader {
-            display: none;
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #00cc88;
-            border-radius: 50%;
-            width: 24px;
-            height: 24px;
-            animation: spin 1s linear infinite;
-            margin: 1rem auto;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
         }
 
         .error-message {
-            display: none;
             color: #ff4444;
             padding: 1rem;
+            display: none;
             text-align: center;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>🌐 Universal Proxy Gateway</h1>
-            <div class="nav-controls">
-                <button class="nav-btn" id="backBtn">← Back</button>
-                <button class="nav-btn" id="forwardBtn">Forward →</button>
-                <button class="nav-btn" id="refreshBtn">↻ Refresh</button>
-                <button class="nav-btn" id="homeBtn">🏠 Home</button>
-            </div>
+    <div class="header">
+        <h1>🔒 Secure Web Gateway</h1>
+        <div class="controls">
+            <button class="nav-btn" id="backBtn">← Back</button>
+            <button class="nav-btn" id="forwardBtn">Forward →</button>
+            <button class="nav-btn" id="refreshBtn">↻ Refresh</button>
+            <button class="nav-btn" id="newSessionBtn">🔄 New Session</button>
         </div>
-
-        <div class="search-box">
-            <input type="url" id="searchInput" placeholder="Enter website URL (e.g., google.com)">
-            <button class="btn" id="goBtn">Go</button>
-        </div>
-
-        <div class="browser-bar">
-            <input type="url" id="browserInput" readonly>
-        </div>
-
-        <div class="status-bar" id="statusBar"></div>
-        <div class="loader" id="loader"></div>
-        <div class="error-message" id="errorMessage"></div>
-
-        <iframe 
-            id="proxyFrame"
-            sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-modals"
-            allowfullscreen
-            referrerpolicy="no-referrer-when-downgrade"
-        ></iframe>
     </div>
+
+    <div class="search-box">
+        <input type="url" id="urlInput" placeholder="Enter website URL (e.g., example.com)">
+        <button class="nav-btn" id="goBtn">Go</button>
+    </div>
+
+    <div class="status-bar" id="statusBar">Ready</div>
+    <div class="error-message" id="errorMessage"></div>
+    <iframe 
+        id="proxyFrame"
+        sandbox="allow-forms allow-scripts allow-same-origin allow-popups"
+        referrerpolicy="no-referrer-when-downgrade"
+    ></iframe>
 
     <script>
-        (function() {
-            const ENTRY_POINT = 'https://croxyproxy.com';
-            const iframe = document.getElementById('proxyFrame');
-            const browserInput = document.getElementById('browserInput');
+    (function() {
+        const PROXY_BASE = 'https://croxyproxy.vip';
+        const iframe = document.getElementById('proxyFrame');
+        const urlInput = document.getElementById('urlInput');
+        const statusBar = document.getElementById('statusBar');
+        const errorMessage = document.getElementById('errorMessage');
+        
+        let currentUrl = PROXY_BASE;
+        let historyStack = [PROXY_BASE];
+        let historyPointer = 0;
 
-            // Initialize with CroxyProxy's official domain
-            iframe.src = ENTRY_POINT;
-            browserInput.value = ENTRY_POINT;
+        // Initialize proxy
+        function initProxy() {
+            iframe.src = PROXY_BASE;
+            updateStatus('Connected to proxy network');
+        }
 
-            // Enhanced IP validation regex
-            const validIPRegex = /^(\d{1,3}\.){3}\d{1,3}$/;
-
-            window.addEventListener('message', (e) => {
-                try {
-                    // Validate message origin
-                    if (e.origin.startsWith('https://croxyproxy') || validIPRegex.test(new URL(e.origin).hostname)) {
-                        const data = JSON.parse(e.data);
-                        
-                        if (data.type === 'navigationUpdate') {
-                            // Validate received URL
-                            const url = new URL(data.url);
-                            
-                            // Update browser bar with sanitized URL
-                            browserInput.value = url.hostname.includes('croxyproxy') 
-                                ? url.href 
-                                : `${url.protocol}//${url.hostname}`;
-                        }
-                    }
-                } catch(err) {
-                    console.warn('Secure message error:', err);
-                }
-            });
-
-            // Modified navigation handler
-            document.getElementById('goBtn').addEventListener('click', () => {
-                const rawInput = searchInput.value.trim();
-                if (!rawInput) return;
-
-                try {
-                    // Validate user input
-                    const targetUrl = new URL(
-                        rawInput.startsWith('http') ? rawInput : `https://${rawInput}`
-                    );
-                    
-                    // Encode for CroxyProxy
-                    const proxyUrl = `${ENTRY_POINT}/?__cpo=${btoa(targetUrl.href)}`;
-                    
-                    // Update iframe
-                    iframe.src = proxyUrl;
-                    browserInput.value = proxyUrl;
-                    
-                } catch(err) {
-                    showError(`Invalid URL: ${err.message}`);
-                }
-            });
-
-            // Enhanced error handling
-            iframe.addEventListener('error', () => {
-                const currentUrl = new URL(iframe.src);
+        // Handle navigation
+        function navigateToUrl(target) {
+            try {
+                const cleanUrl = target.startsWith('http') ? target : `https://${target}`;
+                const encodedUrl = btoa(cleanUrl).replace(/=+$/, '');
+                const proxyUrl = `${PROXY_BASE}/?__cpo=${encodedUrl}`;
                 
-                if (validIPRegex.test(currentUrl.hostname)) {
-                    showError(`Proxy server ${currentUrl.hostname} refused connection`);
-                } else {
-                    showError('Connection failed - try another site');
+                historyStack = historyStack.slice(0, historyPointer + 1);
+                historyStack.push(proxyUrl);
+                historyPointer++;
+                
+                iframe.src = proxyUrl;
+                updateStatus(`Loading: ${cleanUrl}`);
+                
+            } catch(error) {
+                showError('Invalid URL format');
+            }
+        }
+
+        // Update UI state
+        function updateStatus(message) {
+            statusBar.textContent = message;
+            errorMessage.style.display = 'none';
+        }
+
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+            statusBar.textContent = 'Error occurred';
+        }
+
+        // Handle messages from proxy
+        window.addEventListener('message', (event) => {
+            try {
+                if (event.origin.startsWith(PROXY_BASE) || 
+                    event.origin.startsWith('https://') && event.data) {
+                    
+                    const currentProxyUrl = iframe.src;
+                    urlInput.value = new URL(currentProxyUrl).searchParams.get('__cpo') 
+                        ? atob(new URL(currentProxyUrl).searchParams.get('__cpo'))
+                        : currentProxyUrl;
                 }
-            });
-
-            // IP format validation function
-            function sanitizeIP(ipString) {
-                const octets = ipString.split('.').slice(0, 4);
-                return octets.join('.');
+            } catch(error) {
+                console.warn('Message handling error:', error);
             }
+        });
 
-            // Update loader messages
-            function showLoader(message) {
-                loader.style.display = 'block';
-                statusBar.textContent = message;
-                statusBar.style.display = 'block';
+        // Event listeners
+        document.getElementById('goBtn').addEventListener('click', () => {
+            const target = urlInput.value.trim();
+            if (target) navigateToUrl(target);
+        });
+
+        document.getElementById('backBtn').addEventListener('click', () => {
+            if (historyPointer > 0) {
+                historyPointer--;
+                iframe.src = historyStack[historyPointer];
+                updateStatus('Navigating back');
             }
-        })();
-        </script>
-    </div>
+        });
+
+        document.getElementById('forwardBtn').addEventListener('click', () => {
+            if (historyPointer < historyStack.length - 1) {
+                historyPointer++;
+                iframe.src = historyStack[historyPointer];
+                updateStatus('Navigating forward');
+            }
+        });
+
+        document.getElementById('refreshBtn').addEventListener('click', () => {
+            iframe.contentWindow.location.reload();
+            updateStatus('Refreshing page');
+        });
+
+        document.getElementById('newSessionBtn').addEventListener('click', () => {
+            historyStack = [PROXY_BASE];
+            historyPointer = 0;
+            initProxy();
+            updateStatus('New session started');
+        });
+
+        // Initialize
+        initProxy();
+    })();
+    </script>
 </body>
 </html>

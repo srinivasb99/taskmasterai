@@ -398,13 +398,15 @@ body.night-mode {
 
 .main-content {
     display: grid;
-    grid-template-columns: 2fr 350px;
+    grid-template-columns: 1fr 350px;
     gap: 30px;
-    margin-left: 100px;
     flex-grow: 1;
+    margin: 0 auto;
     padding: 20px;
     overflow-y: auto;
     background: transparent;
+    max-width: 100%; /* Prevent the main content from expanding beyond its container */
+    box-sizing: border-box; /* Ensure proper sizing */
 }
 
     .community-uploads,

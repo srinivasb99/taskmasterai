@@ -861,36 +861,6 @@ body.night-mode {
     const searchInput = document.getElementById('search-input');
     
 
-    // Updated Upload Handler
-    document.getElementById('file-upload').addEventListener('change', async e => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        const uploadButton = document.getElementById('upload-button');
-        const uploadText = document.getElementById('upload-text');
-        const spinner = document.getElementById('upload-spinner');
-
-        try {
-            // Show loading state
-            uploadText.textContent = 'Uploading...';
-            spinner.style.display = 'block';
-            uploadButton.disabled = true;
-
-            // Upload file
-            await handleFileUpload(file);
-            
-            // Refresh files
-            loadCommunityUploads();
-        } catch (error) {
-            alert(`Upload failed: ${error.message}`);
-        } finally {
-            // Reset UI
-            uploadText.textContent = 'Upload New File';
-            spinner.style.display = 'none';
-            uploadButton.disabled = false;
-            e.target.value = ''; // Reset file input
-        }
-    });
 
         // Token Management
         async function initializeTokens(userId) {

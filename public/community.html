@@ -92,6 +92,8 @@ body.night-mode {
 
 .sidebar {
     width: 250px;
+    min-width: 250px; /* Ensure minimum width is always maintained */
+    max-width: 250px; /* Ensure maximum width is always maintained */
     background: inherit;
     padding: 20px;
     display: flex;
@@ -431,7 +433,6 @@ body.night-mode {
     max-width: 100%; /* Ensure the card doesn't exceed the container width */
     box-sizing: border-box; /* Include padding and borders in the element's total width */
     overflow: hidden; /* Prevent content from overflowing */
-    margin-left: 100px;
 }
 
     .file-card:hover {
@@ -661,6 +662,17 @@ body.night-mode {
         margin-left: 12px;
     }
 
+/* Main Container for Layout */
+.main-container {
+    display: flex;
+    justify-content: flex-start; /* Aligns content and sidebar closer together */
+    gap: 10px; /* Add a small gap between the main content and sidebar */
+}
+
+.container {
+    display: flex;
+    flex-direction: row; /* Default to row on desktop */
+}
     </style>
 </head>
 <body>

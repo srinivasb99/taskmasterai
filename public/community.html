@@ -407,13 +407,16 @@ body.night-mode {
 }
 
 
-    .main-content {
+.main-content {
         display: grid;
         grid-template-columns: 1fr 350px;
         gap: 30px;
-        max-width: 1400px;
         margin: 0 auto;
-    }
+    flex-grow: 1;
+    padding: 20px;
+    overflow-y: auto;
+    background: transparent;
+}
 
     .community-uploads,
     .shared-files {
@@ -607,6 +610,48 @@ body.night-mode {
         }
     }
 
+    .search-container {
+        position: relative;
+        margin-bottom: 25px;
+    }
+
+    .search-icon {
+        position: absolute;
+        left: 15px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 20px;
+        height: 20px;
+        pointer-events: none;
+    }
+
+    .search-bar input {
+        padding-left: 45px;
+    }
+
+    .loading-spinner {
+        display: none;
+        width: 24px;
+        height: 24px;
+        border: 3px solid rgba(255,255,255,0.3);
+        border-radius: 50%;
+        border-top-color: #fff;
+        animation: spin 1s ease-in-out infinite;
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    .token-badge {
+        background: var(--primary-color);
+        color: white;
+        padding: 4px 10px;
+        border-radius: 15px;
+        font-size: 0.85rem;
+        margin-left: 12px;
+    }
+
     </style>
 </head>
 <body>
@@ -768,6 +813,92 @@ body.night-mode {
         const db = firebase.firestore();
         const storage = firebase.storage();
 
+    // File Type Pricing
+    const pricing = {
+        'Basic': {
+            'pdf': 50,
+            'png': 40,
+            'jpg': 40,
+            'jpeg': 40,
+            'mp3': 60,
+            'wav': 60,
+            'mp4': 100,
+            'mov': 100,
+            'docx': 50,
+            'zip': 80,
+            '*': 70
+        },
+        'Pro': {
+            'pdf': 30,
+            'png': 25,
+            'jpg': 25,
+            'jpeg': 25,
+            'mp3': 40,
+            'wav': 40,
+            'mp4': 75,
+            'mov': 75,
+            'docx': 30,
+            'zip': 60,
+            '*': 50
+        },
+        'Premium': {
+            'pdf': 20,
+            'png': 15,
+            'jpg': 15,
+            'jpeg': 15,
+            'mp3': 25,
+            'wav': 25,
+            'mp4': 50,
+            'mov': 50,
+            'docx': 20,
+            'zip': 40,
+            '*': 30
+        }
+    };
+
+    // Search Functionality
+    let allFiles = [];
+    const searchInput = document.getElementById('search-input');
+    
+    searchInput.addEventListener('input', (e) => {
+        const searchTerm = e.target.value.toLowerCase();
+        const filtered = allFiles.filter(file => 
+            file.fileName.toLowerCase().includes(searchTerm)
+        );
+        renderCommunityFiles(filtered);
+    });
+
+    // Updated Upload Handler
+    document.getElementById('file-upload').addEventListener('change', async e => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const uploadButton = document.getElementById('upload-button');
+        const uploadText = document.getElementById('upload-text');
+        const spinner = document.getElementById('upload-spinner');
+
+        try {
+            // Show loading state
+            uploadText.textContent = 'Uploading...';
+            spinner.style.display = 'block';
+            uploadButton.disabled = true;
+
+            // Upload file
+            await handleFileUpload(file);
+            
+            // Refresh files
+            loadCommunityUploads();
+        } catch (error) {
+            alert(`Upload failed: ${error.message}`);
+        } finally {
+            // Reset UI
+            uploadText.textContent = 'Upload New File';
+            spinner.style.display = 'none';
+            uploadButton.disabled = false;
+            e.target.value = ''; // Reset file input
+        }
+    });
+
         // Token Management
         async function initializeTokens(userId) {
             const tokenRef = db.collection('tokens').doc(userId);
@@ -787,22 +918,24 @@ body.night-mode {
             });
         }
 
-        // File Handling
-        async function handleFileUpload(file) {
-            const user = auth.currentUser;
-            const storageRef = storage.ref(`uploads/${user.uid}/${file.name}`);
-            const uploadTask = await storageRef.put(file);
-            const downloadURL = await uploadTask.ref.getDownloadURL();
+   // Update File Upload Handler to Store File Type
+    async function handleFileUpload(file) {
+        const user = auth.currentUser;
+        const extension = file.name.split('.').pop().toLowerCase();
+        
+        const storageRef = storage.ref(`uploads/${user.uid}/${Date.now()}_${file.name}`);
+        const uploadTask = await storageRef.put(file);
+        const downloadURL = await uploadTask.ref.getDownloadURL();
 
-            await db.collection('uploads').add({
-                fileName: file.name,
-                fileUrl: downloadURL,
-                uploaderId: user.uid,
-                uploaderName: user.displayName || 'Anonymous',
-                timestamp: firebase.firestore.FieldValue.serverTimestamp()
-            });
-        }
-
+        await db.collection('uploads').add({
+            fileName: file.name,
+            fileUrl: downloadURL,
+            uploaderId: user.uid,
+            uploaderName: user.displayName || 'Anonymous',
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            fileType: extension
+        });
+    }
         async function handleFileDownload(fileId, uploaderId) {
             const user = auth.currentUser;
             if (user.uid === uploaderId) return true; // No charge for own files
@@ -818,57 +951,75 @@ body.night-mode {
             }
         }
 
-  // Update renderFiles function with new HTML structure
-    function renderFiles() {
+    // Get File Cost
+    async function getFileCost(fileName, plan = 'Basic') {
+        const extension = fileName.split('.').pop().toLowerCase();
+        return pricing[plan][extension] || pricing[plan]['*'];
+    }
+
+    // Updated Render Function with Token Costs
+    async function renderFiles() {
         const user = auth.currentUser;
-        const communityContainer = document.getElementById('community-uploads-container');
-        const sharedContainer = document.getElementById('shared-files-container');
+        const userDoc = await db.collection('users').doc(user.uid).get();
+        const userPlan = userDoc.data().plan || 'Basic';
 
         // Community Files
         db.collection('uploads').where('uploaderId', '!=', user.uid)
-            .onSnapshot(snapshot => {
-                communityContainer.innerHTML = '';
-                snapshot.forEach(doc => {
+            .onSnapshot(async snapshot => {
+                allFiles = await Promise.all(snapshot.docs.map(async doc => {
                     const data = doc.data();
-                    communityContainer.innerHTML += `
-                        <div class="file-card">
-                            <div class="file-name">${data.fileName}</div>
-                            <div class="file-actions">
-                                <button class="info-btn" onclick="showUploader('${data.uploaderName}')">
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-                                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
-                                    </svg>
-                                </button>
-                                <a class="download-btn" onclick="handleFileDownload('${doc.id}', '${data.uploaderId}')">
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white">
-                                        <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
-                                    </svg>
-                                </a>
-                            </div>
-                        </div>
-                    `;
-                });
+                    return {
+                        id: doc.id,
+                        ...data,
+                        cost: await getFileCost(data.fileName, userPlan)
+                    };
+                }));
+                renderCommunityFiles(allFiles);
             });
 
         // User's Files
         db.collection('uploads').where('uploaderId', '==', user.uid)
             .onSnapshot(snapshot => {
-                sharedContainer.innerHTML = '';
-                snapshot.forEach(doc => {
+                const files = snapshot.docs.map(doc => {
                     const data = doc.data();
-                    sharedContainer.innerHTML += `
-                        <div class="file-card">
-                            <div class="file-name">${data.fileName}</div>
-                            <a class="download-btn" href="${data.fileUrl}" target="_blank">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white">
-                                    <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
-                                </svg>
-                            </a>
-                        </div>
-                    `;
+                    return { ...data, id: doc.id };
                 });
+                renderUserFiles(files);
             });
     }
+
+    function renderCommunityFiles(files) {
+        const container = document.getElementById('community-uploads-container');
+        container.innerHTML = files.map(file => `
+            <div class="file-card">
+                <div class="file-name">
+                    ${file.fileName}
+                    <span class="token-badge">${file.cost} tokens</span>
+                </div>
+                <div class="file-actions">
+                    <button class="info-btn" onclick="showUploader('${file.uploaderName}')">
+                        <!-- Info SVG -->
+                    </button>
+                    <a class="download-btn" onclick="handleFileDownload('${file.id}', '${file.uploaderId}')">
+                        <!-- Download SVG -->
+                    </a>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function renderUserFiles(files) {
+        const container = document.getElementById('shared-files-container');
+        container.innerHTML = files.map(file => `
+            <div class="file-card">
+                <div class="file-name">${file.fileName}</div>
+                <a class="download-btn" href="${file.fileUrl}" target="_blank">
+                    <!-- Download SVG -->
+                </a>
+            </div>
+        `).join('');
+    }
+
         function showUploader(name) {
             document.getElementById('uploader-info').textContent = `Uploaded by: ${name}`;
             document.getElementById('uploader-modal').style.display = 'flex';

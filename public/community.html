@@ -91,7 +91,7 @@ body.night-mode {
 }
 
 .sidebar {
-    width: 300px;
+    width: 250px;
     background: inherit;
     padding: 20px;
     display: flex;
@@ -416,17 +416,20 @@ body.night-mode {
         overflow-y: auto;
     }
 
-    .file-card {
-        background: var(--hover-bg);
-        padding: 18px 25px;
-        border-radius: var(--border-radius);
-        margin-bottom: 15px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 20px;
-        transition: transform 0.2s ease;
-    }
+.file-card {
+    background: var(--hover-bg);
+    padding: 18px 25px;
+    border-radius: var(--border-radius);
+    margin-bottom: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+    transition: transform 0.2s ease;
+    max-width: 100%; /* Ensure the card doesn't exceed the container width */
+    box-sizing: border-box; /* Include padding and borders in the element's total width */
+    overflow: hidden; /* Prevent content from overflowing */
+}
 
     .file-card:hover {
         transform: translateX(5px);

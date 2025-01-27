@@ -905,53 +905,24 @@ body.night-mode {
         });
     }
 
-    // File Handling
+  // Update File Upload Handler to Store File Type
     async function handleFileUpload(file) {
         const user = auth.currentUser;
-        const uploadButton = document.getElementById('upload-button');
-        const uploadText = document.getElementById('upload-text');
-        const spinner = document.getElementById('upload-spinner');
+        const extension = file.name.split('.').pop().toLowerCase();
+        
+        const storageRef = storage.ref(`uploads/${user.uid}/${Date.now()}_${file.name}`);
+        const uploadTask = await storageRef.put(file);
+        const downloadURL = await uploadTask.ref.getDownloadURL();
 
-        try {
-            // Show loading state
-            uploadText.textContent = 'Uploading...';
-            spinner.style.display = 'block';
-            uploadButton.disabled = true;
-
-            // Get file extension and cost
-            const extension = file.name.split('.').pop().toLowerCase();
-            const userDoc = await db.collection('users').doc(user.uid).get();
-            const userPlan = userDoc.data().plan || 'Basic';
-            const cost = pricing[userPlan][extension] || pricing[userPlan]['*'];
-
-            // Upload file
-            const storageRef = storage.ref(`uploads/${user.uid}/${Date.now()}_${file.name}`);
-            const uploadTask = await storageRef.put(file);
-            const downloadURL = await uploadTask.ref.getDownloadURL();
-
-            await db.collection('uploads').add({
-                fileName: file.name,
-                fileUrl: downloadURL,
-                uploaderId: user.uid,
-                uploaderName: user.displayName || 'Anonymous',
-                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                fileType: extension,
-                cost: cost
-            });
-
-            // Refresh files
-            loadCommunityUploads();
-        } catch (error) {
-            alert(`Upload failed: ${error.message}`);
-        } finally {
-            // Reset UI
-            uploadText.textContent = 'Upload New File';
-            spinner.style.display = 'none';
-            uploadButton.disabled = false;
-            document.getElementById('file-upload').value = '';
-        }
+        await db.collection('uploads').add({
+            fileName: file.name,
+            fileUrl: downloadURL,
+            uploaderId: user.uid,
+            uploaderName: user.displayName || 'Anonymous',
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            fileType: extension
+        });
     }
-
     async function handleFileDownload(fileId, uploaderId, cost) {
         const user = auth.currentUser;
         if (user.uid === uploaderId) {

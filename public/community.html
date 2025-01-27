@@ -783,16 +783,16 @@ body.night-mode {
         <div id="community-uploads-container"></div>
     </div>
 
-    <div class="shared-files">
-        <h2>Your Files</h2>
-        <label class="upload-button" id="upload-button">
-            <span id="upload-text">Upload New File</span>
-            <div class="loading-spinner" id="upload-spinner"></div>
-        </label>
-        <input type="file" id="file-upload" hidden>
-        <div id="shared-files-container"></div>
+        <div class="shared-files">
+            <h2>Your Files</h2>
+            <button class="upload-button" onclick="document.getElementById('file-upload').click()">
+                Upload New File
+            </button>
+            <input type="file" id="file-upload" hidden>
+            <div id="shared-files-container"></div>
+        </div>
     </div>
-</div>
+
 
 <!-- Updated Modal Section -->
 <div id="uploader-modal" class="modal">

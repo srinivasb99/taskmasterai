@@ -856,9 +856,11 @@ body.night-mode {
         }
     };
 
-    // Search Functionality
+   // Search Functionality
     let allFiles = [];
+    const searchInput = document.getElementById('search-input');
     
+
     // Updated Upload Handler
     document.getElementById('file-upload').addEventListener('change', async e => {
         const file = e.target.files[0];
@@ -982,32 +984,35 @@ body.night-mode {
     function renderCommunityFiles(files) {
         const container = document.getElementById('community-uploads-container');
         container.innerHTML = files.map(file => `
-            <div class="file-card">
-                <div class="file-name">
-                    ${file.fileName}
-                    <span class="token-badge">${file.cost} tokens</span>
-                </div>
-                <div class="file-actions">
-                    <button class="info-btn" onclick="showUploader('${file.uploaderName}')">
-                        <!-- Info SVG -->
-                    </button>
-                    <a class="download-btn" onclick="handleFileDownload('${file.id}', '${file.uploaderId}')">
-                        <!-- Download SVG -->
-                    </a>
-                </div>
-            </div>
+                       <div class="file-card">
+                            <div class="file-name">${data.fileName}</div>
+                            <div class="file-actions">
+                                <button class="info-btn" onclick="showUploader('${data.uploaderName}')">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+                                    </svg>
+                                </button>
+                                <a class="download-btn" onclick="handleFileDownload('${doc.id}', '${data.uploaderId}')">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white">
+                                        <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+                                    </svg>
+                                </a>
+                            </div>
+                        </div>
         `).join('');
     }
 
     function renderUserFiles(files) {
         const container = document.getElementById('shared-files-container');
         container.innerHTML = files.map(file => `
-            <div class="file-card">
-                <div class="file-name">${file.fileName}</div>
-                <a class="download-btn" href="${file.fileUrl}" target="_blank">
-                    <!-- Download SVG -->
-                </a>
-            </div>
+                             <div class="file-card">
+                            <div class="file-name">${data.fileName}</div>
+                            <a class="download-btn" href="${data.fileUrl}" target="_blank">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white">
+                                    <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+                                </svg>
+                            </a>
+                        </div>
         `).join('');
     }
 

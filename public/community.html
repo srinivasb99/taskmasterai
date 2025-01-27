@@ -835,8 +835,9 @@ body.night-mode {
     // Initialize Firebase
     if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
-    const db = firebase.firestore();
     const storage = firebase.storage();
+    const firestore = firebase.firestore();
+
 
     // File Type Pricing
     const pricing = {

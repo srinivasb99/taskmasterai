@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -674,6 +673,20 @@ body.night-mode {
     display: flex;
     flex-direction: row; /* Default to row on desktop */
 }
+
+/* Snowflake wrapper - hidden by default */
+.snowflakes {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1; /* Ensures snowflakes are behind all content */
+    pointer-events: none; /* Prevents snowflakes from interfering with user interactions */
+    overflow: hidden;
+    display: none; /* Snowflakes hidden by default */
+}
+
     </style>
 </head>
 <body>
@@ -774,6 +787,9 @@ body.night-mode {
             </div>
         </div>
 <div class="main-content">
+ <div class="snowflakes">
+        <!-- Snowflakes will be dynamically created here -->
+    </div>
     <div class="community-uploads">
         <h2>Community Uploads</h2>
         <p class="token-display">

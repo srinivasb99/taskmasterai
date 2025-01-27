@@ -406,257 +406,111 @@ body.night-mode {
     font-weight: 600; /* Semi-bold */
 }
 
-.main-content {
-    display: flex;
-    flex-direction: row;
-    justify-content: space-between;
-}
 
-.content-wrapper {
-    flex: 1; /* Take up the remaining space */
-    margin-right: 300px; /* Space for sidebar */
-}
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 25px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
 
-.community-uploads {
-    width: 89%;
-    background-color: var(--card-bg);
-    padding: 20px;
-    border-radius: var(--border-radius);
-    height: 970px; /* Set a fixed height to make the card taller */
-    overflow-y: auto; /* Enable vertical scrolling */
-}
+        .community-uploads {
+            background: var(--card-bg);
+            padding: 25px;
+            border-radius: var(--border-radius);
+            height: calc(100vh - 100px);
+            overflow-y: auto;
+        }
 
-.community-uploads h2 {
-    font-size: 1.8rem; /* Header font size remains the same */
-    color: white;
-    margin-bottom: 20px;
-}
+        .shared-files {
+            background: var(--card-bg);
+            padding: 25px;
+            border-radius: var(--border-radius);
+            height: calc(100vh - 100px);
+            overflow-y: auto;
+        }
 
-.search-bar input {
-    width: 100%;
-    padding: 10px;
-    border-radius: var(--border-radius);
-    border: 2px solid var(--primary-color);
-    background-color: var(--glass-bg);
-    color: var(--text-color);
-    margin-bottom: 20px;
-    font-size: 0.9rem; /* Reduced font size */
-}
+        .file-card {
+            background: var(--hover-bg);
+            padding: 18px;
+            border-radius: var(--border-radius);
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: transform 0.2s;
+        }
 
-.community-uploads .file-card {
-    background-color: var(--hover-bg);
-    padding: 10px; /* Increased padding for a larger card */
-    border-radius: var(--border-radius);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-    width: 100%; /* Make the card take full width */
-    min-height: 80px; /* Optional: set a minimum height for a taller card */
-    font-size: 0.9rem; /* Reduced font size */
-}
+        .file-card:hover {
+            transform: translateX(5px);
+        }
 
-.community-uploads .file-card p {
-    font-size: 1rem; /* Reduced font size */
-}
+        .search-bar input {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: var(--border-radius);
+            background: var(--glass-bg);
+            color: var(--text-color);
+            margin-bottom: 20px;
+        }
 
-.community-uploads .file-card a {
-    padding: 10px 20px; /* Adjust padding for the download button */
-    background-color: var(--primary-color);
-    color: var(--text-color);
-    text-decoration: none;
-    border-radius: var(--border-radius);
-    font-size: 1rem; /* Reduced font size */
-}
+        .token-display {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--hover-bg);
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-weight: 500;
+        }
 
-.community-uploads .file-card a:hover {
-    background-color: var(--accent-color);
-}
+        .upload-button {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            width: 100%;
+            margin-bottom: 20px;
+        }
 
-.shared-files {
-    width: 420px; /* Width of the sidebar */
-    background-color: var(--card-bg);
-    padding: 20px;
-    border-radius: var(--border-radius);
-    position: fixed; /* Fix to the right side */
-    right: 0;
-    top: 0;
-    height: 100%; /* Full height */
-    overflow-y: auto; /* Scroll if content overflows */
-}
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            justify-content: center;
+            align-items: center;
+        }
 
-.shared-files h2 {
-    font-size: 1.8rem; /* Header font size remains the same */
-    color: white;
-    margin-bottom: 10px;
-    text-align: center; /* Centers the text */
-}
+        .modal-content {
+            background: var(--card-bg);
+            padding: 25px;
+            border-radius: var(--border-radius);
+            width: 90%;
+            max-width: 400px;
+        }
 
-.shared-files .file-card {
-    background-color: var(--hover-bg);
-    padding: 15px;
-    border-radius: var(--border-radius);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-    font-size: 0.8rem; /* Reduced font size */
-}
+        .file-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
 
-.shared-files .file-card p {
-    font-size: 0.8rem; /* Reduced font size */
-}
-
-.shared-files .file-card a {
-    padding: 10px;
-    background-color: var(--primary-color);
-    color: var(--text-color);
-    text-decoration: none;
-    border-radius: var(--border-radius);
-    font-size: 0.8rem; /* Reduced font size */
-}
-
-.shared-files .file-card a:hover {
-    background-color: var(--accent-color);
-}
-
-.upload-section {
-    margin-top: 10px; /* Space between last file and upload button */
-    margin-bottom: 20px; /* Space between last file and upload button */
-    text-align: center;
-}
-
-.upload-button {
-    padding: 10px 20px;
-    background-color: var(--primary-color);
-    color: var(--text-color);
-    text-decoration: none;
-    border-radius: var(--border-radius);
-    cursor: pointer;
-    display: inline-block;
-    transition: background-color 0.3s ease;
-    font-size: 0.9rem; /* Reduced font size */
-}
-
-.upload-button:hover {
-    background-color: var(--accent-color);
-}
-
-#file-upload {
-    display: none;
-}
-
-.modal {
-    display: none; /* Hidden by default */
-    position: fixed;
-    z-index: 1000; /* Sit on top */
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.5); /* Black background with opacity */
-    justify-content: center;
-    align-items: center;
-}
-
-.modal-content {
-    background-color: var(--card-bg);
-    border-radius: var(--border-radius);
-    padding: 20px;
-    text-align: center;
-    color: var(--text-color);
-}
-
-.close-button {
-    color: var(--text-color);
-    float: right;
-    font-size: 28px;
-    font-weight: bold;
-}
-
-.close-button:hover,
-.close-button:focus {
-    color: var(--accent-color);
-    cursor: pointer;
-}
-
-.info-button {
-    background-color: var(--primary-color); /* Use primary color for the button background */
-    border: none; /* Remove default border */
-    cursor: pointer; /* Pointer cursor on hover */
-    width: 40px; /* Set width and height to create a circular button */
-    height: 40px;
-    border-radius: 50%; /* Makes the button circular */
-    display: inline-flex; /* Align SVG in the center */
-    align-items: center; /* Vertically center the SVG */
-    justify-content: center; /* Horizontally center the SVG */
-    transition: transform 0.2s ease, background-color 0.2s ease; /* Smooth hover effect */
-}
-
-.info-button svg {
-    width: 24px; /* Larger SVG size */
-    height: 24px;
-    fill: white; /* White color for the SVG */
-    transition: fill 0.2s ease; /* Smooth color transition */
-}
-
-.info-button:hover {
-    background-color: rgba(255, 255, 255, 0.2); /* Slightly lighter background on hover */
-    transform: scale(1.1); /* Slight zoom effect on hover */
-}
-
-.info-button:focus {
-    outline: none; /* Remove focus outline */
-    box-shadow: 0 0 6px rgba(255, 255, 255, 0.5); /* Subtle glow when focused */
-}
-
-.download-button {
-    background-color: var(--primary-color); /* Primary color for the button */
-    border-radius: 50%; /* Circular button */
-    width: 40px; /* Adjust width */
-    height: 40px; /* Adjust height */
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: background-color 0.3s ease;
-    border: none; /* Remove border */
-}
-
-.download-button:hover {
-    background-color: var(--primary-color-dark); /* Darker shade of primary color on hover */
-}
-
-.download-button svg {
-    width: 24px; /* Adjust the SVG width */
-    height: 24px; /* Adjust the SVG height */
-}
-
-.community-uploads #token-count {
-    font-size: 1.8rem;
-    color: white;
-    margin-bottom: 20px;
-}
-
-#token-count {
-    font-size: 16px; /* Adjust to match your needs */
-    display: flex;
-    align-items: center;
-}
-
-.token-display {
-    display: flex;
-    align-items: center;
-    margin-left: 5px; /* Add space between "Current Tokens:" and icon + count */
-}
-
-.token-icon {
-    width: 34px; /* Adjust to match text size */
-    height: 34px; /* Adjust to match text size */
-    fill: white; /* Set the SVG color to white */
-    margin-right: 0px; /* Spacing between icon and the "500" */
-}
-
+        .download-btn {
+            background: var(--primary-color);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 5px;
+            text-decoration: none;
+            cursor: pointer;
+        }
 
     </style>
 </head>
@@ -757,271 +611,199 @@ body.night-mode {
                 </div>
             </div>
         </div>
-        <div class="main-content">
-            <div class="content-wrapper">
-                <div class="community-uploads">
-                    <h2>Community Uploads</h2>
-                    <p id="token-count">
-                        Current Tokens: 
-                        <span class="token-display">
-                            <svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="-5.0 -10.0 110.0 135.0" class="token-icon">
-                                <path d="m49.996 10c-22.055 0-39.996 17.945-39.996 40s17.941 40 39.996 40c22.055 0 40-17.945 40-40s-17.941-40-40-40zm0 67.121c-14.957 0-27.121-12.168-27.121-27.121 0-14.957 12.168-27.121 27.121-27.121 14.957 0 27.121 12.168 27.121 27.121 0 14.957-12.168 27.121-27.121 27.121zm20.492-50.352c-5.0156-4.4297-11.469-7.2617-18.559-7.6992v-5.1445c8.5078 0.44922 16.238 3.8594 22.195 9.2109l-3.6367 3.6367zm-22.43-7.6992c-7.0898 0.4375-13.543 3.2734-18.559 7.6992l-3.6367-3.6367c5.9531-5.3516 13.688-8.7617 22.191-9.2109v5.1445zm-21.297 10.438c-4.4297 5.0156-7.2617 11.469-7.6992 18.559h-5.1406c0.44922-8.5039 3.8594-16.238 9.207-22.191zm-7.6992 22.43c0.4375 7.0898 3.2734 13.543 7.6992 18.559l-3.6328 3.6328c-5.3516-5.9531-8.7578-13.688-9.207-22.191zm10.438 21.297c5.0156 4.4297 11.469 7.2617 18.559 7.6992v5.1445c-8.5078-0.44922-16.238-3.8594-22.191-9.2109l3.6367-3.6367zm22.43 7.6992c7.0898-0.4375 13.543-3.2734 18.559-7.6992l3.6367 3.6367c-5.9531 5.3516-13.688 8.7617-22.195 9.2109zm21.297-10.438c4.4297-5.0156 7.2617-11.469 7.6992-18.559h5.1445c-0.44922 8.5078-3.8594 16.238-9.2109 22.195l-3.6367-3.6367zm7.6992-22.43c-0.4375-7.0898-3.2734-13.543-7.6992-18.559l3.6367-3.6367c5.3516 5.9531 8.7617 13.688 9.2109 22.195zm-16.758-0.26172-11.18-15.211c-0.70312-0.96484-1.7969-1.5195-2.9922-1.5195-1.1914 0-2.2773 0.55078-2.9883 1.5156l-11.184 15.215c-0.96484 1.3125-0.96484 3.0781 0 4.3945l11.184 15.219c0.71094 0.96094 1.8008 1.5117 2.9883 1.5117 1.1992 0 2.2891-0.55469 2.9883-1.5156l11.184-15.215c0.96484-1.3125 0.96484-3.0781 0-4.3945zm-14.172 17.145-10.984-14.945 10.984-14.945 10.984 14.945zm-1.7461-36.602c-0.75391-0.75391-0.75391-1.9805 0-2.7383 0.75781-0.75391 1.9844-0.75391 2.7383 0 0.75391 0.75781 0.75391 1.9844 0 2.7383-0.75391 0.75391-1.9805 0.75391-2.7383 0zm-16.738 5.6406c0-1.0664 0.87109-1.9336 1.9375-1.9336 1.0664 0 1.9336 0.86719 1.9336 1.9336 0 1.0664-0.86719 1.9336-1.9336 1.9336-1.0664 0-1.9375-0.86719-1.9375-1.9336zm-3.1719 15.023c0.75781 0.75391 0.75781 1.9805 0 2.7383-0.75391 0.75391-1.9805 0.75391-2.7344 0-0.75781-0.75781-0.75781-1.9844 0-2.7383 0.75391-0.75391 1.9805-0.75391 2.7344 0zm7.5781 17.535c0 1.0703-0.86719 1.9375-1.9375 1.9375-1.0703 0-1.9336-0.86719-1.9336-1.9375s0.86328-1.9336 1.9336-1.9336c1.0703 0 1.9375 0.86719 1.9375 1.9336zm15.824 5.1094c0.75391 0.75391 0.75391 1.9805 0 2.7383-0.75391 0.75391-1.9805 0.75391-2.7383 0-0.75391-0.75781-0.75391-1.9844 0-2.7383 0.75781-0.75391 1.9844-0.75391 2.7383 0zm16.738-5.6406c0 1.0703-0.86719 1.9336-1.9336 1.9336s-1.9375-0.86328-1.9375-1.9336 0.86719-1.9336 1.9375-1.9336 1.9336 0.86328 1.9336 1.9336zm5.9102-15.023c-0.75781 0.75391-1.9844 0.75391-2.7383 0-0.75391-0.75391-0.75391-1.9805 0-2.7383 0.75391-0.75391 1.9805-0.75391 2.7383 0 0.75391 0.75781 0.75391 1.9844 0 2.7383zm-10.312-17.535c0-1.0703 0.86328-1.9375 1.9336-1.9375 1.0703 0 1.9336 0.86719 1.9336 1.9375s-0.86328 1.9336-1.9336 1.9336c-1.0703 0-1.9336-0.86719-1.9336-1.9336z" fill-rule="evenodd"/>
-                            </svg>
-                            500
-                        </span>
-                    </p> <!-- Display token count -->
-                    <div class="search-bar">
-                        <input type="text" placeholder="Search files...">
-                    </div>
-                    <div id="community-uploads-container"></div>
-                </div>
+    <div class="main-content">
+        <div class="community-uploads">
+            <h2>Community Uploads</h2>
+            <p class="token-display">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm1-14h-2v8h2V6zm0 10h-2v2h2v-2z"/>
+                </svg>
+                <span id="token-count">500</span>
+            </p>
+            <div class="search-bar">
+                <input type="text" placeholder="Search files...">
             </div>
+            <div id="community-uploads-container"></div>
         </div>
 
-
-    <div class="shared-files">
-        <h2>Your Shared Files</h2>
-        <div class="upload-section">
-            <label for="file-upload" class="upload-button">Upload New File</label>
-            <input type="file" id="file-upload" accept=".pdf,.docx,.pptx,.txt" style="display:none;">
-            <!-- Loading indicator -->
-            <div id="loading-indicator" style="display: none; margin-top: 10px;">
-                Uploading file, please wait...
-            </div>
+        <div class="shared-files">
+            <h2>Your Files</h2>
+            <button class="upload-button" onclick="document.getElementById('file-upload').click()">
+                Upload New File
+            </button>
+            <input type="file" id="file-upload" hidden>
+            <div id="shared-files-container"></div>
         </div>
-        <div id="shared-files-container"></div>
     </div>
-</div>
 
-
-<div id="uploader-details-modal" class="modal">
-    <div class="modal-content">
-        <span class="close-button" onclick="closeModal()">&times;</span>
-        <p id="uploader-details-content"></p>
+    <div id="uploader-modal" class="modal">
+        <div class="modal-content">
+            <h3>Uploader Details</h3>
+            <p id="uploader-info"></p>
+            <button onclick="closeModal()">Close</button>
+        </div>
     </div>
-</div>
 
-            
-        
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-storage.js"></script>
+
     <script>
-        document.querySelector('.sidebar-toggle').addEventListener('click', () => {
-            document.querySelector('.sidebar').classList.toggle('active');
-        });
-    </script>
+        // Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDaMAlQRMXiDsZ4P0b06P18id3y5xBiZ1k",
+            authDomain: "deepworkai-c3419.firebaseapp.com",
+            projectId: "deepworkai-c3419",
+            storageBucket: "deepworkai-c3419.appspot.com",
+            messagingSenderId: "367439182644",
+            appId: "1:367439182644:web:304216430df97eff68c361"
+        };
 
+        // Initialize Firebase
+        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        const storage = firebase.storage();
 
-    </script>
-<!-- Firebase App (the core Firebase SDK) is always required and must be listed first -->
-<script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
-<!-- Add Firebase products that you want to use -->
-<script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-auth.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-firestore.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-storage.js"></script>
-
-<script>
-    // Replace the following with your app's Firebase project configuration
-    var firebaseConfig = {
-        apiKey: "AIzaSyDaMAlQRMXiDsZ4P0b06P18id3y5xBiZ1k",
-        authDomain: "deepworkai-c3419.firebaseapp.com",
-        projectId: "deepworkai-c3419",
-        storageBucket: "deepworkai-c3419.appspot.com",
-        messagingSenderId: "367439182644",
-        appId: "1:367439182644:web:304216430df97eff68c361"
-    };
-
-    // Initialize Firebase
-    if (!firebase.apps.length) {
-        firebase.initializeApp(firebaseConfig);
-    } else {
-        firebase.app(); // if already initialized, use that one
-    }
-
-    const db = firebase.firestore();
-    const firestore = firebase.firestore();
-    const storage = firebase.storage();
-    var auth = firebase.auth();
-
-document.addEventListener('DOMContentLoaded', async () => {
-    const tokenCountElement = document.getElementById('token-count');
-    const user = auth.currentUser;
-
-    // Initial token setup
-    let userTokens = 500;
-
-    // Fetch user's token balance from Firestore
-    const userDoc = await db.collection('users').doc(user.uid).get();
-    if (userDoc.exists && userDoc.data().tokens) {
-        userTokens = userDoc.data().tokens;
-    } else {
-        // If no tokens exist, set them to 500
-        await db.collection('users').doc(user.uid).set({ tokens: 500 }, { merge: true });
-    }
-
-    // Update the token display
-    tokenCountElement.textContent = `Current Tokens: ${userTokens}`;
-
-    // Handle file download logic and token deduction
-    async function handleFileDownload(fileType) {
-        let cost;
-        switch (fileType) {
-            case '.pdf':
-                cost = 250;
-                break;
-            case '.docx':
-                cost = 200;
-                break;
-            case '.pptx':
-                cost = 150;
-                break;
-            case '.txt':
-                cost = 100;
-                break;
-            default:
-                return;
+        // Token Management
+        async function initializeTokens(userId) {
+            const tokenRef = db.collection('tokens').doc(userId);
+            const doc = await tokenRef.get();
+            if (!doc.exists) {
+                await tokenRef.set({ count: 500 });
+            }
         }
 
-        // Check if the user has enough tokens
-        if (userTokens >= cost) {
-            userTokens -= cost;
-            await db.collection('users').doc(user.uid).update({ tokens: userTokens });
-            tokenCountElement.textContent = `Current Tokens: ${userTokens}`;
-            // Allow the download
-            alert(`You have unlocked the ${fileType} file!`);
-        } else {
-            alert('Not enough tokens to download this file.');
+        async function deductTokens(userId, amount) {
+            const tokenRef = db.collection('tokens').doc(userId);
+            await db.runTransaction(async (transaction) => {
+                const doc = await transaction.get(tokenRef);
+                const currentTokens = doc.data().count;
+                if (currentTokens < amount) throw new Error('Insufficient tokens');
+                transaction.update(tokenRef, { count: currentTokens - amount });
+            });
         }
-    }
 
-    // Example usage of handleFileDownload when a file is clicked
-    document.querySelectorAll('.file-card a').forEach(fileLink => {
-        fileLink.addEventListener('click', (event) => {
-            const fileType = event.target.getAttribute('data-file-type');
-            event.preventDefault(); // Prevent automatic download
-            handleFileDownload(fileType);
-        });
-    });
-});
+        // File Handling
+        async function handleFileUpload(file) {
+            const user = auth.currentUser;
+            const storageRef = storage.ref(`uploads/${user.uid}/${file.name}`);
+            const uploadTask = await storageRef.put(file);
+            const downloadURL = await uploadTask.ref.getDownloadURL();
 
-
-// Function to handle file upload
-document.getElementById('file-upload').addEventListener('change', async (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    const user = auth.currentUser;
-    if (!user) return; // Ensure the user is authenticated
-
-    const userDoc = await db.collection('users').doc(user.uid).get(); // Assume user data is stored in 'users' collection
-    const displayName = userDoc.exists ? userDoc.data().displayName : 'Anonymous';
-
-    const storageRef = storage.ref(`uploads/${file.name}`);
-    const uploadTask = storageRef.put(file);
-
-    const loadingIndicator = document.getElementById('loading-indicator');
-    loadingIndicator.style.display = 'block'; // Show the loading indicator
-
-    uploadTask.on('state_changed', 
-        (snapshot) => {
-            // Optional: Handle upload progress
-        }, 
-        (error) => {
-            console.error('Upload failed:', error);
-            loadingIndicator.style.display = 'none'; // Hide the loading indicator on error
-        }, 
-        async () => {
-            const fileUrl = await storageRef.getDownloadURL();
             await db.collection('uploads').add({
                 fileName: file.name,
-                fileUrl,
+                fileUrl: downloadURL,
                 uploaderId: user.uid,
-                uploaderName: displayName // Store the displayName
+                uploaderName: user.displayName || 'Anonymous',
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
             });
-
-            loadingIndicator.style.display = 'none'; // Hide the loading indicator after upload completes
-            loadSharedFiles(); // Refresh the current user's shared files
-            loadCommunityUploads(); // Refresh the community uploads
         }
-    );
-});
 
+        async function handleFileDownload(fileId, uploaderId) {
+            const user = auth.currentUser;
+            if (user.uid === uploaderId) return true; // No charge for own files
+            
+            try {
+                await deductTokens(user.uid, 10);
+                const fileDoc = await db.collection('uploads').doc(fileId).get();
+                window.open(fileDoc.data().fileUrl, '_blank');
+                return true;
+            } catch (error) {
+                alert(error.message);
+                return false;
+            }
+        }
 
+        // UI Functions
+        async function renderFiles() {
+            const user = auth.currentUser;
+            const communityContainer = document.getElementById('community-uploads-container');
+            const sharedContainer = document.getElementById('shared-files-container');
 
-// Function to load current user's shared files
-async function loadSharedFiles() {
-    const user = auth.currentUser;
-    const sharedFilesContainer = document.getElementById('shared-files-container');
-    sharedFilesContainer.innerHTML = ''; // Clear previous entries
+            // Community Files
+            db.collection('uploads').where('uploaderId', '!=', user.uid)
+                .onSnapshot(snapshot => {
+                    communityContainer.innerHTML = '';
+                    snapshot.forEach(doc => {
+                        const data = doc.data();
+                        communityContainer.innerHTML += `
+                            <div class="file-card">
+                                <div>${data.fileName}</div>
+                                <div class="file-actions">
+                                    <button onclick="showUploader('${data.uploaderName}')">👤</button>
+                                    <a class="download-btn" 
+                                       onclick="handleFileDownload('${doc.id}', '${data.uploaderId}')">
+                                        Download
+                                    </a>
+                                </div>
+                            </div>
+                        `;
+                    });
+                });
 
-    const querySnapshot = await db.collection('uploads').where('uploaderId', '==', user.uid).get();
-    querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        const fileCard = document.createElement('div');
-        fileCard.classList.add('file-card');
-        fileCard.innerHTML = `
-            <p>${data.fileName}</p>
-            <div class="file-actions">
-                <a href="${data.fileUrl}" target="_blank" class="download-button">
-                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="width: 1.5em; height: 1.5em;">
-                        <g id="Interface / Download">
-                            <path id="Vector" d="M6 21H18M12 3V17M12 17L17 12M12 17L7 12" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-                        </g>
-                    </svg>
-                </a>
-            </div>
-        `;
-        sharedFilesContainer.appendChild(fileCard);
-    });
-}
+            // User's Files
+            db.collection('uploads').where('uploaderId', '==', user.uid)
+                .onSnapshot(snapshot => {
+                    sharedContainer.innerHTML = '';
+                    snapshot.forEach(doc => {
+                        const data = doc.data();
+                        sharedContainer.innerHTML += `
+                            <div class="file-card">
+                                <div>${data.fileName}</div>
+                                <a class="download-btn" href="${data.fileUrl}" target="_blank">
+                                    Download
+                                </a>
+                            </div>
+                        `;
+                    });
+                });
+        }
 
-// Function to load community uploads (excluding the current user's files)
-async function loadCommunityUploads() {
-    const user = auth.currentUser;
-    const communityUploadsContainer = document.getElementById('community-uploads-container');
-    communityUploadsContainer.innerHTML = ''; // Clear previous entries
+        function showUploader(name) {
+            document.getElementById('uploader-info').textContent = `Uploaded by: ${name}`;
+            document.getElementById('uploader-modal').style.display = 'flex';
+        }
 
-    const querySnapshot = await db.collection('uploads').where('uploaderId', '!=', user.uid).get();
-    querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        const fileCard = document.createElement('div');
-        fileCard.classList.add('file-card');
-        fileCard.innerHTML = `
-            <p>${data.fileName}</p>
-            <div class="file-actions">
-                <button class="info-button" onclick="showUploaderDetails('${data.uploaderName}')">
-                    <svg viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg" style="width: 2.5em; height: 2.5em;">
-                        <path d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10zm-.696-3.534c.63 0 1.332-.288 2.196-1.458l.911-1.22a.334.334 0 0 0-.074-.472.38.38 0 0 0-.505.06l-1.475 1.679a.241.241 0 0 1-.279.061.211.211 0 0 1-.12-.244l1.858-7.446a.499.499 0 0 0-.575-.613l-3.35.613a.35.35 0 0 0-.276.258l-.086.334a.25.25 0 0 0 .243.312h1.73l-1.476 5.922c-.054.234-.144.63-.144.918 0 .666.396 1.296 1.422 1.296zm1.83-10.536c.702 0 1.242-.414 1.386-1.044.036-.144.054-.306.054-.414 0-.504-.396-.972-1.134-.972-.702 0-1.242.414-1.386 1.044a1.868 1.868 0 0 0-.054.414c0 .504.396.972 1.134.972z" fill="white"></path>
-                    </svg>
-                </button>
-                <a href="${data.fileUrl}" target="_blank">Download</a>
-            </div>
-        `;
-        communityUploadsContainer.appendChild(fileCard);
-    });
-}
+        function closeModal() {
+            document.getElementById('uploader-modal').style.display = 'none';
+        }
 
+        // Auth State Listener
+        auth.onAuthStateChanged(async user => {
+            if (user) {
+                await initializeTokens(user.uid);
+                renderFiles();
+                
+                // Real-time token updates
+                db.collection('tokens').doc(user.uid).onSnapshot(doc => {
+                    document.getElementById('token-count').textContent = doc.data().count;
+                });
+            } else {
+                window.location.href = '/login.html';
+            }
+        });
 
+        // Event Listeners
+        document.getElementById('file-upload').addEventListener('change', async e => {
+            const file = e.target.files[0];
+            if (file) {
+                try {
+                    await handleFileUpload(file);
+                    alert('File uploaded successfully!');
+                } catch (error) {
+                    alert('Upload failed: ' + error.message);
+                }
+            }
+        });
 
-// Function to display uploader details in a modal
-function showUploaderDetails(name) {
-    const modal = document.getElementById('uploader-details-modal');
-    const modalContent = document.getElementById('uploader-details-content');
-    modalContent.textContent = `Uploader: ${name}`;
-    modal.style.display = 'block';
-}
-
-// Function to close the modal
-function closeModal() {
-    const modal = document.getElementById('uploader-details-modal');
-    modal.style.display = 'none';
-}
-
-// Listen for auth changes and load the files accordingly
-auth.onAuthStateChanged((user) => {
-    if (user) {
-        loadSharedFiles();
-        loadCommunityUploads();
-    }
-});
+        // Close modal on outside click
+        window.onclick = function(event) {
+            const modal = document.getElementById('uploader-modal');
+            if (event.target === modal) closeModal();
+        }
 
 
 

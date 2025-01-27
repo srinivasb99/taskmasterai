@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -835,9 +836,8 @@ body.night-mode {
     // Initialize Firebase
     if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
+    const db = firebase.firestore();
     const storage = firebase.storage();
-    const firestore = firebase.firestore();
-
 
     // File Type Pricing
     const pricing = {
@@ -1253,7 +1253,7 @@ function loadSmallProfilePicture() {
 
     if (currentUser) {
         const uid = currentUser.uid;
-        const userDocRef = firestore.collection('users').doc(uid);
+        const userDocRef = db.collection('users').doc(uid);
 
         userDocRef.get().then(doc => {
             if (doc.exists) {

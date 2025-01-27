@@ -858,16 +858,7 @@ body.night-mode {
 
     // Search Functionality
     let allFiles = [];
-    const searchInput = document.getElementById('search-input');
     
-    searchInput.addEventListener('input', (e) => {
-        const searchTerm = e.target.value.toLowerCase();
-        const filtered = allFiles.filter(file => 
-            file.fileName.toLowerCase().includes(searchTerm)
-        );
-        renderCommunityFiles(filtered);
-    });
-
     // Updated Upload Handler
     document.getElementById('file-upload').addEventListener('change', async e => {
         const file = e.target.files[0];

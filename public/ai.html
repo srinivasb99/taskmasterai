@@ -2307,9 +2307,7 @@ async function processUserInput(message) {
 
 
         console.error('Error processing message:', error);
-        // Clear the interval and remove the indicator
-        clearInterval(messageRotation);
-        indicator.remove();
+
         addMessage("I apologize, but I encountered an error. Please try again.", false);
     }
 }

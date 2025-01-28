@@ -2173,8 +2173,6 @@ async function handleUserMessage() {
     } catch (error) {
         console.error('Error in handleUserMessage:', error);
         // Clear the interval and remove the indicator in case of error
-        clearInterval(messageRotation);
-        indicator.remove();
         
         if (error.name === 'AbortError') {
             addMessage("Message was stopped by user.", false, 'system');

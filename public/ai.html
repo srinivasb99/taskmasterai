@@ -1796,7 +1796,8 @@ async function queryHuggingFaceAPI(userInput, userData = null, username = null, 
     const userIdentityKeywords = ['who am i', 'what is my name', "what's my name", 'my name', 'who i am'];
     const isIdentityQuestion = userIdentityKeywords.some(keyword => userInput.toLowerCase().includes(keyword));
 
-    // Action keywords and patterns
+    // ============== START OF MODIFIED SECTION ==============
+    // Action keywords and patterns (modified structure)
     const actionPatterns = {
         add: ['add', 'create', 'make', 'set up', 'start', 'begin'],
         update: ['update', 'modify', 'change', 'edit', 'revise'],
@@ -1812,25 +1813,59 @@ async function queryHuggingFaceAPI(userInput, userData = null, username = null, 
         event: ['event', 'meeting', 'appointment']
     };
 
-    // Convert patterns to regex-safe strings
-    const actionRegexStr = Object.entries(actionPatterns)
-        .map(([action, patterns]) => `(?<action>${patterns.join('|')})`)
-        .join('|');
+    // Flatten all keywords into single lists
+    const allActionKeywords = Object.values(actionPatterns).flat();
+    const allTypeKeywords = Object.values(typePatterns).flat();
 
-    const typeRegexStr = Object.entries(typePatterns)
-        .map(([type, patterns]) => `(?<type>${patterns.join('|')})`)
-        .join('|');
+    // Build regex strings with single capture groups
+    const actionRegexStr = `(?<action>${allActionKeywords.join('|')})`;
+    const typeRegexStr = `(?<type>${allTypeKeywords.join('|')})`;
 
-    // Flexible pattern matching
+    // Regex patterns with negative lookahead for content group
     const patterns = [
-        new RegExp(`(?:${actionRegexStr})\\s+(?:a|an|the)?\\s*(?:${typeRegexStr})\\s+(?:to|for|about)?\\s*(?<content>.+)`, 'i'),
-        new RegExp(`(?:${actionRegexStr})\\s+(?:\\d+\\s+)?(?:${typeRegexStr})s?\\s+(?:that|which|to|for)?\\s*(?<content>.+)`, 'i'),
-        new RegExp(`(?:i\\s+(?:need|want|would like)\\s+to\\s+)?(?:${actionRegexStr})\\s+(?:a|an|the|some|new)?\\s*(?:${typeRegexStr})s?(?::|,)?\\s*(?<content>.+)`, 'i'),
-        new RegExp(`(?:can|could)\\s+you\\s+(?:${actionRegexStr})\\s+(?:a|an|the)?\\s*(?:${typeRegexStr})\\s+(?:for\\s+me\\s+)?(?:to|about)?\\s*(?<content>.+)`, 'i'),
-        new RegExp(`(?:please\\s+)?(?:${actionRegexStr})\\s+(?:this|a|an|the)?\\s*(?:${typeRegexStr})(?::|,)?\\s*(?<content>.+)`, 'i')
+        new RegExp(
+            `(?:${actionRegexStr})\\s+(?:a|an|the)?\\s*(?:${typeRegexStr})\\s+` +
+            `(?:to|for|about)?\\s*(?<content>(?!.*\\b(${allActionKeywords.concat(allTypeKeywords).join('|')})\\b).+)`,
+            'i'
+        ),
+        new RegExp(
+            `(?:${actionRegexStr})\\s+(?:\\d+\\s+)?(?:${typeRegexStr})s?\\s+` +
+            `(?:that|which|to|for)?\\s*(?<content>(?!.*\\b(${allActionKeywords.concat(allTypeKeywords).join('|')})\\b).+)`,
+            'i'
+        ),
+        new RegExp(
+            `(?:i\\s+(?:need|want|would like)\\s+to\\s+)?(?:${actionRegexStr})\\s+` +
+            `(?:a|an|the|some|new)?\\s*(?:${typeRegexStr})s?(?::|,)?\\s*` +
+            `(?<content>(?!.*\\b(${allActionKeywords.concat(allTypeKeywords).join('|')})\\b).+)`,
+            'i'
+        ),
+        new RegExp(
+            `(?:can|could)\\s+you\\s+(?:${actionRegexStr})\\s+` +
+            `(?:a|an|the)?\\s*(?:${typeRegexStr})\\s+` +
+            `(?:for\\s+me\\s+)?(?:to|about)?\\s*` +
+            `(?<content>(?!.*\\b(${allActionKeywords.concat(allTypeKeywords).join('|')})\\b).+)`,
+            'i'
+        ),
+        new RegExp(
+            `(?:please\\s+)?(?:${actionRegexStr})\\s+` +
+            `(?:this|a|an|the)?\\s*(?:${typeRegexStr})(?::|,)?\\s*` +
+            `(?<content>(?!.*\\b(${allActionKeywords.concat(allTypeKeywords).join('|')})\\b).+)`,
+            'i'
+        )
     ];
 
-    // Try each pattern
+    // Helper function to categorize matched words
+    const categorizeMatch = (word, categories) => {
+        const normalizedWord = word.toLowerCase();
+        return Object.entries(categories).find(([_, keywords]) => 
+            keywords.includes(normalizedWord)
+        )?.[0] || normalizedWord;
+    };
+    // ============== END OF MODIFIED SECTION ==============
+
+    // Rest of the original function remains the same until...
+    
+    // ============== MODIFIED ACTION MATCH HANDLING ==============
     let actionMatch = null;
     for (const pattern of patterns) {
         const match = userInput.toLowerCase().match(pattern);
@@ -1840,15 +1875,30 @@ async function queryHuggingFaceAPI(userInput, userData = null, username = null, 
                 type: match.groups.type,
                 content: match.groups.content.trim()
             };
+            
+            // Validate match quality
+            if (!actionMatch.action || !actionMatch.type) {
+                console.warn('Partial match detected:', match.groups);
+                continue;
+            }
+            
             break;
         }
     }
 
     if (actionMatch) {
-        const normalizedAction = Object.entries(actionPatterns)
-            .find(([_, patterns]) => patterns.includes(actionMatch.action))?.[0] || actionMatch.action;
-        const normalizedType = Object.entries(typePatterns)
-            .find(([_, patterns]) => patterns.includes(actionMatch.type))?.[0] || actionMatch.type;
+        // Categorize using helper function
+        const normalizedAction = categorizeMatch(actionMatch.action, actionPatterns);
+        const normalizedType = categorizeMatch(actionMatch.type, typePatterns);
+
+        // Log unclassified terms
+        if (normalizedAction === actionMatch.action.toLowerCase()) {
+            console.warn(`Unclassified action: ${actionMatch.action}`);
+        }
+        if (normalizedType === actionMatch.type.toLowerCase()) {
+            console.warn(`Unclassified type: ${actionMatch.type}`);
+        }
+
         return handleActionCommand(normalizedAction, normalizedType, actionMatch.content, userData?.user?.uid);
     }
 
@@ -2173,6 +2223,8 @@ async function handleUserMessage() {
     } catch (error) {
         console.error('Error in handleUserMessage:', error);
         // Clear the interval and remove the indicator in case of error
+        clearInterval(messageRotation);
+        indicator.remove();
         
         if (error.name === 'AbortError') {
             addMessage("Message was stopped by user.", false, 'system');
@@ -2305,7 +2357,9 @@ async function processUserInput(message) {
 
 
         console.error('Error processing message:', error);
-
+        // Clear the interval and remove the indicator
+        clearInterval(messageRotation);
+        indicator.remove();
         addMessage("I apologize, but I encountered an error. Please try again.", false);
     }
 }

@@ -400,7 +400,7 @@ body.night-mode {
 
 .main-content {
     display: grid;
-    grid-template-columns: 1fr 350px;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
     gap: 30px;
     flex-grow: 1;
     margin: 0 auto;
@@ -471,6 +471,8 @@ body.night-mode {
         margin-bottom: 25px;
         font-size: 1rem;
         transition: background 0.2s ease;
+        position: relative;
+
     }
 
     .upload-button:hover {
@@ -615,7 +617,7 @@ body.night-mode {
     .search-bar {
         width: 100%;
         padding: 12px 20px 12px 45px;
-        border: 1px solid var(--primary-color);
+        border: none;
         border-radius: 30px;
         font-size: 1rem;
         background: var(--hover-bg);
@@ -625,23 +627,39 @@ body.night-mode {
 
     .search-bar:focus {
         outline: none;
-        border-color: var(--accent-color);
+        border-color: var(--primary-color);
         box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
     }
 
-    .loading-spinner {
+   /* Loading Spinner */
+   .loading-overlay {
         display: none;
-        width: 24px;
-        height: 24px;
-        border: 3px solid rgba(255,255,255,0.3);
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.7);
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+    }
+
+    .loading-spinner {
+        width: 40px;
+        height: 40px;
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid var(--primary-color);
         border-radius: 50%;
-        border-top-color: #fff;
-        animation: spin 1s ease-in-out infinite;
+        animation: spin 1s linear infinite;
     }
 
     @keyframes spin {
-        to { transform: rotate(360deg); }
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
     }
+
+
 
     .token-badge {
         background: var(--primary-color);
@@ -650,31 +668,59 @@ body.night-mode {
         border-radius: 15px;
         font-size: 0.85rem;
         flex-shrink: 0;
+        margin-left: auto;
+    }
+
+    .unlocked-files {
+        grid-column: 1 / -1;
+        order: 2;
+        height: calc(70vh - 100px);
+
     }
 
     /* Added styling for unlocked files section */
     .unlocked-files .file-card {
         background: rgba(76, 175, 80, 0.15);
-        border: 1px solid var(--accent-color);
+        border: none;
     }
 
     .unlocked-files .token-badge {
         background: var(--accent-color);
     }
 
+   .community-uploads { order: 1; }
+    .shared-files { order: 3; }
+
+    @media (min-width: 1200px) {
+        .main-content {
+            grid-template-columns: 1fr 1fr 1fr;
+        }
+        .unlocked-files {
+            grid-column: auto;
+            order: 2;
+        }
+        .community-uploads { order: 1; }
+        .shared-files { order: 3; }
+    }
+
     @media (max-width: 768px) {
         .main-content {
             grid-template-columns: 1fr;
-            padding: 15px;
-            gap: 20px;
         }
-        
-        .community-uploads,
-        .shared-files,
-        .unlocked-files {
-            height: auto;
-            max-height: 50vh;
-        }
+    }
+
+  .upload-spinner {
+        display: none;
+        position: absolute;
+        right: 15px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 20px;
+        height: 20px;
+        border: 2px solid #fff;
+        border-top-color: transparent;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
     }
 
 /* Main Container for Layout */
@@ -806,6 +852,10 @@ body.night-mode {
         <!-- Snowflakes will be dynamically created here -->
     </div>
     
+    <div class="loading-overlay">
+        <div class="loading-spinner"></div>
+    </div>
+
     <div class="community-uploads">
         <h2>Community Uploads</h2>
         <p class="token-display">
@@ -823,19 +873,19 @@ body.night-mode {
         <div id="community-uploads-container"></div>
     </div>
 
+    <div class="unlocked-files">
+        <h2>Unlocked Files</h2>
+        <div id="unlocked-files-container"></div>
+    </div>
+
     <div class="shared-files">
         <h2>Your Files</h2>
         <button class="upload-button" onclick="document.getElementById('file-upload').click()">
             Upload New File
+            <div class="upload-spinner"></div>
         </button>
         <input type="file" id="file-upload" hidden>
         <div id="shared-files-container"></div>
-    </div>
-
-    <!-- New Unlocked Files Section -->
-    <div class="unlocked-files">
-        <h2>Unlocked Files</h2>
-        <div id="unlocked-files-container"></div>
     </div>
 </div>
 

@@ -412,7 +412,8 @@ body.night-mode {
 }
 
     .community-uploads,
-    .shared-files {
+    .shared-files,
+    .unlocked-files {
         background: var(--card-bg);
         padding: 25px;
         border-radius: var(--border-radius);
@@ -447,30 +448,6 @@ body.night-mode {
         white-space: nowrap;
     }
 
-   .search-container {
-        position: relative;
-        margin-bottom: 25px;
-    }
-
-    .search-icon {
-        position: absolute;
-        left: 15px;
-        top: 50%;
-        transform: translateY(-50%);
-        width: 20px;
-        height: 20px;
-        pointer-events: none;
-    }
-
-    .search-bar {
-        width: 100%;
-        padding: 10px 15px 10px 45px;
-        border: 1px solid #ccc;
-        border-radius: 8px;
-        font-size: 1rem;
-        background: var(--hover-bg);
-
-    }
 
     .token-display {
         display: inline-flex;
@@ -620,7 +597,7 @@ body.night-mode {
         }
     }
 
-    .search-container {
+   .search-container {
         position: relative;
         margin-bottom: 25px;
     }
@@ -635,8 +612,21 @@ body.night-mode {
         pointer-events: none;
     }
 
-    .search-bar input {
-        padding-left: 45px;
+    .search-bar {
+        width: 100%;
+        padding: 12px 20px 12px 45px;
+        border: 1px solid var(--primary-color);
+        border-radius: 30px;
+        font-size: 1rem;
+        background: var(--hover-bg);
+        color: white;
+        transition: all 0.2s ease;
+    }
+
+    .search-bar:focus {
+        outline: none;
+        border-color: var(--accent-color);
+        box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
     }
 
     .loading-spinner {
@@ -656,10 +646,35 @@ body.night-mode {
     .token-badge {
         background: var(--primary-color);
         color: white;
-        padding: 4px 10px;
+        padding: 4px 12px;
         border-radius: 15px;
         font-size: 0.85rem;
-        margin-left: 12px;
+        flex-shrink: 0;
+    }
+
+    /* Added styling for unlocked files section */
+    .unlocked-files .file-card {
+        background: rgba(76, 175, 80, 0.15);
+        border: 1px solid var(--accent-color);
+    }
+
+    .unlocked-files .token-badge {
+        background: var(--accent-color);
+    }
+
+    @media (max-width: 768px) {
+        .main-content {
+            grid-template-columns: 1fr;
+            padding: 15px;
+            gap: 20px;
+        }
+        
+        .community-uploads,
+        .shared-files,
+        .unlocked-files {
+            height: auto;
+            max-height: 50vh;
+        }
     }
 
 /* Main Container for Layout */
@@ -787,9 +802,10 @@ body.night-mode {
             </div>
         </div>
 <div class="main-content">
- <div class="snowflakes">
+    <div class="snowflakes">
         <!-- Snowflakes will be dynamically created here -->
     </div>
+    
     <div class="community-uploads">
         <h2>Community Uploads</h2>
         <p class="token-display">
@@ -802,21 +818,26 @@ body.night-mode {
             <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
             </svg>
-            <input type="text" placeholder="Search files..." id="search-input" class="search-bar" style="color: white;">
+            <input type="text" placeholder="Search files..." id="search-input" class="search-bar">
         </div>
         <div id="community-uploads-container"></div>
     </div>
 
-        <div class="shared-files">
-            <h2>Your Files</h2>
-            <button class="upload-button" onclick="document.getElementById('file-upload').click()">
-                Upload New File
-            </button>
-            <input type="file" id="file-upload" hidden>
-            <div id="shared-files-container"></div>
-        </div>
+    <div class="shared-files">
+        <h2>Your Files</h2>
+        <button class="upload-button" onclick="document.getElementById('file-upload').click()">
+            Upload New File
+        </button>
+        <input type="file" id="file-upload" hidden>
+        <div id="shared-files-container"></div>
     </div>
 
+    <!-- New Unlocked Files Section -->
+    <div class="unlocked-files">
+        <h2>Unlocked Files</h2>
+        <div id="unlocked-files-container"></div>
+    </div>
+</div>
 
 <!-- Updated Modal Section -->
 <div id="uploader-modal" class="modal">
@@ -910,6 +931,10 @@ body.night-mode {
         renderCommunityFiles(filtered);
     });
 
+    // Add unlockedFiles array to track unlocked files
+    let unlockedFiles = [];
+
+
     // Token Management
     async function initializeTokens(userId) {
         const tokenRef = db.collection('tokens').doc(userId);
@@ -948,6 +973,7 @@ body.night-mode {
         });
     }
 
+    // Modified handleFileDownload to track unlocked files
     async function handleFileDownload(fileId, uploaderId, cost) {
         const user = auth.currentUser;
         if (user.uid === uploaderId) {
@@ -958,6 +984,9 @@ body.night-mode {
         
         try {
             await deductTokens(user.uid, cost);
+            await db.collection('uploads').doc(fileId).update({
+                unlockedBy: firebase.firestore.FieldValue.arrayUnion(user.uid)
+            });
             const fileDoc = await db.collection('uploads').doc(fileId).get();
             window.open(fileDoc.data().fileUrl, '_blank');
             return true;
@@ -967,7 +996,8 @@ body.night-mode {
         }
     }
 
-    // Updated Render Function with Token Costs
+
+   // Modified renderFiles function to include unlocked files
     async function renderFiles() {
         const user = auth.currentUser;
         const userDoc = await db.collection('users').doc(user.uid).get();
@@ -983,7 +1013,8 @@ body.night-mode {
                     return {
                         id: doc.id,
                         ...data,
-                        cost: cost
+                        cost: cost,
+                        unlocked: data.unlockedBy?.includes(user.uid) || false
                     };
                 }));
                 renderCommunityFiles(allFiles);
@@ -992,12 +1023,42 @@ body.night-mode {
         // User's Files
         db.collection('uploads').where('uploaderId', '==', user.uid)
             .onSnapshot(snapshot => {
-                const files = snapshot.docs.map(doc => {
-                    const data = doc.data();
-                    return { ...data, id: doc.id };
-                });
+                const files = snapshot.docs.map(doc => ({
+                    ...doc.data(),
+                    id: doc.id
+                }));
                 renderUserFiles(files);
             });
+
+        // Unlocked Files
+        db.collection('uploads').where('unlockedBy', 'array-contains', user.uid)
+            .onSnapshot(snapshot => {
+                unlockedFiles = snapshot.docs.map(doc => ({
+                    ...doc.data(),
+                    id: doc.id
+                }));
+                renderUnlockedFiles(unlockedFiles);
+            });
+    }
+
+    // New render function for unlocked files
+    function renderUnlockedFiles(files) {
+        const container = document.getElementById('unlocked-files-container');
+        container.innerHTML = files.map(file => `
+            <div class="file-card">
+                <div class="file-name">
+                    ${file.fileName}
+                    <span class="token-badge">Unlocked</span>
+                </div>
+                <div class="file-actions">
+                    <a class="download-btn" href="${file.fileUrl}" target="_blank">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white">
+                            <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+                        </svg>
+                    </a>
+                </div>
+            </div>
+        `).join('');
     }
 
     function renderCommunityFiles(files) {

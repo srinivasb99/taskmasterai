@@ -971,25 +971,90 @@ body.night-mode {
         });
     }
 
-     // Update File Upload Handler to Store File Type
-    async function handleFileUpload(file) {
-        const user = auth.currentUser;
-        const extension = file.name.split('.').pop().toLowerCase();
+async function handleFileUpload(file) {
+    const user = auth.currentUser;
+    const extension = file.name.split('.').pop().toLowerCase();
+    
+    // Get references to loading elements
+    const overlaySpinner = document.querySelector('.loading-overlay');
+    const buttonSpinner = document.querySelector('.upload-spinner');
+    const uploadButton = document.querySelector('.upload-button');
+    
+    try {
+        // Disable upload button and show spinners
+        uploadButton.disabled = true;
+        overlaySpinner.style.display = 'flex';
+        buttonSpinner.style.display = 'block';
         
+        // Create storage reference
         const storageRef = storage.ref(`uploads/${user.uid}/${Date.now()}_${file.name}`);
-        const uploadTask = await storageRef.put(file);
-        const downloadURL = await uploadTask.ref.getDownloadURL();
-
-        await db.collection('uploads').add({
-            fileName: file.name,
-            fileUrl: downloadURL,
-            uploaderId: user.uid,
-            uploaderName: user.displayName || 'Anonymous',
-            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-            fileType: extension
-        });
+        
+        // Upload file with progress tracking
+        const uploadTask = storageRef.put(file);
+        
+        // Listen for state changes, errors, and completion
+        uploadTask.on('state_changed',
+            (snapshot) => {
+                // Optional: Add progress tracking here if needed
+                const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                console.log(`Upload is ${progress}% done`);
+            },
+            (error) => {
+                throw error;
+            },
+            async () => {
+                // Get download URL
+                const downloadURL = await uploadTask.snapshot.ref.getDownloadURL();
+                
+                // Add file metadata to Firestore
+                await db.collection('uploads').add({
+                    fileName: file.name,
+                    fileUrl: downloadURL,
+                    uploaderId: user.uid,
+                    uploaderName: user.displayName || 'Anonymous',
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    fileType: extension,
+                    size: file.size,
+                    lastModified: file.lastModified
+                });
+            }
+        );
+    } catch (error) {
+        console.error('Upload failed:', error);
+        alert(`Upload failed: ${error.message}`);
+    } finally {
+        // Re-enable button and hide spinners
+        uploadButton.disabled = false;
+        overlaySpinner.style.display = 'none';
+        buttonSpinner.style.display = 'none';
+        
+        // Clear file input
+        document.getElementById('file-upload').value = '';
     }
+}
 
+// Update event listener for file input
+document.getElementById('file-upload').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+        // Validate file size (example: 50MB limit)
+        const maxSize = 50 * 1024 * 1024; // 50MB
+        if (file.size > maxSize) {
+            alert('File size exceeds 50MB limit');
+            return;
+        }
+        
+        // Validate file type
+        const allowedTypes = ['pdf', 'png', 'jpg', 'jpeg', 'mp3', 'wav', 'mp4', 'mov', 'docx', 'zip'];
+        const extension = file.name.split('.').pop().toLowerCase();
+        if (!allowedTypes.includes(extension)) {
+            alert('File type not allowed');
+            return;
+        }
+        
+        await handleFileUpload(file);
+    }
+});
     // Modified handleFileDownload to track unlocked files
     async function handleFileDownload(fileId, uploaderId, cost) {
         const user = auth.currentUser;

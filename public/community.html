@@ -850,6 +850,9 @@ body.night-mode {
     <div class="snowflakes">
         <!-- Snowflakes will be dynamically created here -->
     </div>
+<div class="loading-overlay">
+    <div class="loading-spinner"></div>
+</div>
     
     <div class="community-uploads">
         <h2>Community Uploads</h2>
@@ -870,15 +873,14 @@ body.night-mode {
 
     <div class="shared-files">
         <h2>Your Files</h2>
-<button class="upload-button" onclick="document.getElementById('file-upload').click()">
-    Upload New File
-    <div class="upload-spinner"></div>
-</button>
-<input type="file" id="file-upload" hidden>
+        <button class="upload-button" onclick="document.getElementById('file-upload').click()">
+            Upload New File
+            <div class="upload-spinner"></div>
+        </button>
+        <input type="file" id="file-upload" hidden>
+        <div id="shared-files-container"></div>
+    </div>
 
-<div class="loading-overlay">
-    <div class="loading-spinner"></div>
-</div>
     <!-- New Unlocked Files Section -->
     <div class="unlocked-files">
         <h2>Unlocked Files</h2>

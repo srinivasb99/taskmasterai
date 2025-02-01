@@ -175,18 +175,50 @@ export function Dashboard() {
 useEffect(() => {
   if (!user) return;
   setOverviewLoading(true);
-  // Use a concise strategic overview prompt per your requirements.
-  const prompt = `Create a personalized strategic overview:
-1. Start with a warm introduction for ${userName}, making it personal and engaging.
-2. Analyze patterns across all items.
-3. Provide 3-4 data-driven recommendations based on the analysis.
-4. Include specific action steps for each recommendation.
-5. Add a personalized motivation message for ${userName} to encourage their progress.
-6. KEEP IT UNDER 150 WORDS, THIS IS JUST AN OVERVIEW, SO DO NOT INCLUDE EXPLANATIONS OR IF YOUR RESPONSE IS CORRECTLY STRUCTURED.
-Ensure the tone remains professional but encouraging.
-overview`;
+
+  // Build a prompt that only includes collections with data.
+  let collectionsData = "";
+  if (tasks.length > 0) {
+    collectionsData += "Tasks:\n" + tasks
+      .map(t => "- " + (t.data.task || "Untitled") + (t.data.dueDate ? ` (Due: ${new Date(t.data.dueDate.toDate ? t.data.dueDate.toDate() : t.data.dueDate).toLocaleDateString()})` : ""))
+      .join("\n") + "\n";
+  }
+  if (goals.length > 0) {
+    collectionsData += "Goals:\n" + goals
+      .map(g => "- " + (g.data.goal || "Untitled") + (g.data.dueDate ? ` (Due: ${new Date(g.data.dueDate.toDate ? g.data.dueDate.toDate() : g.data.dueDate).toLocaleDateString()})` : ""))
+      .join("\n") + "\n";
+  }
+  if (projects.length > 0) {
+    collectionsData += "Projects:\n" + projects
+      .map(p => "- " + (p.data.project || "Untitled") + (p.data.dueDate ? ` (Due: ${new Date(p.data.dueDate.toDate ? p.data.dueDate.toDate() : p.data.dueDate).toLocaleDateString()})` : ""))
+      .join("\n") + "\n";
+  }
+  if (plans.length > 0) {
+    collectionsData += "Plans:\n" + plans
+      .map(pl => "- " + (pl.data.plan || "Untitled") + (pl.data.dueDate ? ` (Due: ${new Date(pl.data.dueDate.toDate ? pl.data.dueDate.toDate() : pl.data.dueDate).toLocaleDateString()})` : ""))
+      .join("\n") + "\n";
+  }
+
+  // If no collection has data, do not call the API.
+  if (collectionsData.trim() === "") {
+    setSmartOverview("No productivity data available.");
+    setOverviewLoading(false);
+    return;
+  }
+
+  // Create a concise prompt that feeds the data in a clear, understandable way.
+  const prompt = `Create a personalized strategic overview for ${userName} based on the following productivity data. Keep it under 150 words and concise. Do not include extra explanations.
+
+${collectionsData}
+
+Provide 2-3 actionable recommendations with specific steps.`;
+
   async function fetchSmartOverview() {
     try {
+      // Use an AbortController to avoid endless generation.
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 sec timeout
+
       const response = await fetch("https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct", {
         method: "POST",
         headers: {
@@ -194,43 +226,25 @@ overview`;
           "Authorization": `Bearer ${hfApiKey}`
         },
         body: JSON.stringify({ inputs: prompt }),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
       if (!response.ok) {
         throw new Error("Smart Overview API fetch failed");
       }
       const result = await response.json();
-      const rawOutput = result && result[0] && result[0].generated_text
+      let rawOutput = result && result[0] && result[0].generated_text
         ? result[0].generated_text
         : "No overview generated.";
-      // Clean the output by removing any leftover prompt text and unwanted phrases.
-      let cleaned = rawOutput
-        .replace(/Create a personalized strategic overview:[\s\S]*?(\d+\.\s*Start with a warm introduction for\s*[^,]+,\s*making it personal and engaging\.)/gi, "")
-        .replace(/for\s*[^,]+/gi, "")
-        .replace(/Best regards,.*$/gi, "")
-        .replace(/Content:/gi, "")
-        .replace(/DATA:/gi, "")
-        .replace(/CONTEXT:/gi, "")
-        .replace(/SECTION TYPE:/gi, "")
-        .replace(/ANALYSIS REQUIREMENTS:/gi, "")
-        .replace(/Instructions:/gi, "")
-        .replace(/overview/gi, "")
+
+      // Clean the output by removing the prompt and unwanted phrases.
+      rawOutput = rawOutput
+        .replace(new RegExp(prompt, "gi"), "")
+        .replace(/(Dear.*?,|Best regards,.*|Sincerely,.*)$/gi, "")
         .trim();
-      // Further format the text: split into separate lines and wrap each line in a div.
-      const formatted = cleaned
-        .split("\n")
-        .map(line => line.trim())
-        .filter(line => line !== "")
-        .map((line, idx) => {
-          // For numbered steps, add an accent color.
-          if (/^\d+\.\s/.test(line)) {
-            return `<div class="mb-1"><span class="text-indigo-400 font-bold">${line}</span></div>`;
-          }
-          // Highlight any date markers within parentheses.
-          line = line.replace(/\(Due:\s*([^)]+)\)/gi, '(Due: <span class="text-green-400">$1</span>)');
-          return `<div class="mb-1">${line}</div>`;
-        })
-        .join("");
-      setSmartOverview(formatted || "No actionable overview could be generated.");
+
+      // Set the cleaned result (or a fallback message)
+      setSmartOverview(rawOutput || "No actionable overview could be generated.");
     } catch (error) {
       console.error("Error fetching Smart Overview:", error);
       setSmartOverview("Error generating overview.");

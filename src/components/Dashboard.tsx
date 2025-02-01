@@ -176,7 +176,7 @@ export function Dashboard() {
   useEffect(() => {
     if (!user) return;
     setOverviewLoading(true);
-    // New concise prompt per your requirements.
+    // Use a concise strategic overview prompt per your requirements.
     const prompt = `Create a personalized strategic overview:
 1. Start with a warm introduction for ${userName}, making it personal and engaging.
 2. Analyze patterns across all items.
@@ -202,7 +202,7 @@ overview`;
         const rawOutput = result && result[0] && result[0].generated_text
           ? result[0].generated_text
           : "No overview generated.";
-        // Clean the output by removing any leftover keywords.
+        // Clean the output by removing any leftover keywords or markers.
         const cleaned = rawOutput
           .replace(/Content:/gi, "")
           .replace(/DATA:/gi, "")
@@ -210,20 +210,20 @@ overview`;
           .replace(/SECTION TYPE:/gi, "")
           .replace(/ANALYSIS REQUIREMENTS:/gi, "")
           .replace(/Instructions:/gi, "")
-          .replace(/\[Provide detailed, actionable content following the instructions\]/gi, "")
           .replace(/overview/gi, "")
+          .replace(/Dear.*?,/gi, "")
           .trim();
-        // Further format the text: split into lines and wrap each line in a div for spacing.
+        // Further format the text: split into separate lines and wrap each line in a div.
         const formatted = cleaned
           .split("\n")
           .map(line => line.trim())
           .filter(line => line !== "")
           .map((line, idx) => {
-            // For steps (lines starting with a number and period), add a blue accent.
+            // For numbered steps, add an accent color.
             if (/^\d+\.\s/.test(line)) {
               return `<div class="mb-1"><span class="text-indigo-400 font-bold">${line}</span></div>`;
             }
-            // For date markers (e.g. "(Due: ...)" ), add a green accent.
+            // Highlight any date markers within parentheses.
             line = line.replace(/\(Due:\s*([^)]+)\)/gi, '(Due: <span class="text-green-400">$1</span>)');
             return `<div class="mb-1">${line}</div>`;
           })
@@ -496,7 +496,6 @@ overview`;
                 <h2 className="text-xl font-semibold text-blue-300 mr-2">Your Smart Overview</h2>
                 <span className="text-xs bg-pink-600 text-white px-2 py-1 rounded-full">BETA</span>
               </div>
-              {/* Render the formatted overview with smaller text and organized spacing */}
               <div className="text-sm" dangerouslySetInnerHTML={{ __html: smartOverview }} />
             </div>
             {/* Productivity Card */}

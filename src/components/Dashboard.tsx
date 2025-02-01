@@ -176,42 +176,25 @@ useEffect(() => {
 
   setOverviewLoading(true);
 
-  // Prepare the data to send to the AI model
-  const userData = {
-    tasks: tasks.map(task => ({
-      name: task.data.task,
-      dueDate: task.data.dueDate?.toDate()?.toISOString().split('T')[0] || 'No due date',
-      completed: task.data.completed || false,
-    })),
-    goals: goals.map(goal => ({
-      name: goal.data.goal,
-      dueDate: goal.data.dueDate?.toDate()?.toISOString().split('T')[0] || 'No due date',
-      completed: goal.data.completed || false,
-    })),
-    projects: projects.map(project => ({
-      name: project.data.project,
-      dueDate: project.data.dueDate?.toDate()?.toISOString().split('T')[0] || 'No due date',
-      completed: project.data.completed || false,
-    })),
-    plans: plans.map(plan => ({
-      name: plan.data.plan,
-      dueDate: plan.data.dueDate?.toDate()?.toISOString().split('T')[0] || 'No due date',
-      completed: plan.data.completed || false,
-    })),
+  // Prepare and filter data
+  const collections = {
+    tasks: tasks.map(t => ({ name: t.data.task, due: t.data.dueDate?.toDate() })),
+    goals: goals.map(g => ({ name: g.data.goal, due: g.data.dueDate?.toDate() })),
+    projects: projects.map(p => ({ name: p.data.project, due: p.data.dueDate?.toDate() })),
+    plans: plans.map(p => ({ name: p.data.plan, due: p.data.dueDate?.toDate() }))
   };
 
-  // Filter out empty collections
-  const activeCollections = Object.entries(userData)
+  const activeData = Object.entries(collections)
     .filter(([_, items]) => items.length > 0)
-    .reduce((acc, [key, items]) => ({ ...acc, [key]: items }), {});
+    .map(([type, items]) => 
+      `${type}: ${items.map(i => 
+        `"${i.name}"${i.due ? ` (Due ${i.due.toLocaleDateString()})` : ''}`
+      ).join(', ')}`
+    ).join('\n');
 
-  // Construct a dynamic prompt based on available data
-  const prompt = `Generate a personalized productivity overview for ${userName}. Focus on immediate priorities and provide actionable recommendations. Here is the user's data:
-${Object.entries(activeCollections)
-  .map(([collection, items]) => `${collection}: ${items.map(item => `"${item.name}" (Due: ${item.dueDate})`).join(', ')}`)
-  .join('\n')}
-
-Provide specific recommendations based on the above data. If a collection is empty, suggest creating relevant items to improve productivity.`;
+  const prompt = `Generate concise productivity insights for ${userName} based on:
+${activeData || 'No current items'}
+Focus on immediate actions for existing items. Format as bullet points. Avoid markdown.`;
 
   async function fetchSmartOverview() {
     try {
@@ -219,34 +202,41 @@ Provide specific recommendations based on the above data. If a collection is emp
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${hfApiKey}`,
+          "Authorization": `Bearer ${hfApiKey}`
         },
-        body: JSON.stringify({ inputs: prompt }),
+        body: JSON.stringify({
+          inputs: prompt,
+          parameters: {
+            max_new_tokens: 300,
+            temperature: 0.7,
+            top_p: 0.9,
+            repetition_penalty: 1.2,
+            return_full_text: false,
+            do_sample: true
+          }
+        }),
       });
 
       if (!response.ok) throw new Error("Overview generation failed");
 
       const result = await response.json();
-      const rawText = result[0]?.generated_text || "No overview generated.";
+      const rawText = result[0]?.generated_text || '';
 
-      // Format the response
-      const formatted = rawText
-        .replace(/\*\*/g, '') // Remove bold markers
-        .replace(/###/g, '') // Remove header markers
+      // Advanced sanitization
+      const cleanText = rawText
+        .replace(/(\*\*|###|boxed|final answer|step \d+:)/gi, '')
+        .replace(/\n{3,}/g, '\n\n')
+        .replace(/^\s*$\n/gm, '')
         .split('\n')
-        .map(line => line.trim())
-        .filter(line => line !== '')
-        .map((line, idx) => {
-          if (/^\d+\.\s/.test(line)) {
-            return `<div class="mb-2"><span class="text-indigo-400 font-semibold">${line}</span></div>`;
-          }
-          return `<div class="mb-2">${line}</div>`;
-        })
+        .map(line => line.replace(/^\s*[\d•]\s*/, '').trim())
+        .filter(line => line.length > 0)
+        .slice(0, 5) // Limit to 5 key points
+        .map(line => `<div class="py-1">${line}</div>`)
         .join('');
 
-      setSmartOverview(formatted);
+      setSmartOverview(cleanText || '<div class="text-gray-400">No insights generated</div>');
     } catch (error) {
-      setSmartOverview('<div class="text-red-400">Failed to generate overview. Try refreshing.</div>');
+      setSmartOverview('<div class="text-red-400">Error generating insights</div>');
     } finally {
       setOverviewLoading(false);
     }

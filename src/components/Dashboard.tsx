@@ -40,10 +40,7 @@ export function Dashboard() {
   const [weatherData, setWeatherData] = useState<any>(null);
 
   // ---------------------
-  // 4. SMART OVERVIEW STATE
-  // ---------------------
-  const [smartOverview, setSmartOverview] = useState("Generating overview...");
-  const [overviewLoading, setOverviewLoading] = useState(true);
+
 
   // ---------------------
   // 5. UI STATES
@@ -170,39 +167,58 @@ export function Dashboard() {
     );
   }, [user]);
 
-  // ---------------------
+// ---------------------
+// SMART OVERVIEW GENERATION
+// ---------------------
+const [smartOverview, setSmartOverview] = useState<string>("");
+const [overviewLoading, setOverviewLoading] = useState(false);
+
 useEffect(() => {
   if (!user) return;
 
-  setOverviewLoading(true);
-
-  // Prepare and filter data
-  const collections = {
-    tasks: tasks.map(t => ({ name: t.data.task, due: t.data.dueDate?.toDate() })),
-    goals: goals.map(g => ({ name: g.data.goal, due: g.data.dueDate?.toDate() })),
-    projects: projects.map(p => ({ name: p.data.project, due: p.data.dueDate?.toDate() })),
-    plans: plans.map(p => ({ name: p.data.plan, due: p.data.dueDate?.toDate() }))
-  };
-
-  const activeData = Object.entries(collections)
-    .filter(([_, items]) => items.length > 0)
-    .map(([type, items]) => 
-      `${type}: ${items.map(i => 
-        `"${i.name}"${i.due ? ` (Due ${i.due.toLocaleDateString()})` : ''}`
-      ).join(', ')}`
-    ).join('\n');
-
-  const prompt = `Generate concise productivity insights for ${userName} based on:
-${activeData || 'No current items'}
-Focus on immediate actions for existing items. Format as bullet points. Avoid markdown.`;
-
-  async function fetchSmartOverview() {
+  const generateOverview = async () => {
+    setOverviewLoading(true);
+    
     try {
+      // 1. Format Firebase data for AI processing
+      const formatItem = (item: any, type: string) => {
+        const dueDate = item.data.dueDate?.toDate();
+        return `• ${item.data[type]} (${dueDate ? dueDate.toLocaleDateString() : 'No due date'})`;
+      };
+
+      const formattedData = [
+        tasks.length && `📋 TASKS:\n${tasks.map(t => formatItem(t, 'task')).join('\n')}`,
+        goals.length && `🎯 GOALS:\n${goals.map(g => formatItem(g, 'goal')).join('\n')}`,
+        projects.length && `📊 PROJECTS:\n${projects.map(p => formatItem(p, 'project')).join('\n')}`,
+        plans.length && `📅 PLANS:\n${plans.map(p => formatItem(p, 'plan')).join('\n')}`,
+      ].filter(Boolean).join('\n\n');
+
+      if (!formattedData) {
+        setSmartOverview("Create tasks, goals, projects, or plans to generate your Smart Overview");
+        return;
+      }
+
+      // 2. Construct AI prompt
+      const prompt = `[INST] <<SYS>>
+You are TaskMaster, an advanced AI productivity assistant. Analyze this data and generate a concise Smart Overview:
+
+${formattedData}
+
+Guidelines:
+- Start with personalized greeting for ${userName}
+- Highlight 3 key priorities
+- Provide actionable recommendations
+- Mention specific item names
+- No markdown formatting
+- Keep under 200 words
+<</SYS>>[/INST]`;
+
+      // 3. Call Hugging Face API
       const response = await fetch("https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct", {
         method: "POST",
         headers: {
+          "Authorization": `Bearer ${hfApiKey}`,
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${hfApiKey}`
         },
         body: JSON.stringify({
           inputs: prompt,
@@ -217,33 +233,38 @@ Focus on immediate actions for existing items. Format as bullet points. Avoid ma
         }),
       });
 
-      if (!response.ok) throw new Error("Overview generation failed");
+      if (!response.ok) throw new Error("API request failed");
 
+      // 4. Process response
       const result = await response.json();
       const rawText = result[0]?.generated_text || '';
 
-      // Advanced sanitization
+      // 5. Sanitize and format output
       const cleanText = rawText
+        .replace(/\[\/?(INST|SYS)\]|<\/?s>/gi, '')
         .replace(/(\*\*|###|boxed|final answer|step \d+:)/gi, '')
-        .replace(/\n{3,}/g, '\n\n')
-        .replace(/^\s*$\n/gm, '')
         .split('\n')
-        .map(line => line.replace(/^\s*[\d•]\s*/, '').trim())
+        .map(line => line.trim())
         .filter(line => line.length > 0)
-        .slice(0, 5) // Limit to 5 key points
-        .map(line => `<div class="py-1">${line}</div>`)
+        .map((line, index) => {
+          if (index === 0) return `<div class="text-green-400 font-semibold mb-2">${line}</div>`;
+          if (/^\d+\./.test(line)) return `<div class="ml-4 mb-1">${line}</div>`;
+          return `<div class="mb-2">${line}</div>`;
+        })
         .join('');
 
-      setSmartOverview(cleanText || '<div class="text-gray-400">No insights generated</div>');
+      setSmartOverview(cleanText || "Could not generate overview");
+
     } catch (error) {
-      setSmartOverview('<div class="text-red-400">Error generating insights</div>');
+      console.error("Overview generation error:", error);
+      setSmartOverview("Error generating overview. Please try again.");
     } finally {
       setOverviewLoading(false);
     }
-  }
+  };
 
-  fetchSmartOverview();
-}, [user, tasks, goals, projects, plans, userName]);
+  generateOverview();
+}, [user, tasks, goals, projects, plans, userName, hfApiKey]);
   // ---------------------
   // 11. CREATE & EDIT & DELETE
   // ---------------------
@@ -496,44 +517,29 @@ Focus on immediate actions for existing items. Format as bullet points. Avoid ma
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="flex flex-col gap-6">
             {/* Smart Overview Card with fade-in animation */}
-<div className="bg-gray-800 rounded-xl p-5 relative min-h-[200px] transition-all duration-300 ease-in-out hover:bg-gray-750">
-  <div className="flex items-center mb-4">
-    <h2 className="text-xl font-semibold text-blue-300 mr-2 animate-fade-in">
-      Your Smart Overview
-    </h2>
-    <span className="text-xs bg-pink-600 text-white px-2 py-1 rounded-full animate-pulse">
-      LIVE SYNC
-    </span>
-  </div>
+  <div className="bg-gray-800 rounded-xl p-5 relative min-h-[200px]">
+    <div className="flex items-center mb-4">
+      <h2 className="text-xl font-semibold text-blue-300 mr-2">
+        Smart Overview
+      </h2>
+      <span className="text-xs bg-pink-600 text-white px-2 py-1 rounded-full">
+        BETA
+      </span>
+    </div>
 
-  {overviewLoading ? (
-    <div className="space-y-4 animate-pulse">
-      <div className="h-4 bg-gray-700 rounded-full w-3/4"></div>
-      <div className="h-4 bg-gray-700 rounded-full w-2/3"></div>
-      <div className="h-4 bg-gray-700 rounded-full w-4/5"></div>
-      <div className="flex items-center justify-center pt-4 space-x-2">
-        <div className="animate-bounce delay-100 h-2 w-2 bg-indigo-400 rounded-full"></div>
-        <div className="animate-bounce delay-200 h-2 w-2 bg-indigo-400 rounded-full"></div>
-        <div className="animate-bounce delay-300 h-2 w-2 bg-indigo-400 rounded-full"></div>
+    {overviewLoading ? (
+      <div className="space-y-3 animate-pulse">
+        <div className="h-4 bg-gray-700 rounded-full w-3/4"></div>
+        <div className="h-4 bg-gray-700 rounded-full w-2/3"></div>
+        <div className="h-4 bg-gray-700 rounded-full w-4/5"></div>
       </div>
-    </div>
-  ) : (
-    <div className="space-y-3 animate-fade-in-up">
+    ) : (
       <div 
-        className="text-sm text-gray-300 font-light leading-relaxed"
-        dangerouslySetInnerHTML={{ 
-          __html: smartOverview || 
-          '<p class="text-gray-400">No overview available. Create some items to generate insights!</p>'
-        }}
+        className="text-sm text-gray-300"
+        dangerouslySetInnerHTML={{ __html: smartOverview }}
       />
-      <div className="pt-2 border-t border-gray-700 mt-4">
-        <p className="text-xs text-gray-500 font-mono">
-          Updated: {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-        </p>
-      </div>
-    </div>
-  )}
-</div>
+    )}
+  </div>
             {/* Productivity Card */}
             <div className="bg-gray-800 rounded-xl p-5">
               <h2 className="text-xl font-semibold text-purple-400 mb-2">Your Productivity</h2>

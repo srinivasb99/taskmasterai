@@ -172,7 +172,7 @@ export function Dashboard() {
 
   // ---------------------
 useEffect(() => {
-  if (!user || tasks.length + goals.length + projects.length + plans.length === 0) return;
+  if (!user) return;
 
   setOverviewLoading(true);
 
@@ -200,13 +200,18 @@ useEffect(() => {
     })),
   };
 
-  const prompt = `Generate a concise productivity overview for ${userName} based on the following data:
-- Tasks: ${userData.tasks.length} (${userData.tasks.filter(t => t.completed).length} completed)
-- Goals: ${userData.goals.length} (${userData.goals.filter(g => g.completed).length} completed)
-- Projects: ${userData.projects.length} (${userData.projects.filter(p => p.completed).length} completed)
-- Plans: ${userData.plans.length} (${userData.plans.filter(p => p.completed).length} completed)
+  // Filter out empty collections
+  const activeCollections = Object.entries(userData)
+    .filter(([_, items]) => items.length > 0)
+    .reduce((acc, [key, items]) => ({ ...acc, [key]: items }), {});
 
-Provide 2-3 actionable recommendations based on the data above. Focus on immediate priorities and include specific action steps. Keep the response under 150 words.`;
+  // Construct a dynamic prompt based on available data
+  const prompt = `Generate a personalized productivity overview for ${userName}. Focus on immediate priorities and provide actionable recommendations. Here is the user's data:
+${Object.entries(activeCollections)
+  .map(([collection, items]) => `${collection}: ${items.map(item => `"${item.name}" (Due: ${item.dueDate})`).join(', ')}`)
+  .join('\n')}
+
+Provide specific recommendations based on the above data. If a collection is empty, suggest creating relevant items to improve productivity.`;
 
   async function fetchSmartOverview() {
     try {
@@ -249,7 +254,6 @@ Provide 2-3 actionable recommendations based on the data above. Focus on immedia
 
   fetchSmartOverview();
 }, [user, tasks, goals, projects, plans, userName]);
-
   // ---------------------
   // 11. CREATE & EDIT & DELETE
   // ---------------------

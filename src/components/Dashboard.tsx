@@ -170,12 +170,6 @@ export function Dashboard() {
     );
   }, [user]);
 
-  // ---------------------
-  // 10. SMART OVERVIEW STATE
-// ---------------------
-const [smartOverview, setSmartOverview] = useState<string>("");
-const [overviewLoading, setOverviewLoading] = useState(false);
-
 // ---------------------
 // 11. SMART OVERVIEW FETCH (OPTIMIZED)
 // ---------------------

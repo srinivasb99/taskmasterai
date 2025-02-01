@@ -14,8 +14,8 @@ import {
   deleteItem,
   updateCustomTimer,
   deleteCustomTimer,
-  // Import the weather API key from your Firebase lib
   weatherApiKey,
+  hfApiKey,
 } from '../lib/dashboard-firebase';
 
 export function Dashboard() {
@@ -40,7 +40,12 @@ export function Dashboard() {
   const [weatherData, setWeatherData] = useState<any>(null);
 
   // ---------------------
-  // 4. UI STATES
+  // 4. SMART OVERVIEW STATE
+  // ---------------------
+  const [smartOverview, setSmartOverview] = useState("Generating overview...");
+
+  // ---------------------
+  // 5. UI STATES
   // ---------------------
   const [activeTab, setActiveTab] = useState<"tasks" | "goals" | "projects" | "plans">("tasks");
   const [newItemText, setNewItemText] = useState("");
@@ -50,7 +55,7 @@ export function Dashboard() {
   const [editingDate, setEditingDate] = useState("");
 
   // ---------------------
-  // 5. MAIN POMODORO TIMER (LOCAL)
+  // 6. MAIN POMODORO TIMER (LOCAL)
   // ---------------------
   const [pomodoroTimeLeft, setPomodoroTimeLeft] = useState(25 * 60);
   const [pomodoroRunning, setPomodoroRunning] = useState(false);
@@ -93,7 +98,7 @@ export function Dashboard() {
   };
 
   // ---------------------
-  // 6. AUTH LISTENER
+  // 7. AUTH LISTENER
   // ---------------------
   useEffect(() => {
     const unsubscribe = onFirebaseAuthStateChanged((firebaseUser) => {
@@ -110,11 +115,10 @@ export function Dashboard() {
   }, []);
 
   // ---------------------
-  // 7. COLLECTION SNAPSHOTS
+  // 8. COLLECTION SNAPSHOTS
   // ---------------------
   useEffect(() => {
     if (!user) return;
-
     const unsubTasks = onCollectionSnapshot('tasks', user.uid, (items) => setTasks(items));
     const unsubGoals = onCollectionSnapshot('goals', user.uid, (items) => setGoals(items));
     const unsubProjects = onCollectionSnapshot('projects', user.uid, (items) => setProjects(items));
@@ -122,7 +126,6 @@ export function Dashboard() {
     const unsubTimers = onCustomTimersSnapshot(user.uid, (timers) => {
       setCustomTimers(timers);
     });
-
     return () => {
       unsubTasks();
       unsubGoals();
@@ -133,61 +136,115 @@ export function Dashboard() {
   }, [user]);
 
   // ---------------------
-  // 8. WEATHER FETCH
+  // 9. WEATHER FETCH (using current location)
   // ---------------------
   useEffect(() => {
-  async function fetchWeather() {
-      if (!user) {
-        setWeatherData(null);
-        return;
-      }
-      // Use geolocation to get latitude and longitude
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(async (position) => {
-          const lat = position.coords.latitude;
-          const lon = position.coords.longitude;
-          try {
-            // Check for cached weather data
-            const cached = localStorage.getItem(cacheKey);
-            if (cached) {
-              const parsed = JSON.parse(cached);
-              if (Date.now() - parsed.timestamp < cacheDuration) {
-                setWeatherData(parsed.data);
-                return;
-              }
-            }
-            const weatherApiUrl = `https://api.weatherapi.com/v1/current.json?key=${apiKey}&q=${lat},${lon}`;
-            const response = await fetch(weatherApiUrl);
-            if (!response.ok) throw new Error('Weather data fetch failed');
-            const data = await response.json();
-            // Map returned data to our weatherData shape
-            const weather = {
-              location: data.location.name,
-              condition: data.current.condition.text,
-              temp_f: data.current.temp_f,
-              feelslike_f: data.current.feelslike_f,
-              wind_mph: data.current.wind_mph,
-              humidity: data.current.humidity,
-            };
-            setWeatherData(weather);
-            localStorage.setItem(cacheKey, JSON.stringify({ data: weather, timestamp: Date.now() }));
-          } catch (error) {
-            console.error("Failed to fetch weather:", error);
-            setWeatherData(null);
-          }
-        }, (error) => {
-          console.error("Geolocation error:", error);
-          setWeatherData(null);
-        });
-      } else {
-        setWeatherData(null);
-      }
+    if (!user) {
+      setWeatherData(null);
+      return;
     }
-    fetchWeather();
+    // Get user's current position
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        try {
+          const response = await fetch(
+            `https://api.weatherapi.com/v1/current.json?key=${weatherApiKey}&q=${latitude},${longitude}`
+          );
+          if (!response.ok) throw new Error("Weather fetch failed");
+          const data = await response.json();
+          setWeatherData({
+            location: data.location.name,
+            condition: data.current.condition.text,
+            temp_f: Math.round(data.current.temp_f),
+            feelslike_f: Math.round(data.current.feelslike_f),
+            wind_mph: Math.round(data.current.wind_mph),
+            humidity: data.current.humidity,
+          });
+        } catch (error) {
+          console.error("Failed to fetch weather:", error);
+          setWeatherData(null);
+        }
+      },
+      (error) => {
+        console.error("Geolocation error:", error);
+        setWeatherData(null);
+      }
+    );
   }, [user]);
 
   // ---------------------
-  // 9. CREATE & EDIT & DELETE
+  // 10. SMART OVERVIEW FETCH (using Hugging Face API)
+  // ---------------------
+  useEffect(() => {
+    if (!user) return;
+    // Build an optimized data string from tasks, goals, projects, and plans.
+    const optimizedData = `
+Tasks:
+${tasks.map((t) => "- " + (t.data.task || "Untitled") + (t.data.dueDate ? ` (Due: ${new Date(t.data.dueDate.toDate ? t.data.dueDate.toDate() : t.data.dueDate).toLocaleDateString()})` : "")).join("\n")}
+
+Goals:
+${goals.map((g) => "- " + (g.data.goal || "Untitled") + (g.data.dueDate ? ` (Due: ${new Date(g.data.dueDate.toDate ? g.data.dueDate.toDate() : g.data.dueDate).toLocaleDateString()})` : "")).join("\n")}
+
+Projects:
+${projects.map((p) => "- " + (p.data.project || "Untitled") + (p.data.dueDate ? ` (Due: ${new Date(p.data.dueDate.toDate ? p.data.dueDate.toDate() : p.data.dueDate).toLocaleDateString()})` : "")).join("\n")}
+
+Plans:
+${plans.map((pl) => "- " + (pl.data.plan || "Untitled") + (pl.data.dueDate ? ` (Due: ${new Date(pl.data.dueDate.toDate ? pl.data.dueDate.toDate() : pl.data.dueDate).toLocaleDateString()})` : "")).join("\n")}
+    `;
+    // Define sectionType and instructions as desired.
+    const sectionType = "daily overview";
+    const instructions = "Generate a concise, actionable overview with clear priorities.";
+
+    const prompt = `You are TaskMaster, an advanced AI productivity assistant specializing in Smart Overviews. Your core purpose is to analyze productivity data and generate actionable, personalized insights.
+
+CONTEXT:
+This data represents a user's productivity items including tasks, goals, projects, and plans. Each item has a type and may or may not have a due date. Your role is to create a meaningful ${sectionType} overview that helps the user stay organized and motivated.
+
+DATA:
+${optimizedData}
+
+SECTION TYPE: ${sectionType}
+
+ANALYSIS REQUIREMENTS:
+1. Understand the relationships between different items
+2. Consider due dates and priorities
+3. Identify patterns and dependencies
+4. Focus on actionable insights
+5. Maintain a motivational tone
+
+${instructions}
+
+Format response exactly as:
+Content: [Provide detailed, actionable content following the instructions]`;
+
+    // Call Hugging Face Inference API
+    async function fetchSmartOverview() {
+      try {
+        const response = await fetch("https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${hfApiKey}`
+          },
+          body: JSON.stringify({ inputs: prompt }),
+        });
+        if (!response.ok) {
+          throw new Error("Smart Overview API fetch failed");
+        }
+        const result = await response.json();
+        // Expecting a response with the generated text.
+        setSmartOverview(result && result[0] && result[0].generated_text ? result[0].generated_text : "No overview generated.");
+      } catch (error) {
+        console.error("Error fetching Smart Overview:", error);
+        setSmartOverview("Error generating overview.");
+      }
+    }
+    fetchSmartOverview();
+  }, [user, tasks, goals, projects, plans]);
+
+  // ---------------------
+  // 11. CREATE & EDIT & DELETE
   // ---------------------
   const handleTabChange = (tabName: "tasks" | "goals" | "projects" | "plans") => {
     setActiveTab(tabName);
@@ -243,7 +300,7 @@ export function Dashboard() {
     setEditingText(oldText || "");
     if (oldDueDate) {
       const dueDateObj = oldDueDate.toDate ? oldDueDate.toDate() : new Date(oldDueDate);
-      setEditingDate(dueDateObj.toISOString().split('T')[0]);
+      setEditingDate(dueDateObj.toISOString().split("T")[0]);
     } else {
       setEditingDate("");
     }
@@ -283,7 +340,7 @@ export function Dashboard() {
   };
 
   // ---------------------
-  // 10. CUSTOM TIMERS
+  // 12. CUSTOM TIMERS
   // ---------------------
   const [runningTimers, setRunningTimers] = useState<{
     [id: string]: {
@@ -397,7 +454,7 @@ export function Dashboard() {
   };
 
   // ---------------------
-  // 11. PROGRESS BARS
+  // 13. PROGRESS BARS
   // ---------------------
   const totalTasks = tasks.length;
   const completedTasks = tasks.filter((t) => t.data.completed).length;
@@ -426,7 +483,6 @@ export function Dashboard() {
   return (
     <div className="bg-gray-900 text-white min-h-screen w-full overflow-hidden">
       <Sidebar userName={userName} />
-
       <main className="ml-64 p-8 overflow-auto h-screen">
         <header className="dashboard-header mb-6">
           <h1 className="text-3xl font-bold mb-1">
@@ -436,45 +492,37 @@ export function Dashboard() {
             "The way to get started is to quit talking and begin doing."
           </p>
         </header>
-
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="flex flex-col gap-6">
+            {/* Smart Overview Card */}
             <div className="bg-gray-800 rounded-xl p-5">
               <div className="flex items-center mb-2">
                 <h2 className="text-xl font-semibold text-blue-300 mr-2">Your Smart Overview</h2>
                 <span className="text-xs bg-pink-600 text-white px-2 py-1 rounded-full">BETA</span>
               </div>
-              <p className="text-green-400 font-bold mb-1">Welcome!</p>
-              <p className="text-blue-400">
-                TaskMaster is ready to generate your Smart Overview. To get started, create a task, goal, project, or plan.
-              </p>
-              <small className="block mt-2 text-gray-500">TaskMaster can make mistakes. Verify details.</small>
+              <p>{smartOverview}</p>
             </div>
-
+            {/* Productivity Card */}
             <div className="bg-gray-800 rounded-xl p-5">
               <h2 className="text-xl font-semibold text-purple-400 mb-2">Your Productivity</h2>
-
               <div className="mb-2">
                 <p className="mb-1">Tasks: {completedTasks}/{totalTasks} completed</p>
                 <div className="w-full bg-gray-700 h-2 rounded">
                   <div className="bg-green-500 h-2 rounded" style={{ width: `${tasksProgress}%` }} />
                 </div>
               </div>
-
               <div className="mb-2">
                 <p className="mb-1">Goals: {completedGoals}/{totalGoals} completed</p>
                 <div className="w-full bg-gray-700 h-2 rounded">
                   <div className="bg-pink-500 h-2 rounded" style={{ width: `${goalsProgress}%` }} />
                 </div>
               </div>
-
               <div className="mb-2">
                 <p className="mb-1">Projects: {completedProjects}/{totalProjects} completed</p>
                 <div className="w-full bg-gray-700 h-2 rounded">
                   <div className="bg-blue-500 h-2 rounded" style={{ width: `${projectsProgress}%` }} />
                 </div>
               </div>
-
               <div className="mb-2">
                 <p className="mb-1">Plans: {completedPlans}/{totalPlans} completed</p>
                 <div className="w-full bg-gray-700 h-2 rounded">
@@ -482,50 +530,39 @@ export function Dashboard() {
                 </div>
               </div>
             </div>
-
+            {/* Upcoming Deadlines Card */}
             <div className="bg-gray-800 rounded-xl p-5">
               <h2 className="text-xl font-semibold text-blue-400 mb-2">Upcoming Deadlines</h2>
               <p>No upcoming deadlines (example placeholder)</p>
             </div>
-
+            {/* Tasks/Goals/Projects/Plans Tabs & List */}
             <div className="bg-gray-800 rounded-xl p-5">
-              {/* TAB SWITCHER */}
               <div className="flex space-x-3 mb-4">
                 <button
-                  className={`px-4 py-2 rounded-full ${
-                    activeTab === "tasks" ? "bg-indigo-500 text-white" : "bg-gray-700 text-gray-200"
-                  }`}
+                  className={`px-4 py-2 rounded-full ${activeTab === "tasks" ? "bg-indigo-500 text-white" : "bg-gray-700 text-gray-200"}`}
                   onClick={() => handleTabChange("tasks")}
                 >
                   Tasks
                 </button>
                 <button
-                  className={`px-4 py-2 rounded-full ${
-                    activeTab === "goals" ? "bg-indigo-500 text-white" : "bg-gray-700 text-gray-200"
-                  }`}
+                  className={`px-4 py-2 rounded-full ${activeTab === "goals" ? "bg-indigo-500 text-white" : "bg-gray-700 text-gray-200"}`}
                   onClick={() => handleTabChange("goals")}
                 >
                   Goals
                 </button>
                 <button
-                  className={`px-4 py-2 rounded-full ${
-                    activeTab === "projects" ? "bg-indigo-500 text-white" : "bg-gray-700 text-gray-200"
-                  }`}
+                  className={`px-4 py-2 rounded-full ${activeTab === "projects" ? "bg-indigo-500 text-white" : "bg-gray-700 text-gray-200"}`}
                   onClick={() => handleTabChange("projects")}
                 >
                   Projects
                 </button>
                 <button
-                  className={`px-4 py-2 rounded-full ${
-                    activeTab === "plans" ? "bg-indigo-500 text-white" : "bg-gray-700 text-gray-200"
-                  }`}
+                  className={`px-4 py-2 rounded-full ${activeTab === "plans" ? "bg-indigo-500 text-white" : "bg-gray-700 text-gray-200"}`}
                   onClick={() => handleTabChange("plans")}
                 >
                   Plans
                 </button>
               </div>
-
-              {/* NEW ITEM FORM */}
               <h3 className="text-lg font-semibold mb-2 capitalize">{activeTab}</h3>
               <div className="flex gap-2 mb-4">
                 <input
@@ -541,15 +578,10 @@ export function Dashboard() {
                   value={newItemDate}
                   onChange={(e) => setNewItemDate(e.target.value)}
                 />
-                <button
-                  className="bg-indigo-600 text-white px-4 py-2 rounded-full"
-                  onClick={handleCreate}
-                >
+                <button className="bg-indigo-600 text-white px-4 py-2 rounded-full" onClick={handleCreate}>
                   Create {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
                 </button>
               </div>
-
-              {/* SHOW LOADED ITEMS */}
               <ul className="space-y-2">
                 {currentItems.length === 0 ? (
                   <li className="text-gray-400">No {activeTab} yet...</li>
@@ -560,9 +592,7 @@ export function Dashboard() {
                     let overdue = false;
                     let dueDateStr = "";
                     if (item.data.dueDate) {
-                      const dueDateObj = item.data.dueDate.toDate
-                        ? item.data.dueDate.toDate()
-                        : new Date(item.data.dueDate);
+                      const dueDateObj = item.data.dueDate.toDate ? item.data.dueDate.toDate() : new Date(item.data.dueDate);
                       dueDateStr = dueDateObj.toLocaleDateString();
                       overdue = dueDateObj < new Date();
                     }
@@ -570,17 +600,12 @@ export function Dashboard() {
                     return (
                       <li
                         key={item.id}
-                        className={`p-2 rounded flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 ${
-                          overdue ? "bg-red-600" : "bg-gray-700"
-                        }`}
+                        className={`p-2 rounded flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 ${overdue ? "bg-red-600" : "bg-gray-700"}`}
                       >
-                        {/* Item Content */}
                         {!isEditing ? (
                           <div>
                             <span className="font-bold">{textValue}</span>
-                            {dueDateStr && (
-                              <span className="ml-2 text-sm font-bold">(Due: {dueDateStr})</span>
-                            )}
+                            {dueDateStr && <span className="ml-2 text-sm font-bold">(Due: {dueDateStr})</span>}
                           </div>
                         ) : (
                           <div className="flex flex-col sm:flex-row gap-2">
@@ -597,8 +622,6 @@ export function Dashboard() {
                             />
                           </div>
                         )}
-                        
-                        {/* Action Buttons */}
                         <div className="flex gap-2">
                           {!isEditing ? (
                             <>
@@ -606,15 +629,13 @@ export function Dashboard() {
                                 className="bg-blue-500 hover:bg-blue-600 px-2 py-1 rounded-full text-white flex items-center gap-1"
                                 onClick={() => handleEditClick(itemId, textValue, item.data.dueDate)}
                               >
-                                <Edit className="w-4 h-4" />
-                                Edit
+                                <Edit className="w-4 h-4" /> Edit
                               </button>
                               <button
                                 className="bg-red-500 hover:bg-red-600 px-2 py-1 rounded-full text-white flex items-center gap-1"
                                 onClick={() => handleDelete(itemId)}
                               >
-                                <Trash className="w-4 h-4" />
-                                Delete
+                                <Trash className="w-4 h-4" /> Delete
                               </button>
                             </>
                           ) : (
@@ -645,7 +666,6 @@ export function Dashboard() {
               </ul>
             </div>
           </div>
-
           {/* RIGHT COLUMN */}
           <div className="flex flex-col gap-6">
             {/* Weather Card */}
@@ -666,38 +686,26 @@ export function Dashboard() {
                 <p>Loading weather...</p>
               )}
             </div>
-
             {/* Main Pomodoro Timer */}
             <div className="bg-gray-800 rounded-xl p-5">
               <div className="flex items-center justify-between mb-2">
                 <h2 className="text-xl font-semibold">Pomodoro Timer</h2>
-                {/* '+' Button for custom timers */}
                 <button
                   className="bg-gray-700 text-white px-2 py-1 rounded-full font-bold flex items-center gap-1"
                   onClick={handleAddCustomTimer}
                 >
-                  <PlusCircle className="w-4 h-4" />
-                  New Timer
+                  <PlusCircle className="w-4 h-4" /> New Timer
                 </button>
               </div>
               <div className="text-4xl font-bold mb-4">{formatPomodoroTime(pomodoroTimeLeft)}</div>
               <div className="flex space-x-3">
-                <button
-                  className="bg-green-500 px-4 py-2 rounded-full font-semibold"
-                  onClick={handlePomodoroStart}
-                >
+                <button className="bg-green-500 px-4 py-2 rounded-full font-semibold" onClick={handlePomodoroStart}>
                   Start
                 </button>
-                <button
-                  className="bg-yellow-500 px-4 py-2 rounded-full font-semibold"
-                  onClick={handlePomodoroPause}
-                >
+                <button className="bg-yellow-500 px-4 py-2 rounded-full font-semibold" onClick={handlePomodoroPause}>
                   Pause
                 </button>
-                <button
-                  className="bg-red-500 px-4 py-2 rounded-full font-semibold"
-                  onClick={handlePomodoroReset}
-                >
+                <button className="bg-red-500 px-4 py-2 rounded-full font-semibold" onClick={handlePomodoroReset}>
                   Reset
                 </button>
               </div>
@@ -707,8 +715,7 @@ export function Dashboard() {
                 </p>
               )}
             </div>
-
-            {/* CUSTOM TIMERS LIST */}
+            {/* Custom Timers List */}
             <div className="bg-gray-800 rounded-xl p-5">
               <h2 className="text-xl font-semibold mb-4">Custom Timers</h2>
               {customTimers.length === 0 ? (
@@ -729,13 +736,13 @@ export function Dashboard() {
                               className="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded-full flex items-center gap-1"
                               onClick={() => handleEditTimerName(timerId)}
                             >
-                              <Edit className="w-4 h-4" />
+                              <Edit className="w-4 h-4" /> 
                             </button>
                             <button
                               className="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded-full flex items-center gap-1"
                               onClick={() => handleDeleteTimer(timerId)}
                             >
-                              <Trash className="w-4 h-4" />
+                              <Trash className="w-4 h-4" /> 
                             </button>
                           </div>
                           <span className="text-2xl font-semibold">{formatCustomTime(timeLeft)}</span>

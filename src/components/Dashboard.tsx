@@ -171,74 +171,75 @@ export function Dashboard() {
   }, [user]);
 
   // ---------------------
-  // 10. SMART OVERVIEW FETCH (using Hugging Face API)
-  // ---------------------
-  useEffect(() => {
-    if (!user) return;
-    setOverviewLoading(true);
-    // Use a concise strategic overview prompt per your requirements.
-    const prompt = `Create a personalized strategic overview:
+// 10. SMART OVERVIEW FETCH (using Hugging Face API)
+useEffect(() => {
+  if (!user) return;
+  setOverviewLoading(true);
+  // Use a concise strategic overview prompt per your requirements.
+  const prompt = `Create a personalized strategic overview:
 1. Start with a warm introduction for ${userName}, making it personal and engaging.
 2. Analyze patterns across all items.
 3. Provide 3-4 data-driven recommendations based on the analysis.
 4. Include specific action steps for each recommendation.
 5. Add a personalized motivation message for ${userName} to encourage their progress.
-6. KEEP IT UNDER 150 WORDS, THIS IS JUST AN OVERVIEW, SO DO NOT INCLUDE EXPLANATIONS OR IF YOUR RESPONSE IS CORRECTLY STRUCTURED. 
+6. KEEP IT UNDER 150 WORDS, THIS IS JUST AN OVERVIEW, SO DO NOT INCLUDE EXPLANATIONS OR IF YOUR RESPONSE IS CORRECTLY STRUCTURED.
 Ensure the tone remains professional but encouraging.
 overview`;
-    async function fetchSmartOverview() {
-      try {
-        const response = await fetch("https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${hfApiKey}`
-          },
-          body: JSON.stringify({ inputs: prompt }),
-        });
-        if (!response.ok) {
-          throw new Error("Smart Overview API fetch failed");
-        }
-        const result = await response.json();
-        const rawOutput = result && result[0] && result[0].generated_text
-          ? result[0].generated_text
-          : "No overview generated.";
-        // Clean the output by removing any leftover keywords or markers.
-        const cleaned = rawOutput
-          .replace(/Content:/gi, "")
-          .replace(/DATA:/gi, "")
-          .replace(/CONTEXT:/gi, "")
-          .replace(/SECTION TYPE:/gi, "")
-          .replace(/ANALYSIS REQUIREMENTS:/gi, "")
-          .replace(/Instructions:/gi, "")
-          .replace(/overview/gi, "")
-          .replace(/Dear.*?,/gi, "")
-          .trim();
-        // Further format the text: split into separate lines and wrap each line in a div.
-        const formatted = cleaned
-          .split("\n")
-          .map(line => line.trim())
-          .filter(line => line !== "")
-          .map((line, idx) => {
-            // For numbered steps, add an accent color.
-            if (/^\d+\.\s/.test(line)) {
-              return `<div class="mb-1"><span class="text-indigo-400 font-bold">${line}</span></div>`;
-            }
-            // Highlight any date markers within parentheses.
-            line = line.replace(/\(Due:\s*([^)]+)\)/gi, '(Due: <span class="text-green-400">$1</span>)');
-            return `<div class="mb-1">${line}</div>`;
-          })
-          .join("");
-        setSmartOverview(formatted || "No actionable overview could be generated.");
-      } catch (error) {
-        console.error("Error fetching Smart Overview:", error);
-        setSmartOverview("Error generating overview.");
-      } finally {
-        setOverviewLoading(false);
+  async function fetchSmartOverview() {
+    try {
+      const response = await fetch("https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${hfApiKey}`
+        },
+        body: JSON.stringify({ inputs: prompt }),
+      });
+      if (!response.ok) {
+        throw new Error("Smart Overview API fetch failed");
       }
+      const result = await response.json();
+      const rawOutput = result && result[0] && result[0].generated_text
+        ? result[0].generated_text
+        : "No overview generated.";
+      // Clean the output by removing any leftover prompt text and unwanted phrases.
+      let cleaned = rawOutput
+        .replace(/Create a personalized strategic overview:[\s\S]*?(\d+\.\s*Start with a warm introduction for\s*[^,]+,\s*making it personal and engaging\.)/gi, "")
+        .replace(/for\s*[^,]+/gi, "")
+        .replace(/Best regards,.*$/gi, "")
+        .replace(/Content:/gi, "")
+        .replace(/DATA:/gi, "")
+        .replace(/CONTEXT:/gi, "")
+        .replace(/SECTION TYPE:/gi, "")
+        .replace(/ANALYSIS REQUIREMENTS:/gi, "")
+        .replace(/Instructions:/gi, "")
+        .replace(/overview/gi, "")
+        .trim();
+      // Further format the text: split into separate lines and wrap each line in a div.
+      const formatted = cleaned
+        .split("\n")
+        .map(line => line.trim())
+        .filter(line => line !== "")
+        .map((line, idx) => {
+          // For numbered steps, add an accent color.
+          if (/^\d+\.\s/.test(line)) {
+            return `<div class="mb-1"><span class="text-indigo-400 font-bold">${line}</span></div>`;
+          }
+          // Highlight any date markers within parentheses.
+          line = line.replace(/\(Due:\s*([^)]+)\)/gi, '(Due: <span class="text-green-400">$1</span>)');
+          return `<div class="mb-1">${line}</div>`;
+        })
+        .join("");
+      setSmartOverview(formatted || "No actionable overview could be generated.");
+    } catch (error) {
+      console.error("Error fetching Smart Overview:", error);
+      setSmartOverview("Error generating overview.");
+    } finally {
+      setOverviewLoading(false);
     }
-    fetchSmartOverview();
-  }, [user, tasks, goals, projects, plans, userName]);
+  }
+  fetchSmartOverview();
+}, [user, tasks, goals, projects, plans, userName]);
 
   // ---------------------
   // 11. CREATE & EDIT & DELETE

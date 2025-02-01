@@ -14,6 +14,8 @@ import {
   deleteItem,
   updateCustomTimer,
   deleteCustomTimer,
+  // Import the weather API key from your Firebase lib
+  weatherApiKey,
 } from '../lib/dashboard-firebase';
 
 export function Dashboard() {
@@ -36,9 +38,6 @@ export function Dashboard() {
   // 3. WEATHER STATE
   // ---------------------
   const [weatherData, setWeatherData] = useState<any>(null);
-  const apiKey = 'e3f77d4d29e24862b4f190231241611'; // Your WeatherAPI key
-  const cacheKey = 'weatherDataCache';
-  const cacheDuration = 30 * 60 * 1000; // 30 minutes
 
   // ---------------------
   // 4. UI STATES
@@ -115,6 +114,7 @@ export function Dashboard() {
   // ---------------------
   useEffect(() => {
     if (!user) return;
+
     const unsubTasks = onCollectionSnapshot('tasks', user.uid, (items) => setTasks(items));
     const unsubGoals = onCollectionSnapshot('goals', user.uid, (items) => setGoals(items));
     const unsubProjects = onCollectionSnapshot('projects', user.uid, (items) => setProjects(items));
@@ -122,6 +122,7 @@ export function Dashboard() {
     const unsubTimers = onCustomTimersSnapshot(user.uid, (timers) => {
       setCustomTimers(timers);
     });
+
     return () => {
       unsubTasks();
       unsubGoals();
@@ -140,45 +141,24 @@ export function Dashboard() {
         setWeatherData(null);
         return;
       }
-      // Use geolocation to get latitude and longitude
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(async (position) => {
-          const lat = position.coords.latitude;
-          const lon = position.coords.longitude;
-          try {
-            // Check for cached weather data
-            const cached = localStorage.getItem(cacheKey);
-            if (cached) {
-              const parsed = JSON.parse(cached);
-              if (Date.now() - parsed.timestamp < cacheDuration) {
-                setWeatherData(parsed.data);
-                return;
-              }
-            }
-            const weatherApiUrl = `https://api.weatherapi.com/v1/current.json?key=${apiKey}&q=${lat},${lon}`;
-            const response = await fetch(weatherApiUrl);
-            if (!response.ok) throw new Error('Weather data fetch failed');
-            const data = await response.json();
-            // Map returned data to our weatherData shape
-            const weather = {
-              location: data.location.name,
-              condition: data.current.condition.text,
-              temp_f: data.current.temp_f,
-              feelslike_f: data.current.feelslike_f,
-              wind_mph: data.current.wind_mph,
-              humidity: data.current.humidity,
-            };
-            setWeatherData(weather);
-            localStorage.setItem(cacheKey, JSON.stringify({ data: weather, timestamp: Date.now() }));
-          } catch (error) {
-            console.error("Failed to fetch weather:", error);
-            setWeatherData(null);
-          }
-        }, (error) => {
-          console.error("Geolocation error:", error);
-          setWeatherData(null);
+      try {
+        // Using WeatherAPI.com – the API key is now imported from dashboard-firebase.
+        const response = await fetch(
+          `https://api.weatherapi.com/v1/current.json?key=${weatherApiKey}&q=Frisco`
+        );
+        if (!response.ok) throw new Error("Weather fetch failed");
+        const data = await response.json();
+
+        setWeatherData({
+          location: data.location.name,
+          condition: data.current.condition.text,
+          temp_f: Math.round(data.current.temp_f),
+          feelslike_f: Math.round(data.current.feelslike_f),
+          wind_mph: Math.round(data.current.wind_mph),
+          humidity: data.current.humidity,
         });
-      } else {
+      } catch (error) {
+        console.error("Failed to fetch weather:", error);
         setWeatherData(null);
       }
     }
@@ -284,11 +264,13 @@ export function Dashboard() {
   // ---------------------
   // 10. CUSTOM TIMERS
   // ---------------------
-  const [runningTimers, setRunningTimers] = useState<{ [id: string]: {
-    isRunning: boolean;
-    timeLeft: number;
-    intervalRef: NodeJS.Timer | null;
-  } }>({});
+  const [runningTimers, setRunningTimers] = useState<{
+    [id: string]: {
+      isRunning: boolean;
+      timeLeft: number;
+      intervalRef: NodeJS.Timer | null;
+    };
+  }>({});
 
   const handleAddCustomTimer = async () => {
     if (!user) return;
@@ -360,8 +342,8 @@ export function Dashboard() {
       const timerState = { ...prev[timerId] };
       if (timerState.intervalRef) clearInterval(timerState.intervalRef);
       timerState.isRunning = false;
-      timerState.timeLeft = defaultTime
-        ?? (customTimers.find((t) => t.id === timerId)?.data.time || 25 * 60);
+      timerState.timeLeft =
+        defaultTime ?? (customTimers.find((t) => t.id === timerId)?.data.time || 25 * 60);
       timerState.intervalRef = null;
       return { ...prev, [timerId]: timerState };
     });
@@ -390,7 +372,7 @@ export function Dashboard() {
   const formatCustomTime = (timeInSeconds: number) => {
     const mins = Math.floor(timeInSeconds / 60);
     const secs = timeInSeconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
   // ---------------------
@@ -423,6 +405,7 @@ export function Dashboard() {
   return (
     <div className="bg-gray-900 text-white min-h-screen w-full overflow-hidden">
       <Sidebar userName={userName} />
+
       <main className="ml-64 p-8 overflow-auto h-screen">
         <header className="dashboard-header mb-6">
           <h1 className="text-3xl font-bold mb-1">
@@ -435,106 +418,98 @@ export function Dashboard() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="flex flex-col gap-6">
-            {/* Smart Overview Card */}
             <div className="bg-gray-800 rounded-xl p-5">
               <div className="flex items-center mb-2">
-                <h2 className="text-xl font-semibold text-blue-300 mr-2">
-                  Your Smart Overview
-                </h2>
-                <span className="text-xs bg-pink-600 text-white px-2 py-1 rounded-full">
-                  BETA
-                </span>
+                <h2 className="text-xl font-semibold text-blue-300 mr-2">Your Smart Overview</h2>
+                <span className="text-xs bg-pink-600 text-white px-2 py-1 rounded-full">BETA</span>
               </div>
               <p className="text-green-400 font-bold mb-1">Welcome!</p>
               <p className="text-blue-400">
-                TaskMaster is ready to generate your Smart Overview. 
-                To get started, create a task, goal, project, or plan.
+                TaskMaster is ready to generate your Smart Overview. To get started, create a task, goal, project, or plan.
               </p>
-              <small className="block mt-2 text-gray-500">
-                TaskMaster can make mistakes. Verify details.
-              </small>
+              <small className="block mt-2 text-gray-500">TaskMaster can make mistakes. Verify details.</small>
             </div>
 
-            {/* Productivity Card */}
             <div className="bg-gray-800 rounded-xl p-5">
-              <h2 className="text-xl font-semibold text-purple-400 mb-2">
-                Your Productivity
-              </h2>
+              <h2 className="text-xl font-semibold text-purple-400 mb-2">Your Productivity</h2>
+
               <div className="mb-2">
-                <p className="mb-1">
-                  Tasks: {completedTasks}/{totalTasks} completed
-                </p>
+                <p className="mb-1">Tasks: {completedTasks}/{totalTasks} completed</p>
                 <div className="w-full bg-gray-700 h-2 rounded">
                   <div className="bg-green-500 h-2 rounded" style={{ width: `${tasksProgress}%` }} />
                 </div>
               </div>
+
               <div className="mb-2">
-                <p className="mb-1">
-                  Goals: {completedGoals}/{totalGoals} completed
-                </p>
+                <p className="mb-1">Goals: {completedGoals}/{totalGoals} completed</p>
                 <div className="w-full bg-gray-700 h-2 rounded">
                   <div className="bg-pink-500 h-2 rounded" style={{ width: `${goalsProgress}%` }} />
                 </div>
               </div>
+
               <div className="mb-2">
-                <p className="mb-1">
-                  Projects: {completedProjects}/{totalProjects} completed
-                </p>
+                <p className="mb-1">Projects: {completedProjects}/{totalProjects} completed</p>
                 <div className="w-full bg-gray-700 h-2 rounded">
                   <div className="bg-blue-500 h-2 rounded" style={{ width: `${projectsProgress}%` }} />
                 </div>
               </div>
+
               <div className="mb-2">
-                <p className="mb-1">
-                  Plans: {completedPlans}/{totalPlans} completed
-                </p>
+                <p className="mb-1">Plans: {completedPlans}/{totalPlans} completed</p>
                 <div className="w-full bg-gray-700 h-2 rounded">
                   <div className="bg-yellow-500 h-2 rounded" style={{ width: `${plansProgress}%` }} />
                 </div>
               </div>
             </div>
 
-            {/* Upcoming Deadlines Card */}
             <div className="bg-gray-800 rounded-xl p-5">
-              <h2 className="text-xl font-semibold text-blue-400 mb-2">
-                Upcoming Deadlines
-              </h2>
+              <h2 className="text-xl font-semibold text-blue-400 mb-2">Upcoming Deadlines</h2>
               <p>No upcoming deadlines (example placeholder)</p>
             </div>
 
-            {/* Tabs & New Item Form */}
             <div className="bg-gray-800 rounded-xl p-5">
+              {/* TAB SWITCHER */}
               <div className="flex space-x-3 mb-4">
                 <button
-                  className={`px-4 py-2 rounded ${activeTab === 'tasks' ? 'bg-indigo-500 text-white' : 'bg-gray-700 text-gray-200'}`}
-                  onClick={() => handleTabChange('tasks')}
+                  className={`px-4 py-2 rounded-full ${
+                    activeTab === "tasks" ? "bg-indigo-500 text-white" : "bg-gray-700 text-gray-200"
+                  }`}
+                  onClick={() => handleTabChange("tasks")}
                 >
                   Tasks
                 </button>
                 <button
-                  className={`px-4 py-2 rounded ${activeTab === 'goals' ? 'bg-indigo-500 text-white' : 'bg-gray-700 text-gray-200'}`}
-                  onClick={() => handleTabChange('goals')}
+                  className={`px-4 py-2 rounded-full ${
+                    activeTab === "goals" ? "bg-indigo-500 text-white" : "bg-gray-700 text-gray-200"
+                  }`}
+                  onClick={() => handleTabChange("goals")}
                 >
                   Goals
                 </button>
                 <button
-                  className={`px-4 py-2 rounded ${activeTab === 'projects' ? 'bg-indigo-500 text-white' : 'bg-gray-700 text-gray-200'}`}
-                  onClick={() => handleTabChange('projects')}
+                  className={`px-4 py-2 rounded-full ${
+                    activeTab === "projects" ? "bg-indigo-500 text-white" : "bg-gray-700 text-gray-200"
+                  }`}
+                  onClick={() => handleTabChange("projects")}
                 >
                   Projects
                 </button>
                 <button
-                  className={`px-4 py-2 rounded ${activeTab === 'plans' ? 'bg-indigo-500 text-white' : 'bg-gray-700 text-gray-200'}`}
-                  onClick={() => handleTabChange('plans')}
+                  className={`px-4 py-2 rounded-full ${
+                    activeTab === "plans" ? "bg-indigo-500 text-white" : "bg-gray-700 text-gray-200"
+                  }`}
+                  onClick={() => handleTabChange("plans")}
                 >
                   Plans
                 </button>
               </div>
+
+              {/* NEW ITEM FORM */}
               <h3 className="text-lg font-semibold mb-2 capitalize">{activeTab}</h3>
               <div className="flex gap-2 mb-4">
                 <input
                   type="text"
-                  className="flex-grow bg-gray-900 border border-gray-700 rounded p-2"
+                  className="flex-grow bg-gray-900 border border-gray-700 rounded-full p-2"
                   placeholder={`Enter new ${activeTab}...`}
                   value={newItemText}
                   onChange={(e) => setNewItemText(e.target.value)}
@@ -561,25 +536,21 @@ export function Dashboard() {
                   currentItems.map((item) => {
                     const itemId = item.id;
                     const textValue = item.data[titleField] || "Untitled";
-
-                    // If there's a dueDate, check if overdue
                     let overdue = false;
                     let dueDateStr = "";
                     if (item.data.dueDate) {
                       const dueDateObj = item.data.dueDate.toDate
                         ? item.data.dueDate.toDate()
-                        : new Date(item.data.dueDate); 
+                        : new Date(item.data.dueDate);
                       dueDateStr = dueDateObj.toLocaleDateString();
                       overdue = dueDateObj < new Date();
                     }
-
                     const isEditing = editingItemId === itemId;
-                    
                     return (
                       <li
                         key={item.id}
                         className={`p-2 rounded flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 ${
-                          overdue ? 'bg-red-600' : 'bg-gray-700'
+                          overdue ? "bg-red-600" : "bg-gray-700"
                         }`}
                       >
                         {/* Item Content */}
@@ -587,21 +558,19 @@ export function Dashboard() {
                           <div>
                             <span className="font-bold">{textValue}</span>
                             {dueDateStr && (
-                              <span className="ml-2 text-sm font-bold">
-                                (Due: {dueDateStr})
-                              </span>
+                              <span className="ml-2 text-sm font-bold">(Due: {dueDateStr})</span>
                             )}
                           </div>
                         ) : (
                           <div className="flex flex-col sm:flex-row gap-2">
                             <input
-                              className="bg-gray-800 border border-gray-600 rounded p-1"
+                              className="bg-gray-800 border border-gray-600 rounded-full p-1"
                               value={editingText}
                               onChange={(e) => setEditingText(e.target.value)}
                             />
                             <input
                               type="date"
-                              className="bg-gray-800 border border-gray-600 rounded p-1"
+                              className="bg-gray-800 border border-gray-600 rounded-full p-1"
                               value={editingDate}
                               onChange={(e) => setEditingDate(e.target.value)}
                             />
@@ -613,14 +582,14 @@ export function Dashboard() {
                           {!isEditing ? (
                             <>
                               <button
-                                className="bg-blue-500 hover:bg-blue-600 px-2 py-1 rounded text-white flex items-center gap-1"
+                                className="bg-blue-500 hover:bg-blue-600 px-2 py-1 rounded-full text-white flex items-center gap-1"
                                 onClick={() => handleEditClick(itemId, textValue, item.data.dueDate)}
                               >
                                 <Edit className="w-4 h-4" />
                                 Edit
                               </button>
                               <button
-                                className="bg-red-500 hover:bg-red-600 px-2 py-1 rounded text-white flex items-center gap-1"
+                                className="bg-red-500 hover:bg-red-600 px-2 py-1 rounded-full text-white flex items-center gap-1"
                                 onClick={() => handleDelete(itemId)}
                               >
                                 <Trash className="w-4 h-4" />
@@ -630,13 +599,13 @@ export function Dashboard() {
                           ) : (
                             <>
                               <button
-                                className="bg-green-500 hover:bg-green-600 px-2 py-1 rounded text-white"
+                                className="bg-green-500 hover:bg-green-600 px-2 py-1 rounded-full text-white"
                                 onClick={() => handleEditSave(itemId)}
                               >
                                 Save
                               </button>
                               <button
-                                className="bg-gray-500 hover:bg-gray-600 px-2 py-1 rounded text-white"
+                                className="bg-gray-500 hover:bg-gray-600 px-2 py-1 rounded-full text-white"
                                 onClick={() => {
                                   setEditingItemId(null);
                                   setEditingText("");
@@ -665,8 +634,7 @@ export function Dashboard() {
                 <>
                   <p className="text-lg font-bold">{weatherData.location}</p>
                   <p className="text-gray-300 mb-2">
-                    {weatherData.condition} ☀️ {weatherData.temp_f}°F 
-                    (Feels like: {weatherData.feelslike_f}°F)
+                    {weatherData.condition} ☀️ {weatherData.temp_f}°F (Feels like: {weatherData.feelslike_f}°F)
                   </p>
                   <p className="text-sm text-gray-400">
                     <strong>Wind:</strong> {weatherData.wind_mph} mph &nbsp; | &nbsp;
@@ -691,35 +659,30 @@ export function Dashboard() {
                   New Timer
                 </button>
               </div>
-              <div className="text-4xl font-bold mb-4">
-                {formatPomodoroTime(pomodoroTimeLeft)}
-              </div>
+              <div className="text-4xl font-bold mb-4">{formatPomodoroTime(pomodoroTimeLeft)}</div>
               <div className="flex space-x-3">
                 <button
-                  className="bg-green-500 px-4 py-2 rounded font-semibold"
+                  className="bg-green-500 px-4 py-2 rounded-full font-semibold"
                   onClick={handlePomodoroStart}
                 >
                   Start
                 </button>
                 <button
-                  className="bg-yellow-500 px-4 py-2 rounded font-semibold"
+                  className="bg-yellow-500 px-4 py-2 rounded-full font-semibold"
                   onClick={handlePomodoroPause}
                 >
                   Pause
                 </button>
                 <button
-                  className="bg-red-500 px-4 py-2 rounded font-semibold"
+                  className="bg-red-500 px-4 py-2 rounded-full font-semibold"
                   onClick={handlePomodoroReset}
                 >
                   Reset
                 </button>
               </div>
-              {/* Hide message if there is at least one custom timer */}
               {!customTimers.length && (
                 <p className="text-sm text-gray-400 mt-3">
-                  🍎 Looks like you have no current custom timers. To get started,
-                  just press the '+' button next to the Pomodoro timer and 
-                  create your own! 🍎
+                  🍎 Looks like you have no current custom timers. To get started, just press the '+' button next to the Pomodoro timer and create your own! 🍎
                 </p>
               )}
             </div>
@@ -736,38 +699,30 @@ export function Dashboard() {
                     const runningState = runningTimers[timerId];
                     const timeLeft = runningState ? runningState.timeLeft : timer.data.time;
                     const isRunning = runningState ? runningState.isRunning : false;
-
                     return (
-                      <li
-                        key={timerId}
-                        className="bg-gray-700 p-3 rounded flex items-center justify-between"
-                      >
+                      <li key={timerId} className="bg-gray-700 p-3 rounded flex items-center justify-between">
                         <div className="flex flex-col">
                           <div className="flex items-center gap-2">
                             <span className="font-bold text-lg">{timer.data.name}</span>
-                            {/* Edit timer name */}
                             <button
-                              className="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded flex items-center gap-1"
+                              className="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded-full flex items-center gap-1"
                               onClick={() => handleEditTimerName(timerId)}
                             >
                               <Edit className="w-4 h-4" />
                             </button>
-                            {/* Delete timer */}
                             <button
-                              className="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded flex items-center gap-1"
+                              className="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded-full flex items-center gap-1"
                               onClick={() => handleDeleteTimer(timerId)}
                             >
                               <Trash className="w-4 h-4" />
                             </button>
                           </div>
-                          <span className="text-2xl font-semibold">
-                            {formatCustomTime(timeLeft)}
-                          </span>
+                          <span className="text-2xl font-semibold">{formatCustomTime(timeLeft)}</span>
                         </div>
                         <div className="flex gap-2">
                           {!isRunning && (
                             <button
-                              className="bg-green-500 px-3 py-1 rounded font-semibold"
+                              className="bg-green-500 px-3 py-1 rounded-full font-semibold"
                               onClick={() => startCustomTimer(timerId)}
                             >
                               Start
@@ -775,14 +730,14 @@ export function Dashboard() {
                           )}
                           {isRunning && (
                             <button
-                              className="bg-yellow-500 px-3 py-1 rounded font-semibold"
+                              className="bg-yellow-500 px-3 py-1 rounded-full font-semibold"
                               onClick={() => pauseCustomTimer(timerId)}
                             >
                               Pause
                             </button>
                           )}
                           <button
-                            className="bg-gray-500 px-3 py-1 rounded font-semibold"
+                            className="bg-gray-500 px-3 py-1 rounded-full font-semibold"
                             onClick={() => resetCustomTimer(timerId)}
                           >
                             Reset

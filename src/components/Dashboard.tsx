@@ -143,7 +143,7 @@ export function Dashboard() {
       setWeatherData(null);
       return;
     }
-    // Get user's current position
+    // Use browser geolocation for current position.
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const { latitude, longitude } = position.coords;
@@ -192,14 +192,15 @@ ${projects.map((p) => "- " + (p.data.project || "Untitled") + (p.data.dueDate ? 
 Plans:
 ${plans.map((pl) => "- " + (pl.data.plan || "Untitled") + (pl.data.dueDate ? ` (Due: ${new Date(pl.data.dueDate.toDate ? pl.data.dueDate.toDate() : pl.data.dueDate).toLocaleDateString()})` : "")).join("\n")}
     `;
-    // Define sectionType and instructions as desired.
+
+    // Define the section type and instructions.
     const sectionType = "daily overview";
     const instructions = "Generate a concise, actionable overview with clear priorities.";
 
     const prompt = `You are TaskMaster, an advanced AI productivity assistant specializing in Smart Overviews. Your core purpose is to analyze productivity data and generate actionable, personalized insights.
 
 CONTEXT:
-This data represents a user's productivity items including tasks, goals, projects, and plans. Each item has a type and may or may not have a due date. Your role is to create a meaningful ${sectionType} overview that helps the user stay organized and motivated.
+This data represents a user's productivity items including tasks, goals, projects, and plans. Each item has a type and may or may not have a due date. Your role is to create a meaningful ${sectionType} that helps the user stay organized and motivated.
 
 DATA:
 ${optimizedData}
@@ -207,18 +208,33 @@ ${optimizedData}
 SECTION TYPE: ${sectionType}
 
 ANALYSIS REQUIREMENTS:
-1. Understand the relationships between different items
-2. Consider due dates and priorities
-3. Identify patterns and dependencies
-4. Focus on actionable insights
-5. Maintain a motivational tone
+1. Understand the relationships between different items.
+2. Consider due dates and priorities.
+3. Identify patterns and dependencies.
+4. Focus on actionable insights.
+5. Maintain a motivational tone.
 
 ${instructions}
 
 Format response exactly as:
 Content: [Provide detailed, actionable content following the instructions]`;
 
-    // Call Hugging Face Inference API
+    // Function to clean the raw output from the Hugging Face API.
+    const cleanOverview = (raw: string) => {
+      let cleaned = raw;
+      // If the response contains the marker "Content:", extract text after it.
+      const contentIdx = cleaned.indexOf("Content:");
+      if (contentIdx !== -1) {
+        cleaned = cleaned.substring(contentIdx + "Content:".length);
+      }
+      // Remove any trailing "end" markers (case-insensitive).
+      cleaned = cleaned.replace(/end\.?\s*$/i, "");
+      // Also remove any occurrences of prompt header parts.
+      // (This example removes common sections—adjust as needed.)
+      cleaned = cleaned.replace(/(DATA:|CONTEXT:|SECTION TYPE:|ANALYSIS REQUIREMENTS:|Instructions:)/gi, "");
+      return cleaned.trim();
+    };
+
     async function fetchSmartOverview() {
       try {
         const response = await fetch("https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct", {
@@ -233,8 +249,9 @@ Content: [Provide detailed, actionable content following the instructions]`;
           throw new Error("Smart Overview API fetch failed");
         }
         const result = await response.json();
-        // Expecting a response with the generated text.
-        setSmartOverview(result && result[0] && result[0].generated_text ? result[0].generated_text : "No overview generated.");
+        const rawOutput = result && result[0] && result[0].generated_text ? result[0].generated_text : "No overview generated.";
+        const finalOutput = cleanOverview(rawOutput);
+        setSmartOverview(finalOutput);
       } catch (error) {
         console.error("Error fetching Smart Overview:", error);
         setSmartOverview("Error generating overview.");
@@ -736,13 +753,13 @@ Content: [Provide detailed, actionable content following the instructions]`;
                               className="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded-full flex items-center gap-1"
                               onClick={() => handleEditTimerName(timerId)}
                             >
-                              <Edit className="w-4 h-4" /> 
+                              <Edit className="w-4 h-4" />
                             </button>
                             <button
                               className="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded-full flex items-center gap-1"
                               onClick={() => handleDeleteTimer(timerId)}
                             >
-                              <Trash className="w-4 h-4" /> 
+                              <Trash className="w-4 h-4" />
                             </button>
                           </div>
                           <span className="text-2xl font-semibold">{formatCustomTime(timeLeft)}</span>

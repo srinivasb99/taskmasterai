@@ -5,6 +5,10 @@
 // 1. IMPORT YOUR ALREADY-INITIALIZED APP & SERVICES FROM `firebase.ts`
 import { auth, db } from './firebase';
 
+// At the top of dashboard-firebase.ts
+export const weatherApiKey = 'e3f77d4d29e24862b4f190231241611';
+
+
 import {
   User,
   onAuthStateChanged,

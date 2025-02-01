@@ -397,14 +397,14 @@ export function Dashboard() {
 
   if (user === null) {
     return (
-      <div className="flex items-center justify-center h-screen bg-gray-900 text-white font-poppins">
+      <div className="flex items-center justify-center h-screen bg-gray-900 text-white">
         <p>Loading dashboard...</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-gray-900 text-white min-h-screen w-full overflow-hidden font-poppins">
+    <div className="bg-gray-900 text-white min-h-screen w-full overflow-hidden">
       <Sidebar userName={userName} />
 
       <main className="ml-64 p-8 overflow-auto h-screen">
@@ -420,7 +420,7 @@ export function Dashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* LEFT COLUMN */}
           <div className="flex flex-col gap-6">
-            <div className="bg-gray-800 rounded-xl p-5">
+            <div className="bg-gray-800 p-5">
               <div className="flex items-center mb-2">
                 <h2 className="text-xl font-semibold text-blue-300 mr-2">
                   Your Smart Overview
@@ -439,7 +439,7 @@ export function Dashboard() {
               </small>
             </div>
 
-            <div className="bg-gray-800 rounded-xl p-5">
+            <div className="bg-gray-800 p-5">
               <h2 className="text-xl font-semibold text-purple-400 mb-2">
                 Your Productivity
               </h2>
@@ -480,7 +480,6 @@ export function Dashboard() {
                 </div>
               </div>
 
-              {/* Plans progress */}
               <div className="mb-2">
                 <p className="mb-1">
                   Plans: {completedPlans}/{totalPlans} completed
@@ -494,16 +493,14 @@ export function Dashboard() {
               </div>
             </div>
 
-            {/* Upcoming Deadlines Card */}
-            <div className="bg-gray-800 rounded-xl p-5">
+            <div className="bg-gray-800 p-5">
               <h2 className="text-xl font-semibold text-blue-400 mb-2">
                 Upcoming Deadlines
               </h2>
               <p>No upcoming deadlines (example placeholder)</p>
             </div>
 
-            {/* Tasks / Goals / Projects / Plans Tabs */}
-            <div className="bg-gray-800 rounded-xl p-5">
+            <div className="bg-gray-800 p-5">
               {/* TAB SWITCHER */}
               <div className="flex space-x-3 mb-4">
                 <button
@@ -540,7 +537,6 @@ export function Dashboard() {
                 </button>
               </div>
 
-              {/* NEW ITEM FORM */}
               <h3 className="text-lg font-semibold mb-2 capitalize">{activeTab}</h3>
               <div className="flex gap-2 mb-4">
                 <input
@@ -561,7 +557,6 @@ export function Dashboard() {
                 </button>
               </div>
 
-              {/* SHOW LOADED ITEMS */}
               <ul className="space-y-2">
                 {currentItems.length === 0 ? (
                   <li className="text-gray-400">No {activeTab} yet...</li>
@@ -570,7 +565,6 @@ export function Dashboard() {
                     const itemId = item.id;
                     const textValue = item.data[titleField] || "Untitled";
 
-                    // If there's a dueDate, check if overdue
                     let overdue = false;
                     let dueDateStr = "";
                     if (item.data.dueDate) {
@@ -586,11 +580,10 @@ export function Dashboard() {
                     return (
                       <li
                         key={item.id}
-                        className={`p-2 rounded-full flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 ${
+                        className={`p-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 ${
                           overdue ? 'bg-red-600' : 'bg-gray-700'
                         }`}
                       >
-                        {/* Item Content */}
                         {!isEditing ? (
                           <div>
                             <span className="font-bold">{textValue}</span>
@@ -616,7 +609,6 @@ export function Dashboard() {
                           </div>
                         )}
                         
-                        {/* Action Buttons */}
                         <div className="flex gap-2">
                           {!isEditing ? (
                             <>
@@ -666,8 +658,7 @@ export function Dashboard() {
 
           {/* RIGHT COLUMN */}
           <div className="flex flex-col gap-6">
-            {/* Weather Card */}
-            <div className="bg-gray-800 rounded-xl p-5">
+            <div className="bg-gray-800 p-5">
               <h2 className="text-xl font-semibold mb-2">Today's Weather</h2>
               {weatherData ? (
                 <>
@@ -686,11 +677,9 @@ export function Dashboard() {
               )}
             </div>
 
-            {/* Main Pomodoro Timer */}
-            <div className="bg-gray-800 rounded-xl p-5">
+            <div className="bg-gray-800 p-5">
               <div className="flex items-center justify-between mb-2">
                 <h2 className="text-xl font-semibold">Pomodoro Timer</h2>
-                {/* '+' Button for custom timers */}
                 <button
                   className="bg-gray-700 text-white px-2 py-1 rounded-full font-bold flex items-center gap-1"
                   onClick={handleAddCustomTimer}
@@ -731,8 +720,7 @@ export function Dashboard() {
               )}
             </div>
 
-            {/* CUSTOM TIMERS LIST */}
-            <div className="bg-gray-800 rounded-xl p-5">
+            <div className="bg-gray-800 p-5">
               <h2 className="text-xl font-semibold mb-4">Custom Timers</h2>
               {customTimers.length === 0 ? (
                 <p className="text-gray-400">No custom timers yet...</p>
@@ -752,14 +740,12 @@ export function Dashboard() {
                         <div className="flex flex-col">
                           <div className="flex items-center gap-2">
                             <span className="font-bold text-lg">{timer.data.name}</span>
-                            {/* Edit timer name */}
                             <button
                               className="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded-full flex items-center gap-1"
                               onClick={() => handleEditTimerName(timerId)}
                             >
                               <Edit className="w-4 h-4" />
                             </button>
-                            {/* Delete timer */}
                             <button
                               className="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded-full flex items-center gap-1"
                               onClick={() => handleDeleteTimer(timerId)}

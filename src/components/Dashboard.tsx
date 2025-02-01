@@ -136,29 +136,50 @@ export function Dashboard() {
   // 8. WEATHER FETCH
   // ---------------------
   useEffect(() => {
-    async function fetchWeather() {
+  async function fetchWeather() {
       if (!user) {
         setWeatherData(null);
         return;
       }
-      try {
-        // Using WeatherAPI.com – the API key is now imported from dashboard-firebase.
-        const response = await fetch(
-          `https://api.weatherapi.com/v1/current.json?key=${apiKey}&q=${lat},${lon}`
-        );
-        if (!response.ok) throw new Error("Weather fetch failed");
-        const data = await response.json();
-
-        setWeatherData({
-          location: data.location.name,
-          condition: data.current.condition.text,
-          temp_f: Math.round(data.current.temp_f),
-          feelslike_f: Math.round(data.current.feelslike_f),
-          wind_mph: Math.round(data.current.wind_mph),
-          humidity: data.current.humidity,
+      // Use geolocation to get latitude and longitude
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(async (position) => {
+          const lat = position.coords.latitude;
+          const lon = position.coords.longitude;
+          try {
+            // Check for cached weather data
+            const cached = localStorage.getItem(cacheKey);
+            if (cached) {
+              const parsed = JSON.parse(cached);
+              if (Date.now() - parsed.timestamp < cacheDuration) {
+                setWeatherData(parsed.data);
+                return;
+              }
+            }
+            const weatherApiUrl = `https://api.weatherapi.com/v1/current.json?key=${apiKey}&q=${lat},${lon}`;
+            const response = await fetch(weatherApiUrl);
+            if (!response.ok) throw new Error('Weather data fetch failed');
+            const data = await response.json();
+            // Map returned data to our weatherData shape
+            const weather = {
+              location: data.location.name,
+              condition: data.current.condition.text,
+              temp_f: data.current.temp_f,
+              feelslike_f: data.current.feelslike_f,
+              wind_mph: data.current.wind_mph,
+              humidity: data.current.humidity,
+            };
+            setWeatherData(weather);
+            localStorage.setItem(cacheKey, JSON.stringify({ data: weather, timestamp: Date.now() }));
+          } catch (error) {
+            console.error("Failed to fetch weather:", error);
+            setWeatherData(null);
+          }
+        }, (error) => {
+          console.error("Geolocation error:", error);
+          setWeatherData(null);
         });
-      } catch (error) {
-        console.error("Failed to fetch weather:", error);
+      } else {
         setWeatherData(null);
       }
     }

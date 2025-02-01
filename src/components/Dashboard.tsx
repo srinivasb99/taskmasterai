@@ -43,6 +43,7 @@ export function Dashboard() {
   // 4. SMART OVERVIEW STATE
   // ---------------------
   const [smartOverview, setSmartOverview] = useState("Generating overview...");
+  const [overviewLoading, setOverviewLoading] = useState(true);
 
   // ---------------------
   // 5. UI STATES
@@ -61,7 +62,7 @@ export function Dashboard() {
   const [pomodoroRunning, setPomodoroRunning] = useState(false);
   const pomodoroRef = useRef<NodeJS.Timer | null>(null);
 
-  // Start Pomodoro
+  // Pomodoro Handlers
   const handlePomodoroStart = () => {
     if (pomodoroRunning) return;
     setPomodoroRunning(true);
@@ -77,20 +78,17 @@ export function Dashboard() {
     }, 1000);
   };
 
-  // Pause Pomodoro
   const handlePomodoroPause = () => {
     setPomodoroRunning(false);
     if (pomodoroRef.current) clearInterval(pomodoroRef.current);
   };
 
-  // Reset Pomodoro
   const handlePomodoroReset = () => {
     setPomodoroRunning(false);
     if (pomodoroRef.current) clearInterval(pomodoroRef.current);
     setPomodoroTimeLeft(25 * 60);
   };
 
-  // Format pomodoro time as MM:SS
   const formatPomodoroTime = (timeInSeconds: number) => {
     const mins = Math.floor(timeInSeconds / 60);
     const secs = timeInSeconds % 60;
@@ -143,7 +141,6 @@ export function Dashboard() {
       setWeatherData(null);
       return;
     }
-    // Use browser geolocation for current position.
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const { latitude, longitude } = position.coords;
@@ -178,7 +175,7 @@ export function Dashboard() {
   // ---------------------
   useEffect(() => {
     if (!user) return;
-    // Build an optimized data string from tasks, goals, projects, and plans.
+    setOverviewLoading(true);
     const optimizedData = `
 Tasks:
 ${tasks.map((t) => "- " + (t.data.task || "Untitled") + (t.data.dueDate ? ` (Due: ${new Date(t.data.dueDate.toDate ? t.data.dueDate.toDate() : t.data.dueDate).toLocaleDateString()})` : "")).join("\n")}
@@ -193,7 +190,6 @@ Plans:
 ${plans.map((pl) => "- " + (pl.data.plan || "Untitled") + (pl.data.dueDate ? ` (Due: ${new Date(pl.data.dueDate.toDate ? pl.data.dueDate.toDate() : pl.data.dueDate).toLocaleDateString()})` : "")).join("\n")}
     `;
 
-    // Define the section type and instructions.
     const sectionType = "daily overview";
     const instructions = "Generate a concise, actionable overview with clear priorities.";
 
@@ -219,18 +215,19 @@ ${instructions}
 Format response exactly as:
 Content: [Provide detailed, actionable content following the instructions]`;
 
-    // Function to clean the raw output from the Hugging Face API.
     const cleanOverview = (raw: string) => {
       let cleaned = raw;
-      // If the response contains the marker "Content:", extract text after it.
+      // Remove the literal prompt portion if present.
+      const unwanted = "[Provide detailed, actionable content following the instructions]";
+      cleaned = cleaned.replace(unwanted, "");
+      // Remove any content before "Content:" (if present).
       const contentIdx = cleaned.indexOf("Content:");
       if (contentIdx !== -1) {
         cleaned = cleaned.substring(contentIdx + "Content:".length);
       }
-      // Remove any trailing "end" markers (case-insensitive).
+      // Remove any trailing markers like "end" (case-insensitive).
       cleaned = cleaned.replace(/end\.?\s*$/i, "");
-      // Also remove any occurrences of prompt header parts.
-      // (This example removes common sections—adjust as needed.)
+      // Remove any header markers
       cleaned = cleaned.replace(/(DATA:|CONTEXT:|SECTION TYPE:|ANALYSIS REQUIREMENTS:|Instructions:)/gi, "");
       return cleaned.trim();
     };
@@ -251,10 +248,12 @@ Content: [Provide detailed, actionable content following the instructions]`;
         const result = await response.json();
         const rawOutput = result && result[0] && result[0].generated_text ? result[0].generated_text : "No overview generated.";
         const finalOutput = cleanOverview(rawOutput);
-        setSmartOverview(finalOutput);
+        setSmartOverview(finalOutput || "No actionable overview could be generated.");
       } catch (error) {
         console.error("Error fetching Smart Overview:", error);
         setSmartOverview("Error generating overview.");
+      } finally {
+        setOverviewLoading(false);
       }
     }
     fetchSmartOverview();
@@ -511,13 +510,13 @@ Content: [Provide detailed, actionable content following the instructions]`;
         </header>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="flex flex-col gap-6">
-            {/* Smart Overview Card */}
-            <div className="bg-gray-800 rounded-xl p-5">
+            {/* Smart Overview Card with fade-in animation */}
+            <div className="bg-gray-800 rounded-xl p-5 transition-opacity duration-700 ease-in-out" style={{ opacity: overviewLoading ? 0.5 : 1 }}>
               <div className="flex items-center mb-2">
                 <h2 className="text-xl font-semibold text-blue-300 mr-2">Your Smart Overview</h2>
                 <span className="text-xs bg-pink-600 text-white px-2 py-1 rounded-full">BETA</span>
               </div>
-              <p>{smartOverview}</p>
+              <pre className="whitespace-pre-wrap break-words">{smartOverview}</pre>
             </div>
             {/* Productivity Card */}
             <div className="bg-gray-800 rounded-xl p-5">

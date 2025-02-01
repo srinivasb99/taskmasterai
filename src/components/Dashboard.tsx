@@ -1,8 +1,5 @@
-
 import React, { useEffect, useState, useRef } from 'react';
-import { 
-  PlusCircle, Edit, Trash 
-} from 'lucide-react';
+import { PlusCircle, Edit, Trash } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import {
   onFirebaseAuthStateChanged,
@@ -39,6 +36,9 @@ export function Dashboard() {
   // 3. WEATHER STATE
   // ---------------------
   const [weatherData, setWeatherData] = useState<any>(null);
+  const apiKey = 'e3f77d4d29e24862b4f190231241611'; // Your WeatherAPI key
+  const cacheKey = 'weatherDataCache';
+  const cacheDuration = 30 * 60 * 1000; // 30 minutes
 
   // ---------------------
   // 4. UI STATES
@@ -99,7 +99,6 @@ export function Dashboard() {
   useEffect(() => {
     const unsubscribe = onFirebaseAuthStateChanged((firebaseUser) => {
       setUser(firebaseUser);
-
       if (firebaseUser && firebaseUser.displayName) {
         setUserName(firebaseUser.displayName);
       } else if (firebaseUser) {
@@ -116,7 +115,6 @@ export function Dashboard() {
   // ---------------------
   useEffect(() => {
     if (!user) return;
-
     const unsubTasks = onCollectionSnapshot('tasks', user.uid, (items) => setTasks(items));
     const unsubGoals = onCollectionSnapshot('goals', user.uid, (items) => setGoals(items));
     const unsubProjects = onCollectionSnapshot('projects', user.uid, (items) => setProjects(items));
@@ -124,7 +122,6 @@ export function Dashboard() {
     const unsubTimers = onCustomTimersSnapshot(user.uid, (timers) => {
       setCustomTimers(timers);
     });
-
     return () => {
       unsubTasks();
       unsubGoals();
@@ -143,23 +140,45 @@ export function Dashboard() {
         setWeatherData(null);
         return;
       }
-      try {
-        const response = await fetch(
-          `https://api.weatherapi.com/v1/current.json?key=e3f77d4d29e24862b4f190231241611&units=imperial`
-        );
-        if (!response.ok) throw new Error("Weather fetch failed");
-        const data = await response.json();
-
-        setWeatherData({
-          location: data.name,
-          condition: data.weather[0].main,
-          temp_f: Math.round(data.main.temp),
-          feelslike_f: Math.round(data.main.feels_like),
-          wind_mph: Math.round(data.wind.speed),
-          humidity: data.main.humidity,
+      // Use geolocation to get latitude and longitude
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(async (position) => {
+          const lat = position.coords.latitude;
+          const lon = position.coords.longitude;
+          try {
+            // Check for cached weather data
+            const cached = localStorage.getItem(cacheKey);
+            if (cached) {
+              const parsed = JSON.parse(cached);
+              if (Date.now() - parsed.timestamp < cacheDuration) {
+                setWeatherData(parsed.data);
+                return;
+              }
+            }
+            const weatherApiUrl = `https://api.weatherapi.com/v1/current.json?key=${apiKey}&q=${lat},${lon}`;
+            const response = await fetch(weatherApiUrl);
+            if (!response.ok) throw new Error('Weather data fetch failed');
+            const data = await response.json();
+            // Map returned data to our weatherData shape
+            const weather = {
+              location: data.location.name,
+              condition: data.current.condition.text,
+              temp_f: data.current.temp_f,
+              feelslike_f: data.current.feelslike_f,
+              wind_mph: data.current.wind_mph,
+              humidity: data.current.humidity,
+            };
+            setWeatherData(weather);
+            localStorage.setItem(cacheKey, JSON.stringify({ data: weather, timestamp: Date.now() }));
+          } catch (error) {
+            console.error("Failed to fetch weather:", error);
+            setWeatherData(null);
+          }
+        }, (error) => {
+          console.error("Geolocation error:", error);
+          setWeatherData(null);
         });
-      } catch (error) {
-        console.error("Failed to fetch weather:", error);
+      } else {
         setWeatherData(null);
       }
     }
@@ -180,12 +199,10 @@ export function Dashboard() {
       alert("Please enter a name or description before creating.");
       return;
     }
-
     let dateValue: Date | null = null;
     if (newItemDate) {
       dateValue = new Date(newItemDate);
     }
-
     try {
       if (activeTab === "tasks") {
         await createTask(user.uid, newItemText, dateValue);
@@ -236,12 +253,10 @@ export function Dashboard() {
       alert("Please enter a valid name for the item.");
       return;
     }
-
     let dateValue: Date | null = null;
     if (editingDate) {
       dateValue = new Date(editingDate);
     }
-
     try {
       await updateItem(collectionName, itemId, {
         [titleField]: editingText,
@@ -310,7 +325,6 @@ export function Dashboard() {
       const timerState = { ...prev[timerId] };
       if (timerState.isRunning) return prev;
       timerState.isRunning = true;
-
       const intervalId = setInterval(() => {
         setRunningTimers((old) => {
           const copy = { ...old };
@@ -409,7 +423,6 @@ export function Dashboard() {
   return (
     <div className="bg-gray-900 text-white min-h-screen w-full overflow-hidden">
       <Sidebar userName={userName} />
-
       <main className="ml-64 p-8 overflow-auto h-screen">
         <header className="dashboard-header mb-6">
           <h1 className="text-3xl font-bold mb-1">
@@ -422,6 +435,7 @@ export function Dashboard() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="flex flex-col gap-6">
+            {/* Smart Overview Card */}
             <div className="bg-gray-800 rounded-xl p-5">
               <div className="flex items-center mb-2">
                 <h2 className="text-xl font-semibold text-blue-300 mr-2">
@@ -441,57 +455,41 @@ export function Dashboard() {
               </small>
             </div>
 
+            {/* Productivity Card */}
             <div className="bg-gray-800 rounded-xl p-5">
               <h2 className="text-xl font-semibold text-purple-400 mb-2">
                 Your Productivity
               </h2>
-
               <div className="mb-2">
                 <p className="mb-1">
                   Tasks: {completedTasks}/{totalTasks} completed
                 </p>
                 <div className="w-full bg-gray-700 h-2 rounded">
-                  <div
-                    className="bg-green-500 h-2 rounded"
-                    style={{ width: `${tasksProgress}%` }}
-                  />
+                  <div className="bg-green-500 h-2 rounded" style={{ width: `${tasksProgress}%` }} />
                 </div>
               </div>
-
               <div className="mb-2">
                 <p className="mb-1">
                   Goals: {completedGoals}/{totalGoals} completed
                 </p>
                 <div className="w-full bg-gray-700 h-2 rounded">
-                  <div
-                    className="bg-pink-500 h-2 rounded"
-                    style={{ width: `${goalsProgress}%` }}
-                  />
+                  <div className="bg-pink-500 h-2 rounded" style={{ width: `${goalsProgress}%` }} />
                 </div>
               </div>
-
               <div className="mb-2">
                 <p className="mb-1">
                   Projects: {completedProjects}/{totalProjects} completed
                 </p>
                 <div className="w-full bg-gray-700 h-2 rounded">
-                  <div
-                    className="bg-blue-500 h-2 rounded"
-                    style={{ width: `${projectsProgress}%` }}
-                  />
+                  <div className="bg-blue-500 h-2 rounded" style={{ width: `${projectsProgress}%` }} />
                 </div>
               </div>
-
-              {/* Plans progress */}
               <div className="mb-2">
                 <p className="mb-1">
                   Plans: {completedPlans}/{totalPlans} completed
                 </p>
                 <div className="w-full bg-gray-700 h-2 rounded">
-                  <div
-                    className="bg-yellow-500 h-2 rounded"
-                    style={{ width: `${plansProgress}%` }}
-                  />
+                  <div className="bg-yellow-500 h-2 rounded" style={{ width: `${plansProgress}%` }} />
                 </div>
               </div>
             </div>
@@ -504,45 +502,34 @@ export function Dashboard() {
               <p>No upcoming deadlines (example placeholder)</p>
             </div>
 
-            {/* Tasks / Goals / Projects / Plans Tabs */}
+            {/* Tabs & New Item Form */}
             <div className="bg-gray-800 rounded-xl p-5">
-              {/* TAB SWITCHER */}
               <div className="flex space-x-3 mb-4">
                 <button
-                  className={`px-4 py-2 rounded ${
-                    activeTab === 'tasks' ? 'bg-indigo-500 text-white' : 'bg-gray-700 text-gray-200'
-                  }`}
+                  className={`px-4 py-2 rounded ${activeTab === 'tasks' ? 'bg-indigo-500 text-white' : 'bg-gray-700 text-gray-200'}`}
                   onClick={() => handleTabChange('tasks')}
                 >
                   Tasks
                 </button>
                 <button
-                  className={`px-4 py-2 rounded ${
-                    activeTab === 'goals' ? 'bg-indigo-500 text-white' : 'bg-gray-700 text-gray-200'
-                  }`}
+                  className={`px-4 py-2 rounded ${activeTab === 'goals' ? 'bg-indigo-500 text-white' : 'bg-gray-700 text-gray-200'}`}
                   onClick={() => handleTabChange('goals')}
                 >
                   Goals
                 </button>
                 <button
-                  className={`px-4 py-2 rounded ${
-                    activeTab === 'projects' ? 'bg-indigo-500 text-white' : 'bg-gray-700 text-gray-200'
-                  }`}
+                  className={`px-4 py-2 rounded ${activeTab === 'projects' ? 'bg-indigo-500 text-white' : 'bg-gray-700 text-gray-200'}`}
                   onClick={() => handleTabChange('projects')}
                 >
                   Projects
                 </button>
                 <button
-                  className={`px-4 py-2 rounded ${
-                    activeTab === 'plans' ? 'bg-indigo-500 text-white' : 'bg-gray-700 text-gray-200'
-                  }`}
+                  className={`px-4 py-2 rounded ${activeTab === 'plans' ? 'bg-indigo-500 text-white' : 'bg-gray-700 text-gray-200'}`}
                   onClick={() => handleTabChange('plans')}
                 >
                   Plans
                 </button>
               </div>
-
-              {/* NEW ITEM FORM */}
               <h3 className="text-lg font-semibold mb-2 capitalize">{activeTab}</h3>
               <div className="flex gap-2 mb-4">
                 <input
@@ -554,11 +541,14 @@ export function Dashboard() {
                 />
                 <input
                   type="date"
-                  className="bg-gray-900 border border-gray-700 rounded p-2"
+                  className="bg-gray-900 border border-gray-700 rounded-full p-2"
                   value={newItemDate}
                   onChange={(e) => setNewItemDate(e.target.value)}
                 />
-                <button className="bg-indigo-600 text-white px-4 py-2 rounded" onClick={handleCreate}>
+                <button
+                  className="bg-indigo-600 text-white px-4 py-2 rounded-full"
+                  onClick={handleCreate}
+                >
                   Create {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
                 </button>
               </div>

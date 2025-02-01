@@ -42,8 +42,8 @@ export function Dashboard() {
   // ---------------------
   // 4. SMART OVERVIEW STATE
   // ---------------------
-const [smartOverview, setSmartOverview] = useState<string>("");
-const [overviewLoading, setOverviewLoading] = useState(false);
+  const [smartOverview, setSmartOverview] = useState("Generating overview...");
+  const [overviewLoading, setOverviewLoading] = useState(true);
 
   // ---------------------
   // 5. UI STATES
@@ -170,59 +170,76 @@ const [overviewLoading, setOverviewLoading] = useState(false);
     );
   }, [user]);
 
-// ---------------------
-// 11. SMART OVERVIEW FETCH (OPTIMIZED)
-// ---------------------
-useEffect(() => {
-  if (!user || tasks.length + goals.length + projects.length + plans.length === 0) return;
-  
-  setOverviewLoading(true);
-  const prompt = `Generate concise productivity overview for ${userName}:
-- 2-3 key recommendations max
-- Focus on immediate priorities
-- Include specific action steps
-- Keep under 150 words
-- Format with bold titles and green dates`;
-
-  async function fetchSmartOverview() {
-    try {
-      const response = await fetch("https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${hfApiKey}`
-        },
-        body: JSON.stringify({ inputs: prompt }),
-      });
-
-      if (!response.ok) throw new Error("Overview generation failed");
-
-      const result = await response.json();
-      const rawText = result[0]?.generated_text || "No overview generated.";
-
-      // Enhanced formatting logic
-      const formatted = rawText
-        .split('\n')
-        .map(line => {
-          line = line.trim()
-            .replace(/^\d+\./, '<span class="text-indigo-400 font-bold">$&</span>')
-            .replace(/Action step:/g, '<span class="text-green-400 font-semibold">Action:</span>')
-            .replace(/Due: (.*?)(?=\s|$)/g, 'Due: <span class="text-green-400">$1</span>');
-          
-          return line ? `<div class="mb-3">${line}</div>` : '';
-        })
-        .join('');
-
-      setSmartOverview(formatted);
-    } catch (error) {
-      setSmartOverview('<div class="text-red-400">Failed to generate overview. Try refreshing.</div>');
-    } finally {
-      setOverviewLoading(false);
+  // ---------------------
+  // 10. SMART OVERVIEW FETCH (using Hugging Face API)
+  // ---------------------
+  useEffect(() => {
+    if (!user) return;
+    setOverviewLoading(true);
+    // Use a concise strategic overview prompt per your requirements.
+    const prompt = `Create a personalized strategic overview:
+1. Start with a warm introduction for ${userName}, making it personal and engaging.
+2. Analyze patterns across all items.
+3. Provide 3-4 data-driven recommendations based on the analysis.
+4. Include specific action steps for each recommendation.
+5. Add a personalized motivation message for ${userName} to encourage their progress.
+6. KEEP IT UNDER 150 WORDS, THIS IS JUST AN OVERVIEW, SO DO NOT INCLUDE EXPLANATIONS OR IF YOUR RESPONSE IS CORRECTLY STRUCTURED. 
+Ensure the tone remains professional but encouraging.
+overview`;
+    async function fetchSmartOverview() {
+      try {
+        const response = await fetch("https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${hfApiKey}`
+          },
+          body: JSON.stringify({ inputs: prompt }),
+        });
+        if (!response.ok) {
+          throw new Error("Smart Overview API fetch failed");
+        }
+        const result = await response.json();
+        const rawOutput = result && result[0] && result[0].generated_text
+          ? result[0].generated_text
+          : "No overview generated.";
+        // Clean the output by removing any leftover keywords or markers.
+        const cleaned = rawOutput
+          .replace(/Content:/gi, "")
+          .replace(/DATA:/gi, "")
+          .replace(/CONTEXT:/gi, "")
+          .replace(/SECTION TYPE:/gi, "")
+          .replace(/ANALYSIS REQUIREMENTS:/gi, "")
+          .replace(/Instructions:/gi, "")
+          .replace(/overview/gi, "")
+          .replace(/Dear.*?,/gi, "")
+          .trim();
+        // Further format the text: split into separate lines and wrap each line in a div.
+        const formatted = cleaned
+          .split("\n")
+          .map(line => line.trim())
+          .filter(line => line !== "")
+          .map((line, idx) => {
+            // For numbered steps, add an accent color.
+            if (/^\d+\.\s/.test(line)) {
+              return `<div class="mb-1"><span class="text-indigo-400 font-bold">${line}</span></div>`;
+            }
+            // Highlight any date markers within parentheses.
+            line = line.replace(/\(Due:\s*([^)]+)\)/gi, '(Due: <span class="text-green-400">$1</span>)');
+            return `<div class="mb-1">${line}</div>`;
+          })
+          .join("");
+        setSmartOverview(formatted || "No actionable overview could be generated.");
+      } catch (error) {
+        console.error("Error fetching Smart Overview:", error);
+        setSmartOverview("Error generating overview.");
+      } finally {
+        setOverviewLoading(false);
+      }
     }
-  }
+    fetchSmartOverview();
+  }, [user, tasks, goals, projects, plans, userName]);
 
-  fetchSmartOverview();
-}, [user, tasks, goals, projects, plans, userName]);
   // ---------------------
   // 11. CREATE & EDIT & DELETE
   // ---------------------
@@ -474,45 +491,14 @@ useEffect(() => {
         </header>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="flex flex-col gap-6">
-{/* Smart Overview Card with advanced animations */}
-<div className="bg-gray-800 rounded-xl p-5 relative min-h-[200px] transition-all duration-300 ease-in-out hover:bg-gray-750">
-  <div className="flex items-center mb-4">
-    <h2 className="text-xl font-semibold text-blue-300 mr-2 animate-fade-in">
-      Your Smart Overview
-    </h2>
-    <span className="text-xs bg-pink-600 text-white px-2 py-1 rounded-full animate-pulse">
-      LIVE SYNC
-    </span>
-  </div>
-
-  {overviewLoading ? (
-    <div className="space-y-4 animate-pulse">
-      <div className="h-4 bg-gray-700 rounded-full w-3/4"></div>
-      <div className="h-4 bg-gray-700 rounded-full w-2/3"></div>
-      <div className="h-4 bg-gray-700 rounded-full w-4/5"></div>
-      <div className="flex items-center justify-center pt-4 space-x-2">
-        <div className="animate-bounce delay-100 h-2 w-2 bg-indigo-400 rounded-full"></div>
-        <div className="animate-bounce delay-200 h-2 w-2 bg-indigo-400 rounded-full"></div>
-        <div className="animate-bounce delay-300 h-2 w-2 bg-indigo-400 rounded-full"></div>
-      </div>
-    </div>
-  ) : (
-    <div className="space-y-3 animate-fade-in-up">
-      <div 
-        className="text-sm text-gray-300 font-light leading-relaxed"
-        dangerouslySetInnerHTML={{ 
-          __html: smartOverview || 
-          '<p class="text-gray-400">No overview available. Create some items to generate insights!</p>'
-        }}
-      />
-      <div className="pt-2 border-t border-gray-700 mt-4">
-        <p className="text-xs text-gray-500 font-mono">
-          Updated: {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-        </p>
-      </div>
-    </div>
-  )}
-</div>
+            {/* Smart Overview Card with fade-in animation */}
+            <div className="bg-gray-800 rounded-xl p-5 transition-opacity duration-700 ease-in-out" style={{ opacity: overviewLoading ? 0.5 : 1 }}>
+              <div className="flex items-center mb-2">
+                <h2 className="text-xl font-semibold text-blue-300 mr-2">Your Smart Overview</h2>
+                <span className="text-xs bg-pink-600 text-white px-2 py-1 rounded-full">BETA</span>
+              </div>
+              <div className="text-sm" dangerouslySetInnerHTML={{ __html: smartOverview }} />
+            </div>
             {/* Productivity Card */}
             <div className="bg-gray-800 rounded-xl p-5">
               <h2 className="text-xl font-semibold text-purple-400 mb-2">Your Productivity</h2>

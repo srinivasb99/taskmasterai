@@ -145,7 +145,7 @@ export function Dashboard() {
       }
       try {
         const response = await fetch(
-          `https://api.openweathermap.org/data/2.5/weather?q=Frisco&appid=YOUR_API_KEY&units=imperial`
+          `https://api.weatherapi.com/v1/current.json?key=e3f77d4d29e24862b4f190231241611&units=imperial`
         );
         if (!response.ok) throw new Error("Weather fetch failed");
         const data = await response.json();

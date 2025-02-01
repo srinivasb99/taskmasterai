@@ -1,11 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { 
-  Home, Settings, Palette, StickyNote, Calendar, Users, 
-  Globe, Zap, Cpu, Gem, User, PlusCircle, Edit, Trash 
+  PlusCircle, Edit, Trash 
 } from 'lucide-react';
-import { Logo } from './Logo';
-
-// Import your Firebase functions
+import { Sidebar } from './Sidebar';
 import {
   onFirebaseAuthStateChanged,
   onCollectionSnapshot,
@@ -15,11 +12,10 @@ import {
   createPlan,
   addCustomTimer,
   onCustomTimersSnapshot,
-  // NEW functions (example names):
-  updateItem,         // For tasks/goals/projects/plans
-  deleteItem,         // For tasks/goals/projects/plans
-  updateCustomTimer,  // For custom timers
-  deleteCustomTimer,  // For custom timers
+  updateItem,
+  deleteItem,
+  updateCustomTimer,
+  deleteCustomTimer,
 } from '../lib/dashboard-firebase';
 
 export function Dashboard() {
@@ -36,8 +32,6 @@ export function Dashboard() {
   const [goals, setGoals] = useState<Array<{ id: string; data: any }>>([]);
   const [projects, setProjects] = useState<Array<{ id: string; data: any }>>([]);
   const [plans, setPlans] = useState<Array<{ id: string; data: any }>>([]);
-
-  // Custom timers from Firestore
   const [customTimers, setCustomTimers] = useState<Array<{ id: string; data: any }>>([]);
 
   // ---------------------
@@ -48,14 +42,9 @@ export function Dashboard() {
   // ---------------------
   // 4. UI STATES
   // ---------------------
-  // "activeTab" controls which collection we’re viewing: "tasks" | "goals" | "projects" | "plans"
   const [activeTab, setActiveTab] = useState<"tasks" | "goals" | "projects" | "plans">("tasks");
-
-  // New item form states
   const [newItemText, setNewItemText] = useState("");
   const [newItemDate, setNewItemDate] = useState("");
-
-  // Edit form states
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
   const [editingDate, setEditingDate] = useState("");
@@ -63,20 +52,20 @@ export function Dashboard() {
   // ---------------------
   // 5. MAIN POMODORO TIMER (LOCAL)
   // ---------------------
-  const [pomodoroTimeLeft, setPomodoroTimeLeft] = useState(25 * 60); // 25 min default
+  const [pomodoroTimeLeft, setPomodoroTimeLeft] = useState(25 * 60);
   const [pomodoroRunning, setPomodoroRunning] = useState(false);
   const pomodoroRef = useRef<NodeJS.Timer | null>(null);
 
   // Start Pomodoro
   const handlePomodoroStart = () => {
-    if (pomodoroRunning) return; // Already running
+    if (pomodoroRunning) return;
     setPomodoroRunning(true);
     pomodoroRef.current = setInterval(() => {
       setPomodoroTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(pomodoroRef.current as NodeJS.Timer);
           setPomodoroRunning(false);
-          return 0; // End
+          return 0;
         }
         return prev - 1;
       });
@@ -131,8 +120,6 @@ export function Dashboard() {
     const unsubGoals = onCollectionSnapshot('goals', user.uid, (items) => setGoals(items));
     const unsubProjects = onCollectionSnapshot('projects', user.uid, (items) => setProjects(items));
     const unsubPlans = onCollectionSnapshot('plans', user.uid, (items) => setPlans(items));
-
-    // Listen for custom timers
     const unsubTimers = onCustomTimersSnapshot(user.uid, (timers) => {
       setCustomTimers(timers);
     });
@@ -156,7 +143,6 @@ export function Dashboard() {
         return;
       }
       try {
-        // Replace with your own city & API key
         const response = await fetch(
           `https://api.openweathermap.org/data/2.5/weather?q=Frisco&appid=YOUR_API_KEY&units=imperial`
         );
@@ -182,13 +168,11 @@ export function Dashboard() {
   // ---------------------
   // 9. CREATE & EDIT & DELETE
   // ---------------------
-
   const handleTabChange = (tabName: "tasks" | "goals" | "projects" | "plans") => {
     setActiveTab(tabName);
-    setEditingItemId(null); // reset editing if we switch tabs
+    setEditingItemId(null);
   };
 
-  // Create new item in the active collection
   const handleCreate = async () => {
     if (!user) return;
     if (!newItemText.trim()) {
@@ -211,7 +195,6 @@ export function Dashboard() {
       } else if (activeTab === "plans") {
         await createPlan(user.uid, newItemText, dateValue);
       }
-      // Clear input fields
       setNewItemText("");
       setNewItemDate("");
     } catch (error) {
@@ -219,9 +202,8 @@ export function Dashboard() {
     }
   };
 
-  // Determine which array of data to display based on the active tab
   let currentItems: Array<{ id: string; data: any }> = [];
-  let titleField = ""; // e.g., 'task', 'goal', 'project', 'plan'
+  let titleField = "";
   let collectionName = activeTab;
   if (activeTab === "tasks") {
     currentItems = tasks;
@@ -237,7 +219,6 @@ export function Dashboard() {
     titleField = "plan";
   }
 
-  // Start editing an item
   const handleEditClick = (itemId: string, oldText: string, oldDueDate?: any) => {
     setEditingItemId(itemId);
     setEditingText(oldText || "");
@@ -249,7 +230,6 @@ export function Dashboard() {
     }
   };
 
-  // Save an edited item
   const handleEditSave = async (itemId: string) => {
     if (!user || !editingText.trim()) {
       alert("Please enter a valid name for the item.");
@@ -274,7 +254,6 @@ export function Dashboard() {
     }
   };
 
-  // Delete an item
   const handleDelete = async (itemId: string) => {
     if (!user) return;
     const confirmDel = window.confirm("Are you sure you want to delete this item?");
@@ -287,9 +266,8 @@ export function Dashboard() {
   };
 
   // ---------------------
-  // 10. CUSTOM TIMERS (POMODORO +)
+  // 10. CUSTOM TIMERS
   // ---------------------
-
   const [runningTimers, setRunningTimers] = useState<{ [id: string]: {
     isRunning: boolean;
     timeLeft: number;
@@ -298,7 +276,6 @@ export function Dashboard() {
 
   const handleAddCustomTimer = async () => {
     if (!user) return;
-    // default is 1500 seconds (25 minutes)
     try {
       await addCustomTimer("My Custom Timer", 25 * 60, user.uid);
     } catch (error) {
@@ -306,7 +283,6 @@ export function Dashboard() {
     }
   };
 
-  // Initialize local running state when new timers come in
   useEffect(() => {
     setRunningTimers((prev) => {
       const nextState = { ...prev };
@@ -319,7 +295,6 @@ export function Dashboard() {
           };
         }
       });
-      // Also remove old local states if the timer no longer exists
       Object.keys(nextState).forEach((id) => {
         if (!customTimers.some((t) => t.id === id)) {
           delete nextState[id];
@@ -329,11 +304,10 @@ export function Dashboard() {
     });
   }, [customTimers]);
 
-  // Start a custom timer
   const startCustomTimer = (timerId: string) => {
     setRunningTimers((prev) => {
       const timerState = { ...prev[timerId] };
-      if (timerState.isRunning) return prev; // already running
+      if (timerState.isRunning) return prev;
       timerState.isRunning = true;
 
       const intervalId = setInterval(() => {
@@ -356,7 +330,6 @@ export function Dashboard() {
     });
   };
 
-  // Pause a custom timer
   const pauseCustomTimer = (timerId: string) => {
     setRunningTimers((prev) => {
       const timerState = { ...prev[timerId] };
@@ -367,13 +340,11 @@ export function Dashboard() {
     });
   };
 
-  // Reset a custom timer
   const resetCustomTimer = (timerId: string, defaultTime?: number) => {
     setRunningTimers((prev) => {
       const timerState = { ...prev[timerId] };
       if (timerState.intervalRef) clearInterval(timerState.intervalRef);
       timerState.isRunning = false;
-      // use parentheses if mixing ?? and ||
       timerState.timeLeft = defaultTime
         ?? (customTimers.find((t) => t.id === timerId)?.data.time || 25 * 60);
       timerState.intervalRef = null;
@@ -381,19 +352,16 @@ export function Dashboard() {
     });
   };
 
-  // Edit timer name
   const handleEditTimerName = async (timerId: string) => {
     const newName = prompt("Enter new timer name:");
     if (!newName) return;
     try {
-      await updateCustomTimer(timerId, newName, undefined); 
-      // or update your existing function to allow partial updates
+      await updateCustomTimer(timerId, newName, undefined);
     } catch (error) {
       console.error("Error editing custom timer name:", error);
     }
   };
 
-  // Delete custom timer
   const handleDeleteTimer = async (timerId: string) => {
     const confirmDel = window.confirm("Are you sure you want to delete this timer?");
     if (!confirmDel) return;
@@ -411,9 +379,8 @@ export function Dashboard() {
   };
 
   // ---------------------
-  // 11. PRODUCTIVITY PROGRESS BARS
+  // 11. PROGRESS BARS
   // ---------------------
-  // For each category, we can see how many are completed
   const totalTasks = tasks.length;
   const completedTasks = tasks.filter((t) => t.data.completed).length;
   const tasksProgress = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
@@ -440,69 +407,9 @@ export function Dashboard() {
 
   return (
     <div className="bg-gray-900 text-white min-h-screen w-full overflow-hidden">
-      {/* UPDATED SIDEBAR */}
-      <div className="sidebar fixed top-0 left-0 h-full w-64 bg-gray-800 flex flex-col p-5 box-border gap-5 rounded-tr-xl rounded-br-xl">
-        {/* Logo Container */}
-        <div className="logo-container flex items-center mb-8">
-          <Logo className="mr-2" />
-        </div>
-        
-        {/* Menu Items */}
-        <div className="menu flex flex-col gap-4 flex-grow">
-          <button className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-full transition-all transform hover:scale-105">
-            <Home className="w-5 h-5" />
-            <span>Dashboard</span>
-          </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-full transition-all transform hover:scale-105">
-            <Settings className="w-5 h-5" />
-            <span>Settings</span>
-          </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-full transition-all transform hover:scale-105">
-            <Palette className="w-5 h-5" />
-            <span>Theme</span>
-          </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-full transition-all transform hover:scale-105">
-            <StickyNote className="w-5 h-5" />
-            <span>Notes</span>
-          </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-full transition-all transform hover:scale-105">
-            <Calendar className="w-5 h-5" />
-            <span>Calendar</span>
-          </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-full transition-all transform hover:scale-105">
-            <Users className="w-5 h-5" />
-            <span>Friends</span>
-          </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-full transition-all transform hover:scale-105">
-            <Globe className="w-5 h-5" />
-            <span>Community</span>
-          </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-full transition-all transform hover:scale-105">
-            <Zap className="w-5 h-5" />
-            <span>Distraction Control</span>
-          </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-full transition-all transform hover:scale-105">
-            <Cpu className="w-5 h-5" />
-            <span>AI Chat Bot</span>
-          </button>
-          <button className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-full transition-all transform hover:scale-105 font-semibold flex items-center gap-2">
-            <Gem className="w-5 h-5" />
-            <span>Upgrade to Premium</span>
-          </button>
-        </div>
-        
-        {/* User Profile */}
-        <div className="user-profile mt-auto flex items-center gap-2 text-white cursor-pointer p-2 hover:bg-gray-700 rounded-full transition-colors">
-          <div className="icon-container w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center">
-            <User className="w-4 h-4" />
-          </div>
-          <span>{userName || "Loading..."}</span>
-        </div>
-      </div>
+      <Sidebar userName={userName} />
 
-      {/* MAIN CONTENT AREA */}
       <main className="ml-64 p-8 overflow-auto h-screen">
-        {/* Greeting / Heading */}
         <header className="dashboard-header mb-6">
           <h1 className="text-3xl font-bold mb-1">
             ☀️ Good afternoon, <span className="font-normal">{userName || "Loading..."}</span>
@@ -512,11 +419,8 @@ export function Dashboard() {
           </p>
         </header>
 
-        {/* 2-column layout */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* LEFT COLUMN */}
           <div className="flex flex-col gap-6">
-            {/* Smart Overview Card */}
             <div className="bg-gray-800 rounded-xl p-5">
               <div className="flex items-center mb-2">
                 <h2 className="text-xl font-semibold text-blue-300 mr-2">
@@ -536,13 +440,11 @@ export function Dashboard() {
               </small>
             </div>
 
-            {/* Productivity Card (Progress Bars) */}
             <div className="bg-gray-800 rounded-xl p-5">
               <h2 className="text-xl font-semibold text-purple-400 mb-2">
                 Your Productivity
               </h2>
 
-              {/* Tasks progress */}
               <div className="mb-2">
                 <p className="mb-1">
                   Tasks: {completedTasks}/{totalTasks} completed
@@ -555,7 +457,6 @@ export function Dashboard() {
                 </div>
               </div>
 
-              {/* Goals progress */}
               <div className="mb-2">
                 <p className="mb-1">
                   Goals: {completedGoals}/{totalGoals} completed
@@ -568,7 +469,6 @@ export function Dashboard() {
                 </div>
               </div>
 
-              {/* Projects progress */}
               <div className="mb-2">
                 <p className="mb-1">
                   Projects: {completedProjects}/{totalProjects} completed

@@ -144,7 +144,7 @@ export function Dashboard() {
       try {
         // Using WeatherAPI.com – the API key is now imported from dashboard-firebase.
         const response = await fetch(
-          `https://api.weatherapi.com/v1/current.json?key=${weatherApiKey}&q=Frisco`
+          `https://api.weatherapi.com/v1/current.json?key=${apiKey}&q=${lat},${lon}`
         );
         if (!response.ok) throw new Error("Weather fetch failed");
         const data = await response.json();

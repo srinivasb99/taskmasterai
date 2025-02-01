@@ -176,6 +176,7 @@ export function Dashboard() {
   useEffect(() => {
     if (!user) return;
     setOverviewLoading(true);
+    // Build an optimized data string from tasks, goals, projects, and plans.
     const optimizedData = `
 Tasks:
 ${tasks.map((t) => "- " + (t.data.task || "Untitled") + (t.data.dueDate ? ` (Due: ${new Date(t.data.dueDate.toDate ? t.data.dueDate.toDate() : t.data.dueDate).toLocaleDateString()})` : "")).join("\n")}
@@ -215,21 +216,30 @@ ${instructions}
 Format response exactly as:
 Content: [Provide detailed, actionable content following the instructions]`;
 
+    // Clean the response by removing unwanted prompt markers.
     const cleanOverview = (raw: string) => {
       let cleaned = raw;
-      // Remove the literal prompt portion if present.
-      const unwanted = "[Provide detailed, actionable content following the instructions]";
-      cleaned = cleaned.replace(unwanted, "");
-      // Remove any content before "Content:" (if present).
-      const contentIdx = cleaned.indexOf("Content:");
-      if (contentIdx !== -1) {
-        cleaned = cleaned.substring(contentIdx + "Content:".length);
-      }
+      // Remove prompt-related tokens.
+      cleaned = cleaned.replace(/Content:/gi, "");
+      cleaned = cleaned.replace(/DATA:/gi, "");
+      cleaned = cleaned.replace(/CONTEXT:/gi, "");
+      cleaned = cleaned.replace(/SECTION TYPE:/gi, "");
+      cleaned = cleaned.replace(/ANALYSIS REQUIREMENTS:/gi, "");
+      cleaned = cleaned.replace(/Instructions:/gi, "");
+      // Remove placeholder text.
+      cleaned = cleaned.replace(/\[Provide detailed, actionable content following the instructions\]/gi, "");
       // Remove any trailing markers like "end" (case-insensitive).
       cleaned = cleaned.replace(/end\.?\s*$/i, "");
-      // Remove any header markers
-      cleaned = cleaned.replace(/(DATA:|CONTEXT:|SECTION TYPE:|ANALYSIS REQUIREMENTS:|Instructions:)/gi, "");
       return cleaned.trim();
+    };
+
+    // Format the cleaned text further by highlighting steps and dates.
+    const formatOverviewText = (text: string) => {
+      // Highlight steps: any line that starts with a number and a period.
+      let formatted = text.replace(/^(\d+\.\s)/gm, '<span class="text-indigo-400 font-bold">$1</span>');
+      // Highlight dates: any occurrence of "(Due:" followed by text and a closing parenthesis.
+      formatted = formatted.replace(/\(Due:\s*([^)]+)\)/gi, '(Due: <span class="text-green-400">$1</span>)');
+      return formatted;
     };
 
     async function fetchSmartOverview() {
@@ -246,9 +256,11 @@ Content: [Provide detailed, actionable content following the instructions]`;
           throw new Error("Smart Overview API fetch failed");
         }
         const result = await response.json();
-        const rawOutput = result && result[0] && result[0].generated_text ? result[0].generated_text : "No overview generated.";
-        const finalOutput = cleanOverview(rawOutput);
-        setSmartOverview(finalOutput || "No actionable overview could be generated.");
+        const rawOutput = result && result[0] && result[0].generated_text
+          ? result[0].generated_text
+          : "No overview generated.";
+        const finalOutput = formatOverviewText(cleanOverview(rawOutput)) || "No actionable overview could be generated.";
+        setSmartOverview(finalOutput);
       } catch (error) {
         console.error("Error fetching Smart Overview:", error);
         setSmartOverview("Error generating overview.");
@@ -516,7 +528,9 @@ Content: [Provide detailed, actionable content following the instructions]`;
                 <h2 className="text-xl font-semibold text-blue-300 mr-2">Your Smart Overview</h2>
                 <span className="text-xs bg-pink-600 text-white px-2 py-1 rounded-full">BETA</span>
               </div>
-              <pre className="whitespace-pre-wrap break-words">{smartOverview}</pre>
+              {/* Use a div with dangerouslySetInnerHTML to render the formatted HTML.
+                  The text is smaller using text-sm. */}
+              <div className="text-sm" dangerouslySetInnerHTML={{ __html: smartOverview }} />
             </div>
             {/* Productivity Card */}
             <div className="bg-gray-800 rounded-xl p-5">

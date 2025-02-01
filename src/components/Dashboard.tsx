@@ -1,7 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { 
-  PlusCircle, Edit, Trash 
-} from 'lucide-react';
+import { PlusCircle, Edit, Trash } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import {
   onFirebaseAuthStateChanged,
@@ -399,14 +397,14 @@ export function Dashboard() {
 
   if (user === null) {
     return (
-      <div className="flex items-center justify-center h-screen bg-gray-900 text-white">
+      <div className="flex items-center justify-center h-screen bg-gray-900 text-white font-poppins">
         <p>Loading dashboard...</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-gray-900 text-white min-h-screen w-full overflow-hidden">
+    <div className="bg-gray-900 text-white min-h-screen w-full overflow-hidden font-poppins">
       <Sidebar userName={userName} />
 
       <main className="ml-64 p-8 overflow-auto h-screen">
@@ -420,6 +418,7 @@ export function Dashboard() {
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* LEFT COLUMN */}
           <div className="flex flex-col gap-6">
             <div className="bg-gray-800 rounded-xl p-5">
               <div className="flex items-center mb-2">
@@ -449,9 +448,9 @@ export function Dashboard() {
                 <p className="mb-1">
                   Tasks: {completedTasks}/{totalTasks} completed
                 </p>
-                <div className="w-full bg-gray-700 h-2 rounded">
+                <div className="w-full bg-gray-700 h-2 rounded-full">
                   <div
-                    className="bg-green-500 h-2 rounded"
+                    className="bg-green-500 h-2 rounded-full"
                     style={{ width: `${tasksProgress}%` }}
                   />
                 </div>
@@ -461,9 +460,9 @@ export function Dashboard() {
                 <p className="mb-1">
                   Goals: {completedGoals}/{totalGoals} completed
                 </p>
-                <div className="w-full bg-gray-700 h-2 rounded">
+                <div className="w-full bg-gray-700 h-2 rounded-full">
                   <div
-                    className="bg-pink-500 h-2 rounded"
+                    className="bg-pink-500 h-2 rounded-full"
                     style={{ width: `${goalsProgress}%` }}
                   />
                 </div>
@@ -473,9 +472,9 @@ export function Dashboard() {
                 <p className="mb-1">
                   Projects: {completedProjects}/{totalProjects} completed
                 </p>
-                <div className="w-full bg-gray-700 h-2 rounded">
+                <div className="w-full bg-gray-700 h-2 rounded-full">
                   <div
-                    className="bg-blue-500 h-2 rounded"
+                    className="bg-blue-500 h-2 rounded-full"
                     style={{ width: `${projectsProgress}%` }}
                   />
                 </div>
@@ -486,9 +485,9 @@ export function Dashboard() {
                 <p className="mb-1">
                   Plans: {completedPlans}/{totalPlans} completed
                 </p>
-                <div className="w-full bg-gray-700 h-2 rounded">
+                <div className="w-full bg-gray-700 h-2 rounded-full">
                   <div
-                    className="bg-yellow-500 h-2 rounded"
+                    className="bg-yellow-500 h-2 rounded-full"
                     style={{ width: `${plansProgress}%` }}
                   />
                 </div>
@@ -508,7 +507,7 @@ export function Dashboard() {
               {/* TAB SWITCHER */}
               <div className="flex space-x-3 mb-4">
                 <button
-                  className={`px-4 py-2 rounded ${
+                  className={`px-4 py-2 rounded-full ${
                     activeTab === 'tasks' ? 'bg-indigo-500 text-white' : 'bg-gray-700 text-gray-200'
                   }`}
                   onClick={() => handleTabChange('tasks')}
@@ -516,7 +515,7 @@ export function Dashboard() {
                   Tasks
                 </button>
                 <button
-                  className={`px-4 py-2 rounded ${
+                  className={`px-4 py-2 rounded-full ${
                     activeTab === 'goals' ? 'bg-indigo-500 text-white' : 'bg-gray-700 text-gray-200'
                   }`}
                   onClick={() => handleTabChange('goals')}
@@ -524,7 +523,7 @@ export function Dashboard() {
                   Goals
                 </button>
                 <button
-                  className={`px-4 py-2 rounded ${
+                  className={`px-4 py-2 rounded-full ${
                     activeTab === 'projects' ? 'bg-indigo-500 text-white' : 'bg-gray-700 text-gray-200'
                   }`}
                   onClick={() => handleTabChange('projects')}
@@ -532,7 +531,7 @@ export function Dashboard() {
                   Projects
                 </button>
                 <button
-                  className={`px-4 py-2 rounded ${
+                  className={`px-4 py-2 rounded-full ${
                     activeTab === 'plans' ? 'bg-indigo-500 text-white' : 'bg-gray-700 text-gray-200'
                   }`}
                   onClick={() => handleTabChange('plans')}
@@ -557,7 +556,7 @@ export function Dashboard() {
                   value={newItemDate}
                   onChange={(e) => setNewItemDate(e.target.value)}
                 />
-                <button className="bg-indigo-600 text-white px-4 py-2 rounded" onClick={handleCreate}>
+                <button className="bg-indigo-600 text-white px-4 py-2 rounded-full" onClick={handleCreate}>
                   Create {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
                 </button>
               </div>
@@ -577,7 +576,7 @@ export function Dashboard() {
                     if (item.data.dueDate) {
                       const dueDateObj = item.data.dueDate.toDate
                         ? item.data.dueDate.toDate()
-                        : new Date(item.data.dueDate); 
+                        : new Date(item.data.dueDate);
                       dueDateStr = dueDateObj.toLocaleDateString();
                       overdue = dueDateObj < new Date();
                     }
@@ -587,7 +586,7 @@ export function Dashboard() {
                     return (
                       <li
                         key={item.id}
-                        className={`p-2 rounded flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 ${
+                        className={`p-2 rounded-full flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 ${
                           overdue ? 'bg-red-600' : 'bg-gray-700'
                         }`}
                       >
@@ -604,13 +603,13 @@ export function Dashboard() {
                         ) : (
                           <div className="flex flex-col sm:flex-row gap-2">
                             <input
-                              className="bg-gray-800 border border-gray-600 rounded p-1"
+                              className="bg-gray-800 border border-gray-600 rounded-full p-1"
                               value={editingText}
                               onChange={(e) => setEditingText(e.target.value)}
                             />
                             <input
                               type="date"
-                              className="bg-gray-800 border border-gray-600 rounded p-1"
+                              className="bg-gray-800 border border-gray-600 rounded-full p-1"
                               value={editingDate}
                               onChange={(e) => setEditingDate(e.target.value)}
                             />
@@ -622,14 +621,14 @@ export function Dashboard() {
                           {!isEditing ? (
                             <>
                               <button
-                                className="bg-blue-500 hover:bg-blue-600 px-2 py-1 rounded text-white flex items-center gap-1"
+                                className="bg-blue-500 hover:bg-blue-600 px-2 py-1 rounded-full text-white flex items-center gap-1"
                                 onClick={() => handleEditClick(itemId, textValue, item.data.dueDate)}
                               >
                                 <Edit className="w-4 h-4" />
                                 Edit
                               </button>
                               <button
-                                className="bg-red-500 hover:bg-red-600 px-2 py-1 rounded text-white flex items-center gap-1"
+                                className="bg-red-500 hover:bg-red-600 px-2 py-1 rounded-full text-white flex items-center gap-1"
                                 onClick={() => handleDelete(itemId)}
                               >
                                 <Trash className="w-4 h-4" />
@@ -639,13 +638,13 @@ export function Dashboard() {
                           ) : (
                             <>
                               <button
-                                className="bg-green-500 hover:bg-green-600 px-2 py-1 rounded text-white"
+                                className="bg-green-500 hover:bg-green-600 px-2 py-1 rounded-full text-white"
                                 onClick={() => handleEditSave(itemId)}
                               >
                                 Save
                               </button>
                               <button
-                                className="bg-gray-500 hover:bg-gray-600 px-2 py-1 rounded text-white"
+                                className="bg-gray-500 hover:bg-gray-600 px-2 py-1 rounded-full text-white"
                                 onClick={() => {
                                   setEditingItemId(null);
                                   setEditingText("");
@@ -705,25 +704,24 @@ export function Dashboard() {
               </div>
               <div className="flex space-x-3">
                 <button
-                  className="bg-green-500 px-4 py-2 rounded font-semibold"
+                  className="bg-green-500 px-4 py-2 rounded-full font-semibold"
                   onClick={handlePomodoroStart}
                 >
                   Start
                 </button>
                 <button
-                  className="bg-yellow-500 px-4 py-2 rounded font-semibold"
+                  className="bg-yellow-500 px-4 py-2 rounded-full font-semibold"
                   onClick={handlePomodoroPause}
                 >
                   Pause
                 </button>
                 <button
-                  className="bg-red-500 px-4 py-2 rounded font-semibold"
+                  className="bg-red-500 px-4 py-2 rounded-full font-semibold"
                   onClick={handlePomodoroReset}
                 >
                   Reset
                 </button>
               </div>
-              {/* Hide message if there is at least one custom timer */}
               {!customTimers.length && (
                 <p className="text-sm text-gray-400 mt-3">
                   🍎 Looks like you have no current custom timers. To get started,
@@ -749,21 +747,21 @@ export function Dashboard() {
                     return (
                       <li
                         key={timerId}
-                        className="bg-gray-700 p-3 rounded flex items-center justify-between"
+                        className="bg-gray-700 p-3 rounded-full flex items-center justify-between"
                       >
                         <div className="flex flex-col">
                           <div className="flex items-center gap-2">
                             <span className="font-bold text-lg">{timer.data.name}</span>
                             {/* Edit timer name */}
                             <button
-                              className="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded flex items-center gap-1"
+                              className="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded-full flex items-center gap-1"
                               onClick={() => handleEditTimerName(timerId)}
                             >
                               <Edit className="w-4 h-4" />
                             </button>
                             {/* Delete timer */}
                             <button
-                              className="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded flex items-center gap-1"
+                              className="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded-full flex items-center gap-1"
                               onClick={() => handleDeleteTimer(timerId)}
                             >
                               <Trash className="w-4 h-4" />
@@ -776,7 +774,7 @@ export function Dashboard() {
                         <div className="flex gap-2">
                           {!isRunning && (
                             <button
-                              className="bg-green-500 px-3 py-1 rounded font-semibold"
+                              className="bg-green-500 px-3 py-1 rounded-full font-semibold"
                               onClick={() => startCustomTimer(timerId)}
                             >
                               Start
@@ -784,14 +782,14 @@ export function Dashboard() {
                           )}
                           {isRunning && (
                             <button
-                              className="bg-yellow-500 px-3 py-1 rounded font-semibold"
+                              className="bg-yellow-500 px-3 py-1 rounded-full font-semibold"
                               onClick={() => pauseCustomTimer(timerId)}
                             >
                               Pause
                             </button>
                           )}
                           <button
-                            className="bg-gray-500 px-3 py-1 rounded font-semibold"
+                            className="bg-gray-500 px-3 py-1 rounded-full font-semibold"
                             onClick={() => resetCustomTimer(timerId)}
                           >
                             Reset

@@ -176,72 +176,15 @@ export function Dashboard() {
   useEffect(() => {
     if (!user) return;
     setOverviewLoading(true);
-    // Build an optimized data string from tasks, goals, projects, and plans.
-    const optimizedData = `
-Tasks:
-${tasks.map((t) => "- " + (t.data.task || "Untitled") + (t.data.dueDate ? ` (Due: ${new Date(t.data.dueDate.toDate ? t.data.dueDate.toDate() : t.data.dueDate).toLocaleDateString()})` : "")).join("\n")}
-
-Goals:
-${goals.map((g) => "- " + (g.data.goal || "Untitled") + (g.data.dueDate ? ` (Due: ${new Date(g.data.dueDate.toDate ? g.data.dueDate.toDate() : g.data.dueDate).toLocaleDateString()})` : "")).join("\n")}
-
-Projects:
-${projects.map((p) => "- " + (p.data.project || "Untitled") + (p.data.dueDate ? ` (Due: ${new Date(p.data.dueDate.toDate ? p.data.dueDate.toDate() : p.data.dueDate).toLocaleDateString()})` : "")).join("\n")}
-
-Plans:
-${plans.map((pl) => "- " + (pl.data.plan || "Untitled") + (pl.data.dueDate ? ` (Due: ${new Date(pl.data.dueDate.toDate ? pl.data.dueDate.toDate() : pl.data.dueDate).toLocaleDateString()})` : "")).join("\n")}
-    `;
-
-    const sectionType = "daily overview";
-    const instructions = "Generate a concise, actionable overview with clear priorities.";
-
-    const prompt = `You are TaskMaster, an advanced AI productivity assistant specializing in Smart Overviews. Your core purpose is to analyze productivity data and generate actionable, personalized insights.
-
-CONTEXT:
-This data represents a user's productivity items including tasks, goals, projects, and plans. Each item has a type and may or may not have a due date. Your role is to create a meaningful ${sectionType} that helps the user stay organized and motivated.
-
-DATA:
-${optimizedData}
-
-SECTION TYPE: ${sectionType}
-
-ANALYSIS REQUIREMENTS:
-1. Understand the relationships between different items.
-2. Consider due dates and priorities.
-3. Identify patterns and dependencies.
-4. Focus on actionable insights.
-5. Maintain a motivational tone.
-
-${instructions}
-
-Format response exactly as:
-Content: [Provide detailed, actionable content following the instructions]`;
-
-    // Clean the response by removing unwanted prompt markers.
-    const cleanOverview = (raw: string) => {
-      let cleaned = raw;
-      // Remove prompt-related tokens.
-      cleaned = cleaned.replace(/Content:/gi, "");
-      cleaned = cleaned.replace(/DATA:/gi, "");
-      cleaned = cleaned.replace(/CONTEXT:/gi, "");
-      cleaned = cleaned.replace(/SECTION TYPE:/gi, "");
-      cleaned = cleaned.replace(/ANALYSIS REQUIREMENTS:/gi, "");
-      cleaned = cleaned.replace(/Instructions:/gi, "");
-      // Remove placeholder text.
-      cleaned = cleaned.replace(/\[Provide detailed, actionable content following the instructions\]/gi, "");
-      // Remove any trailing markers like "end" (case-insensitive).
-      cleaned = cleaned.replace(/end\.?\s*$/i, "");
-      return cleaned.trim();
-    };
-
-    // Format the cleaned text further by highlighting steps and dates.
-    const formatOverviewText = (text: string) => {
-      // Highlight steps: any line that starts with a number and a period.
-      let formatted = text.replace(/^(\d+\.\s)/gm, '<span class="text-indigo-400 font-bold">$1</span>');
-      // Highlight dates: any occurrence of "(Due:" followed by text and a closing parenthesis.
-      formatted = formatted.replace(/\(Due:\s*([^)]+)\)/gi, '(Due: <span class="text-green-400">$1</span>)');
-      return formatted;
-    };
-
+    // New concise prompt per your requirements.
+    const prompt = `Create a personalized strategic overview:
+1. Start with a warm introduction for ${userName}, making it personal and engaging.
+2. Analyze patterns across all items.
+3. Provide 3-4 data-driven recommendations based on the analysis.
+4. Include specific action steps for each recommendation.
+5. Add a personalized motivation message for ${userName} to encourage their progress.
+Ensure the tone remains professional but encouraging.
+overview`;
     async function fetchSmartOverview() {
       try {
         const response = await fetch("https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct", {
@@ -259,8 +202,33 @@ Content: [Provide detailed, actionable content following the instructions]`;
         const rawOutput = result && result[0] && result[0].generated_text
           ? result[0].generated_text
           : "No overview generated.";
-        const finalOutput = formatOverviewText(cleanOverview(rawOutput)) || "No actionable overview could be generated.";
-        setSmartOverview(finalOutput);
+        // Clean the output by removing any leftover keywords.
+        const cleaned = rawOutput
+          .replace(/Content:/gi, "")
+          .replace(/DATA:/gi, "")
+          .replace(/CONTEXT:/gi, "")
+          .replace(/SECTION TYPE:/gi, "")
+          .replace(/ANALYSIS REQUIREMENTS:/gi, "")
+          .replace(/Instructions:/gi, "")
+          .replace(/\[Provide detailed, actionable content following the instructions\]/gi, "")
+          .replace(/overview/gi, "")
+          .trim();
+        // Further format the text: split into lines and wrap each line in a div for spacing.
+        const formatted = cleaned
+          .split("\n")
+          .map(line => line.trim())
+          .filter(line => line !== "")
+          .map((line, idx) => {
+            // For steps (lines starting with a number and period), add a blue accent.
+            if (/^\d+\.\s/.test(line)) {
+              return `<div class="mb-1"><span class="text-indigo-400 font-bold">${line}</span></div>`;
+            }
+            // For date markers (e.g. "(Due: ...)" ), add a green accent.
+            line = line.replace(/\(Due:\s*([^)]+)\)/gi, '(Due: <span class="text-green-400">$1</span>)');
+            return `<div class="mb-1">${line}</div>`;
+          })
+          .join("");
+        setSmartOverview(formatted || "No actionable overview could be generated.");
       } catch (error) {
         console.error("Error fetching Smart Overview:", error);
         setSmartOverview("Error generating overview.");
@@ -269,7 +237,7 @@ Content: [Provide detailed, actionable content following the instructions]`;
       }
     }
     fetchSmartOverview();
-  }, [user, tasks, goals, projects, plans]);
+  }, [user, tasks, goals, projects, plans, userName]);
 
   // ---------------------
   // 11. CREATE & EDIT & DELETE
@@ -528,8 +496,7 @@ Content: [Provide detailed, actionable content following the instructions]`;
                 <h2 className="text-xl font-semibold text-blue-300 mr-2">Your Smart Overview</h2>
                 <span className="text-xs bg-pink-600 text-white px-2 py-1 rounded-full">BETA</span>
               </div>
-              {/* Use a div with dangerouslySetInnerHTML to render the formatted HTML.
-                  The text is smaller using text-sm. */}
+              {/* Render the formatted overview with smaller text and organized spacing */}
               <div className="text-sm" dangerouslySetInnerHTML={{ __html: smartOverview }} />
             </div>
             {/* Productivity Card */}
@@ -565,7 +532,7 @@ Content: [Provide detailed, actionable content following the instructions]`;
               <h2 className="text-xl font-semibold text-blue-400 mb-2">Upcoming Deadlines</h2>
               <p>No upcoming deadlines (example placeholder)</p>
             </div>
-            {/* Tasks/Goals/Projects/Plans Tabs & List */}
+            {/* Tabs & List */}
             <div className="bg-gray-800 rounded-xl p-5">
               <div className="flex space-x-3 mb-4">
                 <button

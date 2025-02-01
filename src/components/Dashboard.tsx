@@ -42,8 +42,8 @@ export function Dashboard() {
   // ---------------------
   // 4. SMART OVERVIEW STATE
   // ---------------------
-  const [smartOverview, setSmartOverview] = useState("Generating overview...");
-  const [overviewLoading, setOverviewLoading] = useState(true);
+const [smartOverview, setSmartOverview] = useState<string>("");
+const [overviewLoading, setOverviewLoading] = useState(false);
 
   // ---------------------
   // 5. UI STATES

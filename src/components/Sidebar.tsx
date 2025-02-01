@@ -34,7 +34,7 @@ export function Sidebar({ userName }: SidebarProps) {
   ];
 
   return (
-    <div className="sidebar fixed top-0 left-0 h-full w-56 bg-gray-800 flex flex-col p-3 gap-3 rounded-tr-xl rounded-br-xl">
+    <div className="sidebar fixed top-0 left-0 h-full w-56 bg-gray-800 flex flex-col p-3 gap-3 rounded-tr-xl rounded-br-xl font-poppins">
       {/* Logo Container */}
       <div className="logo-container flex items-center mb-6">
         <Logo className="mr-2 w-8 h-8" />
@@ -48,7 +48,7 @@ export function Sidebar({ userName }: SidebarProps) {
           return (
             <button
               key={item.label}
-              className={`flex items-center gap-2 px-3 py-2 text-white rounded transition-transform duration-300 transform hover:scale-105 hover:bg-gray-700 ${
+              className={`flex items-center gap-2 px-3 py-2 text-white rounded-full transition-transform duration-300 transform hover:scale-105 hover:bg-gray-700 ${
                 isActive ? 'bg-gray-700' : ''
               }`}
             >
@@ -60,7 +60,7 @@ export function Sidebar({ userName }: SidebarProps) {
 
         {/* Upgrade to Premium Button */}
         <button
-          className="flex items-center gap-2 px-3 py-2 text-white rounded transition-transform duration-300 transform hover:scale-105 bg-gradient-to-r from-indigo-500 to-purple-500 font-semibold"
+          className="flex items-center gap-2 px-3 py-2 text-white rounded-full transition-transform duration-300 transform hover:scale-105 bg-gradient-to-r from-indigo-500 to-purple-500 font-semibold"
         >
           <Gem className="w-4 h-4" />
           <span className="whitespace-nowrap text-xs">Upgrade to Premium</span>

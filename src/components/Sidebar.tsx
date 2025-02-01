@@ -2,7 +2,6 @@ import React from 'react';
 import {
   Home,
   Settings,
-  Palette,
   StickyNote,
   Calendar,
   Users,
@@ -13,12 +12,27 @@ import {
   User,
 } from 'lucide-react';
 import { Logo } from './Logo';
+import { useLocation } from 'react-router-dom';
 
 interface SidebarProps {
   userName: string;
 }
 
 export function Sidebar({ userName }: SidebarProps) {
+  const location = useLocation();
+
+  // Define the menu items with label, icon component, and path.
+  const menuItems = [
+    { label: 'Dashboard', icon: Home, path: '/dashboard' },
+    { label: 'Settings', icon: Settings, path: '/settings' },
+    { label: 'Notes', icon: StickyNote, path: '/notes' },
+    { label: 'Calendar', icon: Calendar, path: '/calendar' },
+    { label: 'Friends', icon: Users, path: '/friends' },
+    { label: 'Community', icon: Globe, path: '/community' },
+    { label: 'Distraction Control', icon: Zap, path: '/distraction-control' },
+    { label: 'AI Chat Bot', icon: Cpu, path: '/ai' },
+  ];
+
   return (
     <div className="sidebar fixed top-0 left-0 h-full w-56 bg-gray-800 flex flex-col p-3 gap-3 rounded-tr-xl rounded-br-xl">
       {/* Logo Container */}
@@ -28,45 +42,28 @@ export function Sidebar({ userName }: SidebarProps) {
 
       {/* Menu Items */}
       <div className="menu flex flex-col gap-2 flex-grow">
-        <button className="flex items-center gap-2 px-3 py-2 text-white rounded transition-transform duration-300 transform hover:scale-105 hover:bg-gray-700">
-          <Home className="w-4 h-4" />
-          <span>Dashboard</span>
-        </button>
-        <button className="flex items-center gap-2 px-3 py-2 text-white rounded transition-transform duration-300 transform hover:scale-105 hover:bg-gray-700">
-          <Settings className="w-4 h-4" />
-          <span>Settings</span>
-        </button>
-        <button className="flex items-center gap-2 px-3 py-2 text-white rounded transition-transform duration-300 transform hover:scale-105 hover:bg-gray-700">
-          <Palette className="w-4 h-4" />
-          <span>Theme</span>
-        </button>
-        <button className="flex items-center gap-2 px-3 py-2 text-white rounded transition-transform duration-300 transform hover:scale-105 hover:bg-gray-700">
-          <StickyNote className="w-4 h-4" />
-          <span>Notes</span>
-        </button>
-        <button className="flex items-center gap-2 px-3 py-2 text-white rounded transition-transform duration-300 transform hover:scale-105 hover:bg-gray-700">
-          <Calendar className="w-4 h-4" />
-          <span>Calendar</span>
-        </button>
-        <button className="flex items-center gap-2 px-3 py-2 text-white rounded transition-transform duration-300 transform hover:scale-105 hover:bg-gray-700">
-          <Users className="w-4 h-4" />
-          <span>Friends</span>
-        </button>
-        <button className="flex items-center gap-2 px-3 py-2 text-white rounded transition-transform duration-300 transform hover:scale-105 hover:bg-gray-700">
-          <Globe className="w-4 h-4" />
-          <span>Community</span>
-        </button>
-        <button className="flex items-center gap-2 px-3 py-2 text-white rounded transition-transform duration-300 transform hover:scale-105 hover:bg-gray-700">
-          <Zap className="w-4 h-4" />
-          <span>Distraction Control</span>
-        </button>
-        <button className="flex items-center gap-2 px-3 py-2 text-white rounded transition-transform duration-300 transform hover:scale-105 hover:bg-gray-700">
-          <Cpu className="w-4 h-4" />
-          <span>AI Chat Bot</span>
-        </button>
-        <button className="flex items-center gap-2 px-3 py-2 text-white rounded transition-transform duration-300 transform hover:scale-105 hover:bg-gray-700 font-semibold">
+        {menuItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = location.pathname === item.path;
+          return (
+            <button
+              key={item.label}
+              className={`flex items-center gap-2 px-3 py-2 text-white rounded transition-transform duration-300 transform hover:scale-105 hover:bg-gray-700 ${
+                isActive ? 'bg-gray-700' : ''
+              }`}
+            >
+              <Icon className="w-4 h-4" />
+              <span>{item.label}</span>
+            </button>
+          );
+        })}
+
+        {/* Upgrade to Premium Button */}
+        <button
+          className="flex items-center gap-2 px-3 py-2 text-white rounded transition-transform duration-300 transform hover:scale-105 bg-gradient-to-r from-indigo-500 to-purple-500 font-semibold"
+        >
           <Gem className="w-4 h-4" />
-          <span className="whitespace-nowrap">Upgrade to Premium</span>
+          <span className="whitespace-nowrap text-xs">Upgrade to Premium</span>
         </button>
       </div>
 
@@ -75,7 +72,7 @@ export function Sidebar({ userName }: SidebarProps) {
         <div className="icon-container w-6 h-6 bg-gray-700 rounded-full flex items-center justify-center">
           <User className="w-3 h-3" />
         </div>
-        <span className="text-sm">{userName || "Loading..."}</span>
+        <span className="text-sm">{userName || 'Loading...'}</span>
       </div>
     </div>
   );

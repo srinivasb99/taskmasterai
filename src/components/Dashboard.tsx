@@ -252,7 +252,8 @@ Guidelines:
         .replace(/>>|boxed|answer:|\\\//g, '')
         .replace(/(Note:.*|\.?\[\/?\w+\])/gi, '')
         // Clean markdown
-        .replace(/(\*\*|###|__|~~|```
+       // After (fixed)
+        .replace(/(\*\*|###|__|~~|```)/g, '')
         // Split and process lines
         .split('\n')
         .map(line => line.trim().replace(/^[-- *]+/, '').trim())

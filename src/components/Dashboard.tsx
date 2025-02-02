@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useRef } from 'react';
 import { PlusCircle, Edit, Trash } from 'lucide-react';
 import { Sidebar } from './Sidebar';
@@ -167,6 +168,7 @@ export function Dashboard() {
     );
   }, [user]);
 
+// ---------------------
 // SMART OVERVIEW GENERATION
 // ---------------------
 const [smartOverview, setSmartOverview] = useState<string>("");
@@ -179,24 +181,17 @@ useEffect(() => {
     setOverviewLoading(true);
     
     try {
-      // Formatting helper with emoji mapping
+      // 1. Format Firebase data for AI processing
       const formatItem = (item: any, type: string) => {
         const dueDate = item.data.dueDate?.toDate();
-        const icons = {
-          task: '📌',
-          goal: '🎯',
-          project: '📂',
-          plan: '🗓️'
-        };
-        return `${icons[type]} ${item.data[type]} (${dueDate ? dueDate.toLocaleDateString() : 'No due date'})`;
+        return `• ${item.data[type]} (${dueDate ? dueDate.toLocaleDateString() : 'No due date'})`;
       };
 
-      // Build formatted data string
       const formattedData = [
-        tasks.length && `📋 TASKS\n${tasks.map(t => formatItem(t, 'task')).join('\n')}`,
-        goals.length && `🎯 GOALS\n${goals.map(g => formatItem(g, 'goal')).join('\n')}`,
-        projects.length && `📂 PROJECTS\n${projects.map(p => formatItem(p, 'project')).join('\n')}`,
-        plans.length && `🗓️ PLANS\n${plans.map(p => formatItem(p, 'plan')).join('\n')}`,
+        tasks.length && `📋 TASKS:\n${tasks.map(t => formatItem(t, 'task')).join('\n')}`,
+        goals.length && `🎯 GOALS:\n${goals.map(g => formatItem(g, 'goal')).join('\n')}`,
+        projects.length && `📊 PROJECTS:\n${projects.map(p => formatItem(p, 'project')).join('\n')}`,
+        plans.length && `📅 PLANS:\n${plans.map(p => formatItem(p, 'plan')).join('\n')}`,
       ].filter(Boolean).join('\n\n');
 
       if (!formattedData) {
@@ -204,7 +199,7 @@ useEffect(() => {
         return;
       }
 
-      // Enhanced AI prompt
+      // 2. Construct AI prompt
       const prompt = `[INST] <<SYS>>
 You are TaskMaster, an advanced AI productivity assistant. Analyze this data and generate a concise Smart Overview:
 
@@ -212,14 +207,14 @@ ${formattedData}
 
 Guidelines:
 - Start with a personalized greeting for ${userName}
-- Highlight 3 key priorities with specific item names
-- Provide 3 actionable recommendations
-- Use short, impactful sentences
-- No markdown, code blocks, or special formatting
-- Never include notes, disclaimers, or explanations
+- Highlight 3 key priorities
+- Provide actionable recommendations
+- Mention specific item names
+- Make sure you use complete sentences
+- No explainations
 <</SYS>>[/INST]`;
 
-      // API call
+      // 3. Call Hugging Face API
       const response = await fetch("https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct", {
         method: "POST",
         headers: {
@@ -229,7 +224,7 @@ Guidelines:
         body: JSON.stringify({
           inputs: prompt,
           parameters: {
-            max_new_tokens: 400,
+            max_new_tokens: 300,
             temperature: 0.7,
             top_p: 0.9,
             repetition_penalty: 1.2,
@@ -241,41 +236,21 @@ Guidelines:
 
       if (!response.ok) throw new Error("API request failed");
 
-      // Process response
+      // 4. Process response
       const result = await response.json();
       const rawText = result[0]?.generated_text || '';
 
-      // Enhanced sanitization and formatting
+      // 5. Sanitize and format output
       const cleanText = rawText
-        // Remove unwanted artifacts
-        .replace(/\[\/?(INST|SYS|AI|TASK|response|note|code|markdown|text)\]/gi, '')
-        .replace(/>>|boxed|answer:|\\\//g, '')
-        .replace(/(Note:.*|\.?\[\/?\w+\])/gi, '')
-        // Split and process lines
+        .replace(/\[\/?(INST|SYS)\]|<\/?s>/gi, '')
+        .replace(/(\*\*|###|boxed|final answer|step \d+:)/gi, '')
         .split('\n')
-        .map(line => line.trim().replace(/^[-* ]+/, '').trim()) // Fixed regex here
-        .filter(line => line && !line.match(/^(-{3,}|={3,})$/))
-        // Structure output with animations
+        .map(line => line.trim())
+        .filter(line => line.length > 0)
         .map((line, index) => {
-          const animationDelay = `${index * 75}ms`;
-          if (index === 0) {
-            return `
-              <div class="greeting text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent animate-fadeIn" style="animation-delay: ${animationDelay}">
-                ${line.replace(/^,\s*/, '')}
-              </div>`;
-          }
-          if (/priority/i.test(line)) {
-            return `
-              <div class="priority-item flex items-center space-x-3 p-4 bg-white/10 rounded-lg hover:bg-white/20 transition-all duration-300 animate-slideIn" style="animation-delay: ${animationDelay}">
-                <div class="checkmark w-5 h-5 border-2 border-blue-400 rounded-full flex items-center justify-center animate-pulse"></div>
-                <span class="text-gray-200">${line}</span>
-              </div>`;
-          }
-          return `
-            <div class="recommendation p-4 mb-2 bg-gray-800/50 rounded-lg hover:shadow-lg transition-all duration-300 animate-fadeIn" style="animation-delay: ${animationDelay}">
-              <span class="text-purple-400 mr-2">⮞</span>
-              <span class="text-gray-200">${line}</span>
-            </div>`;
+          if (index === 0) return `<div class="text-green-400 font-semibold mb-2">${line}</div>`;
+          if (/^\d+\./.test(line)) return `<div class="ml-4 mb-1">${line}</div>`;
+          return `<div class="mb-2">${line}</div>`;
         })
         .join('');
 
@@ -283,10 +258,7 @@ Guidelines:
 
     } catch (error) {
       console.error("Overview generation error:", error);
-      setSmartOverview(`
-        <div class="error-message text-red-300 p-4 border border-red-400/30 rounded-lg bg-red-900/10 animate-shake">
-          Error generating overview. Please try again.
-        </div>`);
+      setSmartOverview("Error generating overview. Please try again.");
     } finally {
       setOverviewLoading(false);
     }
@@ -294,32 +266,7 @@ Guidelines:
 
   generateOverview();
 }, [user, tasks, goals, projects, plans, userName, hfApiKey]);
-
-// Add these CSS animations to your global styles
-const globalStyles = `
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  @keyframes slideIn {
-    from { opacity: 0; transform: translateX(20px); }
-    to { opacity: 1; transform: translateX(0); }
-  }
-
-  @keyframes shake {
-    0%, 100% { transform: translateX(0); }
-    25% { transform: translateX(-5px); }
-    75% { transform: translateX(5px); }
-  }
-
-  .animate-fadeIn { animation: fadeIn 0.5s ease-out forwards; }
-  .animate-slideIn { animation: slideIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
-  .animate-shake { animation: shake 0.4s ease-in-out; }
-`;
-
-
-
+  // ---------------------
   // 11. CREATE & EDIT & DELETE
   // ---------------------
   const handleTabChange = (tabName: "tasks" | "goals" | "projects" | "plans") => {

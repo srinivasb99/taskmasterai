@@ -251,9 +251,6 @@ Guidelines:
         .replace(/\[\/?(INST|SYS|AI|TASK|response|note|code|markdown|text)\]/gi, '')
         .replace(/>>|boxed|answer:|\\\//g, '')
         .replace(/(Note:.*|\.?\[\/?\w+\])/gi, '')
-        // Clean markdown
-       // After (fixed)
-        .replace(/(\*\*|###|__|~~|```)/g, '')
         // Split and process lines
         .split('\n')
         .map(line => line.trim().replace(/^[-- *]+/, '').trim())

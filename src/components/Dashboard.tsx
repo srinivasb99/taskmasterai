@@ -253,7 +253,7 @@ Guidelines:
         .replace(/(Note:.*|\.?\[\/?\w+\])/gi, '')
         // Split and process lines
         .split('\n')
-        .map(line => line.trim().replace(/^[-- *]+/, '').trim())
+        .map(line => line.trim().replace(/^[-* ]+/, '').trim()) // Fixed regex here
         .filter(line => line && !line.match(/^(-{3,}|={3,})$/))
         // Structure output with animations
         .map((line, index) => {
@@ -317,6 +317,7 @@ const globalStyles = `
   .animate-slideIn { animation: slideIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
   .animate-shake { animation: shake 0.4s ease-in-out; }
 `;
+
 
 
   // 11. CREATE & EDIT & DELETE

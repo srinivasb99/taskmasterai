@@ -180,12 +180,13 @@ useEffect(() => {
     setOverviewLoading(true);
     
     try {
-      // 1. Format Firebase data for AI processing
+      // Formatting helper
       const formatItem = (item: any, type: string) => {
         const dueDate = item.data.dueDate?.toDate();
         return `• ${item.data[type]} (${dueDate ? dueDate.toLocaleDateString() : 'No due date'})`;
       };
 
+      // Build formatted data string
       const formattedData = [
         tasks.length && `📋 TASKS:\n${tasks.map(t => formatItem(t, 'task')).join('\n')}`,
         goals.length && `🎯 GOALS:\n${goals.map(g => formatItem(g, 'goal')).join('\n')}`,
@@ -198,7 +199,7 @@ useEffect(() => {
         return;
       }
 
-      // 2. Construct AI prompt
+      // Enhanced AI prompt
       const prompt = `[INST] <<SYS>>
 You are TaskMaster, an advanced AI productivity assistant. Analyze this data and generate a concise Smart Overview:
 
@@ -209,11 +210,12 @@ Guidelines:
 - Highlight 3 key priorities
 - Provide actionable recommendations
 - Mention specific item names
-- Make sure you use complete sentences
-- No explainations
+- Use complete sentences
+- No markdown formatting
+- No explanations, notes, or disclaimers
 <</SYS>>[/INST]`;
 
-      // 3. Call Hugging Face API
+      // API call
       const response = await fetch("https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct", {
         method: "POST",
         headers: {
@@ -223,7 +225,7 @@ Guidelines:
         body: JSON.stringify({
           inputs: prompt,
           parameters: {
-            max_new_tokens: 300,
+            max_new_tokens: 400,
             temperature: 0.7,
             top_p: 0.9,
             repetition_penalty: 1.2,
@@ -235,21 +237,31 @@ Guidelines:
 
       if (!response.ok) throw new Error("API request failed");
 
-      // 4. Process response
+      // Process response
       const result = await response.json();
       const rawText = result[0]?.generated_text || '';
 
-      // 5. Sanitize and format output
+      // Enhanced sanitization
       const cleanText = rawText
-        .replace(/\[\/?(INST|SYS)\]|<\/?s>/gi, '')
-        .replace(/(\*\*|###|boxed|final answer|step \d+:)/gi, '')
+        // Remove AI artifacts
+        .replace(/\[\/?(INST|SYS|AI|TASK|response|note)\]/gi, '')
+        .replace(/>>|boxed|answer:|\\\//g, '')
+        .replace(/Note:.*|Note from AI:.*/gi, '')
+        // Clean markdown
+        .replace(/(\*\*|###|__|~~)/g, '')
+        // Split and process lines
         .split('\n')
         .map(line => line.trim())
-        .filter(line => line.length > 0)
+        .filter(line => line && !line.match(/^(-{3,}|={3,})$/))
+        // Structure output
         .map((line, index) => {
-          if (index === 0) return `<div class="text-green-400 font-semibold mb-2">${line}</div>`;
-          if (/^\d+\./.test(line)) return `<div class="ml-4 mb-1">${line}</div>`;
-          return `<div class="mb-2">${line}</div>`;
+          if (index === 0) {
+            return `<div class="greeting text-green-400 font-semibold mb-3">${line.replace(/^Hello\s*,?/, '')}</div>`;
+          }
+          if (/^\d+\.\s/.test(line)) {
+            return `<div class="priority ml-4 mb-2">${line}</div>`;
+          }
+          return `<div class="recommendation mb-2">${line}</div>`;
         })
         .join('');
 
@@ -265,7 +277,7 @@ Guidelines:
 
   generateOverview();
 }, [user, tasks, goals, projects, plans, userName, hfApiKey]);
-  // ---------------------
+
   // 11. CREATE & EDIT & DELETE
   // ---------------------
   const handleTabChange = (tabName: "tasks" | "goals" | "projects" | "plans") => {

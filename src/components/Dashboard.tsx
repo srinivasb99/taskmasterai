@@ -167,7 +167,6 @@ export function Dashboard() {
     );
   }, [user]);
 
-// ---------------------
 // SMART OVERVIEW GENERATION
 // ---------------------
 const [smartOverview, setSmartOverview] = useState<string>("");
@@ -180,18 +179,24 @@ useEffect(() => {
     setOverviewLoading(true);
     
     try {
-      // Formatting helper
+      // Formatting helper with emoji mapping
       const formatItem = (item: any, type: string) => {
         const dueDate = item.data.dueDate?.toDate();
-        return `• ${item.data[type]} (${dueDate ? dueDate.toLocaleDateString() : 'No due date'})`;
+        const icons = {
+          task: '📌',
+          goal: '🎯',
+          project: '📂',
+          plan: '🗓️'
+        };
+        return `${icons[type]} ${item.data[type]} (${dueDate ? dueDate.toLocaleDateString() : 'No due date'})`;
       };
 
       // Build formatted data string
       const formattedData = [
-        tasks.length && `📋 TASKS:\n${tasks.map(t => formatItem(t, 'task')).join('\n')}`,
-        goals.length && `🎯 GOALS:\n${goals.map(g => formatItem(g, 'goal')).join('\n')}`,
-        projects.length && `📊 PROJECTS:\n${projects.map(p => formatItem(p, 'project')).join('\n')}`,
-        plans.length && `📅 PLANS:\n${plans.map(p => formatItem(p, 'plan')).join('\n')}`,
+        tasks.length && `📋 TASKS\n${tasks.map(t => formatItem(t, 'task')).join('\n')}`,
+        goals.length && `🎯 GOALS\n${goals.map(g => formatItem(g, 'goal')).join('\n')}`,
+        projects.length && `📂 PROJECTS\n${projects.map(p => formatItem(p, 'project')).join('\n')}`,
+        plans.length && `🗓️ PLANS\n${plans.map(p => formatItem(p, 'plan')).join('\n')}`,
       ].filter(Boolean).join('\n\n');
 
       if (!formattedData) {
@@ -207,12 +212,11 @@ ${formattedData}
 
 Guidelines:
 - Start with a personalized greeting for ${userName}
-- Highlight 3 key priorities
-- Provide actionable recommendations
-- Mention specific item names
-- Use complete sentences
-- No markdown formatting
-- No explanations, notes, or disclaimers
+- Highlight 3 key priorities with specific item names
+- Provide 3 actionable recommendations
+- Use short, impactful sentences
+- No markdown, code blocks, or special formatting
+- Never include notes, disclaimers, or explanations
 <</SYS>>[/INST]`;
 
       // API call
@@ -241,27 +245,39 @@ Guidelines:
       const result = await response.json();
       const rawText = result[0]?.generated_text || '';
 
-      // Enhanced sanitization
+      // Enhanced sanitization and formatting
       const cleanText = rawText
-        // Remove AI artifacts
-        .replace(/\[\/?(INST|SYS|AI|TASK|response|note)\]/gi, '')
+        // Remove unwanted artifacts
+        .replace(/\[\/?(INST|SYS|AI|TASK|response|note|code|markdown|text)\]/gi, '')
         .replace(/>>|boxed|answer:|\\\//g, '')
-        .replace(/Note:.*|Note from AI:.*/gi, '')
+        .replace(/(Note:.*|\.?\[\/?\w+\])/gi, '')
         // Clean markdown
-        .replace(/(\*\*|###|__|~~)/g, '')
+        .replace(/(\*\*|###|__|~~|```
         // Split and process lines
         .split('\n')
-        .map(line => line.trim())
+        .map(line => line.trim().replace(/^[-- *]+/, '').trim())
         .filter(line => line && !line.match(/^(-{3,}|={3,})$/))
-        // Structure output
+        // Structure output with animations
         .map((line, index) => {
+          const animationDelay = `${index * 75}ms`;
           if (index === 0) {
-            return `<div class="greeting text-green-400 font-semibold mb-3">${line.replace(/^Hello\s*,?/, '')}</div>`;
+            return `
+              <div class="greeting text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent animate-fadeIn" style="animation-delay: ${animationDelay}">
+                ${line.replace(/^,\s*/, '')}
+              </div>`;
           }
-          if (/^\d+\.\s/.test(line)) {
-            return `<div class="priority ml-4 mb-2">${line}</div>`;
+          if (/priority/i.test(line)) {
+            return `
+              <div class="priority-item flex items-center space-x-3 p-4 bg-white/10 rounded-lg hover:bg-white/20 transition-all duration-300 animate-slideIn" style="animation-delay: ${animationDelay}">
+                <div class="checkmark w-5 h-5 border-2 border-blue-400 rounded-full flex items-center justify-center animate-pulse"></div>
+                <span class="text-gray-200">${line}</span>
+              </div>`;
           }
-          return `<div class="recommendation mb-2">${line}</div>`;
+          return `
+            <div class="recommendation p-4 mb-2 bg-gray-800/50 rounded-lg hover:shadow-lg transition-all duration-300 animate-fadeIn" style="animation-delay: ${animationDelay}">
+              <span class="text-purple-400 mr-2">⮞</span>
+              <span class="text-gray-200">${line}</span>
+            </div>`;
         })
         .join('');
 
@@ -269,7 +285,10 @@ Guidelines:
 
     } catch (error) {
       console.error("Overview generation error:", error);
-      setSmartOverview("Error generating overview. Please try again.");
+      setSmartOverview(`
+        <div class="error-message text-red-300 p-4 border border-red-400/30 rounded-lg bg-red-900/10 animate-shake">
+          Error generating overview. Please try again.
+        </div>`);
     } finally {
       setOverviewLoading(false);
     }
@@ -277,6 +296,30 @@ Guidelines:
 
   generateOverview();
 }, [user, tasks, goals, projects, plans, userName, hfApiKey]);
+
+// Add these CSS animations to your global styles
+const globalStyles = `
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(20px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+  }
+
+  .animate-fadeIn { animation: fadeIn 0.5s ease-out forwards; }
+  .animate-slideIn { animation: slideIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+  .animate-shake { animation: shake 0.4s ease-in-out; }
+`;
+
 
   // 11. CREATE & EDIT & DELETE
   // ---------------------

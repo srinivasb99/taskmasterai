@@ -313,12 +313,13 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
           .replace(/\b(TASKS?|GOALS?|PROJECTS?|PLANS?)\b:/gi, '') // Remove category labels
           .replace(/\n\s*\n/g, '\n'); // Remove multiple blank lines
 
-        // Split into lines and clean each line
+        // Filter out lines that mention "corrected response" or "made some minor errors"
         return text
           .split('\n')
           .map(line => line.trim())
           .filter(line => {
-            // Remove empty lines and lines with only special characters
+            if (line.includes("I see I made some minor errors")) return false;
+            if (line.includes("Here is the corrected response")) return false;
             return line.length > 0 && !/^[^a-zA-Z0-9]+$/.test(line);
           })
           .join('\n');
@@ -371,6 +372,7 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
 
   generateOverview();
 }, [user, tasks, goals, projects, plans, userName, hfApiKey, lastGeneratedData]);
+
 
   // ---------------------
   // 11. CREATE & EDIT & DELETE

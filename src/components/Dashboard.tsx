@@ -38,7 +38,6 @@ export function Dashboard() {
   const [plans, setPlans] = useState<Array<{ id: string; data: any }>>([]);
   const [customTimers, setCustomTimers] = useState<Array<{ id: string; data: any }>>([]);
 
-  // Mark item complete
   const handleMarkComplete = async (itemId: string) => {
     if (!user) return;
     try {
@@ -92,7 +91,6 @@ export function Dashboard() {
   const [pomodoroRunning, setPomodoroRunning] = useState(false);
   const pomodoroRef = useRef<NodeJS.Timer | null>(null);
 
-  // Pomodoro Handlers
   const handlePomodoroStart = () => {
     if (pomodoroRunning) return;
     setPomodoroRunning(true);
@@ -175,7 +173,6 @@ export function Dashboard() {
       async (position) => {
         const { latitude, longitude } = position.coords;
         try {
-          // Fetch both current + 3-day forecast in one request
           const response = await fetch(
             `https://api.weatherapi.com/v1/forecast.json?key=${weatherApiKey}&q=${latitude},${longitude}&days=3`
           );
@@ -194,46 +191,46 @@ export function Dashboard() {
     );
   }, [user]);
 
-  // ---------------------
-  // SMART OVERVIEW GENERATION
-  // ---------------------
-  const [smartOverview, setSmartOverview] = useState<string>("");
-  const [overviewLoading, setOverviewLoading] = useState(false);
-  const [lastGeneratedData, setLastGeneratedData] = useState<string>("");
-  const [lastResponse, setLastResponse] = useState<string>("");
+// ---------------------
+// SMART OVERVIEW GENERATION
+// ---------------------
+const [smartOverview, setSmartOverview] = useState<string>("");
+const [overviewLoading, setOverviewLoading] = useState(false);
+const [lastGeneratedData, setLastGeneratedData] = useState<string>("");
+const [lastResponse, setLastResponse] = useState<string>("");
 
-  useEffect(() => {
-    if (!user) return;
+useEffect(() => {
+  if (!user) return;
 
-    const generateOverview = async () => {
-      // 1. Format current data with better handling of due dates
-      const formatItem = (item: any, type: string) => {
-        const dueDate = item.data.dueDate?.toDate?.();
-        const title = item.data[type] || item.data.title || 'Untitled';
-        return `• ${title}${dueDate ? ` (Due: ${dueDate.toLocaleDateString()})` : ''}`;
-      };
+  const generateOverview = async () => {
+    // 1. Format current data with better handling of due dates
+    const formatItem = (item: any, type: string) => {
+      const dueDate = item.data.dueDate?.toDate?.();
+      const title = item.data[type] || item.data.title || 'Untitled';
+      return `• ${title}${dueDate ? ` (Due: ${dueDate.toLocaleDateString()})` : ''}`;
+    };
 
-      // Format all items together without categories
-      const allItems = [
-        ...(tasks.map(t => formatItem(t, 'task')) || []),
-        ...(goals.map(g => formatItem(g, 'goal')) || []),
-        ...(projects.map(p => formatItem(p, 'project')) || []),
-        ...(plans.map(p => formatItem(p, 'plan')) || [])
-      ];
+    // Format all items together without categories
+    const allItems = [
+      ...(tasks.map(t => formatItem(t, 'task')) || []),
+      ...(goals.map(g => formatItem(g, 'goal')) || []),
+      ...(projects.map(p => formatItem(p, 'project')) || []),
+      ...(plans.map(p => formatItem(p, 'plan')) || [])
+    ];
 
-      const formattedData = allItems.join('\n');
+    const formattedData = allItems.join('\n');
 
-      // 2. Check if data has changed and if there's actual data
-      if (formattedData === lastGeneratedData || !allItems.length) {
-        return;
-      }
+    // 2. Check if data has changed and if there's actual data
+    if (formattedData === lastGeneratedData || !allItems.length) {
+      return;
+    }
 
-      setOverviewLoading(true);
-      setLastGeneratedData(formattedData);
+    setOverviewLoading(true);
+    setLastGeneratedData(formattedData);
 
-      try {
-        // 3. Construct AI prompt
-        const prompt = `[INST] <<SYS>>
+    try {
+      // 3. Construct AI prompt
+      const prompt = `[INST] <<SYS>>
 You are TaskMaster, an advanced AI productivity assistant. Analyze the following items and generate a Smart Overview:
 
 ${formattedData}
@@ -263,104 +260,119 @@ Follow these guidelines exactly:
 Remember: Focus on actionable strategies and specific next steps, not just describing the items.
 <</SYS>>[/INST]`;
 
-        // 4. Call Hugging Face API
-        const response = await fetch("https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${hfApiKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            inputs: prompt,
-            parameters: {
-              max_new_tokens: 300,
-              temperature: 0.7,
-              top_p: 0.9,
-              repetition_penalty: 1.2,
-              return_full_text: false,
-              do_sample: true
-            }
-          }),
-        });
+      // 4. Call Hugging Face API
+      const response = await fetch("https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${hfApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          inputs: prompt,
+          parameters: {
+            max_new_tokens: 300,
+            temperature: 0.7,
+            top_p: 0.9,
+            repetition_penalty: 1.2,
+            return_full_text: false,
+            do_sample: true
+          }
+        }),
+      });
 
-        if (!response.ok) throw new Error("API request failed");
+      if (!response.ok) throw new Error("API request failed");
 
-        // 5. Process and clean response
-        const result = await response.json();
-        const rawText = result[0]?.generated_text || '';
+      // 5. Process and clean response
+      const result = await response.json();
+      const rawText = result[0]?.generated_text || '';
 
-        // 6. Clean and validate the response
-        const cleanAndValidate = (text: string) => {
-          // Remove any special characters or formatting
-          text = text
-            .replace(/\[\/?(INST|SYS)\]|<\/?s>|\[\/?(FONT|COLOR)\]/gi, '')
-            .replace(/(\*\*|###|boxed|final answer|step \d+:)/gi, '')
-            .replace(/\$\{.*?\}\$/g, '')
-            .replace(/\[\/?[^\]]+\]/g, '')
-            .replace(/\{.*?\}/g, '')
-            .replace(/📋|📅|🎯|📊/g, '') // Remove category emojis
-            .replace(/\b(TASKS?|GOALS?|PROJECTS?|PLANS?)\b:/gi, '') // Remove category labels
-            .replace(/\n\s*\n/g, '\n'); // Remove multiple blank lines
+      // 6. Clean and validate the response
+      const cleanAndValidate = (text: string) => {
+        // Basic cleanup
+        text = text
+          .replace(/\[\/?(INST|SYS)\]|<\/?s>|\[\/?(FONT|COLOR)\]/gi, '')
+          .replace(/(\*\*|###|boxed|final answer|step \d+:)/gi, '')
+          .replace(/\$\{.*?\}\$/g, '')
+          .replace(/\[\/?[^\]]+\]/g, '')
+          .replace(/\{.*?\}/g, '')
+          .replace(/📋|📅|🎯|📊/g, '') // Remove category emojis
+          .replace(/\b(TASKS?|GOALS?|PROJECTS?|PLANS?)\b:/gi, '') // Remove category labels
+          .replace(/\n\s*\n/g, '\n'); // Remove multiple blank lines
 
-          // Filter out lines that mention "corrected response" or "made some minor errors"
-          return text
-            .split('\n')
-            .map(line => line.trim())
-            .filter(line => {
-              if (line.includes("I see I made some minor errors")) return false;
-              if (line.includes("Here is the corrected response")) return false;
-              return line.length > 0 && !/^[^a-zA-Z0-9]+$/.test(line);
-            })
-            .join('\n');
-        };
+        // Additional filters to remove disclaimers/unwanted lines
+        const excludePhrases = [
+          "was removed as per request",
+          "since I am forced to put something here",
+          "-> You are TaskMaster",
+          "Here is the corrected response",
+          "I see I made some minor errors",
+        ];
 
-        const cleanedText = cleanAndValidate(rawText);
-
-        // Check for duplicate response based on cleaned text
-        if (cleanedText === lastResponse) {
-          setOverviewLoading(false);
-          return;
-        }
-        setLastResponse(cleanedText);
-
-        const cleanTextLines = cleanedText
+        return text
           .split('\n')
-          .filter(line => line.length > 0);
-
-        // 7. Format HTML with improved styling
-        const formattedHtml = cleanTextLines
-          .map((line, index) => {
-            if (index === 0) {
-              // Greeting and overview
-              return `<div class="text-green-400 text-lg font-medium mb-4">${line}</div>`;
-            } else if (line.match(/^\d+\./)) {
-              // Priority items with number
-              return `<div class="text-blue-300 mb-3 pl-4 border-l-2 border-blue-500">${line}</div>`;
-            } else {
-              // Other content
-              return `<div class="text-gray-300 mb-3">${line}</div>`;
+          .map(line => line.trim())
+          .filter(line => {
+            // Exclude lines with our unwanted phrases
+            if (
+              excludePhrases.some(phrase => line.toLowerCase().includes(phrase.toLowerCase()))
+            ) {
+              return false;
             }
+            // Exclude empty or purely symbolic lines
+            return line.length > 0 && !/^[^a-zA-Z0-9]+$/.test(line);
           })
-          .join('');
+          .join('\n');
+      };
 
-        setSmartOverview(formattedHtml || `
-          <div class="text-yellow-400">
-            Add some items to get started with your Smart Overview!
-          </div>
-        `);
+      const cleanedText = cleanAndValidate(rawText);
 
-      } catch (error) {
-        console.error("Overview generation error:", error);
-        setSmartOverview(`
-          <div class="text-red-400">Error generating overview. Please try again.</div>
-        `);
-      } finally {
+      // Check for duplicate response based on cleaned text
+      if (cleanedText === lastResponse) {
         setOverviewLoading(false);
+        return;
       }
-    };
+      setLastResponse(cleanedText);
 
-    generateOverview();
-  }, [user, tasks, goals, projects, plans, userName, hfApiKey, lastGeneratedData]);
+      const cleanTextLines = cleanedText
+        .split('\n')
+        .filter(line => line.length > 0);
+
+      // 7. Format HTML with improved styling
+      const formattedHtml = cleanTextLines
+        .map((line, index) => {
+          if (index === 0) {
+            // Greeting and overview
+            return `<div class="text-green-400 text-lg font-medium mb-4">${line}</div>`;
+          } else if (line.match(/^\d+\./)) {
+            // Priority items with number
+            return `<div class="text-blue-300 mb-3 pl-4 border-l-2 border-blue-500">${line}</div>`;
+          } else {
+            // Other content
+            return `<div class="text-gray-300 mb-3">${line}</div>`;
+          }
+        })
+        .join('');
+
+      setSmartOverview(
+        formattedHtml ||
+        `<div class="text-yellow-400">
+          Add some items to get started with your Smart Overview!
+        </div>`
+      );
+
+    } catch (error) {
+      console.error("Overview generation error:", error);
+      setSmartOverview(`
+        <div class="text-red-400">Error generating overview. Please try again.</div>
+      `);
+    } finally {
+      setOverviewLoading(false);
+    }
+  };
+
+  generateOverview();
+}, [user, tasks, goals, projects, plans, userName, hfApiKey, lastGeneratedData]);
+
 
   // ---------------------
   // 11. CREATE & EDIT & DELETE
@@ -499,6 +511,19 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
     });
   }, [customTimers]);
 
+  /**
+   * Updated time formatter to show HH:MM:SS
+   */
+  const formatCustomTime = (timeInSeconds: number) => {
+    const hours = Math.floor(timeInSeconds / 3600);
+    const remainder = timeInSeconds % 3600;
+    const mins = Math.floor(remainder / 60);
+    const secs = remainder % 60;
+    return `${hours.toString().padStart(2, "0")}:${mins
+      .toString()
+      .padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  };
+
   const startCustomTimer = (timerId: string) => {
     setRunningTimers((prev) => {
       const timerState = { ...prev[timerId] };
@@ -549,6 +574,7 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
   const handleEditTimerClick = (timerId: string, currentName: string, currentTime: number) => {
     setEditingTimerId(timerId);
     setEditingTimerName(currentName);
+    // We'll store the time in minutes in the input field, though we display HH:MM:SS on the actual timer.
     setEditingTimerMinutes(String(Math.floor(currentTime / 60)));
   };
 
@@ -577,12 +603,6 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
     } catch (error) {
       console.error("Error deleting custom timer:", error);
     }
-  };
-
-  const formatCustomTime = (timeInSeconds: number) => {
-    const mins = Math.floor(timeInSeconds / 60);
-    const secs = timeInSeconds % 60;
-    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
   // ---------------------
@@ -894,13 +914,12 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
 
           {/* RIGHT COLUMN */}
           <div className="flex flex-col gap-6">
-            {/* ====== ADVANCED WEATHER CARD ====== */}
+            {/* ADVANCED WEATHER CARD */}
             <div className="bg-gray-800 rounded-xl p-6 transform hover:scale-[1.02] transition-all duration-300">
               <h2 className="text-xl font-semibold mb-4">Local Weather & Forecast</h2>
-
               {weatherData ? (
                 <>
-                  {/* Current weather overview */}
+                  {/* Current weather */}
                   <div className="space-y-3 mb-6">
                     <p className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">
                       {weatherData.location.name}
@@ -932,55 +951,67 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
                     </div>
                   </div>
 
-                  {/* Forecast for next 3 days */}
+                  {/* Show only the next 3 relevant days: Today, Tomorrow, Day After Tomorrow */}
                   {weatherData.forecast && weatherData.forecast.forecastday && (
                     <div className="space-y-4">
                       <h3 className="text-lg font-semibold text-blue-400">3-Day Forecast</h3>
-                      {weatherData.forecast.forecastday.map((day: any, idx: number) => {
-                        const dateLabel = new Date(day.date).toLocaleDateString(undefined, {
-                          weekday: 'short', month: 'short', day: 'numeric',
-                        });
-                        const maxF = Math.round(day.day.maxtemp_f);
-                        const minF = Math.round(day.day.mintemp_f);
-                        const icon = day.day.condition.icon;
 
-                        // Calculate fill ratio for the bar (e.g., scale by typical temperature range)
-                        // For a simple approach, just subtract from some constant
-                        const barWidth = maxF > 0 ? (maxF / 120) * 100 : 0; 
-                        
-                        return (
-                          <div 
-                            key={idx}
-                            className="flex items-center gap-4 bg-gray-700/50 p-3 rounded-lg relative overflow-hidden"
-                          >
-                            {/* Animated gradient background behind each forecast row */}
-                            <div 
-                              className="absolute inset-0 bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 opacity-10 pointer-events-none"
-                            />
-                            <img 
-                              src={icon} 
-                              alt={day.day.condition.text} 
-                              className="w-10 h-10 z-10"
-                            />
-                            <div className="z-10 flex-grow">
-                              <p className="text-sm text-gray-200 font-medium">
-                                {dateLabel}
-                              </p>
-                              <div className="flex items-center gap-3 mt-1">
-                                <p className="text-sm text-red-300">High: {maxF}°F</p>
-                                <p className="text-sm text-blue-300">Low: {minF}°F</p>
-                              </div>
-                              {/* Temperature bar with animation */}
-                              <div className="mt-2 w-full h-2 bg-gray-600 rounded-full overflow-hidden">
-                                <div 
-                                  className="h-full bg-gradient-to-r from-yellow-300 to-red-500 rounded-full transition-all duration-700 ease-out"
-                                  style={{ width: `${barWidth}%` }}
-                                />
+                      {(() => {
+                        // Filter out any past days in case API date is behind local date
+                        const now = new Date();
+                        now.setHours(0, 0, 0, 0);
+
+                        const validDays = weatherData.forecast.forecastday.filter((day: any) => {
+                          const d = new Date(day.date);
+                          d.setHours(0, 0, 0, 0);
+                          return d >= now;
+                        });
+
+                        // Only take up to 3 days from that filtered list
+                        const finalDays = validDays.slice(0, 3);
+
+                        // We'll label them explicitly
+                        const dayLabels = ["Today", "Tomorrow", "Day After Tomorrow"];
+
+                        return finalDays.map((day: any, idx: number) => {
+                          const label = dayLabels[idx] ?? "Coming Day";
+                          const maxF = Math.round(day.day.maxtemp_f);
+                          const minF = Math.round(day.day.mintemp_f);
+                          const icon = day.day.condition.icon;
+                          const barWidth = maxF > 0 ? (maxF / 120) * 100 : 0; 
+
+                          return (
+                            <div
+                              key={day.date}
+                              className="flex items-center gap-4 bg-gray-700/50 p-3 rounded-lg relative overflow-hidden"
+                            >
+                              <div 
+                                className="absolute inset-0 bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 opacity-10 pointer-events-none"
+                              />
+                              <img 
+                                src={icon} 
+                                alt={day.day.condition.text} 
+                                className="w-10 h-10 z-10"
+                              />
+                              <div className="z-10 flex-grow">
+                                <p className="text-sm text-gray-200 font-medium">
+                                  {label}
+                                </p>
+                                <div className="flex items-center gap-3 mt-1">
+                                  <p className="text-sm text-red-300">High: {maxF}°F</p>
+                                  <p className="text-sm text-blue-300">Low: {minF}°F</p>
+                                </div>
+                                <div className="mt-2 w-full h-2 bg-gray-600 rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full bg-gradient-to-r from-yellow-300 to-red-500 rounded-full transition-all duration-700 ease-out"
+                                    style={{ width: `${barWidth}%` }}
+                                  />
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        });
+                      })()}
                     </div>
                   )}
                 </>

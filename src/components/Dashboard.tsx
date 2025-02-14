@@ -221,7 +221,7 @@ useEffect(() => {
     // If there are no items, show the empty state message
     if (!allItems.length) {
       setSmartOverview(`
-        <div class="text-gray-400 font-medium">
+        <div class="text-gray-400 font-large">
           Add some items to get started with your Smart Overview!
         </div>
       `);
@@ -253,7 +253,6 @@ Follow these guidelines exactly:
    - Reference specific items from the data
    - If the item has a due date, mention it
    - Provide ONE specific, actionable next step or strategy
-   - Keep it to 2 sentences maximum
    - Focus on HOW to achieve the item, not just restating it
 Remember: Focus on actionable strategies and specific next steps, not just describing the items.
 <</SYS>>[/INST]`;
@@ -293,7 +292,8 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
           "was removed as per request",
           "since I am forced to put something here",
           "-> You are TaskMaster",
-          "The is:"
+          "The is:",
+          "Note:"
         ];
 
         // Remove text after any excluded phrase

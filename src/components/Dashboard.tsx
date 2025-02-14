@@ -289,10 +289,6 @@ Guidelines:
 
       // 7. Create formatted HTML with better styling
       const formattedHtml = `
-        <div class="flex items-center gap-2 mb-4">
-          <span class="text-xl text-blue-300">✨ Smart Overview</span>
-          <span class="px-2 py-1 text-xs font-medium text-white bg-gradient-to-r from-pink-500 to-purple-500 rounded-full">BETA</span>
-        </div>
         ${cleanText.map((line, index) => {
           if (index === 0) {
             return `<div class="text-green-400 text-lg font-medium mb-4">${line}</div>`;

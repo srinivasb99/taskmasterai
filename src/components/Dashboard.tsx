@@ -207,16 +207,11 @@ const handleMarkComplete = async (itemId: string) => {
 const [smartOverview, setSmartOverview] = useState<string>("");
 const [overviewLoading, setOverviewLoading] = useState(false);
 const [lastGeneratedData, setLastGeneratedData] = useState<string>("");
-const generationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-const isGeneratingRef = useRef(false);
 
 useEffect(() => {
   if (!user) return;
 
   const generateOverview = async () => {
-    // Prevent multiple simultaneous generations
-    if (isGeneratingRef.current) return;
-
     // 1. Format current data with better handling of due dates
     const formatItem = (item: any, type: string) => {
       const dueDate = item.data.dueDate?.toDate?.();
@@ -249,14 +244,7 @@ useEffect(() => {
       return;
     }
 
-    // Clear any pending generation
-    if (generationTimeoutRef.current) {
-      clearTimeout(generationTimeoutRef.current);
-    }
-
-    // Set loading state only if we're going to generate
     setOverviewLoading(true);
-    isGeneratingRef.current = true;
     setLastGeneratedData(formattedData);
 
     try {
@@ -348,14 +336,11 @@ Remember: Only discuss what's actually in the data. Never invent tasks or goals.
         })
         .join('');
 
-      // Only update if we're still the most recent generation
-      if (formattedData === lastGeneratedData) {
-        setSmartOverview(formattedHtml || `
-          <div class="text-yellow-400">
-            Add some tasks, goals, projects, or plans to get started with your Smart Overview!
-          </div>
-        `);
-      }
+      setSmartOverview(formattedHtml || `
+        <div class="text-yellow-400">
+          Add some tasks, goals, projects, or plans to get started with your Smart Overview!
+        </div>
+      `);
 
     } catch (error) {
       console.error("Overview generation error:", error);
@@ -364,22 +349,12 @@ Remember: Only discuss what's actually in the data. Never invent tasks or goals.
       `);
     } finally {
       setOverviewLoading(false);
-      isGeneratingRef.current = false;
     }
   };
 
-  // Debounce the generation to prevent multiple rapid updates
-  generationTimeoutRef.current = setTimeout(() => {
-    generateOverview();
-  }, 1000);
-
-  // Cleanup function
-  return () => {
-    if (generationTimeoutRef.current) {
-      clearTimeout(generationTimeoutRef.current);
-    }
-  };
+  generateOverview();
 }, [user, tasks, goals, projects, plans, userName, hfApiKey, lastGeneratedData]);
+
 
   // ---------------------
   // 11. CREATE & EDIT & DELETE

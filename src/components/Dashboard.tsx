@@ -212,17 +212,26 @@ useEffect(() => {
   if (!user) return;
 
   const generateOverview = async () => {
-    // 1. Format current data
+    // 1. Format current data with a maximum limit per category
     const formatItem = (item: any, type: string) => {
       const dueDate = item.data.dueDate?.toDate();
       return `• ${item.data[type]} (${dueDate ? dueDate.toLocaleDateString() : 'No due date'})`;
     };
 
+    // Helper to limit items per category
+    const limitItems = (items: any[], limit = 5) => {
+      if (items.length > limit) {
+        const selected = items.slice(0, limit);
+        return [...selected.map(i => formatItem(i, i.data.type)), `... and ${items.length - limit} more`];
+      }
+      return items.map(i => formatItem(i, i.data.type));
+    };
+
     const formattedData = [
-      tasks.length && `📋 TASKS:\n${tasks.map(t => formatItem(t, 'task')).join('\n')}`,
-      goals.length && `🎯 GOALS:\n${goals.map(g => formatItem(g, 'goal')).join('\n')}`,
-      projects.length && `📊 PROJECTS:\n${projects.map(p => formatItem(p, 'project')).join('\n')}`,
-      plans.length && `📅 PLANS:\n${plans.map(p => formatItem(p, 'plan')).join('\n')}`,
+      tasks.length && `📋 TASKS:\n${limitItems(tasks, 5).join('\n')}`,
+      goals.length && `🎯 GOALS:\n${limitItems(goals, 5).join('\n')}`,
+      projects.length && `📊 PROJECTS:\n${limitItems(projects, 5).join('\n')}`,
+      plans.length && `📅 PLANS:\n${limitItems(plans, 5).join('\n')}`,
     ].filter(Boolean).join('\n\n');
 
     // 2. Check if data has changed
@@ -238,19 +247,22 @@ useEffect(() => {
         return;
       }
 
-      // 3. Construct AI prompt
+      // 3. Construct AI prompt with more specific instructions
       const prompt = `[INST] <<SYS>>
-You are TaskMaster, an advanced AI productivity assistant. Analyze this data and generate a concise Smart Overview:
+You are TaskMaster, an advanced AI productivity assistant. Analyze this data and generate a concise Smart Overview.
 
 ${formattedData}
 
 Guidelines:
-- Start with a personalized greeting for ${userName}
-- Highlight 3 key priorities
-- Provide actionable recommendations
-- Mention specific item names
-- Make sure you use complete sentences
-- No explanations
+- Start with "Hello ${userName}," followed by a brief overview
+- List exactly 3 key priorities, numbered 1-3
+- Each priority should be from the actual data provided
+- Keep recommendations specific and actionable
+- Maximum 4 sentences per priority
+- Do not repeat information
+- Do not include any special characters or formatting
+- Do not include any mathematical symbols or currency signs
+- Avoid mentioning specific dates unless they're in the original tasks
 <</SYS>>[/INST]`;
 
       // 4. Call Hugging Face API
@@ -277,12 +289,31 @@ Guidelines:
 
       // 5. Process response
       const result = await response.json();
-      const rawText = result[0]?.generated_text || '';
+      let rawText = result[0]?.generated_text || '';
 
-      // 6. Sanitize and format output
-      const cleanText = rawText
-        .replace(/\[\/?(INST|SYS)\]|<\/?s>|\[\/?(FONT|COLOR)\]/gi, '')
-        .replace(/(\*\*|###|boxed|final answer|step \d+:)/gi, '')
+      // 6. Clean and validate the response
+      const cleanAndValidate = (text: string) => {
+        // Remove any potential duplicate content
+        const parts = text.split('Hello');
+        text = 'Hello' + (parts.length > 1 ? parts[1] : parts[0]);
+
+        // Remove any malformed template literals or mathematical expressions
+        text = text.replace(/\$\{.*?\}\$/g, '')
+                  .replace(/\$[^$\n]+\$/g, '')
+                  .replace(/\[\/?[^\]]+\]/g, '')
+                  .replace(/\$+/g, '')
+                  .replace(/\{.*?\}/g, '');
+
+        // Ensure proper sentence structure
+        text = text.split('\n')
+                  .map(line => line.trim())
+                  .filter(line => line && !line.match(/^\$|^\{|\}$|\$$/))
+                  .join('\n');
+
+        return text;
+      };
+
+      const cleanText = cleanAndValidate(rawText)
         .split('\n')
         .map(line => line.trim())
         .filter(line => line.length > 0);
@@ -291,9 +322,15 @@ Guidelines:
       const formattedHtml = `
         ${cleanText.map((line, index) => {
           if (index === 0) {
+            // Greeting
             return `<div class="text-green-400 text-lg font-medium mb-4">${line}</div>`;
+          } else if (line.match(/^\d+\./)) {
+            // Priority items
+            return `<div class="text-blue-300 mb-3 pl-4">${line}</div>`;
+          } else {
+            // Other content
+            return `<div class="text-gray-300 mb-3">${line}</div>`;
           }
-          return `<div class="text-gray-300 mb-3">${line}</div>`;
         }).join('')}
       `;
 

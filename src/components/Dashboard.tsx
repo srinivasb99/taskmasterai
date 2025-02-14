@@ -302,10 +302,6 @@ Guidelines:
     } catch (error) {
       console.error("Overview generation error:", error);
       setSmartOverview(`
-        <div class="flex items-center gap-2 mb-4">
-          <span class="text-xl text-blue-300">✨ Smart Overview</span>
-          <span class="px-2 py-1 text-xs font-medium text-white bg-gradient-to-r from-pink-500 to-purple-500 rounded-full">BETA</span>
-        </div>
         <div class="text-red-400">Error generating overview. Please try again.</div>
       `);
     } finally {

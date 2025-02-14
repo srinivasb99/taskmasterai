@@ -745,13 +745,89 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
               </div>
             </div>
 
-            {/* Upcoming Deadlines Card */}
-            <div className="bg-gray-800 rounded-xl p-6 transform hover:scale-[1.02] transition-all duration-300">
-              <h2 className="text-xl font-semibold text-blue-400 mb-4">
-                Upcoming Deadlines
-              </h2>
-              <p className="text-gray-400">No upcoming deadlines</p>
-            </div>
+{/* Upcoming Deadlines Card */}
+<div className="bg-gray-800 rounded-xl p-6 transform hover:scale-[1.02] transition-all duration-300">
+  <h2 className="text-xl font-semibold text-blue-400 mb-4">
+    Upcoming Deadlines
+  </h2>
+  {(() => {
+    // 1. Combine all items with a 'type' label
+    const tasksWithType = tasks.map((t) => ({ ...t, type: 'Task' }));
+    const goalsWithType = goals.map((g) => ({ ...g, type: 'Goal' }));
+    const projectsWithType = projects.map((p) => ({ ...p, type: 'Project' }));
+    const plansWithType = plans.map((p) => ({ ...p, type: 'Plan' }));
+
+    // 2. Merge into a single array
+    const allItems = [
+      ...tasksWithType,
+      ...goalsWithType,
+      ...projectsWithType,
+      ...plansWithType,
+    ];
+
+    // 3. Filter for items that:
+    //    - Have a dueDate
+    //    - Are due in the future (not past)
+    //    - Are NOT completed
+    const now = new Date();
+    const upcomingDeadlines = allItems
+      .filter((item) => {
+        const { dueDate, completed } = item.data;
+        if (!dueDate) return false;
+
+        const dueDateObj = dueDate.toDate ? dueDate.toDate() : new Date(dueDate);
+        return dueDateObj > now && !completed;
+      })
+      // 4. Sort by ascending due date
+      .sort((a, b) => {
+        const aDate = a.data.dueDate.toDate
+          ? a.data.dueDate.toDate()
+          : new Date(a.data.dueDate);
+        const bDate = b.data.dueDate.toDate
+          ? b.data.dueDate.toDate()
+          : new Date(b.data.dueDate);
+        return aDate - bDate;
+      })
+      // (Optionally limit to 5 or so, if desired)
+      .slice(0, 5);
+
+    // 5. If none found, show a message. Otherwise list them.
+    if (!upcomingDeadlines.length) {
+      return <p className="text-gray-400">No upcoming deadlines</p>;
+    }
+
+    return (
+      <ul className="space-y-3">
+        {upcomingDeadlines.map((item) => {
+          const { id, type, data } = item;
+          const dueDateObj = data.dueDate.toDate ? data.dueDate.toDate() : new Date(data.dueDate);
+          const dueDateStr = dueDateObj.toLocaleDateString();
+          // For the item name, whichever field is used (task, goal, project, plan)
+          const itemName =
+            data.task || data.goal || data.project || data.plan || 'Untitled';
+
+          return (
+            <li
+              key={id}
+              className="bg-gray-700/50 p-4 rounded-lg backdrop-blur-sm transition-all hover:scale-[1.02] hover:shadow-lg"
+            >
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-gray-100 font-medium">
+                  {/* Show the type and name */}
+                  <span className="font-bold">{type}:</span> {itemName}
+                </div>
+                <div className="text-xs text-gray-300 ml-4">
+                  Due: <span className="font-semibold">{dueDateStr}</span>
+                </div>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    );
+  })()}
+</div>
+
 
             {/* Tabs & List */}
             <div className="bg-gray-800 rounded-xl p-6 transform hover:scale-[1.02] transition-all duration-300">
@@ -912,7 +988,7 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
           <div className="flex flex-col gap-6">
             {/* ADVANCED WEATHER CARD */}
             <div className="bg-gray-800 rounded-xl p-6 transform hover:scale-[1.02] transition-all duration-300">
-              <h2 className="text-xl font-semibold mb-4">Local Weather & Forecast</h2>
+              <h2 className="text-xl font-semibold mb-4">Weather & Forecast</h2>
               {weatherData ? (
                 <>
                   {/* Current weather */}
@@ -953,7 +1029,7 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
                   */}
                   {weatherData.forecast && weatherData.forecast.forecastday && (
                     <div className="space-y-4">
-                      <h3 className="text-lg font-semibold text-blue-400">3-Day Forecast</h3>
+                      <h3 className="text-lg font-semibold text-blue-400">Forecast</h3>
                       {(() => {
                         // Filter out any past days in case API date is behind local date
                         const now = new Date();

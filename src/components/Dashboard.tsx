@@ -1,8 +1,8 @@
-
 import React, { useEffect, useState, useRef } from 'react';
 import { PlusCircle, Edit, Trash, Sparkles } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { getTimeBasedGreeting, getRandomQuote } from '../lib/greetings';
+import { PlusCircle, Edit, Trash, Sparkles, CheckCircle } from 'lucide-react';
 import {
   onFirebaseAuthStateChanged,
   onCollectionSnapshot,
@@ -14,6 +14,7 @@ import {
   onCustomTimersSnapshot,
   updateItem,
   deleteItem,
+  markItemComplete,
   updateCustomTimer,
   deleteCustomTimer,
   weatherApiKey,
@@ -37,6 +38,16 @@ export function Dashboard() {
   const [projects, setProjects] = useState<Array<{ id: string; data: any }>>([]);
   const [plans, setPlans] = useState<Array<{ id: string; data: any }>>([]);
   const [customTimers, setCustomTimers] = useState<Array<{ id: string; data: any }>>([]);
+
+const handleMarkComplete = async (itemId: string) => {
+  if (!user) return;
+  try {
+    await markItemComplete(activeTab, itemId);
+  } catch (error) {
+    console.error("Error marking item as complete:", error);
+  }
+};
+
 
   // ---------------------
   // 3. WEATHER STATE
@@ -709,40 +720,49 @@ Guidelines:
                   <li className="text-gray-400 text-center py-8">No {activeTab} yet...</li>
                 ) : (
                   currentItems.map((item, index) => {
-                    const itemId = item.id;
-                    const textValue = item.data[titleField] || "Untitled";
-                    let overdue = false;
-                    let dueDateStr = "";
-                    if (item.data.dueDate) {
-                      const dueDateObj = item.data.dueDate.toDate ? item.data.dueDate.toDate() : new Date(item.data .dueDate);
-                      dueDateStr = dueDateObj.toLocaleDateString();
-                      overdue = dueDateObj < new Date();
-                    }
-                    const isEditing = editingItemId === itemId;
+  const itemId = item.id;
+  const textValue = item.data[titleField] || "Untitled";
+  const isCompleted = item.data.completed || false;  // Add this line
+  let overdue = false;
+  let dueDateStr = "";
+  if (item.data.dueDate) {
+    const dueDateObj = item.data.dueDate.toDate ? item.data.dueDate.toDate() : new Date(item.data.dueDate);
+    dueDateStr = dueDateObj.toLocaleDateString();
+    overdue = dueDateObj < new Date();
+  }
+  const isEditing = editingItemId === itemId;
 
-                    return (
-                      <li
-                        key={item.id}
-                        className={`p-4 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3
-                          ${overdue ? "bg-red-900/50" : "bg-gray-700/50"}
-                          backdrop-blur-sm
-                          transform transition-all duration-300
-                          hover:scale-[1.02] hover:shadow-lg
-                          animate-fadeIn`}
-                        style={{
-                          animationDelay: `${index * 100}ms`
-                        }}
-                      >
-                        {!isEditing ? (
-                          <div>
-                            <span className="font-bold text-lg">{textValue}</span>
-                            {dueDateStr && (
-                              <span className="ml-3 text-sm font-medium px-3 py-1 rounded-full bg-gray-600">
-                                Due: {dueDateStr}
-                              </span>
-                            )}
-                          </div>
-                        ) : (
+  return (
+    <li
+      key={item.id}
+      className={`p-4 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3
+        ${isCompleted ? "bg-green-900/30" : overdue ? "bg-red-900/50" : "bg-gray-700/50"}
+        backdrop-blur-sm
+        transform transition-all duration-300
+        hover:scale-[1.02] hover:shadow-lg
+        animate-fadeIn
+        ${isCompleted ? "opacity-75" : "opacity-100"}`}
+      style={{
+        animationDelay: `${index * 100}ms`
+      }}
+    >
+      {!isEditing ? (
+        <div className="flex items-center gap-3">
+          <span className={`font-bold text-lg ${isCompleted ? "line-through text-gray-400" : ""}`}>
+            {textValue}
+          </span>
+          {dueDateStr && (
+            <span className="text-sm font-medium px-3 py-1 rounded-full bg-gray-600">
+              Due: {dueDateStr}
+            </span>
+          )}
+          {isCompleted && (
+            <span className="text-sm font-medium px-3 py-1 rounded-full bg-green-600">
+              Completed
+            </span>
+          )}
+        </div>
+      ) : (
                           <div className="flex flex-col sm:flex-row gap-3 w-full">
                             <input
                               className="flex-grow bg-gray-800 border border-gray-600 rounded-full p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300"
@@ -757,24 +777,31 @@ Guidelines:
                             />
                           </div>
                         )}
-                        <div className="flex gap-2">
-                          {!isEditing ? (
-                            <>
-                              <button
-                                className="bg-gradient-to-r from-blue-400 to-blue-600 px-4 py-2 rounded-full text-white flex items-center gap-2 hover:shadow-lg hover:shadow-blue-500/20 transition-all duration-300 transform hover:scale-105"
-                                onClick={() => handleEditClick(itemId, textValue, item.data.dueDate)}
-                              >
-                                <Edit className="w-4 h-4" /> Edit
-                              </button>
-                              <button
-                                className="bg-gradient-to-r from-red-400 to-red-600 px-4 py-2 rounded-full text-white flex items-center gap-2 hover:shadow-lg hover:shadow-red-500/20 transition-all duration-300 transform hover:scale-105"
-                                onClick={() => handleDelete(itemId)}
-                              >
-                                <Trash className="w-4 h-4" /> Delete
-                              </button>
-                            </>
-                          ) : (
-                            <>
+     <div className="flex gap-2">
+        {!isEditing ? (
+          <>
+            {!isCompleted && (
+              <button
+                className="bg-gradient-to-r from-green-400 to-green-600 px-4 py-2 rounded-full text-white flex items-center gap-2 hover:shadow-lg hover:shadow-green-500/20 transition-all duration-300 transform hover:scale-105"
+                onClick={() => handleMarkComplete(itemId)}
+              >
+                <CheckCircle className="w-4 h-4" /> Complete
+              </button>
+            )}
+            <button
+              className="bg-gradient-to-r from-blue-400 to-blue-600 px-4 py-2 rounded-full text-white flex items-center gap-2 hover:shadow-lg hover:shadow-blue-500/20 transition-all duration-300 transform hover:scale-105"
+              onClick={() => handleEditClick(itemId, textValue, item.data.dueDate)}
+            >
+              <Edit className="w-4 h-4" /> Edit
+            </button>
+            <button
+              className="bg-gradient-to-r from-red-400 to-red-600 px-4 py-2 rounded-full text-white flex items-center gap-2 hover:shadow-lg hover:shadow-red-500/20 transition-all duration-300 transform hover:scale-105"
+              onClick={() => handleDelete(itemId)}
+            >
+              <Trash className="w-4 h-4" /> Delete
+            </button>
+          </>
+        ) : (                            <>
                               <button
                                 className="bg-gradient-to-r from-green-400 to-green-600 px-4 py-2 rounded-full text-white hover:shadow-lg hover:shadow-green-500/20 transition-all duration-300 transform hover:scale-105"
                                 onClick={() => handleEditSave(itemId)}

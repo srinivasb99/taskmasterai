@@ -65,6 +65,9 @@ export function Dashboard() {
   const [editingText, setEditingText] = useState("");
   const [editingDate, setEditingDate] = useState("");
   const [cardVisible, setCardVisible] = useState(false);
+  const [editingTimerId, setEditingTimerId] = useState<string | null>(null);
+  const [editingTimerName, setEditingTimerName] = useState("");
+  const [editingTimerMinutes, setEditingTimerMinutes] = useState("");
 
   // Effect for card animation on mount
   useEffect(() => {
@@ -469,13 +472,26 @@ Guidelines:
     });
   };
 
-  const handleEditTimerName = async (timerId: string) => {
-    const newName = prompt("Enter new timer name:");
-    if (!newName) return;
+  const handleEditTimerClick = (timerId: string, currentName: string, currentTime: number) => {
+    setEditingTimerId(timerId);
+    setEditingTimerName(currentName);
+    setEditingTimerMinutes(String(Math.floor(currentTime / 60)));
+  };
+
+  const handleEditTimerSave = async (timerId: string) => {
+    if (!editingTimerName.trim()) return;
+    
+    const minutes = parseInt(editingTimerMinutes, 10);
+    if (isNaN(minutes) || minutes <= 0) return;
+
     try {
-      await updateCustomTimer(timerId, newName, undefined);
+      await updateCustomTimer(timerId, editingTimerName, minutes * 60);
+      resetCustomTimer(timerId, minutes * 60);
+      setEditingTimerId(null);
+      setEditingTimerName("");
+      setEditingTimerMinutes("");
     } catch (error) {
-      console.error("Error editing custom timer name:", error);
+      console.error("Error updating timer:", error);
     }
   };
 
@@ -567,69 +583,81 @@ Guidelines:
 
             {/* Productivity Card with animated progress bars */}
             <div className="bg-gray-800 rounded-xl p-6 transform hover:scale-[1.02] transition-all duration-300">
-              <h2 className="text-xl font-semibold text-purple-400 mb-4 flex items-center">
-                <Sparkles className="w-5 h-5 mr-2 text-yellow-400" />
+              <h2 className="text-xl font-semibold text-purple-400 mb-4">
                 Your Productivity
               </h2>
               <div className="space-y-4">
-                <div className="mb-4">
-                  <div className="flex justify-between mb-2">
-                    <p>Tasks</p>
-                    <p className="text-blue-400">{completedTasks}/{totalTasks}</p>
+                {totalTasks > 0 && (
+                  <div className="mb-4">
+                    <div className="flex justify-between mb-2">
+                      <p>Tasks</p>
+                      <p className="text-blue-400">{completedTasks}/{totalTasks}</p>
+                    </div>
+                    <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-gradient-to-r from-green-400 to-green-600 rounded-full transition-all duration-1000 ease-out"
+                        style={{ width: `${tasksProgress}%` }}
+                      />
+                    </div>
                   </div>
-                  <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-gradient-to-r from-green-400 to-green-600 rounded-full transition-all duration-1000 ease-out"
-                      style={{ width: `${tasksProgress}%` }}
-                    />
-                  </div>
-                </div>
+                )}
 
-                <div className="mb-4">
-                  <div className="flex justify-between mb-2">
-                    <p>Goals</p>
-                    <p className="text-pink-400">{completedGoals}/{totalGoals}</p>
+                {totalGoals > 0 && (
+                  <div className="mb-4">
+                    <div className="flex justify-between mb-2">
+                      <p>Goals</p>
+                      <p className="text-pink-400">{completedGoals}/{totalGoals}</p>
+                    </div>
+                    <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-gradient-to-r from-pink-400 to-pink-600 rounded-full transition-all duration-1000 ease-out"
+                        style={{ width: `${goalsProgress}%` }}
+                      />
+                    </div>
                   </div>
-                  <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-gradient-to-r from-pink-400 to-pink-600 rounded-full transition-all duration-1000 ease-out"
-                      style={{ width: `${goalsProgress}%` }}
-                    />
-                  </div>
-                </div>
+                )}
 
-                <div className="mb-4">
-                  <div className="flex justify-between mb-2">
-                    <p>Projects</p>
-                    <p className="text-blue-400">{completedProjects}/{totalProjects}</p>
+                {totalProjects > 0 && (
+                  <div className="mb-4">
+                    <div className="flex justify-between mb-2">
+                      <p>Projects</p>
+                      <p className="text-blue-400">{completedProjects}/{totalProjects}</p>
+                    </div>
+                    <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-gradient-to-r from-blue-400 to-blue-600 rounded-full transition-all duration-1000 ease-out"
+                        style={{ width: `${projectsProgress}%` }}
+                      />
+                    </div>
                   </div>
-                  <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-gradient-to-r from-blue-400 to-blue-600 rounded-full transition-all duration-1000 ease-out"
-                      style={{ width: `${projectsProgress}%` }}
-                    />
-                  </div>
-                </div>
+                )}
 
-                <div className="mb-4">
-                  <div className="flex justify-between mb-2">
-                    <p>Plans</p>
-                    <p className="text-yellow-400">{completedPlans}/{totalPlans}</p>
+                {totalPlans > 0 && (
+                  <div className="mb-4">
+                    <div className="flex justify-between mb-2">
+                      <p>Plans</p>
+                      <p className="text-yellow-400">{completedPlans}/{totalPlans}</p>
+                    </div>
+                    <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-gradient-to-r from-yellow-400 to-yellow-600 rounded-full transition-all duration-1000 ease-out"
+                        style={{ width: `${plansProgress}%` }}
+                      />
+                    </div>
                   </div>
-                  <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-gradient-to-r from-yellow-400 to-yellow-600 rounded-full transition-all duration-1000 ease-out"
-                      style={{ width: `${plansProgress}%` }}
-                    />
-                  </div>
-                </div>
+                )}
+
+                {totalTasks === 0 && totalGoals === 0 && totalProjects === 0 && totalPlans === 0 && (
+                  <p className="text-gray-400 text-center py-4">
+                    No items to track yet. Start by creating some tasks, goals, projects, or plans!
+                  </p>
+                )}
               </div>
             </div>
 
             {/* Upcoming Deadlines Card */}
             <div className="bg-gray-800 rounded-xl p-6 transform hover:scale-[1.02] transition-all duration-300">
-              <h2 className="text-xl font-semibold text-blue-400 mb-4 flex items-center">
-                <Sparkles className="w-5 h-5 mr-2 text-yellow-400" />
+              <h2 className="text-xl font-semibold text-blue-400 mb-4">
                 Upcoming Deadlines
               </h2>
               <p className="text-gray-400">No upcoming deadlines</p>
@@ -685,7 +713,7 @@ Guidelines:
                     let overdue = false;
                     let dueDateStr = "";
                     if (item.data.dueDate) {
-                      const dueDateObj = item.data.dueDate.toDate ? item.data.dueDate.toDate() : new Date(item.data.dueDate);
+                      const dueDateObj = item.data.dueDate.toDate ? item.data.dueDate.toDate() : new Date(item.data .dueDate);
                       dueDateStr = dueDateObj.toLocaleDateString();
                       overdue = dueDateObj < new Date();
                     }
@@ -714,7 +742,7 @@ Guidelines:
                             )}
                           </div>
                         ) : (
-                          <div className="flex flex-col sm:flex-row gap- row gap-3 w-full">
+                          <div className="flex flex-col sm:flex-row gap-3 w-full">
                             <input
                               className="flex-grow bg-gray-800 border border-gray-600 rounded-full p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300"
                               value={editingText}
@@ -777,10 +805,7 @@ Guidelines:
           <div className="flex flex-col gap-6">
             {/* Weather Card */}
             <div className="bg-gray-800 rounded-xl p-6 transform hover:scale-[1.02] transition-all duration-300">
-              <h2 className="text-xl font-semibold mb-4 flex items-center">
-                <Sparkles className="w-5 h-5 mr-2 text-yellow-400" />
-                Today's Weather
-              </h2>
+              <h2 className="text-xl font-semibold mb-4">Today's Weather</h2>
               {weatherData ? (
                 <div className="space-y-3">
                   <p className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">
@@ -815,10 +840,7 @@ Guidelines:
             {/* Main Pomodoro Timer */}
             <div className="bg-gray-800 rounded-xl p-6 transform hover:scale-[1.02] transition-all duration-300">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold flex items-center">
-                  <Sparkles className="w-5 h-5 mr-2 text-yellow-400" />
-                  Pomodoro Timer
-                </h2>
+                <h2 className="text-xl font-semibold">Pomodoro Timer</h2>
                 <button
                   className="bg-gradient-to-r from-purple-400 to-purple-600 text-white px-4 py-2 rounded-full font-bold flex items-center gap-2 hover:shadow-lg hover:shadow-purple-500/20 transition-all duration-300 transform hover:scale-105"
                   onClick={handleAddCustomTimer}
@@ -858,10 +880,7 @@ Guidelines:
 
             {/* Custom Timers List */}
             <div className="bg-gray-800 rounded-xl p-6 transform hover:scale-[1.02] transition-all duration-300">
-              <h2 className="text-xl font-semibold mb-6 flex items-center">
-                <Sparkles className="w-5 h-5 mr-2 text-yellow-400" />
-                Custom Timers
-              </h2>
+              <h2 className="text-xl font-semibold mb-6">Custom Timers</h2>
               {customTimers.length === 0 ? (
                 <p className="text-gray-400 text-center py-8">No custom timers yet...</p>
               ) : (
@@ -871,6 +890,8 @@ Guidelines:
                     const runningState = runningTimers[timerId];
                     const timeLeft = runningState ? runningState.timeLeft : timer.data.time;
                     const isRunning = runningState ? runningState.isRunning : false;
+                    const isEditing = editingTimerId === timerId;
+
                     return (
                       <li
                         key={timerId}
@@ -881,49 +902,87 @@ Guidelines:
                       >
                         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                           <div className="flex flex-col items-center sm:items-start">
-                            <div className="flex items-center gap-2 mb-2">
-                              <span className="font-bold text-lg">{timer.data.name}</span>
+                            {isEditing ? (
+                              <div className="flex flex-col gap-2 w-full">
+                                <input
+                                  type="text"
+                                  className="bg-gray-800 border border-gray-600 rounded-full p-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                  value={editingTimerName}
+                                  onChange={(e) => setEditingTimerName(e.target.value)}
+                                  placeholder="Timer name"
+                                />
+                                <input
+                                  type="number"
+                                  className="bg-gray-800 border border-gray-600 rounded-full p-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                  value={editingTimerMinutes}
+                                  onChange={(e) => setEditingTimerMinutes(e.target.value)}
+                                  placeholder="Minutes"
+                                  min="1"
+                                />
+                                <div className="flex gap-2">
+                                  <button
+                                    className="bg-gradient-to-r from-green-400 to-green-600 px-4 py-2 rounded-full text-white hover:shadow-lg hover:shadow-green-500/20 transition-all duration-300"
+                                    onClick={() => handleEditTimerSave(timerId)}
+                                  >
+                                    Save
+                                  </button>
+                                  <button
+                                    className="bg-gradient-to-r from-gray-400 to-gray-600 px-4 py-2 rounded-full text-white hover:shadow-lg hover:shadow-gray-500/20 transition-all duration-300"
+                                    onClick={() => setEditingTimerId(null)}
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                <div className="flex items-center gap-2 mb-2">
+                                  <span className="font-bold text-lg">{timer.data.name}</span>
+                                  <button
+                                    className="bg-gradient-to-r from-blue-400 to-blue-600 p-2 rounded-full text-white hover:shadow-lg hover:shadow-blue-500/20 transition-all duration-300 transform hover:scale-105"
+                                    onClick={() => handleEditTimerClick(timerId, timer.data.name, timer.data.time)}
+                                  >
+                                    <Edit className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    className="bg-gradient-to-r from-red-400 to-red-600 p-2 rounded-full text-white hover:shadow-lg hover:shadow-red-500/20 transition-all duration-300 transform hover:scale-105"
+                                    onClick={() => handleDeleteTimer(timerId)}
+                                  >
+                                    <Trash className="w-4 h-4" />
+                                  </button>
+                                </div>
+                                <span className="text-3xl font-semibold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">
+                                  {formatCustomTime(timeLeft)}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                          {!isEditing && (
+                            <div className="flex gap-2">
+                              {!isRunning && (
+                                <button
+                                  className="bg-gradient-to-r from-green-400 to-green-600 px-4 py-2 rounded-full font-semibold hover:shadow-lg hover:shadow-green-500/20 transition-all duration-300 transform hover:scale-105"
+                                  onClick={() => startCustomTimer(timerId)}
+                                >
+                                  Start
+                                </button>
+                              )}
+                              {isRunning && (
+                                <button
+                                  className="bg-gradient-to-r from-yellow-400 to-yellow-600 px-4 py-2 rounded-full font-semibold hover:shadow-lg hover:shadow-yellow-500/20 transition-all duration-300 transform hover:scale-105"
+                                  onClick={() => pauseCustomTimer(timerId)}
+                                >
+                                  Pause
+                                </button>
+                              )}
                               <button
-                                className="bg-gradient-to-r from-blue-400 to-blue-600 p-2 rounded-full text-white hover:shadow-lg hover:shadow-blue-500/20 transition-all duration-300 transform hover:scale-105"
-                                onClick={() => handleEditTimerName(timerId)}
+                                className="bg-gradient-to-r from-gray-400 to-gray-600 px-4 py-2 rounded-full font-semibold hover:shadow-lg hover:shadow-gray-500/20 transition-all duration-300 transform hover:scale-105"
+                                onClick={() => resetCustomTimer(timerId)}
                               >
-                                <Edit className="w-4 h-4" />
-                              </button>
-                              <button
-                                className="bg-gradient-to-r from-red-400 to-red-600 p-2 rounded-full text-white hover:shadow-lg hover:shadow-red-500/20 transition-all duration-300 transform hover:scale-105"
-                                onClick={() => handleDeleteTimer(timerId)}
-                              >
-                                <Trash className="w-4 h-4" />
+                                Reset
                               </button>
                             </div>
-                            <span className="text-3xl font-semibold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">
-                              {formatCustomTime(timeLeft)}
-                            </span>
-                          </div>
-                          <div className="flex gap-2">
-                            {!isRunning && (
-                              <button
-                                className="bg-gradient-to-r from-green-400 to-green-600 px-4 py-2 rounded-full font-semibold hover:shadow-lg hover:shadow-green-500/20 transition-all duration-300 transform hover:scale-105"
-                                onClick={() => startCustomTimer(timerId)}
-                              >
-                                Start
-                              </button>
-                            )}
-                            {isRunning && (
-                              <button
-                                className="bg-gradient-to-r from-yellow-400 to-yellow-600 px-4 py-2 rounded-full font-semibold hover:shadow-lg hover:shadow-yellow-500/20 transition-all duration-300 transform hover:scale-105"
-                                onClick={() => pauseCustomTimer(timerId)}
-                              >
-                                Pause
-                              </button>
-                            )}
-                            <button
-                              className="bg-gradient-to-r from-gray-400 to-gray-600 px-4 py-2 rounded-full font-semibold hover:shadow-lg hover:shadow-gray-500/20 transition-all duration-300 transform hover:scale-105"
-                              onClick={() => resetCustomTimer(timerId)}
-                            >
-                              Reset
-                            </button>
-                          </div>
+                          )}
                         </div>
                       </li>
                     );

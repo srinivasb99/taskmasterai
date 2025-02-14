@@ -235,15 +235,6 @@ useEffect(() => {
 
     try {
       if (!formattedData) {
-        setSmartOverview(`
-          <div class="flex items-center gap-2 mb-4">
-            <span class="text-xl text-blue-300">✨ Smart Overview</span>
-            <span class="px-2 py-1 text-xs font-medium text-white bg-gradient-to-r from-pink-500 to-purple-500 rounded-full">BETA</span>
-          </div>
-          <div class="text-gray-400">
-            Create tasks, goals, projects, or plans to generate your Smart Overview
-          </div>
-        `);
         return;
       }
 

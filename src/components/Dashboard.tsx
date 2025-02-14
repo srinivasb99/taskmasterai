@@ -235,7 +235,15 @@ useEffect(() => {
 
     try {
       if (!formattedData) {
-        setSmartOverview("Create tasks, goals, projects, or plans to generate your Smart Overview");
+        setSmartOverview(`
+          <div class="flex items-center gap-2 mb-4">
+            <span class="text-xl text-blue-300">✨ Smart Overview</span>
+            <span class="px-2 py-1 text-xs font-medium text-white bg-gradient-to-r from-pink-500 to-purple-500 rounded-full">BETA</span>
+          </div>
+          <div class="text-gray-400">
+            Create tasks, goals, projects, or plans to generate your Smart Overview
+          </div>
+        `);
         return;
       }
 
@@ -251,7 +259,7 @@ Guidelines:
 - Provide actionable recommendations
 - Mention specific item names
 - Make sure you use complete sentences
-- No explainations
+- No explanations
 <</SYS>>[/INST]`;
 
       // 4. Call Hugging Face API
@@ -282,23 +290,37 @@ Guidelines:
 
       // 6. Sanitize and format output
       const cleanText = rawText
-        .replace(/\[\/?(INST|SYS)\]|<\/?s>/gi, '')
+        .replace(/\[\/?(INST|SYS)\]|<\/?s>|\[\/?(FONT|COLOR)\]/gi, '')
         .replace(/(\*\*|###|boxed|final answer|step \d+:)/gi, '')
         .split('\n')
         .map(line => line.trim())
-        .filter(line => line.length > 0)
-        .map((line, index) => {
-          if (index === 0) return `<div class="text-green-400 font-semibold mb-2">${line}</div>`;
-          if (/^\d+\./.test(line)) return `<div class="ml-4 mb-1">${line}</div>`;
-          return `<div class="mb-2">${line}</div>`;
-        })
-        .join('');
+        .filter(line => line.length > 0);
 
-      setSmartOverview(cleanText || "Could not generate overview");
+      // 7. Create formatted HTML with better styling
+      const formattedHtml = `
+        <div class="flex items-center gap-2 mb-4">
+          <span class="text-xl text-blue-300">✨ Smart Overview</span>
+          <span class="px-2 py-1 text-xs font-medium text-white bg-gradient-to-r from-pink-500 to-purple-500 rounded-full">BETA</span>
+        </div>
+        ${cleanText.map((line, index) => {
+          if (index === 0) {
+            return `<div class="text-green-400 text-lg font-medium mb-4">${line}</div>`;
+          }
+          return `<div class="text-gray-300 mb-3">${line}</div>`;
+        }).join('')}
+      `;
+
+      setSmartOverview(formattedHtml || "Could not generate overview");
 
     } catch (error) {
       console.error("Overview generation error:", error);
-      setSmartOverview("Error generating overview. Please try again.");
+      setSmartOverview(`
+        <div class="flex items-center gap-2 mb-4">
+          <span class="text-xl text-blue-300">✨ Smart Overview</span>
+          <span class="px-2 py-1 text-xs font-medium text-white bg-gradient-to-r from-pink-500 to-purple-500 rounded-full">BETA</span>
+        </div>
+        <div class="text-red-400">Error generating overview. Please try again.</div>
+      `);
     } finally {
       setOverviewLoading(false);
     }
@@ -306,6 +328,7 @@ Guidelines:
 
   generateOverview();
 }, [user, tasks, goals, projects, plans, userName, hfApiKey, lastGeneratedData]);
+
 
   // ---------------------
   // 11. CREATE & EDIT & DELETE

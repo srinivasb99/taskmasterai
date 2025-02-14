@@ -221,7 +221,7 @@ useEffect(() => {
     // If there are no items, show the empty state message
     if (!allItems.length) {
       setSmartOverview(`
-        <div class="text-gray-400">
+        <div class="text-gray-400 font-medium">
           Add some items to get started with your Smart Overview!
         </div>
       `);
@@ -379,32 +379,35 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
     setEditingItemId(null);
   };
 
-  const handleCreate = async () => {
-    if (!user) return;
-    if (!newItemText.trim()) {
-      alert("Please enter a name or description before creating.");
-      return;
+ const handleCreate = async () => {
+  if (!user) return;
+  if (!newItemText.trim()) {
+    alert("Please enter a name or description before creating.");
+    return;
+  }
+  let dateValue: Date | null = null;
+  if (newItemDate) {
+    // Parse "YYYY-MM-DD" and set time to 12:00 to avoid day-off issues
+    const [year, month, day] = newItemDate.split('-').map(Number);
+    dateValue = new Date(year, month - 1, day, 12, 0, 0);
+  }
+
+  try {
+    if (activeTab === "tasks") {
+      await createTask(user.uid, newItemText, dateValue);
+    } else if (activeTab === "goals") {
+      await createGoal(user.uid, newItemText, dateValue);
+    } else if (activeTab === "projects") {
+      await createProject(user.uid, newItemText, dateValue);
+    } else if (activeTab === "plans") {
+      await createPlan(user.uid, newItemText, dateValue);
     }
-    let dateValue: Date | null = null;
-    if (newItemDate) {
-      dateValue = new Date(newItemDate);
-    }
-    try {
-      if (activeTab === "tasks") {
-        await createTask(user.uid, newItemText, dateValue);
-      } else if (activeTab === "goals") {
-        await createGoal(user.uid, newItemText, dateValue);
-      } else if (activeTab === "projects") {
-        await createProject(user.uid, newItemText, dateValue);
-      } else if (activeTab === "plans") {
-        await createPlan(user.uid, newItemText, dateValue);
-      }
-      setNewItemText("");
-      setNewItemDate("");
-    } catch (error) {
-      console.error("Error creating item:", error);
-    }
-  };
+    setNewItemText("");
+    setNewItemDate("");
+  } catch (error) {
+    console.error("Error creating item:", error);
+  }
+};
 
   let currentItems: Array<{ id: string; data: any }> = [];
   let titleField = "";
@@ -434,27 +437,30 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
     }
   };
 
-  const handleEditSave = async (itemId: string) => {
-    if (!user || !editingText.trim()) {
-      alert("Please enter a valid name for the item.");
-      return;
-    }
-    let dateValue: Date | null = null;
-    if (editingDate) {
-      dateValue = new Date(editingDate);
-    }
-    try {
-      await updateItem(collectionName, itemId, {
-        [titleField]: editingText,
-        dueDate: dateValue || null,
-      });
-      setEditingItemId(null);
-      setEditingText("");
-      setEditingDate("");
-    } catch (error) {
-      console.error("Error updating item:", error);
-    }
-  };
+ const handleEditSave = async (itemId: string) => {
+  if (!user || !editingText.trim()) {
+    alert("Please enter a valid name for the item.");
+    return;
+  }
+  let dateValue: Date | null = null;
+  if (editingDate) {
+    // Same parsing logic for editing
+    const [year, month, day] = editingDate.split('-').map(Number);
+    dateValue = new Date(year, month - 1, day, 12, 0, 0);
+  }
+
+  try {
+    await updateItem(collectionName, itemId, {
+      [titleField]: editingText,
+      dueDate: dateValue || null,
+    });
+    setEditingItemId(null);
+    setEditingText("");
+    setEditingDate("");
+  } catch (error) {
+    console.error("Error updating item:", error);
+  }
+};
 
   const handleDelete = async (itemId: string) => {
     if (!user) return;

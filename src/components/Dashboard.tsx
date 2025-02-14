@@ -276,8 +276,27 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
 
       // 6. Clean and validate
       const cleanAndValidate = (text: string) => {
+        // Additional filters - phrases to trigger text removal
+        const excludePhrases = [
+          "I see I made some minor errors",
+          "Here is the corrected response",
+          "was removed as per request",
+          "since I am forced to put something here",
+          "-> You are TaskMaster",
+          "The is:"
+        ];
+
+        // Remove text after any excluded phrase
+        let cleanedText = text;
+        for (const phrase of excludePhrases) {
+          const index = cleanedText.indexOf(phrase);
+          if (index !== -1) {
+            cleanedText = cleanedText.substring(0, index).trim();
+          }
+        }
+
         // Basic cleanup
-        text = text
+        cleanedText = cleanedText
           .replace(/\[\/?(INST|SYS)\]|<\/?s>|\[\/?(FONT|COLOR)\]/gi, '')
           .replace(/(\*\*|###|boxed|final answer|step \d+:)/gi, '')
           .replace(/\$\{.*?\}\$/g, '')
@@ -287,22 +306,11 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
           .replace(/\b(TASKS?|GOALS?|PROJECTS?|PLANS?)\b:/gi, '')
           .replace(/\n\s*\n/g, '\n');
 
-        // Additional filters
-        const excludePhrases = [
-          "I see I made some minor errors",
-          "Here is the corrected response",
-          "was removed as per request",
-          "since I am forced to put something here",
-          "-> You are TaskMaster"
-        ];
-
-        return text
+        return cleanedText
           .split('\n')
           .map(line => line.trim())
           .filter(line => {
-            if (excludePhrases.some(phrase => line.toLowerCase().includes(phrase.toLowerCase()))) {
-              return false;
-            }
+            // Remove empty lines and lines with only special characters
             return line.length > 0 && !/^[^a-zA-Z0-9]+$/.test(line);
           })
           .join('\n');
@@ -356,7 +364,7 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
 
   generateOverview();
 // ----------- Removed lastGeneratedData from dependencies -----------
-}, [user, tasks, goals, projects, plans, userName, hfApiKey]); 
+}, [user, tasks, goals, projects, plans, userName, hfApiKey]);
 
   // ---------------------
   // 11. CREATE & EDIT & DELETE
@@ -624,7 +632,7 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
       <Sidebar userName={userName} />
       <main className="ml-64 p-8 overflow-auto h-screen">
         <header className="dashboard-header mb-6 transform transition-all duration-500 ease-out translate-y-0 opacity-100">
-          <h1 className="text-4xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">
+         <h1 className="text-4xl font-bold mb-2 text-white">
             {greeting.emoji} {greeting.greeting}, <span className="font-normal">{userName || "Loading..."}</span>
           </h1>
           <p className="text-gray-400 italic text-lg">

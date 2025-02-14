@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useRef } from 'react';
 import { PlusCircle, Edit, Trash, Sparkles } from 'lucide-react';
 import { Sidebar } from './Sidebar';
@@ -541,51 +542,21 @@ Guidelines:
     );
   }
 
-   return (
+  return (
     <div className="bg-gray-900 text-white min-h-screen w-full overflow-hidden">
-      {/* Mobile Menu Button */}
-      <div className="lg:hidden fixed top-4 right-4 z-50">
-        <button
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="p-2 rounded-full bg-gray-800 hover:bg-gray-700 transition-colors"
-        >
-          <Menu className="w-6 h-6" />
-        </button>
-      </div>
-
-      {/* Sidebar with mobile support */}
-      <div className={`
-        ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-        transition-transform duration-300 ease-in-out
-        fixed top-0 left-0 z-40
-        lg:relative lg:block
-      `}>
-        <Sidebar userName={userName} />
-      </div>
-
-      {/* Mobile overlay */}
-      {isMobileMenuOpen && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden"
-          onClick={() => setIsMobileMenuOpen(false)}
-        />
-      )}
-
-      <main className="lg:ml-64 p-8 overflow-auto h-screen">
+      <Sidebar userName={userName} />
+      <main className="ml-64 p-8 overflow-auto h-screen">
         <header className="dashboard-header mb-6 transform transition-all duration-500 ease-out translate-y-0 opacity-100">
-          <h1 className="text-4xl font-bold mb-2 text-white flex items-center gap-3">
-            {getGreetingIcon()}
-            <span>{greeting.greeting},</span>
-            <span className="font-normal text-white">{userName || "Loading..."}</span>
+          <h1 className="text-4xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">
+            {greeting.emoji} {greeting.greeting}, <span className="font-normal">{userName || "Loading..."}</span>
           </h1>
           <p className="text-gray-400 italic text-lg">
             "{quote.text}" - <span className="text-purple-400">{quote.author}</span>
           </p>
         </header>
-
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="flex flex-col gap-6">
-            {/* Smart Overview Card */}
+            {/* Smart Overview Card with enhanced animations */}
             <div className={`bg-gray-800 rounded-xl p-6 relative min-h-[200px] transform transition-all duration-500 ease-out ${cardVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'} hover:shadow-lg hover:shadow-purple-500/10`}>
               <div className="flex items-center mb-4">
                 <h2 className="text-xl font-semibold text-blue-300 mr-2 flex items-center">
@@ -611,9 +582,11 @@ Guidelines:
               )}
             </div>
 
-            {/* Productivity Card */}
+            {/* Productivity Card with animated progress bars */}
             <div className="bg-gray-800 rounded-xl p-6 transform hover:scale-[1.02] transition-all duration-300">
-              <h2 className="text-xl font-semibold text-purple-400 mb-4">Your Productivity</h2>
+              <h2 className="text-xl font-semibold text-purple-400 mb-4">
+                Your Productivity
+              </h2>
               <div className="space-y-4">
                 {totalTasks > 0 && (
                   <div className="mb-4">
@@ -685,13 +658,15 @@ Guidelines:
 
             {/* Upcoming Deadlines Card */}
             <div className="bg-gray-800 rounded-xl p-6 transform hover:scale-[1.02] transition-all duration-300">
-              <h2 className="text-xl font-semibold text-blue-400 mb-4">Upcoming Deadlines</h2>
+              <h2 className="text-xl font-semibold text-blue-400 mb-4">
+                Upcoming Deadlines
+              </h2>
               <p className="text-gray-400">No upcoming deadlines</p>
             </div>
 
-            {/* Tabs & List */}
+            {/* Tabs & List with enhanced animations */}
             <div className="bg-gray-800 rounded-xl p-6 transform hover:scale-[1.02] transition-all duration-300">
-              <div className="flex flex-wrap gap-2 mb-6">
+              <div className="flex space-x-3 mb-6">
                 {["tasks", "goals", "projects", "plans"].map((tab) => (
                   <button
                     key={tab}
@@ -707,7 +682,7 @@ Guidelines:
                 ))}
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-2 mb-6">
+              <div className="flex gap-2 mb-6">
                 <input
                   type="text"
                   className="flex-grow bg-gray-900 border border-gray-700 rounded-full p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300"
@@ -725,7 +700,7 @@ Guidelines:
                   className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white px-6 py-3 rounded-full font-semibold hover:shadow-lg hover:shadow-purple-500/20 transition-all duration-300 transform hover:scale-105"
                   onClick={handleCreate}
                 >
-                  Create
+                  Create {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
                 </button>
               </div>
 
@@ -739,7 +714,7 @@ Guidelines:
                     let overdue = false;
                     let dueDateStr = "";
                     if (item.data.dueDate) {
-                      const dueDateObj = item.data.dueDate.toDate ? item.data.dueDate.toDate() : new Date(item.data.dueDate);
+                      const dueDateObj = item.data.dueDate.toDate ? item.data.dueDate.toDate() : new Date(item.data .dueDate);
                       dueDateStr = dueDateObj.toLocaleDateString();
                       overdue = dueDateObj < new Date();
                     }
@@ -897,6 +872,11 @@ Guidelines:
                   Reset
                 </button>
               </div>
+              {!customTimers.length && (
+                <p className="text-sm text-gray-400 mt-6 text-center">
+                  🍎 No custom timers yet. Click the "New Timer" button to create one! 🍎
+                </p>
+              )}
             </div>
 
             {/* Custom Timers List */}
@@ -923,7 +903,39 @@ Guidelines:
                       >
                         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                           <div className="flex flex-col items-center sm:items-start">
-                            {!isEditing ? (
+                            {isEditing ? (
+                              <div className="flex flex-col gap-2 w-full">
+                                <input
+                                  type="text"
+                                  className="bg-gray-800 border border-gray-600 rounded-full p-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                  value={editingTimerName}
+                                  onChange={(e) => setEditingTimerName(e.target.value)}
+                                  placeholder="Timer name"
+                                />
+                                <input
+                                  type="number"
+                                  className="bg-gray-800 border border-gray-600 rounded-full p-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                  value={editingTimerMinutes}
+                                  onChange={(e) => setEditingTimerMinutes(e.target.value)}
+                                  placeholder="Minutes"
+                                  min="1"
+                                />
+                                <div className="flex gap-2">
+                                  <button
+                                    className="bg-gradient-to-r from-green-400 to-green-600 px-4 py-2 rounded-full text-white hover:shadow-lg hover:shadow-green-500/20 transition-all duration-300"
+                                    onClick={() => handleEditTimerSave(timerId)}
+                                  >
+                                    Save
+                                  </button>
+                                  <button
+                                    className="bg-gradient-to-r from-gray-400 to-gray-600 px-4 py-2 rounded-full text-white hover:shadow-lg hover:shadow-gray-500/20 transition-all duration-300"
+                                    onClick={() => setEditingTimerId(null)}
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
                               <>
                                 <div className="flex items-center gap-2 mb-2">
                                   <span className="font-bold text-lg">{timer.data.name}</span>
@@ -944,42 +956,6 @@ Guidelines:
                                   {formatCustomTime(timeLeft)}
                                 </span>
                               </>
-                            ) : (
-                              <div className="flex flex-col gap-2 w-full">
-                                <input
-                                  type="text"
-                                  value={editingTimerName}
-                                  onChange={(e) => setEditingTimerName(e.target.value)}
-                                  className="bg-gray-800 border border-gray-600 rounded-full p-2 w-full"
-                                  placeholder="Timer name"
-                                />
-                                <input
-                                  type="number"
-                                  value={editingTimerMinutes}
-                                  onChange={(e) => setEditingTimerMinutes(e.target.value)}
-                                  className="bg-gray-800 border border-gray-600 rounded-full p-2 w-full"
-                                  placeholder="Minutes"
-                                  min="1"
-                                />
-                                <div className="flex gap-2">
-                                  <button
-                                    className="bg-gradient-to-r from-green-400 to-green-600 px-4 py-2 rounded-full text-white hover:shadow-lg hover:shadow-green-500/20 transition-all duration-300 transform hover:scale-105"
-                                    onClick={() => handleEditTimerSave(timerId)}
-                                  >
-                                    Save
-                                  </button>
-                                  <button
-                                    className="bg-gradient-to-r from-gray-400 to-gray-600 px-4 py-2 rounded-full text-white hover:shadow-lg hover:shadow-gray-500/20 transition-all duration-300 transform hover:scale-105"
-                                    onClick={() => {
-                                      setEditingTimerId(null);
-                                      setEditingTimerName("");
-                                      setEditingTimerMinutes("");
-                                    }}
-                                  >
-                                    Cancel
-                                  </button>
-                                </div>
-                              </div>
                             )}
                           </div>
                           {!isEditing && (

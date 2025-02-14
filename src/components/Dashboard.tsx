@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { PlusCircle, Edit, Trash } from 'lucide-react';
+import { PlusCircle, Edit, Trash, Sparkles } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { getTimeBasedGreeting, getRandomQuote } from '../lib/greetings';
 import {
@@ -64,6 +64,12 @@ export function Dashboard() {
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
   const [editingDate, setEditingDate] = useState("");
+  const [cardVisible, setCardVisible] = useState(false);
+
+  // Effect for card animation on mount
+  useEffect(() => {
+    setCardVisible(true);
+  }, []);
 
   // ---------------------
   // 6. MAIN POMODORO TIMER (LOCAL)
@@ -511,7 +517,10 @@ Guidelines:
   if (user === null) {
     return (
       <div className="flex items-center justify-center h-screen bg-gray-900 text-white">
-        <p>Loading dashboard...</p>
+        <div className="animate-pulse">
+          <p className="text-xl">Loading dashboard...</p>
+          <div className="mt-4 h-2 w-32 bg-gray-700 rounded"></div>
+        </div>
       </div>
     );
   }
@@ -520,125 +529,157 @@ Guidelines:
     <div className="bg-gray-900 text-white min-h-screen w-full overflow-hidden">
       <Sidebar userName={userName} />
       <main className="ml-64 p-8 overflow-auto h-screen">
-        <header className="dashboard-header mb-6">
-          <h1 className="text-3xl font-bold mb-1">
+        <header className="dashboard-header mb-6 transform transition-all duration-500 ease-out translate-y-0 opacity-100">
+          <h1 className="text-4xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">
             {greeting.emoji} {greeting.greeting}, <span className="font-normal">{userName || "Loading..."}</span>
           </h1>
-          <p className="text-gray-400 italic">
-            "{quote.text}" - {quote.author}
+          <p className="text-gray-400 italic text-lg">
+            "{quote.text}" - <span className="text-purple-400">{quote.author}</span>
           </p>
         </header>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="flex flex-col gap-6">
-            {/* Smart Overview Card with fade-in animation */}
-            <div className="bg-gray-800 rounded-xl p-5 relative min-h-[200px]">
+            {/* Smart Overview Card with enhanced animations */}
+            <div className={`bg-gray-800 rounded-xl p-6 relative min-h-[200px] transform transition-all duration-500 ease-out ${cardVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'} hover:shadow-lg hover:shadow-purple-500/10`}>
               <div className="flex items-center mb-4">
-                <h2 className="text-xl font-semibold text-blue-300 mr-2">
+                <h2 className="text-xl font-semibold text-blue-300 mr-2 flex items-center">
+                  <Sparkles className="w-5 h-5 mr-2 text-yellow-400" />
                   Smart Overview
                 </h2>
-                <span className="text-xs bg-pink-600 text-white px-2 py-1 rounded-full">
+                <span className="text-xs bg-gradient-to-r from-pink-500 to-purple-500 text-white px-3 py-1 rounded-full font-medium">
                   BETA
                 </span>
               </div>
 
               {overviewLoading ? (
-                <div className="space-y-3 animate-pulse">
-                  <div className="h-4 bg-gray-700 rounded-full w-3/4"></div>
-                  <div className="h-4 bg-gray-700 rounded-full w-2/3"></div>
-                  <div className="h-4 bg-gray-700 rounded-full w-4/5"></div>
+                <div className="space-y-3">
+                  <div className="h-4 bg-gray-700 rounded-full w-3/4 animate-pulse"></div>
+                  <div className="h-4 bg-gray-700 rounded-full w-2/3 animate-pulse delay-75"></div>
+                  <div className="h-4 bg-gray-700 rounded-full w-4/5 animate-pulse delay-150"></div>
                 </div>
               ) : (
                 <div 
-                  className="text-sm text-gray-300"
+                  className="text-sm text-gray-300 prose prose-invert"
                   dangerouslySetInnerHTML={{ __html: smartOverview }}
                 />
               )}
             </div>
-            {/* Productivity Card */}
-            <div className="bg-gray-800 rounded-xl p-5">
-              <h2 className="text-xl font-semibold text-purple-400 mb-2">Your Productivity</h2>
-              <div className="mb-2">
-                <p className="mb-1">Tasks: {completedTasks}/{totalTasks} completed</p>
-                <div className="w-full bg-gray-700 h-2 rounded">
-                  <div className="bg-green-500 h-2 rounded" style={{ width: `${tasksProgress}%` }} />
+
+            {/* Productivity Card with animated progress bars */}
+            <div className="bg-gray-800 rounded-xl p-6 transform hover:scale-[1.02] transition-all duration-300">
+              <h2 className="text-xl font-semibold text-purple-400 mb-4 flex items-center">
+                <Sparkles className="w-5 h-5 mr-2 text-yellow-400" />
+                Your Productivity
+              </h2>
+              <div className="space-y-4">
+                <div className="mb-4">
+                  <div className="flex justify-between mb-2">
+                    <p>Tasks</p>
+                    <p className="text-blue-400">{completedTasks}/{totalTasks}</p>
+                  </div>
+                  <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-green-400 to-green-600 rounded-full transition-all duration-1000 ease-out"
+                      style={{ width: `${tasksProgress}%` }}
+                    />
+                  </div>
                 </div>
-              </div>
-              <div className="mb-2">
-                <p className="mb-1">Goals: {completedGoals}/{totalGoals} completed</p>
-                <div className="w-full bg-gray-700 h-2 rounded">
-                  <div className="bg-pink-500 h-2 rounded" style={{ width: `${goalsProgress}%` }} />
+
+                <div className="mb-4">
+                  <div className="flex justify-between mb-2">
+                    <p>Goals</p>
+                    <p className="text-pink-400">{completedGoals}/{totalGoals}</p>
+                  </div>
+                  <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-pink-400 to-pink-600 rounded-full transition-all duration-1000 ease-out"
+                      style={{ width: `${goalsProgress}%` }}
+                    />
+                  </div>
                 </div>
-              </div>
-              <div className="mb-2">
-                <p className="mb-1">Projects: {completedProjects}/{totalProjects} completed</p>
-                <div className="w-full bg-gray-700 h-2 rounded">
-                  <div className="bg-blue-500 h-2 rounded" style={{ width: `${projectsProgress}%` }} />
+
+                <div className="mb-4">
+                  <div className="flex justify-between mb-2">
+                    <p>Projects</p>
+                    <p className="text-blue-400">{completedProjects}/{totalProjects}</p>
+                  </div>
+                  <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-blue-400 to-blue-600 rounded-full transition-all duration-1000 ease-out"
+                      style={{ width: `${projectsProgress}%` }}
+                    />
+                  </div>
                 </div>
-              </div>
-              <div className="mb-2">
-                <p className="mb-1">Plans: {completedPlans}/{totalPlans} completed</p>
-                <div className="w-full bg-gray-700 h-2 rounded">
-                  <div className="bg-yellow-500 h-2 rounded" style={{ width: `${plansProgress}%` }} />
+
+                <div className="mb-4">
+                  <div className="flex justify-between mb-2">
+                    <p>Plans</p>
+                    <p className="text-yellow-400">{completedPlans}/{totalPlans}</p>
+                  </div>
+                  <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-yellow-400 to-yellow-600 rounded-full transition-all duration-1000 ease-out"
+                      style={{ width: `${plansProgress}%` }}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
+
             {/* Upcoming Deadlines Card */}
-            <div className="bg-gray-800 rounded-xl p-5">
-              <h2 className="text-xl font-semibold text-blue-400 mb-2">Upcoming Deadlines</h2>
-              <p>No upcoming deadlines (example placeholder)</p>
+            <div className="bg-gray-800 rounded-xl p-6 transform hover:scale-[1.02] transition-all duration-300">
+              <h2 className="text-xl font-semibold text-blue-400 mb-4 flex items-center">
+                <Sparkles className="w-5 h-5 mr-2 text-yellow-400" />
+                Upcoming Deadlines
+              </h2>
+              <p className="text-gray-400">No upcoming deadlines</p>
             </div>
-            {/* Tabs & List */}
-            <div className="bg-gray-800 rounded-xl p-5">
-              <div className="flex space-x-3 mb-4">
-                <button
-                  className={`px-4 py-2 rounded-full ${activeTab === "tasks" ? "bg-indigo-500 text-white" : "bg-gray-700 text-gray-200"}`}
-                  onClick={() => handleTabChange("tasks")}
-                >
-                  Tasks
-                </button>
-                <button
-                  className={`px-4 py-2 rounded-full ${activeTab === "goals" ? "bg-indigo-500 text-white" : "bg-gray-700 text-gray-200"}`}
-                  onClick={() => handleTabChange("goals")}
-                >
-                  Goals
-                </button>
-                <button
-                  className={`px-4 py-2 rounded-full ${activeTab === "projects" ? "bg-indigo-500 text-white" : "bg-gray-700 text-gray-200"}`}
-                  onClick={() => handleTabChange("projects")}
-                >
-                  Projects
-                </button>
-                <button
-                  className={`px-4 py-2 rounded-full ${activeTab === "plans" ? "bg-indigo-500 text-white" : "bg-gray-700 text-gray-200"}`}
-                  onClick={() => handleTabChange("plans")}
-                >
-                  Plans
-                </button>
+
+            {/* Tabs & List with enhanced animations */}
+            <div className="bg-gray-800 rounded-xl p-6 transform hover:scale-[1.02] transition-all duration-300">
+              <div className="flex space-x-3 mb-6">
+                {["tasks", "goals", "projects", "plans"].map((tab) => (
+                  <button
+                    key={tab}
+                    className={`px-4 py-2 rounded-full transition-all duration-300 transform hover:scale-105 ${
+                      activeTab === tab 
+                        ? "bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-lg" 
+                        : "bg-gray-700 text-gray-200 hover:bg-gray-600"
+                    }`}
+                    onClick={() => handleTabChange(tab as any)}
+                  >
+                    {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                  </button>
+                ))}
               </div>
-              <h3 className="text-lg font-semibold mb-2 capitalize">{activeTab}</h3>
-              <div className="flex gap-2 mb-4">
+
+              <div className="flex gap-2 mb-6">
                 <input
                   type="text"
-                  className="flex-grow bg-gray-900 border border-gray-700 rounded-full p-2"
+                  className="flex-grow bg-gray-900 border border-gray-700 rounded-full p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300"
                   placeholder={`Enter new ${activeTab}...`}
                   value={newItemText}
                   onChange={(e) => setNewItemText(e.target.value)}
                 />
                 <input
                   type="date"
-                  className="bg-gray-900 border border-gray-700 rounded-full p-2"
+                  className="bg-gray-900 border border-gray-700 rounded-full p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300"
                   value={newItemDate}
                   onChange={(e) => setNewItemDate(e.target.value)}
                 />
-                <button className="bg-indigo-600 text-white px-4 py-2 rounded-full" onClick={handleCreate}>
+                <button 
+                  className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white px-6 py-3 rounded-full font-semibold hover:shadow-lg hover:shadow-purple-500/20 transition-all duration-300 transform hover:scale-105"
+                  onClick={handleCreate}
+                >
                   Create {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
                 </button>
               </div>
-              <ul className="space-y-2">
+
+              <ul className="space-y-3">
                 {currentItems.length === 0 ? (
-                  <li className="text-gray-400">No {activeTab} yet...</li>
+                  <li className="text-gray-400 text-center py-8">No {activeTab} yet...</li>
                 ) : (
-                  currentItems.map((item) => {
+                  currentItems.map((item, index) => {
                     const itemId = item.id;
                     const textValue = item.data[titleField] || "Untitled";
                     let overdue = false;
@@ -649,26 +690,39 @@ Guidelines:
                       overdue = dueDateObj < new Date();
                     }
                     const isEditing = editingItemId === itemId;
+
                     return (
                       <li
                         key={item.id}
-                        className={`p-2 rounded flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 ${overdue ? "bg-red-600" : "bg-gray-700"}`}
+                        className={`p-4 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3
+                          ${overdue ? "bg-red-900/50" : "bg-gray-700/50"}
+                          backdrop-blur-sm
+                          transform transition-all duration-300
+                          hover:scale-[1.02] hover:shadow-lg
+                          animate-fadeIn`}
+                        style={{
+                          animationDelay: `${index * 100}ms`
+                        }}
                       >
                         {!isEditing ? (
                           <div>
-                            <span className="font-bold">{textValue}</span>
-                            {dueDateStr && <span className="ml-2 text-sm font-bold">(Due: {dueDateStr})</span>}
+                            <span className="font-bold text-lg">{textValue}</span>
+                            {dueDateStr && (
+                              <span className="ml-3 text-sm font-medium px-3 py-1 rounded-full bg-gray-600">
+                                Due: {dueDateStr}
+                              </span>
+                            )}
                           </div>
                         ) : (
-                          <div className="flex flex-col sm:flex-row gap-2">
+                          <div className="flex flex-col sm:flex-row gap- row gap-3 w-full">
                             <input
-                              className="bg-gray-800 border border-gray-600 rounded-full p-1"
+                              className="flex-grow bg-gray-800 border border-gray-600 rounded-full p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300"
                               value={editingText}
                               onChange={(e) => setEditingText(e.target.value)}
                             />
                             <input
                               type="date"
-                              className="bg-gray-800 border border-gray-600 rounded-full p-1"
+                              className="bg-gray-800 border border-gray-600 rounded-full p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300"
                               value={editingDate}
                               onChange={(e) => setEditingDate(e.target.value)}
                             />
@@ -678,13 +732,13 @@ Guidelines:
                           {!isEditing ? (
                             <>
                               <button
-                                className="bg-blue-500 hover:bg-blue-600 px-2 py-1 rounded-full text-white flex items-center gap-1"
+                                className="bg-gradient-to-r from-blue-400 to-blue-600 px-4 py-2 rounded-full text-white flex items-center gap-2 hover:shadow-lg hover:shadow-blue-500/20 transition-all duration-300 transform hover:scale-105"
                                 onClick={() => handleEditClick(itemId, textValue, item.data.dueDate)}
                               >
                                 <Edit className="w-4 h-4" /> Edit
                               </button>
                               <button
-                                className="bg-red-500 hover:bg-red-600 px-2 py-1 rounded-full text-white flex items-center gap-1"
+                                className="bg-gradient-to-r from-red-400 to-red-600 px-4 py-2 rounded-full text-white flex items-center gap-2 hover:shadow-lg hover:shadow-red-500/20 transition-all duration-300 transform hover:scale-105"
                                 onClick={() => handleDelete(itemId)}
                               >
                                 <Trash className="w-4 h-4" /> Delete
@@ -693,13 +747,13 @@ Guidelines:
                           ) : (
                             <>
                               <button
-                                className="bg-green-500 hover:bg-green-600 px-2 py-1 rounded-full text-white"
+                                className="bg-gradient-to-r from-green-400 to-green-600 px-4 py-2 rounded-full text-white hover:shadow-lg hover:shadow-green-500/20 transition-all duration-300 transform hover:scale-105"
                                 onClick={() => handleEditSave(itemId)}
                               >
                                 Save
                               </button>
                               <button
-                                className="bg-gray-500 hover:bg-gray-600 px-2 py-1 rounded-full text-white"
+                                className="bg-gradient-to-r from-gray-400 to-gray-600 px-4 py-2 rounded-full text-white hover:shadow-lg hover:shadow-gray-500/20 transition-all duration-300 transform hover:scale-105"
                                 onClick={() => {
                                   setEditingItemId(null);
                                   setEditingText("");
@@ -718,110 +772,158 @@ Guidelines:
               </ul>
             </div>
           </div>
+
           {/* RIGHT COLUMN */}
           <div className="flex flex-col gap-6">
             {/* Weather Card */}
-            <div className="bg-gray-800 rounded-xl p-5">
-              <h2 className="text-xl font-semibold mb-2">Today's Weather</h2>
+            <div className="bg-gray-800 rounded-xl p-6 transform hover:scale-[1.02] transition-all duration-300">
+              <h2 className="text-xl font-semibold mb-4 flex items-center">
+                <Sparkles className="w-5 h-5 mr-2 text-yellow-400" />
+                Today's Weather
+              </h2>
               {weatherData ? (
-                <>
-                  <p className="text-lg font-bold">{weatherData.location}</p>
-                  <p className="text-gray-300 mb-2">
-                    {weatherData.condition} ☀️ {weatherData.temp_f}°F (Feels like: {weatherData.feelslike_f}°F)
+                <div className="space-y-3">
+                  <p className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">
+                    {weatherData.location}
                   </p>
-                  <p className="text-sm text-gray-400">
-                    <strong>Wind:</strong> {weatherData. wind_mph} mph &nbsp; | &nbsp;
-                    <strong>Humidity:</strong> {weatherData.humidity}%
+                  <p className="text-gray-300 text-lg">
+                    {weatherData.condition} ☀️ {weatherData.temp_f}°F
+                    <span className="text-gray-400 text-base ml-2">
+                      (Feels like: {weatherData.feelslike_f}°F)
+                    </span>
                   </p>
-                </>
+                  <div className="flex gap-4 text-sm text-gray-400">
+                    <div className="flex items-center">
+                      <strong>Wind:</strong>
+                      <span className="ml-2">{weatherData.wind_mph} mph</span>
+                    </div>
+                    <div className="flex items-center">
+                      <strong>Humidity:</strong>
+                      <span className="ml-2">{weatherData.humidity}%</span>
+                    </div>
+                  </div>
+                </div>
               ) : (
-                <p>Loading weather...</p>
+                <div className="animate-pulse space-y-4">
+                  <div className="h-8 bg-gray-700 rounded-full w-1/2"></div>
+                  <div className="h-6 bg-gray-700 rounded-full w-3/4"></div>
+                  <div className="h-4 bg-gray-700 rounded-full w-1/3"></div>
+                </div>
               )}
             </div>
+
             {/* Main Pomodoro Timer */}
-            <div className="bg-gray-800 rounded-xl p-5">
-              <div className="flex items-center justify-between mb-2">
-                <h2 className="text-xl font-semibold">Pomodoro Timer</h2>
+            <div className="bg-gray-800 rounded-xl p-6 transform hover:scale-[1.02] transition-all duration-300">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold flex items-center">
+                  <Sparkles className="w-5 h-5 mr-2 text-yellow-400" />
+                  Pomodoro Timer
+                </h2>
                 <button
-                  className="bg-gray-700 text-white px-2 py-1 rounded-full font-bold flex items-center gap-1"
+                  className="bg-gradient-to-r from-purple-400 to-purple-600 text-white px-4 py-2 rounded-full font-bold flex items-center gap-2 hover:shadow-lg hover:shadow-purple-500/20 transition-all duration-300 transform hover:scale-105"
                   onClick={handleAddCustomTimer}
                 >
                   <PlusCircle className="w-4 h-4" /> New Timer
                 </button>
               </div>
-              <div className="text-4xl font-bold mb-4">{formatPomodoroTime(pomodoroTimeLeft)}</div>
-              <div className="flex space-x-3">
-                <button className="bg-green-500 px-4 py-2 rounded-full font-semibold" onClick={handlePomodoroStart}>
+              <div className="text-6xl font-bold mb-6 text-center bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">
+                {formatPomodoroTime(pomodoroTimeLeft)}
+              </div>
+              <div className="flex justify-center space-x-4">
+                <button
+                  className="bg-gradient-to-r from-green-400 to-green-600 px-6 py-3 rounded-full font-semibold hover:shadow-lg hover:shadow-green-500/20 transition-all duration-300 transform hover:scale-105"
+                  onClick={handlePomodoroStart}
+                >
                   Start
                 </button>
-                <button className="bg-yellow-500 px-4 py-2 rounded-full font-semibold" onClick={handlePomodoroPause}>
+                <button
+                  className="bg-gradient-to-r from-yellow-400 to-yellow-600 px-6 py-3 rounded-full font-semibold hover:shadow-lg hover:shadow-yellow-500/20 transition-all duration-300 transform hover:scale-105"
+                  onClick={handlePomodoroPause}
+                >
                   Pause
                 </button>
-                <button className="bg-red-500 px-4 py-2 rounded-full font-semibold" onClick={handlePomodoroReset}>
+                <button
+                  className="bg-gradient-to-r from-red-400 to-red-600 px-6 py-3 rounded-full font-semibold hover:shadow-lg hover:shadow-red-500/20 transition-all duration-300 transform hover:scale-105"
+                  onClick={handlePomodoroReset}
+                >
                   Reset
                 </button>
               </div>
               {!customTimers.length && (
-                <p className="text-sm text-gray-400 mt-3">
-                  🍎 Looks like you have no current custom timers. To get started, just press the '+' button next to the Pomodoro timer and create your own! 🍎
+                <p className="text-sm text-gray-400 mt-6 text-center">
+                  🍎 No custom timers yet. Click the "New Timer" button to create one! 🍎
                 </p>
               )}
             </div>
+
             {/* Custom Timers List */}
-            <div className="bg-gray-800 rounded-xl p-5">
-              <h2 className="text-xl font-semibold mb-4">Custom Timers</h2>
+            <div className="bg-gray-800 rounded-xl p-6 transform hover:scale-[1.02] transition-all duration-300">
+              <h2 className="text-xl font-semibold mb-6 flex items-center">
+                <Sparkles className="w-5 h-5 mr-2 text-yellow-400" />
+                Custom Timers
+              </h2>
               {customTimers.length === 0 ? (
-                <p className="text-gray-400">No custom timers yet...</p>
+                <p className="text-gray-400 text-center py-8">No custom timers yet...</p>
               ) : (
-                <ul className="space-y-2">
-                  {customTimers.map((timer) => {
+                <ul className="space-y-4">
+                  {customTimers.map((timer, index) => {
                     const timerId = timer.id;
                     const runningState = runningTimers[timerId];
                     const timeLeft = runningState ? runningState.timeLeft : timer.data.time;
                     const isRunning = runningState ? runningState.isRunning : false;
                     return (
-                      <li key={timerId} className="bg-gray-700 p-3 rounded flex items-center justify-between">
-                        <div className="flex flex-col">
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-lg">{timer.data.name}</span>
+                      <li
+                        key={timerId}
+                        className="bg-gray-700/50 p-4 rounded-lg backdrop-blur-sm transform transition-all duration-300 hover:scale-[1.02] hover:shadow-lg animate-fadeIn"
+                        style={{
+                          animationDelay: `${index * 100}ms`
+                        }}
+                      >
+                        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                          <div className="flex flex-col items-center sm:items-start">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="font-bold text-lg">{timer.data.name}</span>
+                              <button
+                                className="bg-gradient-to-r from-blue-400 to-blue-600 p-2 rounded-full text-white hover:shadow-lg hover:shadow-blue-500/20 transition-all duration-300 transform hover:scale-105"
+                                onClick={() => handleEditTimerName(timerId)}
+                              >
+                                <Edit className="w-4 h-4" />
+                              </button>
+                              <button
+                                className="bg-gradient-to-r from-red-400 to-red-600 p-2 rounded-full text-white hover:shadow-lg hover:shadow-red-500/20 transition-all duration-300 transform hover:scale-105"
+                                onClick={() => handleDeleteTimer(timerId)}
+                              >
+                                <Trash className="w-4 h-4" />
+                              </button>
+                            </div>
+                            <span className="text-3xl font-semibold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">
+                              {formatCustomTime(timeLeft)}
+                            </span>
+                          </div>
+                          <div className="flex gap-2">
+                            {!isRunning && (
+                              <button
+                                className="bg-gradient-to-r from-green-400 to-green-600 px-4 py-2 rounded-full font-semibold hover:shadow-lg hover:shadow-green-500/20 transition-all duration-300 transform hover:scale-105"
+                                onClick={() => startCustomTimer(timerId)}
+                              >
+                                Start
+                              </button>
+                            )}
+                            {isRunning && (
+                              <button
+                                className="bg-gradient-to-r from-yellow-400 to-yellow-600 px-4 py-2 rounded-full font-semibold hover:shadow-lg hover:shadow-yellow-500/20 transition-all duration-300 transform hover:scale-105"
+                                onClick={() => pauseCustomTimer(timerId)}
+                              >
+                                Pause
+                              </button>
+                            )}
                             <button
-                              className="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded-full flex items-center gap-1"
-                              onClick={() => handleEditTimerName(timerId)}
+                              className="bg-gradient-to-r from-gray-400 to-gray-600 px-4 py-2 rounded-full font-semibold hover:shadow-lg hover:shadow-gray-500/20 transition-all duration-300 transform hover:scale-105"
+                              onClick={() => resetCustomTimer(timerId)}
                             >
-                              <Edit className="w-4 h-4" />
-                            </button>
-                            <button
-                              className="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded-full flex items-center gap-1"
-                              onClick={() => handleDeleteTimer(timerId)}
-                            >
-                              <Trash className="w-4 h-4" />
+                              Reset
                             </button>
                           </div>
-                          <span className="text-2xl font-semibold">{formatCustomTime(timeLeft)}</span>
-                        </div>
-                        <div className="flex gap-2">
-                          {!isRunning && (
-                            <button
-                              className="bg-green-500 px-3 py-1 rounded-full font-semibold"
-                              onClick={() => startCustomTimer(timerId)}
-                            >
-                              Start
-                            </button>
-                          )}
-                          {isRunning && (
-                            <button
-                              className="bg-yellow-500 px-3 py-1 rounded-full font-semibold"
-                              onClick={() => pauseCustomTimer(timerId)}
-                            >
-                              Pause
-                            </button>
-                          )}
-                          <button
-                            className="bg-gray-500 px-3 py-1 rounded-full font-semibold"
-                            onClick={() => resetCustomTimer(timerId)}
-                          >
-                            Reset
-                          </button>
                         </div>
                       </li>
                     );

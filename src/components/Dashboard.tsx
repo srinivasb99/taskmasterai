@@ -206,33 +206,40 @@ const handleMarkComplete = async (itemId: string) => {
 // ---------------------
 const [smartOverview, setSmartOverview] = useState<string>("");
 const [overviewLoading, setOverviewLoading] = useState(false);
+const [lastGeneratedData, setLastGeneratedData] = useState<string>("");
 
 useEffect(() => {
   if (!user) return;
 
   const generateOverview = async () => {
+    // 1. Format current data
+    const formatItem = (item: any, type: string) => {
+      const dueDate = item.data.dueDate?.toDate();
+      return `• ${item.data[type]} (${dueDate ? dueDate.toLocaleDateString() : 'No due date'})`;
+    };
+
+    const formattedData = [
+      tasks.length && `📋 TASKS:\n${tasks.map(t => formatItem(t, 'task')).join('\n')}`,
+      goals.length && `🎯 GOALS:\n${goals.map(g => formatItem(g, 'goal')).join('\n')}`,
+      projects.length && `📊 PROJECTS:\n${projects.map(p => formatItem(p, 'project')).join('\n')}`,
+      plans.length && `📅 PLANS:\n${plans.map(p => formatItem(p, 'plan')).join('\n')}`,
+    ].filter(Boolean).join('\n\n');
+
+    // 2. Check if data has changed
+    if (formattedData === lastGeneratedData) {
+      return; // Skip if data hasn't changed
+    }
+
     setOverviewLoading(true);
-    
+    setLastGeneratedData(formattedData);
+
     try {
-      // 1. Format Firebase data for AI processing
-      const formatItem = (item: any, type: string) => {
-        const dueDate = item.data.dueDate?.toDate();
-        return `• ${item.data[type]} (${dueDate ? dueDate.toLocaleDateString() : 'No due date'})`;
-      };
-
-      const formattedData = [
-        tasks.length && `📋 TASKS:\n${tasks.map(t => formatItem(t, 'task')).join('\n')}`,
-        goals.length && `🎯 GOALS:\n${goals.map(g => formatItem(g, 'goal')).join('\n')}`,
-        projects.length && `📊 PROJECTS:\n${projects.map(p => formatItem(p, 'project')).join('\n')}`,
-        plans.length && `📅 PLANS:\n${plans.map(p => formatItem(p, 'plan')).join('\n')}`,
-      ].filter(Boolean).join('\n\n');
-
       if (!formattedData) {
         setSmartOverview("Create tasks, goals, projects, or plans to generate your Smart Overview");
         return;
       }
 
-      // 2. Construct AI prompt
+      // 3. Construct AI prompt
       const prompt = `[INST] <<SYS>>
 You are TaskMaster, an advanced AI productivity assistant. Analyze this data and generate a concise Smart Overview:
 
@@ -247,7 +254,7 @@ Guidelines:
 - No explainations
 <</SYS>>[/INST]`;
 
-      // 3. Call Hugging Face API
+      // 4. Call Hugging Face API
       const response = await fetch("https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct", {
         method: "POST",
         headers: {
@@ -269,11 +276,11 @@ Guidelines:
 
       if (!response.ok) throw new Error("API request failed");
 
-      // 4. Process response
+      // 5. Process response
       const result = await response.json();
       const rawText = result[0]?.generated_text || '';
 
-      // 5. Sanitize and format output
+      // 6. Sanitize and format output
       const cleanText = rawText
         .replace(/\[\/?(INST|SYS)\]|<\/?s>/gi, '')
         .replace(/(\*\*|###|boxed|final answer|step \d+:)/gi, '')
@@ -298,7 +305,7 @@ Guidelines:
   };
 
   generateOverview();
-}, [user, tasks, goals, projects, plans, userName, hfApiKey]);
+}, [user, tasks, goals, projects, plans, userName, hfApiKey, lastGeneratedData]);
 
   // ---------------------
   // 11. CREATE & EDIT & DELETE

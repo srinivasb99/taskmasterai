@@ -212,57 +212,61 @@ useEffect(() => {
   if (!user) return;
 
   const generateOverview = async () => {
-    // 1. Format current data with a maximum limit per category
+    // 1. Format current data with better handling of due dates
     const formatItem = (item: any, type: string) => {
-      const dueDate = item.data.dueDate?.toDate();
-      return `• ${item.data[type]} (${dueDate ? dueDate.toLocaleDateString() : 'No due date'})`;
+      const dueDate = item.data.dueDate?.toDate?.();
+      const title = item.data[type] || item.data.title || 'Untitled';
+      return `• ${title}${dueDate ? ` (Due: ${dueDate.toLocaleDateString()})` : ''}`;
     };
 
-    // Helper to limit items per category
-    const limitItems = (items: any[], limit = 5) => {
-      if (items.length > limit) {
-        const selected = items.slice(0, limit);
-        return [...selected.map(i => formatItem(i, i.data.type)), `... and ${items.length - limit} more`];
-      }
-      return items.map(i => formatItem(i, i.data.type));
+    // Helper to check if items exist
+    const hasItems = (items: any[]) => items && items.length > 0;
+
+    // Helper to format category
+    const formatCategory = (items: any[], type: string, emoji: string) => {
+      if (!hasItems(items)) return '';
+      const formattedItems = items.map(item => formatItem(item, type)).join('\n');
+      return `${emoji} ${type.toUpperCase()}:\n${formattedItems}`;
     };
 
-    const formattedData = [
-      tasks.length && `📋 TASKS:\n${limitItems(tasks, 5).join('\n')}`,
-      goals.length && `🎯 GOALS:\n${limitItems(goals, 5).join('\n')}`,
-      projects.length && `📊 PROJECTS:\n${limitItems(projects, 5).join('\n')}`,
-      plans.length && `📅 PLANS:\n${limitItems(plans, 5).join('\n')}`,
-    ].filter(Boolean).join('\n\n');
+    // Format all data categories
+    const categories = [
+      formatCategory(tasks, 'task', '📋'),
+      formatCategory(goals, 'goal', '🎯'),
+      formatCategory(projects, 'project', '📊'),
+      formatCategory(plans, 'plan', '📅')
+    ].filter(Boolean);
 
-    // 2. Check if data has changed
-    if (formattedData === lastGeneratedData) {
-      return; // Skip if data hasn't changed
+    const formattedData = categories.join('\n\n');
+
+    // 2. Check if data has changed and if there's actual data
+    if (formattedData === lastGeneratedData || !categories.length) {
+      return;
     }
 
     setOverviewLoading(true);
     setLastGeneratedData(formattedData);
 
     try {
-      if (!formattedData) {
-        return;
-      }
-
-      // 3. Construct AI prompt with more specific instructions
+      // 3. Construct AI prompt with clear instructions about existing data
       const prompt = `[INST] <<SYS>>
-You are TaskMaster, an advanced AI productivity assistant. Analyze this data and generate a concise Smart Overview.
+You are TaskMaster, an advanced AI productivity assistant. Analyze the following data and generate a Smart Overview:
 
 ${formattedData}
 
-Guidelines:
-- Start with "Hello ${userName}," followed by a brief overview
-- List exactly 3 key priorities, numbered 1-3
-- Each priority should be from the actual data provided
-- Keep recommendations specific and actionable
-- Maximum 4 sentences per priority
-- Do not repeat information
-- Do not include any special characters or formatting
-- Do not include any mathematical symbols or currency signs
-- Avoid mentioning specific dates unless they're in the original tasks
+Follow these guidelines exactly:
+1. Start with "Hello ${userName}," followed by a VERY brief overview of what exists
+2. List EXACTLY 3 priorities based ONLY on the actual items shown above
+3. For each priority:
+   - Start with a number (1., 2., 3.)
+   - Reference specific items from the data
+   - If the item has a due date, mention it
+   - Keep it to 1-2 sentences maximum
+4. DO NOT make up tasks or dates that don't exist
+5. DO NOT give generic advice if there are specific items to discuss
+6. If an item has no due date, focus on its content without mentioning timing
+
+Remember: Only discuss what's actually in the data. Never invent tasks or goals.
 <</SYS>>[/INST]`;
 
       // 4. Call Hugging Face API
@@ -287,54 +291,56 @@ Guidelines:
 
       if (!response.ok) throw new Error("API request failed");
 
-      // 5. Process response
+      // 5. Process and clean response
       const result = await response.json();
-      let rawText = result[0]?.generated_text || '';
+      const rawText = result[0]?.generated_text || '';
 
       // 6. Clean and validate the response
       const cleanAndValidate = (text: string) => {
-        // Remove any potential duplicate content
-        const parts = text.split('Hello');
-        text = 'Hello' + (parts.length > 1 ? parts[1] : parts[0]);
+        // Remove any special characters or formatting
+        text = text
+          .replace(/\[\/?(INST|SYS)\]|<\/?s>|\[\/?(FONT|COLOR)\]/gi, '')
+          .replace(/(\*\*|###|boxed|final answer|step \d+:)/gi, '')
+          .replace(/\$\{.*?\}\$/g, '')
+          .replace(/\[\/?[^\]]+\]/g, '')
+          .replace(/\{.*?\}/g, '');
 
-        // Remove any malformed template literals or mathematical expressions
-        text = text.replace(/\$\{.*?\}\$/g, '')
-                  .replace(/\$[^$\n]+\$/g, '')
-                  .replace(/\[\/?[^\]]+\]/g, '')
-                  .replace(/\$+/g, '')
-                  .replace(/\{.*?\}/g, '');
-
-        // Ensure proper sentence structure
-        text = text.split('\n')
-                  .map(line => line.trim())
-                  .filter(line => line && !line.match(/^\$|^\{|\}$|\$$/))
-                  .join('\n');
-
-        return text;
+        // Split into lines and clean each line
+        return text
+          .split('\n')
+          .map(line => line.trim())
+          .filter(line => {
+            // Remove empty lines and lines with only special characters
+            return line.length > 0 && !/^[^a-zA-Z0-9]+$/.test(line);
+          })
+          .join('\n');
       };
 
       const cleanText = cleanAndValidate(rawText)
         .split('\n')
-        .map(line => line.trim())
         .filter(line => line.length > 0);
 
-      // 7. Create formatted HTML with better styling
-      const formattedHtml = `
-        ${cleanText.map((line, index) => {
+      // 7. Format HTML with improved styling
+      const formattedHtml = cleanText
+        .map((line, index) => {
           if (index === 0) {
-            // Greeting
+            // Greeting and overview
             return `<div class="text-green-400 text-lg font-medium mb-4">${line}</div>`;
           } else if (line.match(/^\d+\./)) {
-            // Priority items
-            return `<div class="text-blue-300 mb-3 pl-4">${line}</div>`;
+            // Priority items with number
+            return `<div class="text-blue-300 mb-3 pl-4 border-l-2 border-blue-500">${line}</div>`;
           } else {
             // Other content
             return `<div class="text-gray-300 mb-3">${line}</div>`;
           }
-        }).join('')}
-      `;
+        })
+        .join('');
 
-      setSmartOverview(formattedHtml || "Could not generate overview");
+      setSmartOverview(formattedHtml || `
+        <div class="text-yellow-400">
+          Add some tasks, goals, projects, or plans to get started with your Smart Overview!
+        </div>
+      `);
 
     } catch (error) {
       console.error("Overview generation error:", error);

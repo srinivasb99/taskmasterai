@@ -210,7 +210,7 @@ useEffect(() => {
       return `• ${title}${dueDate ? ` (Due: ${dueDate.toLocaleDateString()})` : ''}`;
     };
 
-    // Format all items together without categories
+    // Combine all items
     const allItems = [
       ...(tasks.map(t => formatItem(t, 'task')) || []),
       ...(goals.map(g => formatItem(g, 'goal')) || []),
@@ -220,7 +220,7 @@ useEffect(() => {
 
     const formattedData = allItems.join('\n');
 
-    // 2. Check if data has changed and if there's actual data
+    // 2. Check if data changed and there's actual data
     if (formattedData === lastGeneratedData || !allItems.length) {
       return;
     }
@@ -286,7 +286,7 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
       const result = await response.json();
       const rawText = result[0]?.generated_text || '';
 
-      // 6. Clean and validate the response
+      // 6. Clean and validate
       const cleanAndValidate = (text: string) => {
         // Basic cleanup
         text = text
@@ -295,30 +295,26 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
           .replace(/\$\{.*?\}\$/g, '')
           .replace(/\[\/?[^\]]+\]/g, '')
           .replace(/\{.*?\}/g, '')
-          .replace(/📋|📅|🎯|📊/g, '') // Remove category emojis
-          .replace(/\b(TASKS?|GOALS?|PROJECTS?|PLANS?)\b:/gi, '') // Remove category labels
-          .replace(/\n\s*\n/g, '\n'); // Remove multiple blank lines
+          .replace(/📋|📅|🎯|📊/g, '')
+          .replace(/\b(TASKS?|GOALS?|PROJECTS?|PLANS?)\b:/gi, '')
+          .replace(/\n\s*\n/g, '\n');
 
-        // Additional filters to remove disclaimers/unwanted lines
+        // Additional filters
         const excludePhrases = [
+          "I see I made some minor errors",
+          "Here is the corrected response",
           "was removed as per request",
           "since I am forced to put something here",
-          "-> You are TaskMaster",
-          "Here is the corrected response",
-          "I see I made some minor errors",
+          "-> You are TaskMaster"
         ];
 
         return text
           .split('\n')
           .map(line => line.trim())
           .filter(line => {
-            // Exclude lines with our unwanted phrases
-            if (
-              excludePhrases.some(phrase => line.toLowerCase().includes(phrase.toLowerCase()))
-            ) {
+            if (excludePhrases.some(phrase => line.toLowerCase().includes(phrase.toLowerCase()))) {
               return false;
             }
-            // Exclude empty or purely symbolic lines
             return line.length > 0 && !/^[^a-zA-Z0-9]+$/.test(line);
           })
           .join('\n');
@@ -326,7 +322,7 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
 
       const cleanedText = cleanAndValidate(rawText);
 
-      // Check for duplicate response based on cleaned text
+      // Check for duplicate
       if (cleanedText === lastResponse) {
         setOverviewLoading(false);
         return;
@@ -337,14 +333,14 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
         .split('\n')
         .filter(line => line.length > 0);
 
-      // 7. Format HTML with improved styling
+      // 7. Format HTML
       const formattedHtml = cleanTextLines
         .map((line, index) => {
           if (index === 0) {
-            // Greeting and overview
+            // Greeting
             return `<div class="text-green-400 text-lg font-medium mb-4">${line}</div>`;
           } else if (line.match(/^\d+\./)) {
-            // Priority items with number
+            // Priority item
             return `<div class="text-blue-300 mb-3 pl-4 border-l-2 border-blue-500">${line}</div>`;
           } else {
             // Other content
@@ -371,8 +367,8 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
   };
 
   generateOverview();
-}, [user, tasks, goals, projects, plans, userName, hfApiKey, lastGeneratedData]);
-
+// ----------- Removed lastGeneratedData from dependencies -----------
+}, [user, tasks, goals, projects, plans, userName, hfApiKey]); 
 
   // ---------------------
   // 11. CREATE & EDIT & DELETE
@@ -951,11 +947,13 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
                     </div>
                   </div>
 
-                  {/* Show only the next 3 relevant days: Today, Tomorrow, Day After Tomorrow */}
+                  {/* Show only the next 3 relevant days: 
+                      "Today (Feb 14)", "Tomorrow (Feb 15)", "Day After Tomorrow (Feb 16)" 
+                      or a fallback label if we run out of days. 
+                  */}
                   {weatherData.forecast && weatherData.forecast.forecastday && (
                     <div className="space-y-4">
                       <h3 className="text-lg font-semibold text-blue-400">3-Day Forecast</h3>
-
                       {(() => {
                         // Filter out any past days in case API date is behind local date
                         const now = new Date();
@@ -969,12 +967,17 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
 
                         // Only take up to 3 days from that filtered list
                         const finalDays = validDays.slice(0, 3);
-
-                        // We'll label them explicitly
                         const dayLabels = ["Today", "Tomorrow", "Day After Tomorrow"];
 
                         return finalDays.map((day: any, idx: number) => {
-                          const label = dayLabels[idx] ?? "Coming Day";
+                          // e.g. "Today (Feb 14)"
+                          const dateObj = new Date(day.date);
+                          const monthDay = dateObj.toLocaleDateString(undefined, {
+                            month: 'short',
+                            day: 'numeric',
+                          });
+                          const label = `${dayLabels[idx]} (${monthDay})`;
+
                           const maxF = Math.round(day.day.maxtemp_f);
                           const minF = Math.round(day.day.mintemp_f);
                           const icon = day.day.condition.icon;

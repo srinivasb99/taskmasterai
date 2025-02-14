@@ -1,9 +1,7 @@
-
 import React, { useEffect, useState, useRef } from 'react';
-import { PlusCircle, Edit, Trash, Sparkles } from 'lucide-react';
+import { PlusCircle, Edit, Trash, Sparkles, CheckCircle } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { getTimeBasedGreeting, getRandomQuote } from '../lib/greetings';
-import { PlusCircle, Edit, Trash, Sparkles, CheckCircle } from 'lucide-react';
 import {
   onFirebaseAuthStateChanged,
   onCollectionSnapshot,
@@ -40,15 +38,15 @@ export function Dashboard() {
   const [plans, setPlans] = useState<Array<{ id: string; data: any }>>([]);
   const [customTimers, setCustomTimers] = useState<Array<{ id: string; data: any }>>([]);
 
-const handleMarkComplete = async (itemId: string) => {
-  if (!user) return;
-  try {
-    await markItemComplete(activeTab, itemId);
-  } catch (error) {
-    console.error("Error marking item as complete:", error);
-  }
-};
-
+  // Mark item complete
+  const handleMarkComplete = async (itemId: string) => {
+    if (!user) return;
+    try {
+      await markItemComplete(activeTab, itemId);
+    } catch (error) {
+      console.error("Error marking item as complete:", error);
+    }
+  };
 
   // ---------------------
   // 3. WEATHER STATE
@@ -166,7 +164,7 @@ const handleMarkComplete = async (itemId: string) => {
   }, [user]);
 
   // ---------------------
-  // 9. WEATHER FETCH (using current location)
+  // 9. WEATHER FETCH (using 3-day forecast)
   // ---------------------
   useEffect(() => {
     if (!user) {
@@ -177,19 +175,13 @@ const handleMarkComplete = async (itemId: string) => {
       async (position) => {
         const { latitude, longitude } = position.coords;
         try {
+          // Fetch both current + 3-day forecast in one request
           const response = await fetch(
-            `https://api.weatherapi.com/v1/current.json?key=${weatherApiKey}&q=${latitude},${longitude}`
+            `https://api.weatherapi.com/v1/forecast.json?key=${weatherApiKey}&q=${latitude},${longitude}&days=3`
           );
           if (!response.ok) throw new Error("Weather fetch failed");
           const data = await response.json();
-          setWeatherData({
-            location: data.location.name,
-            condition: data.current.condition.text,
-            temp_f: Math.round(data.current.temp_f),
-            feelslike_f: Math.round(data.current.feelslike_f),
-            wind_mph: Math.round(data.current.wind_mph),
-            humidity: data.current.humidity,
-          });
+          setWeatherData(data);
         } catch (error) {
           console.error("Failed to fetch weather:", error);
           setWeatherData(null);
@@ -202,49 +194,46 @@ const handleMarkComplete = async (itemId: string) => {
     );
   }, [user]);
 
-// ---------------------
-// SMART OVERVIEW GENERATION
-// ---------------------
-const [smartOverview, setSmartOverview] = useState<string>("");
-const [overviewLoading, setOverviewLoading] = useState(false);
-const [lastGeneratedData, setLastGeneratedData] = useState<string>("");
-const [lastResponse, setLastResponse] = useState<string>("");
+  // ---------------------
+  // SMART OVERVIEW GENERATION
+  // ---------------------
+  const [smartOverview, setSmartOverview] = useState<string>("");
+  const [overviewLoading, setOverviewLoading] = useState(false);
+  const [lastGeneratedData, setLastGeneratedData] = useState<string>("");
+  const [lastResponse, setLastResponse] = useState<string>("");
 
-useEffect(() => {
-  if (!user) return;
+  useEffect(() => {
+    if (!user) return;
 
-  const generateOverview = async () => {
-    // 1. Format current data with better handling of due dates
-    const formatItem = (item: any, type: string) => {
-      const dueDate = item.data.dueDate?.toDate?.();
-      const title = item.data[type] || item.data.title || 'Untitled';
-      return `• ${title}${dueDate ? ` (Due: ${dueDate.toLocaleDateString()})` : ''}`;
-    };
+    const generateOverview = async () => {
+      // 1. Format current data with better handling of due dates
+      const formatItem = (item: any, type: string) => {
+        const dueDate = item.data.dueDate?.toDate?.();
+        const title = item.data[type] || item.data.title || 'Untitled';
+        return `• ${title}${dueDate ? ` (Due: ${dueDate.toLocaleDateString()})` : ''}`;
+      };
 
-    // Helper to check if items exist
-    const hasItems = (items: any[]) => items && items.length > 0;
+      // Format all items together without categories
+      const allItems = [
+        ...(tasks.map(t => formatItem(t, 'task')) || []),
+        ...(goals.map(g => formatItem(g, 'goal')) || []),
+        ...(projects.map(p => formatItem(p, 'project')) || []),
+        ...(plans.map(p => formatItem(p, 'plan')) || [])
+      ];
 
-    // Format all items together without categories
-    const allItems = [
-      ...(tasks.map(t => formatItem(t, 'task')) || []),
-      ...(goals.map(g => formatItem(g, 'goal')) || []),
-      ...(projects.map(p => formatItem(p, 'project')) || []),
-      ...(plans.map(p => formatItem(p, 'plan')) || [])
-    ];
+      const formattedData = allItems.join('\n');
 
-    const formattedData = allItems.join('\n');
+      // 2. Check if data has changed and if there's actual data
+      if (formattedData === lastGeneratedData || !allItems.length) {
+        return;
+      }
 
-    // 2. Check if data has changed and if there's actual data
-    if (formattedData === lastGeneratedData || !allItems.length) {
-      return;
-    }
+      setOverviewLoading(true);
+      setLastGeneratedData(formattedData);
 
-    setOverviewLoading(true);
-    setLastGeneratedData(formattedData);
-
-    try {
-      // 3. Construct AI prompt with clear instructions about existing data
-      const prompt = `[INST] <<SYS>>
+      try {
+        // 3. Construct AI prompt
+        const prompt = `[INST] <<SYS>>
 You are TaskMaster, an advanced AI productivity assistant. Analyze the following items and generate a Smart Overview:
 
 ${formattedData}
@@ -274,105 +263,104 @@ Follow these guidelines exactly:
 Remember: Focus on actionable strategies and specific next steps, not just describing the items.
 <</SYS>>[/INST]`;
 
-      // 4. Call Hugging Face API
-      const response = await fetch("https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${hfApiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          inputs: prompt,
-          parameters: {
-            max_new_tokens: 300,
-            temperature: 0.7,
-            top_p: 0.9,
-            repetition_penalty: 1.2,
-            return_full_text: false,
-            do_sample: true
-          }
-        }),
-      });
+        // 4. Call Hugging Face API
+        const response = await fetch("https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${hfApiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            inputs: prompt,
+            parameters: {
+              max_new_tokens: 300,
+              temperature: 0.7,
+              top_p: 0.9,
+              repetition_penalty: 1.2,
+              return_full_text: false,
+              do_sample: true
+            }
+          }),
+        });
 
-      if (!response.ok) throw new Error("API request failed");
+        if (!response.ok) throw new Error("API request failed");
 
-      // 5. Process and clean response
-      const result = await response.json();
-      const rawText = result[0]?.generated_text || '';
+        // 5. Process and clean response
+        const result = await response.json();
+        const rawText = result[0]?.generated_text || '';
 
-      // 6. Clean and validate the response
-      const cleanAndValidate = (text: string) => {
-        // Remove any special characters or formatting
-        text = text
-          .replace(/\[\/?(INST|SYS)\]|<\/?s>|\[\/?(FONT|COLOR)\]/gi, '')
-          .replace(/(\*\*|###|boxed|final answer|step \d+:)/gi, '')
-          .replace(/\$\{.*?\}\$/g, '')
-          .replace(/\[\/?[^\]]+\]/g, '')
-          .replace(/\{.*?\}/g, '')
-          .replace(/📋|📅|🎯|📊/g, '') // Remove category emojis
-          .replace(/\b(TASKS?|GOALS?|PROJECTS?|PLANS?)\b:/gi, '') // Remove category labels
-          .replace(/\n\s*\n/g, '\n'); // Remove multiple blank lines
+        // 6. Clean and validate the response
+        const cleanAndValidate = (text: string) => {
+          // Remove any special characters or formatting
+          text = text
+            .replace(/\[\/?(INST|SYS)\]|<\/?s>|\[\/?(FONT|COLOR)\]/gi, '')
+            .replace(/(\*\*|###|boxed|final answer|step \d+:)/gi, '')
+            .replace(/\$\{.*?\}\$/g, '')
+            .replace(/\[\/?[^\]]+\]/g, '')
+            .replace(/\{.*?\}/g, '')
+            .replace(/📋|📅|🎯|📊/g, '') // Remove category emojis
+            .replace(/\b(TASKS?|GOALS?|PROJECTS?|PLANS?)\b:/gi, '') // Remove category labels
+            .replace(/\n\s*\n/g, '\n'); // Remove multiple blank lines
 
-        // Filter out lines that mention "corrected response" or "made some minor errors"
-        return text
+          // Filter out lines that mention "corrected response" or "made some minor errors"
+          return text
+            .split('\n')
+            .map(line => line.trim())
+            .filter(line => {
+              if (line.includes("I see I made some minor errors")) return false;
+              if (line.includes("Here is the corrected response")) return false;
+              return line.length > 0 && !/^[^a-zA-Z0-9]+$/.test(line);
+            })
+            .join('\n');
+        };
+
+        const cleanedText = cleanAndValidate(rawText);
+
+        // Check for duplicate response based on cleaned text
+        if (cleanedText === lastResponse) {
+          setOverviewLoading(false);
+          return;
+        }
+        setLastResponse(cleanedText);
+
+        const cleanTextLines = cleanedText
           .split('\n')
-          .map(line => line.trim())
-          .filter(line => {
-            if (line.includes("I see I made some minor errors")) return false;
-            if (line.includes("Here is the corrected response")) return false;
-            return line.length > 0 && !/^[^a-zA-Z0-9]+$/.test(line);
+          .filter(line => line.length > 0);
+
+        // 7. Format HTML with improved styling
+        const formattedHtml = cleanTextLines
+          .map((line, index) => {
+            if (index === 0) {
+              // Greeting and overview
+              return `<div class="text-green-400 text-lg font-medium mb-4">${line}</div>`;
+            } else if (line.match(/^\d+\./)) {
+              // Priority items with number
+              return `<div class="text-blue-300 mb-3 pl-4 border-l-2 border-blue-500">${line}</div>`;
+            } else {
+              // Other content
+              return `<div class="text-gray-300 mb-3">${line}</div>`;
+            }
           })
-          .join('\n');
-      };
+          .join('');
 
-      const cleanedText = cleanAndValidate(rawText);
+        setSmartOverview(formattedHtml || `
+          <div class="text-yellow-400">
+            Add some items to get started with your Smart Overview!
+          </div>
+        `);
 
-      // Check for duplicate response based on cleaned text
-      if (cleanedText === lastResponse) {
+      } catch (error) {
+        console.error("Overview generation error:", error);
+        setSmartOverview(`
+          <div class="text-red-400">Error generating overview. Please try again.</div>
+        `);
+      } finally {
         setOverviewLoading(false);
-        return;
       }
-      setLastResponse(cleanedText);
+    };
 
-      const cleanTextLines = cleanedText
-        .split('\n')
-        .filter(line => line.length > 0);
-
-      // 7. Format HTML with improved styling
-      const formattedHtml = cleanTextLines
-        .map((line, index) => {
-          if (index === 0) {
-            // Greeting and overview
-            return `<div class="text-green-400 text-lg font-medium mb-4">${line}</div>`;
-          } else if (line.match(/^\d+\./)) {
-            // Priority items with number
-            return `<div class="text-blue-300 mb-3 pl-4 border-l-2 border-blue-500">${line}</div>`;
-          } else {
-            // Other content
-            return `<div class="text-gray-300 mb-3">${line}</div>`;
-          }
-        })
-        .join('');
-
-      setSmartOverview(formattedHtml || `
-        <div class="text-yellow-400">
-          Add some items to get started with your Smart Overview!
-        </div>
-      `);
-
-    } catch (error) {
-      console.error("Overview generation error:", error);
-      setSmartOverview(`
-        <div class="text-red-400">Error generating overview. Please try again.</div>
-      `);
-    } finally {
-      setOverviewLoading(false);
-    }
-  };
-
-  generateOverview();
-}, [user, tasks, goals, projects, plans, userName, hfApiKey, lastGeneratedData]);
-
+    generateOverview();
+  }, [user, tasks, goals, projects, plans, userName, hfApiKey, lastGeneratedData]);
 
   // ---------------------
   // 11. CREATE & EDIT & DELETE
@@ -641,7 +629,7 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
         </header>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="flex flex-col gap-6">
-            {/* Smart Overview Card with enhanced animations */}
+            {/* Smart Overview Card */}
             <div className={`bg-gray-800 rounded-xl p-6 relative min-h-[200px] transform transition-all duration-500 ease-out ${cardVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'} hover:shadow-lg hover:shadow-purple-500/10`}>
               <div className="flex items-center mb-4">
                 <h2 className="text-xl font-semibold text-blue-300 mr-2 flex items-center">
@@ -667,7 +655,7 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
               )}
             </div>
 
-            {/* Productivity Card with animated progress bars */}
+            {/* Productivity Card */}
             <div className="bg-gray-800 rounded-xl p-6 transform hover:scale-[1.02] transition-all duration-300">
               <h2 className="text-xl font-semibold text-purple-400 mb-4">
                 Your Productivity
@@ -749,7 +737,7 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
               <p className="text-gray-400">No upcoming deadlines</p>
             </div>
 
-            {/* Tabs & List with enhanced animations */}
+            {/* Tabs & List */}
             <div className="bg-gray-800 rounded-xl p-6 transform hover:scale-[1.02] transition-all duration-300">
               <div className="flex space-x-3 mb-6">
                 {["tasks", "goals", "projects", "plans"].map((tab) => (
@@ -794,49 +782,49 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
                   <li className="text-gray-400 text-center py-8">No {activeTab} yet...</li>
                 ) : (
                   currentItems.map((item, index) => {
-  const itemId = item.id;
-  const textValue = item.data[titleField] || "Untitled";
-  const isCompleted = item.data.completed || false;  // Add this line
-  let overdue = false;
-  let dueDateStr = "";
-  if (item.data.dueDate) {
-    const dueDateObj = item.data.dueDate.toDate ? item.data.dueDate.toDate() : new Date(item.data.dueDate);
-    dueDateStr = dueDateObj.toLocaleDateString();
-    overdue = dueDateObj < new Date();
-  }
-  const isEditing = editingItemId === itemId;
+                    const itemId = item.id;
+                    const textValue = item.data[titleField] || "Untitled";
+                    const isCompleted = item.data.completed || false;
+                    let overdue = false;
+                    let dueDateStr = "";
+                    if (item.data.dueDate) {
+                      const dueDateObj = item.data.dueDate.toDate ? item.data.dueDate.toDate() : new Date(item.data.dueDate);
+                      dueDateStr = dueDateObj.toLocaleDateString();
+                      overdue = dueDateObj < new Date();
+                    }
+                    const isEditing = editingItemId === itemId;
 
-  return (
-    <li
-      key={item.id}
-      className={`p-4 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3
-        ${isCompleted ? "bg-green-900/30" : overdue ? "bg-red-900/50" : "bg-gray-700/50"}
-        backdrop-blur-sm
-        transform transition-all duration-300
-        hover:scale-[1.02] hover:shadow-lg
-        animate-fadeIn
-        ${isCompleted ? "opacity-75" : "opacity-100"}`}
-      style={{
-        animationDelay: `${index * 100}ms`
-      }}
-    >
-      {!isEditing ? (
-        <div className="flex items-center gap-3">
-          <span className={`font-bold text-lg ${isCompleted ? "line-through text-gray-400" : ""}`}>
-            {textValue}
-          </span>
-          {dueDateStr && (
-            <span className="text-sm font-medium px-3 py-1 rounded-full bg-gray-600">
-              Due: {dueDateStr}
-            </span>
-          )}
-          {isCompleted && (
-            <span className="text-sm font-medium px-3 py-1 rounded-full bg-green-600">
-              Completed
-            </span>
-          )}
-        </div>
-      ) : (
+                    return (
+                      <li
+                        key={item.id}
+                        className={`p-4 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3
+                          ${isCompleted ? "bg-green-900/30" : overdue ? "bg-red-900/50" : "bg-gray-700/50"}
+                          backdrop-blur-sm
+                          transform transition-all duration-300
+                          hover:scale-[1.02] hover:shadow-lg
+                          animate-fadeIn
+                          ${isCompleted ? "opacity-75" : "opacity-100"}`}
+                        style={{
+                          animationDelay: `${index * 100}ms`
+                        }}
+                      >
+                        {!isEditing ? (
+                          <div className="flex items-center gap-3">
+                            <span className={`font-bold text-lg ${isCompleted ? "line-through text-gray-400" : ""}`}>
+                              {textValue}
+                            </span>
+                            {dueDateStr && (
+                              <span className="text-sm font-medium px-3 py-1 rounded-full bg-gray-600">
+                                Due: {dueDateStr}
+                              </span>
+                            )}
+                            {isCompleted && (
+                              <span className="text-sm font-medium px-3 py-1 rounded-full bg-green-600">
+                                Completed
+                              </span>
+                            )}
+                          </div>
+                        ) : (
                           <div className="flex flex-col sm:flex-row gap-3 w-full">
                             <input
                               className="flex-grow bg-gray-800 border border-gray-600 rounded-full p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300"
@@ -851,31 +839,32 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
                             />
                           </div>
                         )}
-     <div className="flex gap-2">
-        {!isEditing ? (
-          <>
-            {!isCompleted && (
-              <button
-                className="bg-gradient-to-r from-green-400 to-green-600 px-4 py-2 rounded-full text-white flex items-center gap-2 hover:shadow-lg hover:shadow-green-500/20 transition-all duration-300 transform hover:scale-105"
-                onClick={() => handleMarkComplete(itemId)}
-              >
-                <CheckCircle className="w-4 h-4" /> Complete
-              </button>
-            )}
-            <button
-              className="bg-gradient-to-r from-blue-400 to-blue-600 px-4 py-2 rounded-full text-white flex items-center gap-2 hover:shadow-lg hover:shadow-blue-500/20 transition-all duration-300 transform hover:scale-105"
-              onClick={() => handleEditClick(itemId, textValue, item.data.dueDate)}
-            >
-              <Edit className="w-4 h-4" /> Edit
-            </button>
-            <button
-              className="bg-gradient-to-r from-red-400 to-red-600 px-4 py-2 rounded-full text-white flex items-center gap-2 hover:shadow-lg hover:shadow-red-500/20 transition-all duration-300 transform hover:scale-105"
-              onClick={() => handleDelete(itemId)}
-            >
-              <Trash className="w-4 h-4" /> Delete
-            </button>
-          </>
-        ) : (                            <>
+                        <div className="flex gap-2">
+                          {!isEditing ? (
+                            <>
+                              {!isCompleted && (
+                                <button
+                                  className="bg-gradient-to-r from-green-400 to-green-600 px-4 py-2 rounded-full text-white flex items-center gap-2 hover:shadow-lg hover:shadow-green-500/20 transition-all duration-300 transform hover:scale-105"
+                                  onClick={() => handleMarkComplete(itemId)}
+                                >
+                                  <CheckCircle className="w-4 h-4" /> Complete
+                                </button>
+                              )}
+                              <button
+                                className="bg-gradient-to-r from-blue-400 to-blue-600 px-4 py-2 rounded-full text-white flex items-center gap-2 hover:shadow-lg hover:shadow-blue-500/20 transition-all duration-300 transform hover:scale-105"
+                                onClick={() => handleEditClick(itemId, textValue, item.data.dueDate)}
+                              >
+                                <Edit className="w-4 h-4" /> Edit
+                              </button>
+                              <button
+                                className="bg-gradient-to-r from-red-400 to-red-600 px-4 py-2 rounded-full text-white flex items-center gap-2 hover:shadow-lg hover:shadow-red-500/20 transition-all duration-300 transform hover:scale-105"
+                                onClick={() => handleDelete(itemId)}
+                              >
+                                <Trash className="w-4 h-4" /> Delete
+                              </button>
+                            </>
+                          ) : (
+                            <>
                               <button
                                 className="bg-gradient-to-r from-green-400 to-green-600 px-4 py-2 rounded-full text-white hover:shadow-lg hover:shadow-green-500/20 transition-all duration-300 transform hover:scale-105"
                                 onClick={() => handleEditSave(itemId)}
@@ -905,31 +894,96 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
 
           {/* RIGHT COLUMN */}
           <div className="flex flex-col gap-6">
-            {/* Weather Card */}
+            {/* ====== ADVANCED WEATHER CARD ====== */}
             <div className="bg-gray-800 rounded-xl p-6 transform hover:scale-[1.02] transition-all duration-300">
-              <h2 className="text-xl font-semibold mb-4">Today's Weather</h2>
+              <h2 className="text-xl font-semibold mb-4">Local Weather & Forecast</h2>
+
               {weatherData ? (
-                <div className="space-y-3">
-                  <p className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">
-                    {weatherData.location}
-                  </p>
-                  <p className="text-gray-300 text-lg">
-                    {weatherData.condition} ☀️ {weatherData.temp_f}°F
-                    <span className="text-gray-400 text-base ml-2">
-                      (Feels like: {weatherData.feelslike_f}°F)
-                    </span>
-                  </p>
-                  <div className="flex gap-4 text-sm text-gray-400">
-                    <div className="flex items-center">
-                      <strong>Wind:</strong>
-                      <span className="ml-2">{weatherData.wind_mph} mph</span>
-                    </div>
-                    <div className="flex items-center">
-                      <strong>Humidity:</strong>
-                      <span className="ml-2">{weatherData.humidity}%</span>
+                <>
+                  {/* Current weather overview */}
+                  <div className="space-y-3 mb-6">
+                    <p className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">
+                      {weatherData.location.name}
+                    </p>
+                    <p className="text-gray-300 text-lg flex items-center gap-2">
+                      <img 
+                        src={weatherData.current.condition.icon} 
+                        alt={weatherData.current.condition.text} 
+                        className="w-10 h-10"
+                      />
+                      {weatherData.current.condition.text} - {weatherData.current.temp_f}°F
+                      <span className="text-gray-400 text-base ml-2">
+                        Feels like {weatherData.current.feelslike_f}°F
+                      </span>
+                    </p>
+                    <div className="flex gap-4 text-sm text-gray-400">
+                      <div className="flex items-center">
+                        <strong>Wind:</strong>
+                        <span className="ml-2">{Math.round(weatherData.current.wind_mph)} mph</span>
+                      </div>
+                      <div className="flex items-center">
+                        <strong>Humidity:</strong>
+                        <span className="ml-2">{weatherData.current.humidity}%</span>
+                      </div>
+                      <div className="flex items-center">
+                        <strong>UV Index:</strong>
+                        <span className="ml-2">{weatherData.current.uv}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
+
+                  {/* Forecast for next 3 days */}
+                  {weatherData.forecast && weatherData.forecast.forecastday && (
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold text-blue-400">3-Day Forecast</h3>
+                      {weatherData.forecast.forecastday.map((day: any, idx: number) => {
+                        const dateLabel = new Date(day.date).toLocaleDateString(undefined, {
+                          weekday: 'short', month: 'short', day: 'numeric',
+                        });
+                        const maxF = Math.round(day.day.maxtemp_f);
+                        const minF = Math.round(day.day.mintemp_f);
+                        const icon = day.day.condition.icon;
+
+                        // Calculate fill ratio for the bar (e.g., scale by typical temperature range)
+                        // For a simple approach, just subtract from some constant
+                        const barWidth = maxF > 0 ? (maxF / 120) * 100 : 0; 
+                        
+                        return (
+                          <div 
+                            key={idx}
+                            className="flex items-center gap-4 bg-gray-700/50 p-3 rounded-lg relative overflow-hidden"
+                          >
+                            {/* Animated gradient background behind each forecast row */}
+                            <div 
+                              className="absolute inset-0 bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 opacity-10 pointer-events-none"
+                            />
+                            <img 
+                              src={icon} 
+                              alt={day.day.condition.text} 
+                              className="w-10 h-10 z-10"
+                            />
+                            <div className="z-10 flex-grow">
+                              <p className="text-sm text-gray-200 font-medium">
+                                {dateLabel}
+                              </p>
+                              <div className="flex items-center gap-3 mt-1">
+                                <p className="text-sm text-red-300">High: {maxF}°F</p>
+                                <p className="text-sm text-blue-300">Low: {minF}°F</p>
+                              </div>
+                              {/* Temperature bar with animation */}
+                              <div className="mt-2 w-full h-2 bg-gray-600 rounded-full overflow-hidden">
+                                <div 
+                                  className="h-full bg-gradient-to-r from-yellow-300 to-red-500 rounded-full transition-all duration-700 ease-out"
+                                  style={{ width: `${barWidth}%` }}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
               ) : (
                 <div className="animate-pulse space-y-4">
                   <div className="h-8 bg-gray-700 rounded-full w-1/2"></div>

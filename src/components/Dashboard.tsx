@@ -207,50 +207,55 @@ const handleMarkComplete = async (itemId: string) => {
 const [smartOverview, setSmartOverview] = useState<string>("");
 const [overviewLoading, setOverviewLoading] = useState(false);
 const [lastGeneratedData, setLastGeneratedData] = useState<string>("");
+const generationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+const isGeneratingRef = useRef(false);
 
 useEffect(() => {
   if (!user) return;
 
   const generateOverview = async () => {
+    // Prevent multiple simultaneous generations
+    if (isGeneratingRef.current) return;
+
     // 1. Format current data with better handling of due dates
     const formatItem = (item: any, type: string) => {
       const dueDate = item.data.dueDate?.toDate?.();
       const title = item.data[type] || item.data.title || 'Untitled';
-      return `• ${title}${dueDate ? ` (Due: ${dueDate.toLocaleDateString()})` : ''}`;
+      return `${title}${dueDate ? ` (Due: ${dueDate.toLocaleDateString()})` : ''}`;
     };
 
     // Helper to check if items exist
     const hasItems = (items: any[]) => items && items.length > 0;
 
-    // Helper to format category
-    const formatCategory = (items: any[], type: string, emoji: string) => {
-      if (!hasItems(items)) return '';
-      const formattedItems = items.map(item => formatItem(item, type)).join('\n');
-      return `${emoji} ${type.toUpperCase()}:\n${formattedItems}`;
-    };
+    // Format all items together without categories
+    const allItems = [
+      ...(tasks.map(t => formatItem(t, 'task')) || []),
+      ...(goals.map(g => formatItem(g, 'goal')) || []),
+      ...(projects.map(p => formatItem(p, 'project')) || []),
+      ...(plans.map(p => formatItem(p, 'plan')) || [])
+    ];
 
-    // Format all data categories
-    const categories = [
-      formatCategory(tasks, 'task', '📋'),
-      formatCategory(goals, 'goal', '🎯'),
-      formatCategory(projects, 'project', '📊'),
-      formatCategory(plans, 'plan', '📅')
-    ].filter(Boolean);
-
-    const formattedData = categories.join('\n\n');
+    const formattedData = allItems.map(item => `• ${item}`).join('\n');
 
     // 2. Check if data has changed and if there's actual data
-    if (formattedData === lastGeneratedData || !categories.length) {
+    if (formattedData === lastGeneratedData || !allItems.length) {
       return;
     }
 
+    // Clear any pending generation
+    if (generationTimeoutRef.current) {
+      clearTimeout(generationTimeoutRef.current);
+    }
+
+    // Set loading state only if we're going to generate
     setOverviewLoading(true);
+    isGeneratingRef.current = true;
     setLastGeneratedData(formattedData);
 
     try {
       // 3. Construct AI prompt with clear instructions about existing data
       const prompt = `[INST] <<SYS>>
-You are TaskMaster, an advanced AI productivity assistant. Analyze the following data and generate a Smart Overview:
+You are TaskMaster, an advanced AI productivity assistant. Analyze the following items and generate a Smart Overview:
 
 ${formattedData}
 
@@ -265,8 +270,9 @@ Follow these guidelines exactly:
 4. DO NOT make up tasks or dates that don't exist
 5. DO NOT give generic advice if there are specific items to discuss
 6. If an item has no due date, focus on its content without mentioning timing
+7. DO NOT mention categories (tasks, goals, projects, plans) in your response
 
-Remember: Only discuss what's actually in the data. Never invent tasks or goals.
+Remember: Only discuss what's actually in the data. Never invent items or dates.
 <</SYS>>[/INST]`;
 
       // 4. Call Hugging Face API
@@ -303,7 +309,9 @@ Remember: Only discuss what's actually in the data. Never invent tasks or goals.
           .replace(/(\*\*|###|boxed|final answer|step \d+:)/gi, '')
           .replace(/\$\{.*?\}\$/g, '')
           .replace(/\[\/?[^\]]+\]/g, '')
-          .replace(/\{.*?\}/g, '');
+          .replace(/\{.*?\}/g, '')
+          .replace(/📋|📅|🎯|📊/g, '') // Remove category emojis
+          .replace(/\b(TASKS?|GOALS?|PROJECTS?|PLANS?)\b:/gi, ''); // Remove category labels
 
         // Split into lines and clean each line
         return text
@@ -336,11 +344,14 @@ Remember: Only discuss what's actually in the data. Never invent tasks or goals.
         })
         .join('');
 
-      setSmartOverview(formattedHtml || `
-        <div class="text-yellow-400">
-          Add some tasks, goals, projects, or plans to get started with your Smart Overview!
-        </div>
-      `);
+      // Only update if we're still the most recent generation
+      if (formattedData === lastGeneratedData) {
+        setSmartOverview(formattedHtml || `
+          <div class="text-yellow-400">
+            Add some items to get started with your Smart Overview!
+          </div>
+        `);
+      }
 
     } catch (error) {
       console.error("Overview generation error:", error);
@@ -349,13 +360,22 @@ Remember: Only discuss what's actually in the data. Never invent tasks or goals.
       `);
     } finally {
       setOverviewLoading(false);
+      isGeneratingRef.current = false;
     }
   };
 
-  generateOverview();
+  // Debounce the generation to prevent multiple rapid updates
+  generationTimeoutRef.current = setTimeout(() => {
+    generateOverview();
+  }, 1000);
+
+  // Cleanup function
+  return () => {
+    if (generationTimeoutRef.current) {
+      clearTimeout(generationTimeoutRef.current);
+    }
+  };
 }, [user, tasks, goals, projects, plans, userName, hfApiKey, lastGeneratedData]);
-
-
   // ---------------------
   // 11. CREATE & EDIT & DELETE
   // ---------------------

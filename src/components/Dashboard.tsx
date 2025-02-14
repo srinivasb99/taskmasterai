@@ -207,7 +207,6 @@ const handleMarkComplete = async (itemId: string) => {
 const [smartOverview, setSmartOverview] = useState<string>("");
 const [overviewLoading, setOverviewLoading] = useState(false);
 const [lastGeneratedData, setLastGeneratedData] = useState<string>("");
-const [lastResponse, setLastResponse] = useState<string>("");
 
 useEffect(() => {
   if (!user) return;
@@ -239,7 +238,6 @@ useEffect(() => {
     }
 
     setOverviewLoading(true);
-    setLastGeneratedData(formattedData);
 
     try {
       // 3. Construct AI prompt with clear instructions about existing data
@@ -299,13 +297,6 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
       const result = await response.json();
       const rawText = result[0]?.generated_text || '';
 
-      // Check for duplicate response
-      if (rawText === lastResponse) {
-        setOverviewLoading(false);
-        return;
-      }
-      setLastResponse(rawText);
-
       // 6. Clean and validate the response
       const cleanAndValidate = (text: string) => {
         // Remove any special characters or formatting
@@ -356,6 +347,9 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
         </div>
       `);
 
+      // Only update lastGeneratedData after successfully setting the overview
+      setLastGeneratedData(formattedData);
+
     } catch (error) {
       console.error("Overview generation error:", error);
       setSmartOverview(`
@@ -367,7 +361,7 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
   };
 
   generateOverview();
-}, [user, tasks, goals, projects, plans, userName, hfApiKey, lastGeneratedData]);
+}, [user, tasks, goals, projects, plans, userName, hfApiKey]); // Removed lastGeneratedData from dependencies
 
   // ---------------------
   // 11. CREATE & EDIT & DELETE

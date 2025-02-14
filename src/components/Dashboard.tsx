@@ -207,8 +207,6 @@ const handleMarkComplete = async (itemId: string) => {
 // ---------------------
 const [smartOverview, setSmartOverview] = useState<string>("");
 const [overviewLoading, setOverviewLoading] = useState(false);
-const [lastGeneratedData, setLastGeneratedData] = useState<string>("");
-const [lastResponse, setLastResponse] = useState<string>("");
 
 useEffect(() => {
   if (!user) return;
@@ -235,12 +233,11 @@ useEffect(() => {
     const formattedData = allItems.join('\n');
 
     // 2. Check if data has changed and if there's actual data
-    if (formattedData === lastGeneratedData || !allItems.length) {
+    if (formattedData || !allItems.length) {
       return;
     }
 
     setOverviewLoading(true);
-    setLastGeneratedData(formattedData);
 
     try {
       // 3. Construct AI prompt with clear instructions about existing data
@@ -305,7 +302,6 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
         setOverviewLoading(false);
         return;
       }
-      setLastResponse(rawText);
 
       // 6. Clean and validate the response
       const cleanAndValidate = (text: string) => {

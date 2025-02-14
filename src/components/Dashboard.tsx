@@ -221,7 +221,7 @@ useEffect(() => {
     // If there are no items, show the empty state message
     if (!allItems.length) {
       setSmartOverview(`
-        <div class="text-yellow-400 text-lg font-medium">
+        <div class="text-gray-400">
           Add some items to get started with your Smart Overview!
         </div>
       `);
@@ -741,7 +741,7 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
                 )}
 
                 {totalTasks === 0 && totalGoals === 0 && totalProjects === 0 && totalPlans === 0 && (
-                  <p className="text-gray-400 text-center py-4">
+                  <p className="text-gray-400">
                     No items to track yet. Start by creating some tasks, goals, projects, or plans!
                   </p>
                 )}

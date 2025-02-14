@@ -218,10 +218,20 @@ useEffect(() => {
       ...(plans.map(p => formatItem(p, 'plan')) || [])
     ];
 
+    // If there are no items, show the empty state message
+    if (!allItems.length) {
+      setSmartOverview(`
+        <div class="text-yellow-400 text-lg font-medium">
+          Add some items to get started with your Smart Overview!
+        </div>
+      `);
+      return;
+    }
+
     const formattedData = allItems.join('\n');
 
-    // 2. Check if data changed and there's actual data
-    if (formattedData === lastGeneratedData || !allItems.length) {
+    // 2. Check if data changed
+    if (formattedData === lastGeneratedData) {
       return;
     }
 
@@ -345,12 +355,7 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
         })
         .join('');
 
-      setSmartOverview(
-        formattedHtml ||
-        `<div class="text-yellow-400">
-          Add some items to get started with your Smart Overview!
-        </div>`
-      );
+      setSmartOverview(formattedHtml);
 
     } catch (error) {
       console.error("Overview generation error:", error);

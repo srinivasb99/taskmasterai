@@ -207,6 +207,7 @@ const handleMarkComplete = async (itemId: string) => {
 const [smartOverview, setSmartOverview] = useState<string>("");
 const [overviewLoading, setOverviewLoading] = useState(false);
 const [lastGeneratedData, setLastGeneratedData] = useState<string>("");
+const [lastResponse, setLastResponse] = useState<string>("");
 
 useEffect(() => {
   if (!user) return;
@@ -248,19 +249,28 @@ You are TaskMaster, an advanced AI productivity assistant. Analyze the following
 ${formattedData}
 
 Follow these guidelines exactly:
-1. Start with "Hello ${userName}," followed by a VERY brief overview of what exists
-2. List EXACTLY 3 priorities based ONLY on the actual items shown above
+1. Start with "Hello ${userName}," followed by a VERY brief overview of what exists (1 sentence max)
+2. List EXACTLY 3 actionable priorities based ONLY on the actual items shown above
 3. For each priority:
    - Start with a number (1., 2., 3.)
    - Reference specific items from the data
    - If the item has a due date, mention it
-   - Keep it to 1-2 sentences maximum
-4. DO NOT make up tasks or dates that don't exist
-5. DO NOT give generic advice if there are specific items to discuss
-6. If an item has no due date, focus on its content without mentioning timing
-7. DO NOT mention or categorize items as tasks, goals, projects, or plans
+   - Provide ONE specific, actionable next step or strategy
+   - Keep it to 2 sentences maximum
+   - Focus on HOW to achieve the item, not just restating it
+   - For financial goals, suggest specific strategies (e.g., "Consider starting with market research and creating a detailed business plan")
+   - For project items, break them down into smaller steps
+   - For time-sensitive items, prioritize those with upcoming due dates
 
-Remember: Only discuss what's actually in the data. Never invent items or dates.
+4. Rules:
+   - NO repetition of information
+   - NO generic advice
+   - NO restating the same item in different ways
+   - ALWAYS provide actionable next steps
+   - BE SPECIFIC and PRACTICAL
+   - If an item has no due date, suggest a reasonable timeframe
+
+Remember: Focus on actionable strategies and specific next steps, not just describing the items.
 <</SYS>>[/INST]`;
 
       // 4. Call Hugging Face API
@@ -289,6 +299,13 @@ Remember: Only discuss what's actually in the data. Never invent items or dates.
       const result = await response.json();
       const rawText = result[0]?.generated_text || '';
 
+      // Check for duplicate response
+      if (rawText === lastResponse) {
+        setOverviewLoading(false);
+        return;
+      }
+      setLastResponse(rawText);
+
       // 6. Clean and validate the response
       const cleanAndValidate = (text: string) => {
         // Remove any special characters or formatting
@@ -299,7 +316,8 @@ Remember: Only discuss what's actually in the data. Never invent items or dates.
           .replace(/\[\/?[^\]]+\]/g, '')
           .replace(/\{.*?\}/g, '')
           .replace(/📋|📅|🎯|📊/g, '') // Remove category emojis
-          .replace(/\b(TASKS?|GOALS?|PROJECTS?|PLANS?)\b:/gi, ''); // Remove category labels
+          .replace(/\b(TASKS?|GOALS?|PROJECTS?|PLANS?)\b:/gi, '') // Remove category labels
+          .replace(/\n\s*\n/g, '\n'); // Remove multiple blank lines
 
         // Split into lines and clean each line
         return text
@@ -350,7 +368,6 @@ Remember: Only discuss what's actually in the data. Never invent items or dates.
 
   generateOverview();
 }, [user, tasks, goals, projects, plans, userName, hfApiKey, lastGeneratedData]);
-
 
   // ---------------------
   // 11. CREATE & EDIT & DELETE

@@ -245,18 +245,6 @@ Follow these guidelines exactly:
    - Provide ONE specific, actionable next step or strategy
    - Keep it to 2 sentences maximum
    - Focus on HOW to achieve the item, not just restating it
-   - For financial goals, suggest specific strategies (e.g., "Consider starting with market research and creating a detailed business plan")
-   - For project items, break them down into smaller steps
-   - For time-sensitive items, prioritize those with upcoming due dates
-
-4. Rules:
-   - NO repetition of information
-   - NO generic advice
-   - NO restating the same item in different ways
-   - ALWAYS provide actionable next steps
-   - BE SPECIFIC and PRACTICAL
-   - If an item has no due date, suggest a reasonable timeframe
-
 Remember: Focus on actionable strategies and specific next steps, not just describing the items.
 <</SYS>>[/INST]`;
 

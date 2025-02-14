@@ -1,7 +1,7 @@
-
 import React, { useEffect, useState, useRef } from 'react';
 import { PlusCircle, Edit, Trash } from 'lucide-react';
 import { Sidebar } from './Sidebar';
+import { getTimeBasedGreeting, getRandomQuote } from '../lib/greetings';
 import {
   onFirebaseAuthStateChanged,
   onCollectionSnapshot,
@@ -25,6 +25,8 @@ export function Dashboard() {
   // ---------------------
   const [user, setUser] = useState<firebase.default.User | null>(null);
   const [userName, setUserName] = useState("Loading...");
+  const [quote, setQuote] = useState(getRandomQuote());
+  const [greeting, setGreeting] = useState(getTimeBasedGreeting());
 
   // ---------------------
   // 2. COLLECTION STATES
@@ -41,7 +43,17 @@ export function Dashboard() {
   const [weatherData, setWeatherData] = useState<any>(null);
 
   // ---------------------
-
+  // 4. GREETING UPDATE
+  // ---------------------
+  useEffect(() => {
+    const updateGreeting = () => {
+      setGreeting(getTimeBasedGreeting());
+    };
+    
+    // Update greeting every minute
+    const interval = setInterval(updateGreeting, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   // ---------------------
   // 5. UI STATES
@@ -266,6 +278,7 @@ Guidelines:
 
   generateOverview();
 }, [user, tasks, goals, projects, plans, userName, hfApiKey]);
+
   // ---------------------
   // 11. CREATE & EDIT & DELETE
   // ---------------------
@@ -509,38 +522,38 @@ Guidelines:
       <main className="ml-64 p-8 overflow-auto h-screen">
         <header className="dashboard-header mb-6">
           <h1 className="text-3xl font-bold mb-1">
-            ☀️ Good afternoon, <span className="font-normal">{userName || "Loading..."}</span>
+            {greeting.emoji} {greeting.greeting}, <span className="font-normal">{userName || "Loading..."}</span>
           </h1>
           <p className="text-gray-400 italic">
-            "The way to get started is to quit talking and begin doing."
+            "{quote.text}" - {quote.author}
           </p>
         </header>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="flex flex-col gap-6">
             {/* Smart Overview Card with fade-in animation */}
-  <div className="bg-gray-800 rounded-xl p-5 relative min-h-[200px]">
-    <div className="flex items-center mb-4">
-      <h2 className="text-xl font-semibold text-blue-300 mr-2">
-        Smart Overview
-      </h2>
-      <span className="text-xs bg-pink-600 text-white px-2 py-1 rounded-full">
-        BETA
-      </span>
-    </div>
+            <div className="bg-gray-800 rounded-xl p-5 relative min-h-[200px]">
+              <div className="flex items-center mb-4">
+                <h2 className="text-xl font-semibold text-blue-300 mr-2">
+                  Smart Overview
+                </h2>
+                <span className="text-xs bg-pink-600 text-white px-2 py-1 rounded-full">
+                  BETA
+                </span>
+              </div>
 
-    {overviewLoading ? (
-      <div className="space-y-3 animate-pulse">
-        <div className="h-4 bg-gray-700 rounded-full w-3/4"></div>
-        <div className="h-4 bg-gray-700 rounded-full w-2/3"></div>
-        <div className="h-4 bg-gray-700 rounded-full w-4/5"></div>
-      </div>
-    ) : (
-      <div 
-        className="text-sm text-gray-300"
-        dangerouslySetInnerHTML={{ __html: smartOverview }}
-      />
-    )}
-  </div>
+              {overviewLoading ? (
+                <div className="space-y-3 animate-pulse">
+                  <div className="h-4 bg-gray-700 rounded-full w-3/4"></div>
+                  <div className="h-4 bg-gray-700 rounded-full w-2/3"></div>
+                  <div className="h-4 bg-gray-700 rounded-full w-4/5"></div>
+                </div>
+              ) : (
+                <div 
+                  className="text-sm text-gray-300"
+                  dangerouslySetInnerHTML={{ __html: smartOverview }}
+                />
+              )}
+            </div>
             {/* Productivity Card */}
             <div className="bg-gray-800 rounded-xl p-5">
               <h2 className="text-xl font-semibold text-purple-400 mb-2">Your Productivity</h2>
@@ -717,7 +730,7 @@ Guidelines:
                     {weatherData.condition} ☀️ {weatherData.temp_f}°F (Feels like: {weatherData.feelslike_f}°F)
                   </p>
                   <p className="text-sm text-gray-400">
-                    <strong>Wind:</strong> {weatherData.wind_mph} mph &nbsp; | &nbsp;
+                    <strong>Wind:</strong> {weatherData. wind_mph} mph &nbsp; | &nbsp;
                     <strong>Humidity:</strong> {weatherData.humidity}%
                   </p>
                 </>

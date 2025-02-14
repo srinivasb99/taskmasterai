@@ -207,6 +207,8 @@ const handleMarkComplete = async (itemId: string) => {
 // ---------------------
 const [smartOverview, setSmartOverview] = useState<string>("");
 const [overviewLoading, setOverviewLoading] = useState(false);
+const [lastGeneratedData, setLastGeneratedData] = useState<string>("");
+const [lastResponse, setLastResponse] = useState<string>("");
 
 useEffect(() => {
   if (!user) return;
@@ -233,11 +235,12 @@ useEffect(() => {
     const formattedData = allItems.join('\n');
 
     // 2. Check if data has changed and if there's actual data
-    if (formattedData || !allItems.length) {
+    if (formattedData === lastGeneratedData || !allItems.length) {
       return;
     }
 
     setOverviewLoading(true);
+    setLastGeneratedData(formattedData);
 
     try {
       // 3. Construct AI prompt with clear instructions about existing data
@@ -297,12 +300,6 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
       const result = await response.json();
       const rawText = result[0]?.generated_text || '';
 
-      // Check for duplicate response
-      if (rawText === lastResponse) {
-        setOverviewLoading(false);
-        return;
-      }
-
       // 6. Clean and validate the response
       const cleanAndValidate = (text: string) => {
         // Remove any special characters or formatting
@@ -327,12 +324,21 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
           .join('\n');
       };
 
-      const cleanText = cleanAndValidate(rawText)
+      const cleanedText = cleanAndValidate(rawText);
+
+      // Check for duplicate response based on cleaned text
+      if (cleanedText === lastResponse) {
+        setOverviewLoading(false);
+        return;
+      }
+      setLastResponse(cleanedText);
+
+      const cleanTextLines = cleanedText
         .split('\n')
         .filter(line => line.length > 0);
 
       // 7. Format HTML with improved styling
-      const formattedHtml = cleanText
+      const formattedHtml = cleanTextLines
         .map((line, index) => {
           if (index === 0) {
             // Greeting and overview
@@ -364,7 +370,7 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
   };
 
   generateOverview();
-}, [user, tasks, goals, projects, plans, userName, hfApiKey]);
+}, [user, tasks, goals, projects, plans, userName, hfApiKey, lastGeneratedData]);
 
   // ---------------------
   // 11. CREATE & EDIT & DELETE

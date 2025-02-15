@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef } from 'react';
 import { Navigate } from 'react-router-dom';
 import {
@@ -1174,15 +1173,15 @@ return (
   )}
 </div>
 
-  {isChatModalOpen && (
+   {/* Chat Modal */}
+    {isChatModalOpen && (
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
         <div className="bg-gray-800 rounded-xl w-full max-w-2xl mx-4 max-h-[80vh] flex flex-col">
           <div className="p-4 border-b border-gray-700 flex justify-between items-center">
             <h3 className="text-lg font-semibold text-blue-300 flex items-center">
               <MessageCircle className="w-5 h-5 mr-2" />
               Chat with TaskMaster
-              <span className="ml-2 text-xs bg-gradient-to-r from-pink-500 to-purple-500 text-gray-300 px-2 py-0.5 rounded-full">BETA</span>
-              <span className="ml-2 text-xs bg-blue text-gray-300 px-2 py-0.5 rounded-full">Chat history is not saved.</span>
+              <span className="ml-2 text-xs bg-gradient-to-r from-pink-500 to-purple-500 text-white-300 px-2 py-0.5 rounded-full">BETA</span>
             </h3>
             <button
               onClick={() => setIsChatModalOpen(false)}
@@ -1238,7 +1237,7 @@ return (
                     <div className="mt-2">
                       <FlashcardsQuestions
                         type="flashcard"
-                        data={message.flashcard.data}
+                        data={[message.flashcard.data]}
                         onComplete={() => {}}
                       />
                     </div>
@@ -1247,7 +1246,7 @@ return (
                     <div className="mt-2">
                       <FlashcardsQuestions
                         type="question"
-                        data={message.question.data}
+                        data={[message.question.data]}
                         onComplete={() => {}}
                       />
                     </div>
@@ -1289,7 +1288,6 @@ return (
         </div>
       </div>
     )}
-
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
           <div className="flex flex-col gap-6">

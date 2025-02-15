@@ -191,7 +191,6 @@ Please answer with direct, helpful info regarding the user's items.
 
     // Quick cleanup to remove system instructions
     // or extraneous disclaimers. Adjust as needed.
-    rawText = rawText.replace(/(\[\/?INST\]|<</g, '').trim();
 
     // 6. Beautify the text for your chat UI
     const beautified = beautifyAssistantReply(rawText);

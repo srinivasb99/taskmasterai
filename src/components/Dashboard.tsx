@@ -47,6 +47,8 @@ import {
   weatherApiKey,
   hfApiKey,
 } from '../lib/dashboard-firebase';
+import { auth } from '../lib/firebase';
+
 
 export function Dashboard() {
   // ---------------------
@@ -301,7 +303,8 @@ const handleChatSubmit = async (e: React.FormEvent) => {
     
     // Update Firestore
     await updateChatSession(currentSessionId, {
-      messages: updatedWithTimer
+      messages: updatedWithTimer,
+      userId: auth.currentUser.uid
     });
     
     setIsChatLoading(false);
@@ -442,10 +445,8 @@ FORBIDDEN IN YOUR FINAL RESPONSE:
     if (jsonMatch) {
       try {
         const jsonContent = JSON.parse(jsonMatch[1].trim());
-        // Remove the JSON block from the text response
         assistantReply = assistantReply.replace(/```json\n[\s\S]*?\n```/, '').trim();
         
-        // Validate JSON structure
         if (
           jsonContent.type &&
           jsonContent.data &&
@@ -477,15 +478,19 @@ FORBIDDEN IN YOUR FINAL RESPONSE:
     const finalHistory = [...updatedHistory, assistantMessage];
     setChatHistory(finalHistory);
 
-    // Update Firestore
+    // Update Firestore with user ID
     await updateChatSession(currentSessionId, {
-      messages: finalHistory
+      messages: finalHistory,
+      userId: auth.currentUser.uid
     });
 
     // Generate and update title if this is the first user message
     if (chatHistory.length <= 1) {
       const newTitle = await generateChatTitle(finalHistory);
-      await updateChatSession(currentSessionId, { title: newTitle });
+      await updateChatSession(currentSessionId, { 
+        title: newTitle,
+        userId: auth.currentUser.uid
+      });
     }
 
   } catch (err) {
@@ -497,7 +502,8 @@ FORBIDDEN IN YOUR FINAL RESPONSE:
       const finalHistory = [...updatedHistory, abortMessage];
       setChatHistory(finalHistory);
       await updateChatSession(currentSessionId, {
-        messages: finalHistory
+        messages: finalHistory,
+        userId: auth.currentUser.uid
       });
     } else {
       console.error('Chat error:', err);
@@ -508,7 +514,8 @@ FORBIDDEN IN YOUR FINAL RESPONSE:
       const finalHistory = [...updatedHistory, errorMessage];
       setChatHistory(finalHistory);
       await updateChatSession(currentSessionId, {
-        messages: finalHistory
+        messages: finalHistory,
+        userId: auth.currentUser.uid
       });
     }
   } finally {
@@ -516,7 +523,6 @@ FORBIDDEN IN YOUR FINAL RESPONSE:
     setIsChatLoading(false);
   }
 };
-
 
   // ---------------------
   // 2. COLLECTION STATES

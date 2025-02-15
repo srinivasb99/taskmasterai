@@ -154,7 +154,7 @@ ${conversation}
 [NEW USER MESSAGE]
 User: ${userMsg.content}
 
-You're TaskMaster, an advanced AI. Continue the conversation, referencing the items above as needed. The current year is 2025. Use the provided current date and time to give more contextual responses, especially when discussing deadlines or scheduling. Do not include disclaimers like "[RESPONSE]" or "To respond, simply type..." Please answer with direct, helpful info regarding the user's items. Keep your response short, not too long.
+You're TaskMaster, an advanced AI. Continue the conversation, referencing the items above as needed. The current year is 2025. Use the provided current date and time to give more contextual responses, especially when discussing deadlines or scheduling. Do not include disclaimers like "[RESPONSE]" or "To respond, simply type..." Please answer with direct, helpful info regarding the user's items. Keep your response short, not too long. Don't always talk about the current time, only if the user asks. In your response, NEVER provide what you are thinking, only your final output. 
 `;
 
   // 3. Call Hugging Face to get the AI's response

@@ -32,12 +32,12 @@ import {
 
 export function Dashboard() {
   // ---------------------
-  // 1. USER & GENERAL STATE
-  // ---------------------
-  const [user, setUser] = useState<firebase.default.User | null>(null);
-  const [userName, setUserName] = useState("Loading...");
-  const [quote, setQuote] = useState(getRandomQuote());
-  const [greeting, setGreeting] = useState(getTimeBasedGreeting());
+// 1. USER & GENERAL STATE
+// ---------------------
+const [user, setUser] = useState<firebase.default.User | null>(null);
+const [userName, setUserName] = useState("Loading...");
+const [quote, setQuote] = useState(getRandomQuote());
+const [greeting, setGreeting] = useState(getTimeBasedGreeting());
 
 // ---------------------
 // CHAT MODAL (NEW AI CHAT FUNCTIONALITY)
@@ -68,8 +68,7 @@ const formatItemsForChat = () => {
   const lines: string[] = [];
 
   // Example: tasks, goals, etc. are in your state: tasks, goals, projects, plans
-  // We'll just gather them. You can customize formatting.
-  lines.push('Your items:\n');
+  lines.push(`${userName}'s items:\n`);
 
   tasks.forEach((t) => {
     const due = t.data.dueDate?.toDate?.();
@@ -121,7 +120,7 @@ const handleChatSubmit = async (e: React.FormEvent) => {
   // We'll combine prior assistant/user lines + the user's items
   // for a more "aware" conversation about tasks, goals, etc.
   const conversation = chatHistory
-    .map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
+    .map((m) => `${m.role === 'user' ? userName : 'Assistant'}: ${m.content}`)
     .join('\n');
   const itemsText = formatItemsForChat(); // Gather tasks, etc.
 
@@ -143,6 +142,7 @@ const handleChatSubmit = async (e: React.FormEvent) => {
 
   const prompt = `
 [CONTEXT]
+User's Name: ${userName}
 Current Date: ${currentDateTime.date}
 Current Time: ${currentDateTime.time}
 
@@ -152,9 +152,9 @@ ${itemsText}
 ${conversation}
 
 [NEW USER MESSAGE]
-User: ${userMsg.content}
+${userName}: ${userMsg.content}
 
-You're TaskMaster, an advanced AI. Continue the conversation, referencing the items above as needed. The current year is 2025. Use the provided current date and time to give more contextual responses, especially when discussing deadlines or scheduling. Do not include disclaimers like "[RESPONSE]" or "To respond, simply type..." Please answer with direct, helpful info regarding the user's items. Keep your response short, not too long. Don't always talk about the current time, only if the user asks. In your response, NEVER provide what you are thinking, only your final output. 
+You're TaskMaster, an advanced AI assistant helping ${userName}. Continue the conversation, referencing ${userName}'s items listed above as needed. The current year is 2025. Use the provided current date and time to give more contextual responses, especially when discussing deadlines or scheduling. Do not include disclaimers like "[RESPONSE]" or "To respond, simply type..." Please answer with direct, helpful info regarding ${userName}'s items. Keep your response short, not too long. Don't always talk about the current time, only if ${userName} asks. In your response, NEVER provide what you are thinking, only your final output. Remember that all tasks, goals, projects, and plans belong to ${userName}, not you.
 `;
 
   // 3. Call Hugging Face to get the AI's response

@@ -40,7 +40,7 @@ export function Dashboard() {
   const [greeting, setGreeting] = useState(getTimeBasedGreeting());
 
 // ---------------------
-// CHAT MODAL (NEW AI CHAT FUNCTIONALITY)
+// CHAT MODAL (UPDATED AI CHAT FUNCTIONALITY)
 // ---------------------
 const [isChatModalOpen, setIsChatModalOpen] = useState(false);
 const [chatMessage, setChatMessage] = useState('');
@@ -57,13 +57,10 @@ useEffect(() => {
   }
 }, [chatHistory]);
 
-// Utility: Format the user's tasks/goals/projects/plans as text
-const formatItemsForChat = () => {
-  const lines: string[] = [];
-
-  // Example: tasks, goals, etc. are in your state: tasks, goals, projects, plans
-  // We'll just gather them. You can customize formatting.
-  lines.push('Your items:\n');
+// 1. Format the user’s items for context
+function formatItemsForChat(): string {
+  let lines: string[] = [];
+  lines.push('Here are your items:');
 
   tasks.forEach((t) => {
     const due = t.data.dueDate?.toDate?.();
@@ -73,6 +70,7 @@ const formatItemsForChat = () => {
       }`
     );
   });
+
   goals.forEach((g) => {
     const due = g.data.dueDate?.toDate?.();
     lines.push(
@@ -81,6 +79,7 @@ const formatItemsForChat = () => {
       }`
     );
   });
+
   projects.forEach((p) => {
     const due = p.data.dueDate?.toDate?.();
     lines.push(
@@ -89,6 +88,7 @@ const formatItemsForChat = () => {
       }`
     );
   });
+
   plans.forEach((p) => {
     const due = p.data.dueDate?.toDate?.();
     lines.push(
@@ -99,42 +99,69 @@ const formatItemsForChat = () => {
   });
 
   return lines.join('\n');
-};
+}
 
-// NEW handleChatSubmit that calls Hugging Face
+// 2. A small helper to “beautify” the AI’s response
+function beautifyAssistantReply(text: string): string {
+  // For example, split on double-newlines => paragraphs
+  // Then add bullet points if the line starts with a number or dash, etc.
+  // Adjust to your preference
+  const paragraphs = text
+    .split(/\n\s*\n/) // separate paragraphs
+    .map((p) => p.trim())
+    .filter((p) => p.length > 0);
+
+  return paragraphs
+    .map((p) => {
+      // If the line starts with digits or dash, we could style it
+      // For simplicity, just wrap in <p> tags for now
+      return `<p class="mb-2 leading-relaxed">${p}</p>`;
+    })
+    .join('');
+}
+
+// 3. The updated handleChatSubmit
 const handleChatSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
   if (!chatMessage.trim()) return;
 
-  // 1. Add user's message to chat
+  // Add user message to chat
   const userMsg = { role: 'user' as const, content: chatMessage };
   setChatHistory((prev) => [...prev, userMsg]);
   setChatMessage('');
 
-  // 2. Build conversation context
-  // We'll combine prior assistant/user lines + the user's items
-  // for a more "aware" conversation about tasks, goals, etc.
-  const conversation = chatHistory
-    .map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
+  // Build conversation context
+  // Combine prior assistant/user lines + the user’s items
+  const conversationSoFar = chatHistory
+    .map(
+      (m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`
+    )
     .join('\n');
-  const itemsText = formatItemsForChat(); // Gather tasks, etc.
+  const itemsText = formatItemsForChat();
 
+  // 4. Construct the prompt
+  // Add a note that "the current year is 2025" and avoid disclaimers
   const prompt = `
 [CONTEXT]
+The current year is 2025. 
+You are TaskMaster, an advanced AI productivity assistant.
+Do not include disclaimers like "[RESPONSE]" or "To respond, simply type..."
+
+Below is the user's data:
 ${itemsText}
 
 [CONVERSATION SO FAR]
-${conversation}
+${conversationSoFar}
 
-[NEW USER MESSAGE]
+[USER'S NEW MESSAGE]
 User: ${userMsg.content}
 
-You're TaskMaster, an advanced AI. Continue the conversation, referencing the items above as needed.
+Please answer with direct, helpful info regarding the user's items.
 `;
 
-  // 3. Call Hugging Face to get the AI's response
   setIsChatLoading(true);
   try {
+    // 5. Call Hugging Face for an AI response
     const response = await fetch(
       'https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct',
       {
@@ -160,17 +187,19 @@ You're TaskMaster, an advanced AI. Continue the conversation, referencing the it
     if (!response.ok) throw new Error('Chat API request failed');
     const result = await response.json();
 
-    // 4. Extract the model's text from the result
-    const rawText = (result[0]?.generated_text as string) || '';
-    // Optionally, do a quick cleanup
-    const assistantReply = rawText
-      .replace(/\[\/?INST\]|<</g, '')
-      .trim();
+    let rawText = (result[0]?.generated_text as string) || '';
 
-    // 5. Add assistant's reply to chat
+    // Quick cleanup to remove system instructions
+    // or extraneous disclaimers. Adjust as needed.
+    rawText = rawText.replace(/(\[\/?INST\]|<</g, '').trim();
+
+    // 6. Beautify the text for your chat UI
+    const beautified = beautifyAssistantReply(rawText);
+
+    // Add assistant's reply to chat
     setChatHistory((prev) => [
       ...prev,
-      { role: 'assistant', content: assistantReply },
+      { role: 'assistant', content: beautified },
     ]);
   } catch (err) {
     console.error('Chat error:', err);
@@ -186,6 +215,7 @@ You're TaskMaster, an advanced AI. Continue the conversation, referencing the it
     setIsChatLoading(false);
   }
 };
+
 
 
   // ---------------------

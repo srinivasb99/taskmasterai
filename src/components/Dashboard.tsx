@@ -75,12 +75,12 @@ interface QuestionData {
 
 interface FlashcardMessage {
   type: 'flashcard';
-  data: FlashcardData;
+  data: FlashcardData[];  // Changed to array
 }
 
 interface QuestionMessage {
   type: 'question';
-  data: QuestionData;
+  data: QuestionData[];   // Changed to array
 }
 
 interface ChatMessage {
@@ -275,7 +275,7 @@ You're TaskMaster, an AI assistant helping ${userName}. When responding, follow 
    - NEVER create multiple JSON blocks
 
 2. JSON FORMATS:
-   For multiple flashcards:
+   For flashcards:
    {
      "type": "flashcard",
      "data": [
@@ -294,7 +294,7 @@ You're TaskMaster, an AI assistant helping ${userName}. When responding, follow 
      ]
    }
 
-   For multiple quiz questions:
+   For quiz questions:
    {
      "type": "question",
      "data": [
@@ -321,40 +321,8 @@ You're TaskMaster, an AI assistant helping ${userName}. When responding, follow 
    - NEVER include partial or malformed JSON
    - NEVER mix educational content types
    - ALWAYS validate JSON structure before including it
-   - ALWAYS include multiple items in the data array when asked for multiple questions/flashcards
+   - ALWAYS include multiple items in the data array
    - NEVER create single-item responses unless specifically requested
-
-Example correct response for multiple items:
-Here are three practice questions about cell biology:
-
-\`\`\`json
-{
-  "type": "question",
-  "data": [
-    {
-      "id": "cell-1",
-      "question": "What is the powerhouse of the cell?",
-      "options": ["Mitochondria", "Nucleus", "Golgi Body", "Endoplasmic Reticulum"],
-      "correctAnswer": 0,
-      "explanation": "Mitochondria are called the powerhouse of the cell because they produce most of the cell's energy through ATP production."
-    },
-    {
-      "id": "cell-2",
-      "question": "Which organelle is responsible for protein synthesis?",
-      "options": ["Nucleus", "Ribosomes", "Lysosomes", "Vacuoles"],
-      "correctAnswer": 1,
-      "explanation": "Ribosomes are the cell's protein factories, assembling proteins according to genetic instructions."
-    },
-    {
-      "id": "cell-3",
-      "question": "What is the function of the cell membrane?",
-      "options": ["Energy production", "Waste storage", "Selective permeability", "Protein synthesis"],
-      "correctAnswer": 2,
-      "explanation": "The cell membrane controls what enters and exits the cell through selective permeability."
-    }
-  ]
-}
-\`\`\`
 
 FORBIDDEN:
 - Meta-commentary about the conversation

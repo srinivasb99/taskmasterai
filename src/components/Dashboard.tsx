@@ -1242,8 +1242,12 @@ return (
       )}
       <button
         onClick={regenerateResponse}
-        className="text-gray-400 hover:text-gray-200 transition-colors p-1 rounded hover:bg-gray-700"
-        disabled={!chatHistory || chatHistory.length < 2 || isChatLoading}
+        className={`text-gray-400 transition-colors p-1 rounded ${
+          isChatLoading || chatHistory.length <= 1
+            ? 'opacity-50 cursor-not-allowed'
+            : 'hover:text-gray-200 hover:bg-gray-700'
+        }`}
+        disabled={isChatLoading || chatHistory.length <= 1}
         title="Regenerate response"
       >
         <RefreshCw className="w-5 h-5" />
@@ -1257,6 +1261,8 @@ return (
       </button>
     </div>
   </div>
+</div>
+
 
 
         {/* Chat Messages */}

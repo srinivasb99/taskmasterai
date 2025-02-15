@@ -75,22 +75,19 @@ interface QuestionData {
 
 interface FlashcardMessage {
   type: 'flashcard';
-  data: FlashcardData[];
+  data: FlashcardData;
 }
 
 interface QuestionMessage {
   type: 'question';
-  data: QuestionData[];
+  data: QuestionData;
 }
 
 interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   timer?: TimerMessage;
-  flashcard?: FlashcardMessage;
-  question?: QuestionMessage;
 }
-
 
 // ---------------------
 // CHAT MODAL (NEW AI CHAT FUNCTIONALITY)
@@ -349,7 +346,7 @@ const handleChatSubmit = async (e: React.FormEvent) => {
     })
   };
 
-const prompt = `
+ const prompt = `
 [CONTEXT]
 User's Name: ${userName}
 Current Date: ${currentDateTime.date}
@@ -374,84 +371,53 @@ You're TaskMaster, an AI assistant helping ${userName}. When responding, follow 
    - NEVER create multiple JSON blocks
 
 2. JSON FORMATS:
-   For multiple flashcards:
+   For flashcards:
+   \`\`\`json
    {
      "type": "flashcard",
-     "data": [
-       {
-         "id": "unique-id-1",
-         "question": "Question 1",
-         "answer": "Answer 1",
-         "topic": "Subject area"
-       },
-       {
-         "id": "unique-id-2",
-         "question": "Question 2",
-         "answer": "Answer 2",
-         "topic": "Subject area"
-       }
-     ]
+     "data": {
+       "id": "unique-id",
+       "question": "Clear question",
+       "answer": "Clear answer",
+       "topic": "Subject area"
+     }
    }
+   \`\`\`
 
-   For multiple quiz questions:
+   For quiz questions:
+   \`\`\`json
    {
      "type": "question",
-     "data": [
-       {
-         "id": "unique-id-1",
-         "question": "Question 1",
-         "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
-         "correctAnswer": 0,
-         "explanation": "Explanation 1"
-       },
-       {
-         "id": "unique-id-2",
-         "question": "Question 2",
-         "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
-         "correctAnswer": 1,
-         "explanation": "Explanation 2"
-       }
-     ]
+     "data": {
+       "id": "unique-id",
+       "question": "Clear question text",
+       "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
+       "correctAnswer": 0,
+       "explanation": "Why this answer is correct"
+     }
    }
+   \`\`\`
 
 3. CRITICAL RULES:
    - Keep text responses concise and natural
    - NEVER explain JSON structure in text
    - NEVER include partial or malformed JSON
    - NEVER mix educational content types
+   - NEVER create multiple cards/questions
    - ALWAYS validate JSON structure before including it
-   - ALWAYS include multiple items in the data array when asked for multiple questions/flashcards
-   - NEVER create single-item responses unless specifically requested
 
-Example correct response for multiple items:
-Here are three practice questions about cell biology:
+Example correct response:
+Here's a flashcard about photosynthesis:
 
 \`\`\`json
 {
-  "type": "question",
-  "data": [
-    {
-      "id": "cell-1",
-      "question": "What is the powerhouse of the cell?",
-      "options": ["Mitochondria", "Nucleus", "Golgi Body", "Endoplasmic Reticulum"],
-      "correctAnswer": 0,
-      "explanation": "Mitochondria are called the powerhouse of the cell because they produce most of the cell's energy through ATP production."
-    },
-    {
-      "id": "cell-2",
-      "question": "Which organelle is responsible for protein synthesis?",
-      "options": ["Nucleus", "Ribosomes", "Lysosomes", "Vacuoles"],
-      "correctAnswer": 1,
-      "explanation": "Ribosomes are the cell's protein factories, assembling proteins according to genetic instructions."
-    },
-    {
-      "id": "cell-3",
-      "question": "What is the function of the cell membrane?",
-      "options": ["Energy production", "Waste storage", "Selective permeability", "Protein synthesis"],
-      "correctAnswer": 2,
-      "explanation": "The cell membrane controls what enters and exits the cell through selective permeability."
-    }
-  ]
+  "type": "flashcard",
+  "data": {
+    "id": "photo-1",
+    "question": "What is photosynthesis?",
+    "answer": "The process by which plants convert sunlight into energy",
+    "topic": "Biology"
+  }
 }
 \`\`\`
 
@@ -461,6 +427,7 @@ FORBIDDEN:
 - Explaining what you're about to do
 - Using phrases like "Based on the context"
 `;
+
   setIsChatLoading(true);
   try {
     const response = await fetch(

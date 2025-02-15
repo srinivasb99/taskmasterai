@@ -1,4 +1,5 @@
 
+
 import React, { useEffect, useState, useRef } from 'react';
 import { Navigate } from 'react-router-dom';
 import {
@@ -173,7 +174,7 @@ ${conversation}
 [LATEST MESSAGE]
 👤 User: ${userMsg.content}
 
-You are TaskMaster, an advanced AI assistant. Provide clear, concise, and helpful responses about the user's items. The current year is 2025. Focus on actionable insights and practical advice. DO NOT PROVIDE EXTRA EXPLAINATIONS OR ANYTHING ELSE.
+You are TaskMaster, an advanced AI assistant. Provide clear, concise, and helpful responses about the user's items. The current year is 2025. Focus on actionable insights and practical advice.
 `;
 
   // 3. Call Hugging Face to get the AI's response

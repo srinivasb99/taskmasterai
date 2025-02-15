@@ -881,11 +881,17 @@ return (
                     className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                   >
                     <div
-                      className={`max-w-[80%] rounded-lg px-4 py-2 ${
-                        message.role === 'user'
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-700 text-gray-200'
-                      }`}
+        className={`max-w-[80%] rounded-lg px-4 py-2 ${
+        message.role === 'user'
+          ? 'bg-blue-600 text-white'
+          : 'bg-gray-700'
+      }`}
+      dangerouslySetInnerHTML={
+        message.role === 'assistant' 
+          ? { __html: message.content }
+          : { __html: `<p>${message.content}</p>` }
+      }
+    />
                     >
                       {message.content}
                     </div>

@@ -901,38 +901,34 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
       return <p className="text-gray-400">No upcoming deadlines</p>;
     }
 
-    return (
-      <ul className="space-y-3">
-        {upcomingDeadlines.map((item) => {
-          const { id, type, data } = item;
-          const dueDateObj = data.dueDate.toDate ? data.dueDate.toDate() : new Date(data.dueDate);
-          const dueDateStr = dueDateObj.toLocaleDateString();
-          // For the item name, whichever field is used (task, goal, project, plan)
-          const itemName =
-            data.task || data.goal || data.project || data.plan || 'Untitled';
+// Fix for the first section (upcomingDeadlines)
+return (
+  <ul className="space-y-3">
+    {upcomingDeadlines.map((item) => {
+      const { id, type, data } = item;
+      const dueDateObj = data.dueDate.toDate ? data.dueDate.toDate() : new Date(data.dueDate);
+      const dueDateStr = dueDateObj.toLocaleDateString();
+      const itemName =
+        data.task || data.goal || data.project || data.plan || 'Untitled';
 
-          return (
-            <li
-              key={id}
-              className="bg-gray-700/50 p-4 rounded-lg backdrop-blur-sm transition-all hover:scale-[1.02] hover:shadow-lg"
-            >
-              <div className="flex items-center justify-between">
-                <div className="text-sm text-gray-100 font-medium">
-                  {/* Show the type and name */}
-                  <span className="font-bold">{type}:</span> {itemName}
-                </div>
-                <div className="text-xs text-gray-300 ml-4">
-                  Due: <span className="font-semibold">{dueDateStr}</span>
-                </div>
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-    );
-  })()}
-</div>
-
+      return (
+        <li
+          key={id}
+          className="bg-gray-700/50 p-4 rounded-lg backdrop-blur-sm transition-all hover:scale-[1.02] hover:shadow-lg"
+        >
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-gray-100 font-medium">
+              <span className="font-bold">{type}:</span> {itemName}
+            </div>
+            <div className="text-xs text-gray-300 ml-4">
+              Due: <span className="font-semibold">{dueDateStr}</span>
+            </div>
+          </div>
+        </li>
+      );
+    })}
+  </ul>
+);
 
             {/* Tabs & List */}
             <div className="bg-gray-800 rounded-xl p-6 transform hover:scale-[1.02] transition-all duration-300">
@@ -1135,68 +1131,67 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
                   {weatherData.forecast && weatherData.forecast.forecastday && (
                     <div className="space-y-4">
                       <h3 className="text-lg font-semibold text-blue-400">Forecast</h3>
-                      {(() => {
-                        // Filter out any past days in case API date is behind local date
-                        const now = new Date();
-                        now.setHours(0, 0, 0, 0);
+{(() => {
+  // Filter out any past days in case API date is behind local date
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
 
-                        const validDays = weatherData.forecast.forecastday.filter((day: any) => {
-                          const d = new Date(day.date);
-                          d.setHours(0, 0, 0, 0);
-                          return d >= now;
-                        });
+  const validDays = weatherData.forecast.forecastday.filter((day) => {
+    const d = new Date(day.date);
+    d.setHours(0, 0, 0, 0);
+    return d >= now;
+  });
 
-                        // Only take up to 3 days from that filtered list
-                        const finalDays = validDays.slice(0, 3);
-                        const dayLabels = ["Today", "Tomorrow", "Day After Tomorrow"];
+  // Only take up to 3 days from that filtered list
+  const finalDays = validDays.slice(0, 3);
+  const dayLabels = ["Today", "Tomorrow", "Day After Tomorrow"];
 
-                        return finalDays.map((day: any, idx: number) => {
-                          // e.g. "Today (Feb 14)"
-                          const dateObj = new Date(day.date);
-                          const monthDay = dateObj.toLocaleDateString(undefined, {
-                            month: 'short',
-                            day: 'numeric',
-                          });
-                          const label = `${dayLabels[idx]} (${monthDay})`;
+  return finalDays.map((day, idx) => {
+    // e.g. "Today (Feb 14)"
+    const dateObj = new Date(day.date);
+    const monthDay = dateObj.toLocaleDateString(undefined, {
+      month: 'short',
+      day: 'numeric',
+    });
+    const label = `${dayLabels[idx]} (${monthDay})`;
 
-                          const maxF = Math.round(day.day.maxtemp_f);
-                          const minF = Math.round(day.day.mintemp_f);
-                          const icon = day.day.condition.icon;
-                          const barWidth = maxF > 0 ? (maxF / 120) * 100 : 0; 
+    const maxF = Math.round(day.day.maxtemp_f);
+    const minF = Math.round(day.day.mintemp_f);
+    const icon = day.day.condition.icon;
+    const barWidth = maxF > 0 ? (maxF / 120) * 100 : 0; 
 
-                          return (
-                            <div
-                              key={day.date}
-                              className="flex items-center gap-4 bg-gray-700/50 p-3 rounded-lg relative overflow-hidden"
-                            >
-                              <div 
-                                className="absolute inset-0 bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 opacity-10 pointer-events-none"
-                              />
-                              <img 
-                                src={icon} 
-                                alt={day.day.condition.text} 
-                                className="w-10 h-10 z-10"
-                              />
-                              <div className="z-10 flex-grow">
-                                <p className="text-sm text-gray-200 font-medium">
-                                  {label}
-                                </p>
-                                <div className="flex items-center gap-3 mt-1">
-                                  <p className="text-sm text-red-300">High: {maxF}°F</p>
-                                  <p className="text-sm text-blue-300">Low: {minF}°F</p>
-                                </div>
-                                <div className="mt-2 w-full h-2 bg-gray-600 rounded-full overflow-hidden">
-                                  <div
-                                    className="h-full bg-gradient-to-r from-yellow-300 to-red-500 rounded-full transition-all duration-700 ease-out"
-                                    style={{ width: `${barWidth}%` }}
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        });
-                      })()}
-                    </div>
+    return (
+      <div
+        key={day.date}
+        className="flex items-center gap-4 bg-gray-700/50 p-3 rounded-lg relative overflow-hidden"
+      >
+        <div 
+          className="absolute inset-0 bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 opacity-10 pointer-events-none"
+        />
+        <img 
+          src={icon} 
+          alt={day.day.condition.text} 
+          className="w-10 h-10 z-10"
+        />
+        <div className="z-10 flex-grow">
+          <p className="text-sm text-gray-200 font-medium">
+            {label}
+          </p>
+          <div className="flex items-center gap-3 mt-1">
+            <p className="text-sm text-red-300">High: {maxF}°F</p>
+            <p className="text-sm text-blue-300">Low: {minF}°F</p>
+          </div>
+          <div className="mt-2 w-full h-2 bg-gray-600 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-yellow-300 to-red-500 rounded-full transition-all duration-700 ease-out"
+              style={{ width: `${barWidth}%` }}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  });
+})()}
                   )}
                 </>
               ) : (

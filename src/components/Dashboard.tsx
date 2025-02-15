@@ -61,43 +61,44 @@ useEffect(() => {
 // Utility: Format the user's tasks/goals/projects/plans as text
 const formatItemsForChat = () => {
   const lines: string[] = [];
+  
+  const formatDate = (date: Date | undefined) => {
+    if (!date) return '';
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
 
-  // Example: tasks, goals, etc. are in your state: tasks, goals, projects, plans
-  // We'll just gather them. You can customize formatting.
-  lines.push('Your items:\n');
+  // Format items with consistent styling and better date formatting
+  const formatItem = (item: any, type: string) => {
+    const due = item.data.dueDate?.toDate?.();
+    const title = item.data[type.toLowerCase()] || 'Untitled';
+    const dueStr = due ? ` (Due: ${formatDate(due)})` : '';
+    return `${type}: ${title}${dueStr}`;
+  };
 
-  tasks.forEach((t) => {
-    const due = t.data.dueDate?.toDate?.();
-    lines.push(
-      `Task: ${t.data.task || 'Untitled'}${
-        due ? ` (Due: ${due.toLocaleDateString()})` : ''
-      }`
-    );
-  });
-  goals.forEach((g) => {
-    const due = g.data.dueDate?.toDate?.();
-    lines.push(
-      `Goal: ${g.data.goal || 'Untitled'}${
-        due ? ` (Due: ${due.toLocaleDateString()})` : ''
-      }`
-    );
-  });
-  projects.forEach((p) => {
-    const due = p.data.dueDate?.toDate?.();
-    lines.push(
-      `Project: ${p.data.project || 'Untitled'}${
-        due ? ` (Due: ${due.toLocaleDateString()})` : ''
-      }`
-    );
-  });
-  plans.forEach((p) => {
-    const due = p.data.dueDate?.toDate?.();
-    lines.push(
-      `Plan: ${p.data.plan || 'Untitled'}${
-        due ? ` (Due: ${due.toLocaleDateString()})` : ''
-      }`
-    );
-  });
+  // Group items by category with headers
+  if (tasks.length) {
+    lines.push('\n📝 Tasks:');
+    tasks.forEach(t => lines.push(`  • ${formatItem(t, 'Task')}`));
+  }
+
+  if (goals.length) {
+    lines.push('\n🎯 Goals:');
+    goals.forEach(g => lines.push(`  • ${formatItem(g, 'Goal')}`));
+  }
+
+  if (projects.length) {
+    lines.push('\n📊 Projects:');
+    projects.forEach(p => lines.push(`  • ${formatItem(p, 'Project')}`));
+  }
+
+  if (plans.length) {
+    lines.push('\n📅 Plans:');
+    plans.forEach(p => lines.push(`  • ${formatItem(p, 'Plan')}`));
+  }
 
   return lines.join('\n');
 };
@@ -112,25 +113,24 @@ const handleChatSubmit = async (e: React.FormEvent) => {
   setChatHistory((prev) => [...prev, userMsg]);
   setChatMessage('');
 
-  // 2. Build conversation context
-  // We'll combine prior assistant/user lines + the user's items
-  // for a more "aware" conversation about tasks, goals, etc.
+  // 2. Build conversation context with improved formatting
   const conversation = chatHistory
-    .map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
-    .join('\n');
-  const itemsText = formatItemsForChat(); // Gather tasks, etc.
+    .map((m) => `${m.role === 'user' ? '👤 User' : '🤖 Assistant'}: ${m.content}`)
+    .join('\n\n');
+  
+  const itemsText = formatItemsForChat();
 
   const prompt = `
-[CONTEXT]
+[CURRENT ITEMS]
 ${itemsText}
 
-[CONVERSATION SO FAR]
+[CONVERSATION HISTORY]
 ${conversation}
 
-[NEW USER MESSAGE]
-User: ${userMsg.content}
+[LATEST MESSAGE]
+👤 User: ${userMsg.content}
 
-You're TaskMaster, an advanced AI. Continue the conversation, referencing the items above as needed. The current year is 2025. Do not include disclaimers like "[RESPONSE]" or "To respond, simply type..." Please answer with direct, helpful info regarding the user's items.
+You are TaskMaster, an advanced AI assistant. Provide clear, concise, and helpful responses about the user's items. The current year is 2025. Focus on actionable insights and practical advice.
 `;
 
   // 3. Call Hugging Face to get the AI's response
@@ -161,17 +161,24 @@ You're TaskMaster, an advanced AI. Continue the conversation, referencing the it
     if (!response.ok) throw new Error('Chat API request failed');
     const result = await response.json();
 
-    // 4. Extract the model's text from the result
-    const rawText = (result[0]?.generated_text as string) || '';
-    // Optionally, do a quick cleanup
-    const assistantReply = rawText
-      .replace(/\[\/?INST\]|<</g, '')
-      .trim();
+    // 4. Clean and format the AI's response
+    let rawText = (result[0]?.generated_text as string) || '';
+    
+    // Improved cleanup with proper regex
+    rawText = rawText
+      .replace(/\[\/?INST\]/g, '')
+      .replace(/<<SYS>>|<<\/SYS>>/g, '')
+      .replace(/\[RESPONSE\]|\[ASSISTANT\]|\[AI\]/g, '')
+      .replace(/^[\s\n]+|[\s\n]+$/g, '')
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 0)
+      .join('\n');
 
     // 5. Add assistant's reply to chat
     setChatHistory((prev) => [
       ...prev,
-      { role: 'assistant', content: assistantReply },
+      { role: 'assistant', content: rawText },
     ]);
   } catch (err) {
     console.error('Chat error:', err);
@@ -179,14 +186,14 @@ You're TaskMaster, an advanced AI. Continue the conversation, referencing the it
       ...prev,
       {
         role: 'assistant',
-        content:
-          'Sorry, I had an issue responding. Please try again in a moment.',
+        content: 'I apologize, but I encountered an issue. Please try again in a moment.',
       },
     ]);
   } finally {
     setIsChatLoading(false);
   }
 };
+
 
 
   // ---------------------
@@ -803,7 +810,7 @@ return (
       <main className="ml-64 p-8 overflow-auto h-screen">
         <header className="dashboard-header mb-6 transform transition-all duration-500 ease-out translate-y-0 opacity-100">
           <h1 className="text-4xl font-bold mb-2 text-white">
-            {greeting.emoji} {greeting.greeting}, <span className="font-normal">{userName || "Loading..."}</span>
+            {greeting.emoji} {greeting.greeting}, <span className="font-bold mb-2 ">{userName || "Loading..."}</span>
           </h1>
           <p className="text-gray-400 italic text-lg">
             "{quote.text}" - <span className="text-purple-400">{quote.author}</span>

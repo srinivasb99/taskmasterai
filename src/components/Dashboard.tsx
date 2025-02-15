@@ -125,8 +125,27 @@ const handleChatSubmit = async (e: React.FormEvent) => {
     .join('\n');
   const itemsText = formatItemsForChat(); // Gather tasks, etc.
 
+  // Get current date and time
+  const now = new Date();
+  const currentDateTime = {
+    date: now.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    }),
+    time: now.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    })
+  };
+
   const prompt = `
 [CONTEXT]
+Current Date: ${currentDateTime.date}
+Current Time: ${currentDateTime.time}
+
 ${itemsText}
 
 [CONVERSATION SO FAR]
@@ -135,7 +154,7 @@ ${conversation}
 [NEW USER MESSAGE]
 User: ${userMsg.content}
 
-You're TaskMaster, an advanced AI. Continue the conversation, referencing the items above as needed. The current year is 2025. Do not include disclaimers like "[RESPONSE]" or "To respond, simply type..." Please answer with direct, helpful info regarding the user's items. Keep your response short, not too long.
+You're TaskMaster, an advanced AI. Continue the conversation, referencing the items above as needed. The current year is 2025. Use the provided current date and time to give more contextual responses, especially when discussing deadlines or scheduling. Do not include disclaimers like "[RESPONSE]" or "To respond, simply type..." Please answer with direct, helpful info regarding the user's items. Keep your response short, not too long.
 `;
 
   // 3. Call Hugging Face to get the AI's response

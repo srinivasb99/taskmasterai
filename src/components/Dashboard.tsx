@@ -1,5 +1,14 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { PlusCircle, Edit, Trash, Sparkles, CheckCircle } from 'lucide-react';
+import {
+  PlusCircle,
+  Edit,
+  Trash,
+  Sparkles,
+  CheckCircle,
+  MessageCircle,
+  X,
+  Send,
+} from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { getTimeBasedGreeting, getRandomQuote } from '../lib/greetings';
 import {
@@ -29,19 +38,42 @@ export function Dashboard() {
   const [quote, setQuote] = useState(getRandomQuote());
   const [greeting, setGreeting] = useState(getTimeBasedGreeting());
 
-const [isChatModalOpen, setIsChatModalOpen] = useState(false);
-const [chatMessage, setChatMessage] = useState('');
-const [chatHistory, setChatHistory] = useState<Array<{ role: 'user' | 'assistant', content: string }>>([]);
-const [isChatLoading, setIsChatLoading] = useState(false);
-const chatEndRef = useRef<HTMLDivElement>(null);
+  // ---------------------
+  // CHAT MODAL
+  // ---------------------
+  const [isChatModalOpen, setIsChatModalOpen] = useState(false);
+  const [chatMessage, setChatMessage] = useState('');
+  const [chatHistory, setChatHistory] = useState<Array<{ role: 'user' | 'assistant', content: string }>>([]);
+  const [isChatLoading, setIsChatLoading] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
-useEffect(() => {
-  if (chatEndRef.current) {
-    chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
-  }
-}, [chatHistory]);
+  // Scroll the chat to the bottom whenever chatHistory changes
+  useEffect(() => {
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [chatHistory]);
 
-
+  // Minimal handleChatSubmit to prevent errors
+  const handleChatSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatMessage.trim()) return;
+    
+    // Add user's message to the chat
+    setChatHistory((prev) => [...prev, { role: 'user', content: chatMessage }]);
+    setChatMessage('');
+    
+    // Simulate loading/response
+    setIsChatLoading(true);
+    // Example: after 1 second, respond with a placeholder
+    setTimeout(() => {
+      setIsChatLoading(false);
+      setChatHistory((prev) => [
+        ...prev,
+        { role: 'assistant', content: "Hello from TaskMaster! (Placeholder response)" },
+      ]);
+    }, 1000);
+  };
 
   // ---------------------
   // 2. COLLECTION STATES
@@ -73,7 +105,6 @@ useEffect(() => {
     const updateGreeting = () => {
       setGreeting(getTimeBasedGreeting());
     };
-
     
     // Update greeting every minute
     const interval = setInterval(updateGreeting, 60000);
@@ -206,56 +237,56 @@ useEffect(() => {
     );
   }, [user]);
 
-// ---------------------
-// SMART OVERVIEW GENERATION
-// ---------------------
-const [smartOverview, setSmartOverview] = useState<string>("");
-const [overviewLoading, setOverviewLoading] = useState(false);
-const [lastGeneratedData, setLastGeneratedData] = useState<string>("");
-const [lastResponse, setLastResponse] = useState<string>("");
+  // ---------------------
+  // SMART OVERVIEW GENERATION
+  // ---------------------
+  const [smartOverview, setSmartOverview] = useState<string>("");
+  const [overviewLoading, setOverviewLoading] = useState(false);
+  const [lastGeneratedData, setLastGeneratedData] = useState<string>("");
+  const [lastResponse, setLastResponse] = useState<string>("");
 
-useEffect(() => {
-  if (!user) return;
+  useEffect(() => {
+    if (!user) return;
 
-  const generateOverview = async () => {
-    // 1. Format current data with better handling of due dates
-    const formatItem = (item: any, type: string) => {
-      const dueDate = item.data.dueDate?.toDate?.();
-      const title = item.data[type] || item.data.title || 'Untitled';
-      return `• ${title}${dueDate ? ` (Due: ${dueDate.toLocaleDateString()})` : ''}`;
-    };
+    const generateOverview = async () => {
+      // 1. Format current data with better handling of due dates
+      const formatItem = (item: any, type: string) => {
+        const dueDate = item.data.dueDate?.toDate?.();
+        const title = item.data[type] || item.data.title || 'Untitled';
+        return `• ${title}${dueDate ? ` (Due: ${dueDate.toLocaleDateString()})` : ''}`;
+      };
 
-    // Combine all items
-    const allItems = [
-      ...(tasks.map(t => formatItem(t, 'task')) || []),
-      ...(goals.map(g => formatItem(g, 'goal')) || []),
-      ...(projects.map(p => formatItem(p, 'project')) || []),
-      ...(plans.map(p => formatItem(p, 'plan')) || [])
-    ];
+      // Combine all items
+      const allItems = [
+        ...(tasks.map(t => formatItem(t, 'task')) || []),
+        ...(goals.map(g => formatItem(g, 'goal')) || []),
+        ...(projects.map(p => formatItem(p, 'project')) || []),
+        ...(plans.map(p => formatItem(p, 'plan')) || [])
+      ];
 
-    // If there are no items, show the empty state message
-    if (!allItems.length) {
-      setSmartOverview(`
-        <div class="text-gray-400 font-large">
-          Add some items to get started with your Smart Overview!
-        </div>
-      `);
-      return;
-    }
+      // If there are no items, show the empty state message
+      if (!allItems.length) {
+        setSmartOverview(`
+          <div class="text-gray-400 font-large">
+            Add some items to get started with your Smart Overview!
+          </div>
+        `);
+        return;
+      }
 
-    const formattedData = allItems.join('\n');
+      const formattedData = allItems.join('\n');
 
-    // 2. Check if data changed
-    if (formattedData === lastGeneratedData) {
-      return;
-    }
+      // 2. Check if data changed
+      if (formattedData === lastGeneratedData) {
+        return;
+      }
 
-    setOverviewLoading(true);
-    setLastGeneratedData(formattedData);
+      setOverviewLoading(true);
+      setLastGeneratedData(formattedData);
 
-    try {
-      // 3. Construct AI prompt
-      const prompt = `[INST] <<SYS>>
+      try {
+        // 3. Construct AI prompt
+        const prompt = `[INST] <<SYS>>
 You are TaskMaster, an advanced AI productivity assistant. Analyze the following items and generate a Smart Overview:
 
 ${formattedData}
@@ -272,122 +303,122 @@ Follow these guidelines exactly:
 Remember: Focus on actionable strategies and specific next steps, not just describing the items.
 <</SYS>>[/INST]`;
 
-      // 4. Call Hugging Face API
-      const response = await fetch("https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${hfApiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          inputs: prompt,
-          parameters: {
-            max_new_tokens: 300,
-            temperature: 0.7,
-            top_p: 0.9,
-            repetition_penalty: 1.2,
-            return_full_text: false,
-            do_sample: true
+        // 4. Call Hugging Face API
+        const response = await fetch("https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${hfApiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            inputs: prompt,
+            parameters: {
+              max_new_tokens: 300,
+              temperature: 0.7,
+              top_p: 0.9,
+              repetition_penalty: 1.2,
+              return_full_text: false,
+              do_sample: true
+            }
+          }),
+        });
+
+        if (!response.ok) throw new Error("API request failed");
+
+        // 5. Process and clean response
+        const result = await response.json();
+        const rawText = result[0]?.generated_text || '';
+
+        // 6. Clean and validate
+        const cleanAndValidate = (text: string) => {
+          // Additional filters - phrases to trigger text removal
+          const excludePhrases = [
+            "I see I made some minor errors",
+            "Here is the corrected response",
+            "was removed as per request",
+            "since I am forced to put something here",
+            "-> You are TaskMaster",
+            "The is:",
+            "Note:",
+            "You are TaskMaster, an advanced AI productivity assistant. Analyze the following items and generate a Smart Overview:",
+            "Follow these guidelines exactly:",
+            "- Start with a number"
+          ];
+
+          // Remove text after any excluded phrase
+          let cleanedText = text;
+          for (const phrase of excludePhrases) {
+            const index = cleanedText.indexOf(phrase);
+            if (index !== -1) {
+              cleanedText = cleanedText.substring(0, index).trim();
+            }
           }
-        }),
-      });
 
-      if (!response.ok) throw new Error("API request failed");
+          // Basic cleanup
+          cleanedText = cleanedText
+            .replace(/\[\/?(INST|SYS)\]|<\/?s>|\[\/?(FONT|COLOR)\]/gi, '')
+            .replace(/(\*\*|###|boxed|final answer|step \d+:)/gi, '')
+            .replace(/\$\{.*?\}\$/g, '')
+            .replace(/\[\/?[^\]]+\]/g, '')
+            .replace(/\{.*?\}/g, '')
+            .replace(/📋|📅|🎯|📊/g, '')
+            .replace(/\b(TASKS?|GOALS?|PROJECTS?|PLANS?)\b:/gi, '')
+            .replace(/\n\s*\n/g, '\n');
 
-      // 5. Process and clean response
-      const result = await response.json();
-      const rawText = result[0]?.generated_text || '';
+          return cleanedText
+            .split('\n')
+            .map(line => line.trim())
+            .filter(line => {
+              // Remove empty lines and lines with only special characters
+              return line.length > 0 && !/^[^a-zA-Z0-9]+$/.test(line);
+            })
+            .join('\n');
+        };
 
-      // 6. Clean and validate
-      const cleanAndValidate = (text: string) => {
-        // Additional filters - phrases to trigger text removal
-        const excludePhrases = [
-          "I see I made some minor errors",
-          "Here is the corrected response",
-          "was removed as per request",
-          "since I am forced to put something here",
-          "-> You are TaskMaster",
-          "The is:",
-          "Note:",
-          "You are TaskMaster, an advanced AI productivity assistant. Analyze the following items and generate a Smart Overview:",
-          "Follow these guidelines exactly:",
-          "- Start with a number"
-        ];
+        const cleanedText = cleanAndValidate(rawText);
 
-        // Remove text after any excluded phrase
-        let cleanedText = text;
-        for (const phrase of excludePhrases) {
-          const index = cleanedText.indexOf(phrase);
-          if (index !== -1) {
-            cleanedText = cleanedText.substring(0, index).trim();
-          }
+        // Check for duplicate
+        if (cleanedText === lastResponse) {
+          setOverviewLoading(false);
+          return;
         }
+        setLastResponse(cleanedText);
 
-        // Basic cleanup
-        cleanedText = cleanedText
-          .replace(/\[\/?(INST|SYS)\]|<\/?s>|\[\/?(FONT|COLOR)\]/gi, '')
-          .replace(/(\*\*|###|boxed|final answer|step \d+:)/gi, '')
-          .replace(/\$\{.*?\}\$/g, '')
-          .replace(/\[\/?[^\]]+\]/g, '')
-          .replace(/\{.*?\}/g, '')
-          .replace(/📋|📅|🎯|📊/g, '')
-          .replace(/\b(TASKS?|GOALS?|PROJECTS?|PLANS?)\b:/gi, '')
-          .replace(/\n\s*\n/g, '\n');
-
-        return cleanedText
+        const cleanTextLines = cleanedText
           .split('\n')
-          .map(line => line.trim())
-          .filter(line => {
-            // Remove empty lines and lines with only special characters
-            return line.length > 0 && !/^[^a-zA-Z0-9]+$/.test(line);
+          .filter(line => line.length > 0);
+
+        // 7. Format HTML
+        const formattedHtml = cleanTextLines
+          .map((line, index) => {
+            if (index === 0) {
+              // Greeting
+              return `<div class="text-green-400 text-lg font-medium mb-4">${line}</div>`;
+            } else if (line.match(/^\d+\./)) {
+              // Priority item
+              return `<div class="text-blue-300 mb-3 pl-4 border-l-2 border-blue-500">${line}</div>`;
+            } else {
+              // Other content
+              return `<div class="text-gray-300 mb-3">${line}</div>`;
+            }
           })
-          .join('\n');
-      };
+          .join('');
 
-      const cleanedText = cleanAndValidate(rawText);
+        setSmartOverview(formattedHtml);
 
-      // Check for duplicate
-      if (cleanedText === lastResponse) {
+      } catch (error) {
+        console.error("Overview generation error:", error);
+        setSmartOverview(`
+          <div class="text-red-400">Error generating overview. Please try again.</div>
+        `);
+      } finally {
         setOverviewLoading(false);
-        return;
       }
-      setLastResponse(cleanedText);
+    };
 
-      const cleanTextLines = cleanedText
-        .split('\n')
-        .filter(line => line.length > 0);
-
-      // 7. Format HTML
-      const formattedHtml = cleanTextLines
-        .map((line, index) => {
-          if (index === 0) {
-            // Greeting
-            return `<div class="text-green-400 text-lg font-medium mb-4">${line}</div>`;
-          } else if (line.match(/^\d+\./)) {
-            // Priority item
-            return `<div class="text-blue-300 mb-3 pl-4 border-l-2 border-blue-500">${line}</div>`;
-          } else {
-            // Other content
-            return `<div class="text-gray-300 mb-3">${line}</div>`;
-          }
-        })
-        .join('');
-
-      setSmartOverview(formattedHtml);
-
-    } catch (error) {
-      console.error("Overview generation error:", error);
-      setSmartOverview(`
-        <div class="text-red-400">Error generating overview. Please try again.</div>
-      `);
-    } finally {
-      setOverviewLoading(false);
-    }
-  };
-
-  generateOverview();
-// ----------- Removed lastGeneratedData from dependencies -----------
-}, [user, tasks, goals, projects, plans, userName, hfApiKey]);
+    generateOverview();
+    // Removed lastGeneratedData from dependencies
+  }, [user, tasks, goals, projects, plans, userName, hfApiKey]);
 
   // ---------------------
   // 11. CREATE & EDIT & DELETE
@@ -397,35 +428,35 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
     setEditingItemId(null);
   };
 
- const handleCreate = async () => {
-  if (!user) return;
-  if (!newItemText.trim()) {
-    alert("Please enter a name or description before creating.");
-    return;
-  }
-  let dateValue: Date | null = null;
-  if (newItemDate) {
-    // Parse "YYYY-MM-DD" and set time to 12:00 to avoid day-off issues
-    const [year, month, day] = newItemDate.split('-').map(Number);
-    dateValue = new Date(year, month - 1, day, 12, 0, 0);
-  }
-
-  try {
-    if (activeTab === "tasks") {
-      await createTask(user.uid, newItemText, dateValue);
-    } else if (activeTab === "goals") {
-      await createGoal(user.uid, newItemText, dateValue);
-    } else if (activeTab === "projects") {
-      await createProject(user.uid, newItemText, dateValue);
-    } else if (activeTab === "plans") {
-      await createPlan(user.uid, newItemText, dateValue);
+  const handleCreate = async () => {
+    if (!user) return;
+    if (!newItemText.trim()) {
+      alert("Please enter a name or description before creating.");
+      return;
     }
-    setNewItemText("");
-    setNewItemDate("");
-  } catch (error) {
-    console.error("Error creating item:", error);
-  }
-};
+    let dateValue: Date | null = null;
+    if (newItemDate) {
+      // Parse "YYYY-MM-DD" and set time to 12:00 to avoid day-off issues
+      const [year, month, day] = newItemDate.split('-').map(Number);
+      dateValue = new Date(year, month - 1, day, 12, 0, 0);
+    }
+
+    try {
+      if (activeTab === "tasks") {
+        await createTask(user.uid, newItemText, dateValue);
+      } else if (activeTab === "goals") {
+        await createGoal(user.uid, newItemText, dateValue);
+      } else if (activeTab === "projects") {
+        await createProject(user.uid, newItemText, dateValue);
+      } else if (activeTab === "plans") {
+        await createPlan(user.uid, newItemText, dateValue);
+      }
+      setNewItemText("");
+      setNewItemDate("");
+    } catch (error) {
+      console.error("Error creating item:", error);
+    }
+  };
 
   let currentItems: Array<{ id: string; data: any }> = [];
   let titleField = "";
@@ -455,30 +486,29 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
     }
   };
 
- const handleEditSave = async (itemId: string) => {
-  if (!user || !editingText.trim()) {
-    alert("Please enter a valid name for the item.");
-    return;
-  }
-  let dateValue: Date | null = null;
-  if (editingDate) {
-    // Same parsing logic for editing
-    const [year, month, day] = editingDate.split('-').map(Number);
-    dateValue = new Date(year, month - 1, day, 12, 0, 0);
-  }
+  const handleEditSave = async (itemId: string) => {
+    if (!user || !editingText.trim()) {
+      alert("Please enter a valid name for the item.");
+      return;
+    }
+    let dateValue: Date | null = null;
+    if (editingDate) {
+      const [year, month, day] = editingDate.split('-').map(Number);
+      dateValue = new Date(year, month - 1, day, 12, 0, 0);
+    }
 
-  try {
-    await updateItem(collectionName, itemId, {
-      [titleField]: editingText,
-      dueDate: dateValue || null,
-    });
-    setEditingItemId(null);
-    setEditingText("");
-    setEditingDate("");
-  } catch (error) {
-    console.error("Error updating item:", error);
-  }
-};
+    try {
+      await updateItem(collectionName, itemId, {
+        [titleField]: editingText,
+        dueDate: dateValue || null,
+      });
+      setEditingItemId(null);
+      setEditingText("");
+      setEditingDate("");
+    } catch (error) {
+      console.error("Error updating item:", error);
+    }
+  };
 
   const handleDelete = async (itemId: string) => {
     if (!user) return;
@@ -532,9 +562,6 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
     });
   }, [customTimers]);
 
-  /**
-   * Updated time formatter to show HH:MM:SS
-   */
   const formatCustomTime = (timeInSeconds: number) => {
     const hours = Math.floor(timeInSeconds / 3600);
     const remainder = timeInSeconds % 3600;
@@ -595,7 +622,6 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
   const handleEditTimerClick = (timerId: string, currentName: string, currentTime: number) => {
     setEditingTimerId(timerId);
     setEditingTimerName(currentName);
-    // We'll store the time in minutes in the input field, though we display HH:MM:SS on the actual timer.
     setEditingTimerMinutes(String(Math.floor(currentTime / 60)));
   };
 
@@ -645,137 +671,137 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
   const completedPlans = plans.filter((pl) => pl.data.completed).length;
   const plansProgress = totalPlans > 0 ? (completedPlans / totalPlans) * 100 : 0;
 
-  if (user === null) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-gray-900 text-white">
-        <div className="animate-pulse">
-          <p className="text-xl">Loading dashboard...</p>
-          <div className="mt-4 h-2 w-32 bg-gray-700 rounded"></div>
-        </div>
-      </div>
-    );
-  }
+if (user === null) {
+  return <Navigate to="/login" replace />;
+}
+
 
   return (
     <div className="bg-gray-900 text-white min-h-screen w-full overflow-hidden">
       <Sidebar userName={userName} />
       <main className="ml-64 p-8 overflow-auto h-screen">
         <header className="dashboard-header mb-6 transform transition-all duration-500 ease-out translate-y-0 opacity-100">
-         <h1 className="text-4xl font-bold mb-2 text-white">
+          <h1 className="text-4xl font-bold mb-2 text-white">
             {greeting.emoji} {greeting.greeting}, <span className="font-normal">{userName || "Loading..."}</span>
           </h1>
           <p className="text-gray-400 italic text-lg">
             "{quote.text}" - <span className="text-purple-400">{quote.author}</span>
           </p>
         </header>
-{/* Smart Overview Card */}
-<div className={`bg-gray-800 rounded-xl p-6 relative min-h-[200px] transform transition-all duration-500 ease-out ${cardVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'} hover:shadow-lg hover:shadow-purple-500/10`}>
-  <div className="flex items-center mb-4">
-    <h2 className="text-xl font-semibold text-blue-300 mr-2 flex items-center">
-      <Sparkles className="w-5 h-5 mr-2 text-yellow-400" />
-      Smart Overview
-    </h2>
-    <button
-      onClick={() => setIsChatModalOpen(true)}
-      className="p-2 text-blue-300 hover:text-blue-400 hover:bg-blue-500/10 rounded-full transition-colors duration-200"
-      title="Chat with TaskMaster"
-    >
-      <MessageCircle className="w-5 h-5" />
-    </button>
-    <span className="text-xs bg-gradient-to-r from-pink-500 to-purple-500 text-white px-3 py-1 rounded-full font-medium ml-2">
-      BETA
-    </span>
-  </div>
 
-  {overviewLoading ? (
-    <div className="space-y-3">
-      <div className="h-4 bg-gray-700 rounded-full w-3/4 animate-pulse"></div>
-      <div className="h-4 bg-gray-700 rounded-full w-2/3 animate-pulse delay-75"></div>
-      <div className="h-4 bg-gray-700 rounded-full w-4/5 animate-pulse delay-150"></div>
-    </div>
-  ) : (
-    <>
-      <div 
-        className="text-sm text-gray-300 prose prose-invert"
-        dangerouslySetInnerHTML={{ __html: smartOverview }}
-      />
-      <div className="text-center mt-4 text-xs text-gray-400">
-        TaskMaster can make mistakes. Verify details.
-      </div>
-    </>
-  )}
-</div>
-
-{/* Chat Modal */}
-{isChatModalOpen && (
-  <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
-    <div className="bg-gray-800 rounded-xl w-full max-w-2xl mx-4 max-h-[80vh] flex flex-col">
-      <div className="p-4 border-b border-gray-700 flex justify-between items-center">
-        <h3 className="text-lg font-semibold text-blue-300 flex items-center">
-          <MessageCircle className="w-5 h-5 mr-2" />
-          Chat with TaskMaster
-        </h3>
-        <button
-          onClick={() => setIsChatModalOpen(false)}
-          className="text-gray-400 hover:text-gray-200 transition-colors"
+        {/* Smart Overview Card */}
+        <div
+          className={`bg-gray-800 rounded-xl p-6 relative min-h-[200px] transform transition-all duration-500 ease-out ${
+            cardVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
+          } hover:shadow-lg hover:shadow-purple-500/10`}
         >
-          <X className="w-5 h-5" />
-        </button>
-      </div>
-      
-      <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={chatEndRef}>
-        {chatHistory.map((message, index) => (
-          <div
-            key={index}
-            className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
-            <div
-              className={`max-w-[80%] rounded-lg px-4 py-2 ${
-                message.role === 'user'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-700 text-gray-200'
-              }`}
+          <div className="flex items-center mb-4">
+            <h2 className="text-xl font-semibold text-blue-300 mr-2 flex items-center">
+              <Sparkles className="w-5 h-5 mr-2 text-yellow-400" />
+              Smart Overview
+            </h2>
+            <button
+              onClick={() => setIsChatModalOpen(true)}
+              className="p-2 text-blue-300 hover:text-blue-400 hover:bg-blue-500/10 rounded-full transition-colors duration-200"
+              title="Chat with TaskMaster"
             >
-              {message.content}
-            </div>
+              <MessageCircle className="w-5 h-5" />
+            </button>
+            <span className="text-xs bg-gradient-to-r from-pink-500 to-purple-500 text-white px-3 py-1 rounded-full font-medium ml-2">
+              BETA
+            </span>
           </div>
-        ))}
-        {isChatLoading && (
-          <div className="flex justify-start">
-            <div className="bg-gray-700 text-gray-200 rounded-lg px-4 py-2 max-w-[80%]">
-              <div className="flex space-x-2">
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100"></div>
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200"></div>
+
+          {overviewLoading ? (
+            <div className="space-y-3">
+              <div className="h-4 bg-gray-700 rounded-full w-3/4 animate-pulse"></div>
+              <div className="h-4 bg-gray-700 rounded-full w-2/3 animate-pulse delay-75"></div>
+              <div className="h-4 bg-gray-700 rounded-full w-4/5 animate-pulse delay-150"></div>
+            </div>
+          ) : (
+            <>
+              <div
+                className="text-sm text-gray-300 prose prose-invert"
+                dangerouslySetInnerHTML={{ __html: smartOverview }}
+              />
+              <div className="text-center mt-4 text-xs text-gray-400">
+                TaskMaster can make mistakes. Verify details.
               </div>
+            </>
+          )}
+        </div>
+
+        {/* Chat Modal */}
+        {isChatModalOpen && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
+            <div className="bg-gray-800 rounded-xl w-full max-w-2xl mx-4 max-h-[80vh] flex flex-col">
+              <div className="p-4 border-b border-gray-700 flex justify-between items-center">
+                <h3 className="text-lg font-semibold text-blue-300 flex items-center">
+                  <MessageCircle className="w-5 h-5 mr-2" />
+                  Chat with TaskMaster
+                </h3>
+                <button
+                  onClick={() => setIsChatModalOpen(false)}
+                  className="text-gray-400 hover:text-gray-200 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={chatEndRef}>
+                {chatHistory.map((message, index) => (
+                  <div
+                    key={index}
+                    className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div
+                      className={`max-w-[80%] rounded-lg px-4 py-2 ${
+                        message.role === 'user'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-700 text-gray-200'
+                      }`}
+                    >
+                      {message.content}
+                    </div>
+                  </div>
+                ))}
+                {isChatLoading && (
+                  <div className="flex justify-start">
+                    <div className="bg-gray-700 text-gray-200 rounded-lg px-4 py-2 max-w-[80%]">
+                      <div className="flex space-x-2">
+                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100"></div>
+                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200"></div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <form onSubmit={handleChatSubmit} className="p-4 border-t border-gray-700">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={chatMessage}
+                    onChange={(e) => setChatMessage(e.target.value)}
+                    placeholder="Ask TaskMaster about your items..."
+                    className="flex-1 bg-gray-700 text-gray-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <button
+                    type="submit"
+                    disabled={isChatLoading}
+                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Send className="w-5 h-5" />
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}
-      </div>
 
-      <form onSubmit={handleChatSubmit} className="p-4 border-t border-gray-700">
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={chatMessage}
-            onChange={(e) => setChatMessage(e.target.value)}
-            placeholder="Ask TaskMaster about your items..."
-            className="flex-1 bg-gray-700 text-gray-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <button
-            type="submit"
-            disabled={isChatLoading}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Send className="w-5 h-5" />
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
-)}
-
-
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+          <div className="flex flex-col gap-6">
             {/* Productivity Card */}
             <div className="bg-gray-800 rounded-xl p-6 transform hover:scale-[1.02] transition-all duration-300">
               <h2 className="text-xl font-semibold text-purple-400 mb-4">
@@ -786,10 +812,12 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
                   <div className="mb-4">
                     <div className="flex justify-between mb-2">
                       <p>Tasks</p>
-                      <p className="text-blue-400">{completedTasks}/{totalTasks}</p>
+                      <p className="text-blue-400">
+                        {completedTasks}/{totalTasks}
+                      </p>
                     </div>
                     <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
-                      <div 
+                      <div
                         className="h-full bg-gradient-to-r from-green-400 to-green-600 rounded-full transition-all duration-1000 ease-out"
                         style={{ width: `${tasksProgress}%` }}
                       />
@@ -801,10 +829,12 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
                   <div className="mb-4">
                     <div className="flex justify-between mb-2">
                       <p>Goals</p>
-                      <p className="text-pink-400">{completedGoals}/{totalGoals}</p>
+                      <p className="text-pink-400">
+                        {completedGoals}/{totalGoals}
+                      </p>
                     </div>
                     <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
-                      <div 
+                      <div
                         className="h-full bg-gradient-to-r from-pink-400 to-pink-600 rounded-full transition-all duration-1000 ease-out"
                         style={{ width: `${goalsProgress}%` }}
                       />
@@ -816,10 +846,12 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
                   <div className="mb-4">
                     <div className="flex justify-between mb-2">
                       <p>Projects</p>
-                      <p className="text-blue-400">{completedProjects}/{totalProjects}</p>
+                      <p className="text-blue-400">
+                        {completedProjects}/{totalProjects}
+                      </p>
                     </div>
                     <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
-                      <div 
+                      <div
                         className="h-full bg-gradient-to-r from-blue-400 to-blue-600 rounded-full transition-all duration-1000 ease-out"
                         style={{ width: `${projectsProgress}%` }}
                       />
@@ -831,10 +863,12 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
                   <div className="mb-4">
                     <div className="flex justify-between mb-2">
                       <p>Plans</p>
-                      <p className="text-yellow-400">{completedPlans}/{totalPlans}</p>
+                      <p className="text-yellow-400">
+                        {completedPlans}/{totalPlans}
+                      </p>
                     </div>
                     <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
-                      <div 
+                      <div
                         className="h-full bg-gradient-to-r from-yellow-400 to-yellow-600 rounded-full transition-all duration-1000 ease-out"
                         style={{ width: `${plansProgress}%` }}
                       />
@@ -842,93 +876,106 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
                   </div>
                 )}
 
-                {totalTasks === 0 && totalGoals === 0 && totalProjects === 0 && totalPlans === 0 && (
-                  <p className="text-gray-400">
-                    No items to track yet. Start by creating some tasks, goals, projects, or plans!
-                  </p>
-                )}
+                {totalTasks === 0 &&
+                  totalGoals === 0 &&
+                  totalProjects === 0 &&
+                  totalPlans === 0 && (
+                    <p className="text-gray-400">
+                      No items to track yet. Start by creating some tasks,
+                      goals, projects, or plans!
+                    </p>
+                  )}
               </div>
             </div>
 
-{/* Upcoming Deadlines Card */}
-<div className="bg-gray-800 rounded-xl p-6 transform hover:scale-[1.02] transition-all duration-300">
-  <h2 className="text-xl font-semibold text-blue-400 mb-4">
-    Upcoming Deadlines
-  </h2>
-  {(() => {
-    // 1. Combine all items with a 'type' label
-    const tasksWithType = tasks.map((t) => ({ ...t, type: 'Task' }));
-    const goalsWithType = goals.map((g) => ({ ...g, type: 'Goal' }));
-    const projectsWithType = projects.map((p) => ({ ...p, type: 'Project' }));
-    const plansWithType = plans.map((p) => ({ ...p, type: 'Plan' }));
+            {/* Upcoming Deadlines Card */}
+            <div className="bg-gray-800 rounded-xl p-6 transform hover:scale-[1.02] transition-all duration-300">
+              <h2 className="text-xl font-semibold text-blue-400 mb-4">
+                Upcoming Deadlines
+              </h2>
+              {(() => {
+                // 1. Combine all items with a 'type' label
+                const tasksWithType = tasks.map((t) => ({ ...t, type: 'Task' }));
+                const goalsWithType = goals.map((g) => ({ ...g, type: 'Goal' }));
+                const projectsWithType = projects.map((p) => ({ ...p, type: 'Project' }));
+                const plansWithType = plans.map((p) => ({ ...p, type: 'Plan' }));
 
-    // 2. Merge into a single array
-    const allItems = [
-      ...tasksWithType,
-      ...goalsWithType,
-      ...projectsWithType,
-      ...plansWithType,
-    ];
+                // 2. Merge into a single array
+                const allItems = [
+                  ...tasksWithType,
+                  ...goalsWithType,
+                  ...projectsWithType,
+                  ...plansWithType,
+                ];
 
-    // 3. Filter for items that:
-    //    - Have a dueDate
-    //    - Are due in the future (not past)
-    //    - Are NOT completed
-    const now = new Date();
-    const upcomingDeadlines = allItems
-      .filter((item) => {
-        const { dueDate, completed } = item.data;
-        if (!dueDate) return false;
+                // 3. Filter for items that:
+                //    - Have a dueDate
+                //    - Are due in the future (not past)
+                //    - Are NOT completed
+                const now = new Date();
+                const upcomingDeadlines = allItems
+                  .filter((item) => {
+                    const { dueDate, completed } = item.data;
+                    if (!dueDate) return false;
 
-        const dueDateObj = dueDate.toDate ? dueDate.toDate() : new Date(dueDate);
-        return dueDateObj > now && !completed;
-      })
-      // 4. Sort by ascending due date
-      .sort((a, b) => {
-        const aDate = a.data.dueDate.toDate
-          ? a.data.dueDate.toDate()
-          : new Date(a.data.dueDate);
-        const bDate = b.data.dueDate.toDate
-          ? b.data.dueDate.toDate()
-          : new Date(b.data.dueDate);
-        return aDate - bDate;
-      })
-      // (Optionally limit to 5 or so, if desired)
-      .slice(0, 5);
+                    const dueDateObj = dueDate.toDate
+                      ? dueDate.toDate()
+                      : new Date(dueDate);
+                    return dueDateObj > now && !completed;
+                  })
+                  // 4. Sort by ascending due date
+                  .sort((a, b) => {
+                    const aDate = a.data.dueDate.toDate
+                      ? a.data.dueDate.toDate()
+                      : new Date(a.data.dueDate);
+                    const bDate = b.data.dueDate.toDate
+                      ? b.data.dueDate.toDate()
+                      : new Date(b.data.dueDate);
+                    return aDate - bDate;
+                  })
+                  // (Optionally limit to 5 or so, if desired)
+                  .slice(0, 5);
 
-    // 5. If none found, show a message. Otherwise list them.
-    if (!upcomingDeadlines.length) {
-      return <p className="text-gray-400">No upcoming deadlines</p>;
-    }
+                // 5. If none found, show a message. Otherwise list them.
+                if (!upcomingDeadlines.length) {
+                  return <p className="text-gray-400">No upcoming deadlines</p>;
+                }
 
-// Fix for the first section (upcomingDeadlines)
-return (
-  <ul className="space-y-3">
-    {upcomingDeadlines.map((item) => {
-      const { id, type, data } = item;
-      const dueDateObj = data.dueDate.toDate ? data.dueDate.toDate() : new Date(data.dueDate);
-      const dueDateStr = dueDateObj.toLocaleDateString();
-      const itemName =
-        data.task || data.goal || data.project || data.plan || 'Untitled';
+                return (
+                  <ul className="space-y-3">
+                    {upcomingDeadlines.map((item) => {
+                      const { id, type, data } = item;
+                      const dueDateObj = data.dueDate.toDate
+                        ? data.dueDate.toDate()
+                        : new Date(data.dueDate);
+                      const dueDateStr = dueDateObj.toLocaleDateString();
+                      const itemName =
+                        data.task ||
+                        data.goal ||
+                        data.project ||
+                        data.plan ||
+                        'Untitled';
 
-      return (
-        <li
-          key={id}
-          className="bg-gray-700/50 p-4 rounded-lg backdrop-blur-sm transition-all hover:scale-[1.02] hover:shadow-lg"
-        >
-          <div className="flex items-center justify-between">
-            <div className="text-sm text-gray-100 font-medium">
-              <span className="font-bold">{type}:</span> {itemName}
+                      return (
+                        <li
+                          key={id}
+                          className="bg-gray-700/50 p-4 rounded-lg backdrop-blur-sm transition-all hover:scale-[1.02] hover:shadow-lg"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="text-sm text-gray-100 font-medium">
+                              <span className="font-bold">{type}:</span> {itemName}
+                            </div>
+                            <div className="text-xs text-gray-300 ml-4">
+                              Due: <span className="font-semibold">{dueDateStr}</span>
+                            </div>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                );
+              })()}
             </div>
-            <div className="text-xs text-gray-300 ml-4">
-              Due: <span className="font-semibold">{dueDateStr}</span>
-            </div>
-          </div>
-        </li>
-      );
-    })}
-  </ul>
-);
 
             {/* Tabs & List */}
             <div className="bg-gray-800 rounded-xl p-6 transform hover:scale-[1.02] transition-all duration-300">
@@ -937,8 +984,8 @@ return (
                   <button
                     key={tab}
                     className={`px-4 py-2 rounded-full transition-all duration-300 transform hover:scale-105 ${
-                      activeTab === tab 
-                        ? "bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-lg" 
+                      activeTab === tab
+                        ? "bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-lg"
                         : "bg-gray-700 text-gray-200 hover:bg-gray-600"
                     }`}
                     onClick={() => handleTabChange(tab as any)}
@@ -962,7 +1009,7 @@ return (
                   value={newItemDate}
                   onChange={(e) => setNewItemDate(e.target.value)}
                 />
-                <button 
+                <button
                   className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white px-6 py-3 rounded-full font-semibold hover:shadow-lg hover:shadow-purple-500/20 transition-all duration-300 transform hover:scale-105"
                   onClick={handleCreate}
                 >
@@ -972,7 +1019,9 @@ return (
 
               <ul className="space-y-3">
                 {currentItems.length === 0 ? (
-                  <li className="text-gray-400 text-center py-8">No {activeTab} yet...</li>
+                  <li className="text-gray-400 text-center py-8">
+                    No {activeTab} yet...
+                  </li>
                 ) : (
                   currentItems.map((item, index) => {
                     const itemId = item.id;
@@ -981,7 +1030,9 @@ return (
                     let overdue = false;
                     let dueDateStr = "";
                     if (item.data.dueDate) {
-                      const dueDateObj = item.data.dueDate.toDate ? item.data.dueDate.toDate() : new Date(item.data.dueDate);
+                      const dueDateObj = item.data.dueDate.toDate
+                        ? item.data.dueDate.toDate()
+                        : new Date(item.data.dueDate);
                       dueDateStr = dueDateObj.toLocaleDateString();
                       overdue = dueDateObj < new Date();
                     }
@@ -1003,7 +1054,11 @@ return (
                       >
                         {!isEditing ? (
                           <div className="flex items-center gap-3">
-                            <span className={`font-bold text-lg ${isCompleted ? "line-through text-gray-400" : ""}`}>
+                            <span
+                              className={`font-bold text-lg ${
+                                isCompleted ? "line-through text-gray-400" : ""
+                              }`}
+                            >
                               {textValue}
                             </span>
                             {dueDateStr && (
@@ -1083,6 +1138,7 @@ return (
                 )}
               </ul>
             </div>
+          </div>
 
           {/* RIGHT COLUMN */}
           <div className="flex flex-col gap-6">
@@ -1097,9 +1153,9 @@ return (
                       {weatherData.location.name}
                     </p>
                     <p className="text-gray-300 text-lg flex items-center gap-2">
-                      <img 
-                        src={weatherData.current.condition.icon} 
-                        alt={weatherData.current.condition.text} 
+                      <img
+                        src={weatherData.current.condition.icon}
+                        alt={weatherData.current.condition.text}
                         className="w-10 h-10"
                       />
                       {weatherData.current.condition.text} - {weatherData.current.temp_f}°F
@@ -1110,11 +1166,15 @@ return (
                     <div className="flex gap-4 text-sm text-gray-400">
                       <div className="flex items-center">
                         <strong>Wind:</strong>
-                        <span className="ml-2">{Math.round(weatherData.current.wind_mph)} mph</span>
+                        <span className="ml-2">
+                          {Math.round(weatherData.current.wind_mph)} mph
+                        </span>
                       </div>
                       <div className="flex items-center">
                         <strong>Humidity:</strong>
-                        <span className="ml-2">{weatherData.current.humidity}%</span>
+                        <span className="ml-2">
+                          {weatherData.current.humidity}%
+                        </span>
                       </div>
                       <div className="flex items-center">
                         <strong>UV Index:</strong>
@@ -1123,74 +1183,81 @@ return (
                     </div>
                   </div>
 
-                  {/* Show only the next 3 relevant days: 
-                      "Today (Feb 14)", "Tomorrow (Feb 15)", "Day After Tomorrow (Feb 16)" 
-                      or a fallback label if we run out of days. 
-                  */}
+                  {/* Show only the next 3 relevant days */}
                   {weatherData.forecast && weatherData.forecast.forecastday && (
                     <div className="space-y-4">
-                      <h3 className="text-lg font-semibold text-blue-400">Forecast</h3>
-{(() => {
-  // Filter out any past days in case API date is behind local date
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
+                      <h3 className="text-lg font-semibold text-blue-400">
+                        Forecast
+                      </h3>
+                      {(() => {
+                        // Filter out any past days in case API date is behind local date
+                        const now = new Date();
+                        now.setHours(0, 0, 0, 0);
 
-  const validDays = weatherData.forecast.forecastday.filter((day) => {
-    const d = new Date(day.date);
-    d.setHours(0, 0, 0, 0);
-    return d >= now;
-  });
+                        const validDays = weatherData.forecast.forecastday.filter(
+                          (day: any) => {
+                            const d = new Date(day.date);
+                            d.setHours(0, 0, 0, 0);
+                            return d >= now;
+                          }
+                        );
 
-  // Only take up to 3 days from that filtered list
-  const finalDays = validDays.slice(0, 3);
-  const dayLabels = ["Today", "Tomorrow", "Day After Tomorrow"];
+                        // Only take up to 3 days from that filtered list
+                        const finalDays = validDays.slice(0, 3);
+                        const dayLabels = [
+                          "Today",
+                          "Tomorrow",
+                          "Day After Tomorrow",
+                        ];
 
-  return finalDays.map((day, idx) => {
-    // e.g. "Today (Feb 14)"
-    const dateObj = new Date(day.date);
-    const monthDay = dateObj.toLocaleDateString(undefined, {
-      month: 'short',
-      day: 'numeric',
-    });
-    const label = `${dayLabels[idx]} (${monthDay})`;
+                        return finalDays.map((day: any, idx: number) => {
+                          const dateObj = new Date(day.date);
+                          const monthDay = dateObj.toLocaleDateString(undefined, {
+                            month: 'short',
+                            day: 'numeric',
+                          });
+                          const label = `${dayLabels[idx]} (${monthDay})`;
 
-    const maxF = Math.round(day.day.maxtemp_f);
-    const minF = Math.round(day.day.mintemp_f);
-    const icon = day.day.condition.icon;
-    const barWidth = maxF > 0 ? (maxF / 120) * 100 : 0; 
+                          const maxF = Math.round(day.day.maxtemp_f);
+                          const minF = Math.round(day.day.mintemp_f);
+                          const icon = day.day.condition.icon;
+                          const barWidth = maxF > 0 ? (maxF / 120) * 100 : 0;
 
-    return (
-      <div
-        key={day.date}
-        className="flex items-center gap-4 bg-gray-700/50 p-3 rounded-lg relative overflow-hidden"
-      >
-        <div 
-          className="absolute inset-0 bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 opacity-10 pointer-events-none"
-        />
-        <img 
-          src={icon} 
-          alt={day.day.condition.text} 
-          className="w-10 h-10 z-10"
-        />
-        <div className="z-10 flex-grow">
-          <p className="text-sm text-gray-200 font-medium">
-            {label}
-          </p>
-          <div className="flex items-center gap-3 mt-1">
-            <p className="text-sm text-red-300">High: {maxF}°F</p>
-            <p className="text-sm text-blue-300">Low: {minF}°F</p>
-          </div>
-          <div className="mt-2 w-full h-2 bg-gray-600 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-yellow-300 to-red-500 rounded-full transition-all duration-700 ease-out"
-              style={{ width: `${barWidth}%` }}
-            />
-          </div>
-        </div>
-      </div>
-    );
-  });
-})()}
+                          return (
+                            <div
+                              key={day.date}
+                              className="flex items-center gap-4 bg-gray-700/50 p-3 rounded-lg relative overflow-hidden"
+                            >
+                              <div className="absolute inset-0 bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 opacity-10 pointer-events-none" />
+                              <img
+                                src={icon}
+                                alt={day.day.condition.text}
+                                className="w-10 h-10 z-10"
+                              />
+                              <div className="z-10 flex-grow">
+                                <p className="text-sm text-gray-200 font-medium">
+                                  {label}
+                                </p>
+                                <div className="flex items-center gap-3 mt-1">
+                                  <p className="text-sm text-red-300">
+                                    High: {maxF}°F
+                                  </p>
+                                  <p className="text-sm text-blue-300">
+                                    Low: {minF}°F
+                                  </p>
+                                </div>
+                                <div className="mt-2 w-full h-2 bg-gray-600 rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full bg-gradient-to-r from-yellow-300 to-red-500 rounded-full transition-all duration-700 ease-out"
+                                    style={{ width: `${barWidth}%` }}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        });
+                      })()}
+                    </div>
                   )}
                 </>
               ) : (
@@ -1302,10 +1369,18 @@ return (
                             ) : (
                               <>
                                 <div className="flex items-center gap-2 mb-2">
-                                  <span className="font-bold text-lg">{timer.data.name}</span>
+                                  <span className="font-bold text-lg">
+                                    {timer.data.name}
+                                  </span>
                                   <button
                                     className="bg-gradient-to-r from-blue-400 to-blue-600 p-2 rounded-full text-white hover:shadow-lg hover:shadow-blue-500/20 transition-all duration-300 transform hover:scale-105"
-                                    onClick={() => handleEditTimerClick(timerId, timer.data.name, timer.data.time)}
+                                    onClick={() =>
+                                      handleEditTimerClick(
+                                        timerId,
+                                        timer.data.name,
+                                        timer.data.time
+                                      )
+                                    }
                                   >
                                     <Edit className="w-4 h-4" />
                                   </button>

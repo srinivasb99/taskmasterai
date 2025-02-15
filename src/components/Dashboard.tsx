@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useRef } from 'react';
 import { Navigate } from 'react-router-dom';
 import {
@@ -264,68 +265,71 @@ ${conversation}
 [NEW USER MESSAGE]
 ${userName}: ${userMsg.content}
 
-You're TaskMaster, an AI assistant helping ${userName}. Respond naturally and concisely.
+You're TaskMaster, an AI assistant helping ${userName}. When responding, follow these rules:
 
-RESPONSE TYPES:
-1. For general questions, casual conversation, or non-educational topics:
-   - Provide a simple text response
-   - DO NOT include any JSON
-   - Keep responses friendly but focused
-   - Example topics: social activities, scheduling, personal advice
+1. RESPONSE STRUCTURE:
+   - First provide a brief, natural text response
+   - If educational content is needed, include EXACTLY ONE properly formatted JSON object
+   - Place JSON in a code block with triple backticks and "json" language identifier
+   - NEVER include JSON syntax in regular text
+   - NEVER mix JSON with regular text
+   - NEVER create multiple JSON blocks
 
-2. For educational or study-related content ONLY:
-   - First provide a brief introduction
-   - Then include ONE JSON block for flashcards or quiz questions
-   - Use JSON ONLY for:
-     * Study materials
-     * Test preparation
-     * Learning exercises
-     * Educational content
-     * Knowledge checks
+2. JSON FORMATS:
+   For flashcards:
+   {
+     "type": "flashcard",
+     "data": [
+       {
+         "id": "unique-id-1",
+         "question": "Question 1",
+         "answer": "Answer 1",
+         "topic": "Subject area"
+       },
+       {
+         "id": "unique-id-2",
+         "question": "Question 2",
+         "answer": "Answer 2",
+         "topic": "Subject area"
+       }
+     ]
+   }
 
-JSON FORMAT (Use ONLY for educational content):
-For flashcards:
-{
-  "type": "flashcard",
-  "data": [
-    {
-      "id": "unique-id-1",
-      "question": "Question text",
-      "answer": "Answer text",
-      "topic": "Subject area"
-    }
-  ]
-}
+   For quiz questions:
+   {
+     "type": "question",
+     "data": [
+       {
+         "id": "unique-id-1",
+         "question": "Question 1",
+         "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
+         "correctAnswer": 0,
+         "explanation": "Explanation 1"
+       },
+       {
+         "id": "unique-id-2",
+         "question": "Question 2",
+         "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
+         "correctAnswer": 1,
+         "explanation": "Explanation 2"
+       }
+     ]
+   }
 
-For quiz questions:
-{
-  "type": "question",
-  "data": [
-    {
-      "id": "unique-id-1",
-      "question": "Question text",
-      "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
-      "correctAnswer": 0,
-      "explanation": "Why this answer is correct"
-    }
-  ]
-}
+3. CRITICAL RULES:
+   - Keep text responses concise and natural
+   - NEVER explain JSON structure in text
+   - NEVER include partial or malformed JSON
+   - NEVER mix educational content types
+   - ALWAYS validate JSON structure before including it
+   - ALWAYS include multiple items in the data array
+   - NEVER create single-item responses unless specifically requested
 
-CRITICAL RULES:
-- Keep responses natural and conversational
-- Use JSON ONLY for educational content
-- Never explain the response format
-- Never include JSON for casual conversations
-- Never mix JSON with regular text
-- Never create multiple JSON blocks
-
-FORBIDDEN IN YOUR FINAL RESPONSE:
+FORBIDDEN:
 - Meta-commentary about the conversation
 - Phrases like "I understand", "I see", "I notice"
 - Explaining what you're about to do
 - Using phrases like "Based on the context"
-- Showing response guidelines in the output
-- Including system instructions in the response
 `;
 
   setIsChatLoading(true);
@@ -355,10 +359,13 @@ FORBIDDEN IN YOUR FINAL RESPONSE:
     if (!response.ok) throw new Error('Chat API request failed');
     const result = await response.json();
 
-let assistantReply = (result[0]?.generated_text as string || '')
-  .replace(/\[\/?INST\]|<</g, '')
-  .trim();
-
+     let assistantReply = (result[0]?.generated_text as string || '')
+      .replace(/\[\/?INST\]|<</g, '')
+      .replace(/^[•\-]\s.*$/gm, '') // Remove lines starting with bullet points or dashes
+      .split('\n')
+      .filter(line => !line.trim().startsWith('•') && !line.trim().startsWith('-')) // Additional filter for bullet points
+      .join('\n')
+      .trim()
 
     // Parse any JSON content in the response
     const jsonMatch = assistantReply.match(/```json\n([\s\S]*?)\n```/);

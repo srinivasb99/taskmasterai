@@ -1083,7 +1083,6 @@ return (
                 )}
               </ul>
             </div>
-          </div>
 
           {/* RIGHT COLUMN */}
           <div className="flex flex-col gap-6">

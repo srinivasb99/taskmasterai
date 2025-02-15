@@ -173,7 +173,7 @@ ${conversation}
 [LATEST MESSAGE]
 👤 User: ${userMsg.content}
 
-You are TaskMaster, an advanced AI assistant. Provide clear, concise, and helpful responses about the user's items. The current year is 2025. Focus on actionable insights and practical advice.
+You are TaskMaster, an advanced AI assistant. Provide clear, concise, and helpful responses about the user's items. The current year is 2025. Focus on actionable insights and practical advice. DO NOT PROVIDE EXTRA EXPLAINATIONS OR ANYTHING ELSE. THINK STEP BY STEP. 
 `;
 
   // 3. Call Hugging Face to get the AI's response

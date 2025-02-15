@@ -850,77 +850,76 @@ return (
   )}
 </div>
 
-        {/* Chat Modal */}
-        {isChatModalOpen && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
-            <div className="bg-gray-800 rounded-xl w-full max-w-2xl mx-4 max-h-[80vh] flex flex-col">
-              <div className="p-4 border-b border-gray-700 flex justify-between items-center">
-                <h3 className="text-lg font-semibold text-blue-300 flex items-center">
-                  <MessageCircle className="w-5 h-5 mr-2" />
-                  Chat with TaskMaster
-                </h3>
-                <span className="text-xs bg-gradient-to-r from-pink-500 to-purple-500 text-white px-3 py-1 rounded-full font-medium ml-2">
-      BETA
-    </span>
-                <button
-                  onClick={() => setIsChatModalOpen(false)}
-                  className="text-gray-400 hover:text-gray-200 transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
+    {/* Chat Modal */}
+{isChatModalOpen && (
+  <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
+    <div className="bg-gray-800 rounded-xl w-full max-w-2xl mx-4 max-h-[80vh] flex flex-col">
+      <div className="p-4 border-b border-gray-700 flex justify-between items-center">
+        <h3 className="text-lg font-semibold text-blue-300 flex items-center">
+          <MessageCircle className="w-5 h-5 mr-2" />
+          Chat with TaskMaster
+          <span className="ml-2 text-xs bg-gradient-to-r from-pink-500 to-purple-500 text-white-300 px-2 py-0.5 rounded-full">BETA</span>
+        </h3>
+        <button
+          onClick={() => setIsChatModalOpen(false)}
+          className="text-gray-400 hover:text-gray-200 transition-colors"
+        >
+          <X className="w-5 h-5" />
+        </button>
+      </div>
 
-              <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={chatEndRef}>
-                {chatHistory.map((message, index) => (
-                  <div
-                    key={index}
-                    className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                  >
-                    <div
-                      className={`max-w-[80%] rounded-lg px-4 py-2 ${
-                        message.role === 'user'
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-700 text-gray-200'
-                      }`}
-                    >
-                      {message.content}
-                    </div>
-                  </div>
-                ))}
-                {isChatLoading && (
-                  <div className="flex justify-start">
-                    <div className="bg-gray-700 text-gray-200 rounded-lg px-4 py-2 max-w-[80%]">
-                      <div className="flex space-x-2">
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100"></div>
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200"></div>
-                      </div>
-                    </div>
-                  </div>
-                )}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={chatEndRef}>
+        {chatHistory.map((message, index) => (
+          <div
+            key={index}
+            className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+          >
+            <div
+              className={`max-w-[80%] rounded-lg px-4 py-2 ${
+                message.role === 'user'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-700 text-gray-200'
+              }`}
+            >
+              {message.content}
+            </div>
+          </div>
+        ))}
+        {isChatLoading && (
+          <div className="flex justify-start">
+            <div className="bg-gray-700 text-gray-200 rounded-lg px-4 py-2 max-w-[80%]">
+              <div className="flex space-x-2">
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100"></div>
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200"></div>
               </div>
-
-              <form onSubmit={handleChatSubmit} className="p-4 border-t border-gray-700">
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={chatMessage}
-                    onChange={(e) => setChatMessage(e.target.value)}
-                    placeholder="Ask TaskMaster about your items..."
-                    className="flex-1 bg-gray-700 text-gray-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <button
-                    type="submit"
-                    disabled={isChatLoading}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Send className="w-5 h-5" />
-                  </button>
-                </div>
-              </form>
             </div>
           </div>
         )}
+      </div>
+
+      <form onSubmit={handleChatSubmit} className="p-4 border-t border-gray-700">
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={chatMessage}
+            onChange={(e) => setChatMessage(e.target.value)}
+            placeholder="Ask TaskMaster about your items..."
+            className="flex-1 bg-gray-700 text-gray-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <button
+            type="submit"
+            disabled={isChatLoading}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Send className="w-5 h-5" />
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+)}
+
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
           <div className="flex flex-col gap-6">

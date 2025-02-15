@@ -355,14 +355,10 @@ FORBIDDEN IN YOUR FINAL RESPONSE:
     if (!response.ok) throw new Error('Chat API request failed');
     const result = await response.json();
 
- let assistantReply = (result[0]?.generated_text as string || '')
-      .replace(/\[\/?INST\]|<</g, '')
-      .replace(/^[•\-]\s.*$/gm, '') // Remove lines starting with bullet points or dashes
-      .split('\n')
-      .filter(line => !line.trim().startsWith('•') && !line.trim().startsWith('-')) // Additional filter for bullet points
-      .join('\n')
-      .trim()
-      .replace(/\n{3,}/g, '\n\n'); // Replace multiple consecutive newlines with double newlines
+let assistantReply = (result[0]?.generated_text as string || '')
+  .replace(/\[\/?INST\]|<</g, '')
+  .trim();
+
 
     // Parse any JSON content in the response
     const jsonMatch = assistantReply.match(/```json\n([\s\S]*?)\n```/);

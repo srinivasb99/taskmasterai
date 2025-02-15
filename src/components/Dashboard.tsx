@@ -698,7 +698,7 @@ return (
             "{quote.text}" - <span className="text-purple-400">{quote.author}</span>
           </p>
         </header>
-
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 {/* Smart Overview Card */}
 <div
   className={`bg-gray-800 rounded-xl p-6 relative min-h-[200px] transform transition-all duration-500 ease-out ${cardVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'} hover:shadow-lg hover:shadow-purple-500/10`}
@@ -732,7 +732,7 @@ return (
         className="text-sm text-gray-300 prose prose-invert"
         dangerouslySetInnerHTML={{ __html: smartOverview }}
       />
-      <div className="text-left mt-4 text-xs text-gray-400">
+      <div className="text-center mt-4 text-xs text-gray-400">
         TaskMaster can make mistakes. Verify details.
       </div>
     </>

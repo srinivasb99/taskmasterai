@@ -803,7 +803,7 @@ return (
       <main className="ml-64 p-8 overflow-auto h-screen">
         <header className="dashboard-header mb-6 transform transition-all duration-500 ease-out translate-y-0 opacity-100">
           <h1 className="text-4xl font-bold mb-2 text-white">
-            {greeting.emoji} {greeting.greeting}, <span className="font-normal">{userName || "Loading..."}</span>
+            {greeting.emoji} {greeting.greeting}, <span className="font-bold">{userName || "Loading..."}</span>
           </h1>
           <p className="text-gray-400 italic text-lg">
             "{quote.text}" - <span className="text-purple-400">{quote.author}</span>

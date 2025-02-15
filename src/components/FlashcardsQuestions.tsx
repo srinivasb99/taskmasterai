@@ -18,7 +18,10 @@ interface Question {
 
 interface FlashcardsQuestionsProps {
   type: 'flashcard' | 'question';
-  data: Flashcard | Question | Flashcard[] | Question[];
+  data: {
+    type: 'flashcard' | 'question';
+    data: Flashcard[] | Question[];
+  };
   onComplete: () => void;
 }
 
@@ -36,22 +39,24 @@ export const FlashcardsQuestions: React.FC<FlashcardsQuestionsProps> = ({
     return item && 'options' in item && 'correctAnswer' in item;
   };
 
-  // Validate and convert data to array
+  // Validate data
   const validateData = () => {
-    const dataArray = Array.isArray(data) ? data : [data];
-    
-    // Validate each item matches the expected type
-    if (type === 'flashcard' && !dataArray.every(isFlashcard)) {
-      console.error('Invalid flashcard data provided');
+    if (!data || !data.data || !Array.isArray(data.data)) {
+      console.error('Invalid data structure');
       return [];
     }
-    
-    if (type === 'question' && !dataArray.every(isQuestion)) {
-      console.error('Invalid question data provided');
+
+    if (type === 'flashcard' && !data.data.every(isFlashcard)) {
+      console.error('Invalid flashcard data');
       return [];
     }
-    
-    return dataArray;
+
+    if (type === 'question' && !data.data.every(isQuestion)) {
+      console.error('Invalid question data');
+      return [];
+    }
+
+    return data.data;
   };
 
   const items = validateData();

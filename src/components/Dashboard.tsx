@@ -129,7 +129,7 @@ ${conversation}
 [NEW USER MESSAGE]
 User: ${userMsg.content}
 
-You're TaskMaster, an advanced AI. Continue the conversation, referencing the items above as needed. The current year is 2025. Do not include disclaimers like "[RESPONSE]" or "To respond, simply type..." Please answer with direct, helpful info regarding the user's items.
+You're TaskMaster, an advanced AI. Continue the conversation, referencing the items above as needed. The current year is 2025. Do not include disclaimers like "[RESPONSE]" or "To respond, simply type..." Please answer with direct, helpful info regarding the user's items. Keep your response short, not too long.
 `;
 
   // 3. Call Hugging Face to get the AI's response

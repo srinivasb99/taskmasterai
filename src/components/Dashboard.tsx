@@ -342,8 +342,8 @@ CRITICAL RESPONSE GUIDELINES:
 4. Remember all items belong to ${userName}, not you
 5. FORBIDDEN: Meta-commentary about the conversation (e.g., "Now it's your turn", "Let's continue where we left off")
 6. FORBIDDEN: Phrases like "I understand", "I see", "I notice"
-7. FORBIDDEN: Explaining what you're about to do
-8. FORBIDDEN: Using phrases like "Based on the context" or "According to the information"
+7. FORBIDDEN: Explaining what you're about to do & describing your thinking process
+8. FORBIDDEN: Using phrases like "Based on the context" or "According to the information" or "The response should be:" 
 
 You can use Markdown formatting, including:
 - Math equations using LaTeX syntax (e.g., $E = mc^2$)
@@ -1076,6 +1076,8 @@ return (
           <MessageCircle className="w-5 h-5 mr-2" />
           Chat with TaskMaster
           <span className="ml-2 text-xs bg-gradient-to-r from-pink-500 to-purple-500 text-white-300 px-2 py-0.5 rounded-full">BETA</span>
+          <span className="ml-2 text-xs bg-blue text-gray-300 px-2 py-0.5 rounded-full">Chat history is not saved.</span>
+
         </h3>
         <button
           onClick={() => setIsChatModalOpen(false)}

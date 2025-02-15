@@ -18,10 +18,7 @@ interface Question {
 
 interface FlashcardsQuestionsProps {
   type: 'flashcard' | 'question';
-  data: {
-    type: 'flashcard' | 'question';
-    data: Flashcard[] | Question[];
-  };
+  data: Flashcard[] | Question[];
   onComplete: () => void;
 }
 
@@ -30,49 +27,10 @@ export const FlashcardsQuestions: React.FC<FlashcardsQuestionsProps> = ({
   data,
   onComplete,
 }) => {
-  // Type guard functions
-  const isFlashcard = (item: any): item is Flashcard => {
-    return item && 'answer' in item && 'topic' in item;
-  };
-
-  const isQuestion = (item: any): item is Question => {
-    return item && 'options' in item && 'correctAnswer' in item;
-  };
-
-  // Validate data
-  const validateData = () => {
-    if (!data || !data.data || !Array.isArray(data.data)) {
-      console.error('Invalid data structure');
-      return [];
-    }
-
-    if (type === 'flashcard' && !data.data.every(isFlashcard)) {
-      console.error('Invalid flashcard data');
-      return [];
-    }
-
-    if (type === 'question' && !data.data.every(isQuestion)) {
-      console.error('Invalid question data');
-      return [];
-    }
-
-    return data.data;
-  };
-
-  const items = validateData();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [showExplanation, setShowExplanation] = useState(false);
-
-  // If no valid items, show error state
-  if (items.length === 0) {
-    return (
-      <div className="bg-gray-800 rounded-xl p-6 max-w-xl w-full">
-        <p className="text-red-400 text-center">Invalid data provided</p>
-      </div>
-    );
-  }
 
   const handleFlip = () => {
     setIsFlipped(!isFlipped);
@@ -91,7 +49,7 @@ export const FlashcardsQuestions: React.FC<FlashcardsQuestionsProps> = ({
   };
 
   const handleNext = () => {
-    if (currentIndex < items.length - 1) {
+    if (currentIndex < data.length - 1) {
       setCurrentIndex(currentIndex + 1);
       resetCard();
     }
@@ -104,15 +62,20 @@ export const FlashcardsQuestions: React.FC<FlashcardsQuestionsProps> = ({
     }
   };
 
-  const currentItem = items[currentIndex];
+  if (!data || data.length === 0) {
+    return <div className="text-red-500">No content available</div>;
+  }
 
-  if (type === 'flashcard' && isFlashcard(currentItem)) {
+  const currentItem = data[currentIndex];
+
+  if (type === 'flashcard') {
+    const flashcard = currentItem as Flashcard;
     return (
       <div className="bg-gray-800 rounded-xl p-6 max-w-xl w-full">
         <div className="flex justify-between items-center mb-3">
-          <div className="text-blue-300 text-sm">Topic: {currentItem.topic}</div>
+          <div className="text-blue-300 text-sm">Topic: {flashcard.topic}</div>
           <div className="text-gray-400 text-sm">
-            {currentIndex + 1} / {items.length}
+            {currentIndex + 1} / {data.length}
           </div>
         </div>
         <div
@@ -126,7 +89,7 @@ export const FlashcardsQuestions: React.FC<FlashcardsQuestionsProps> = ({
           >
             <div className="absolute backface-hidden w-full">
               <div className="bg-gray-700 p-6 rounded-lg shadow-lg">
-                <p className="text-white text-lg">{currentItem.question}</p>
+                <p className="text-white text-lg">{flashcard.question}</p>
               </div>
             </div>
             <div
@@ -135,7 +98,7 @@ export const FlashcardsQuestions: React.FC<FlashcardsQuestionsProps> = ({
               }`}
             >
               <div className="bg-gray-700 p-6 rounded-lg shadow-lg">
-                <p className="text-white text-lg">{currentItem.answer}</p>
+                <p className="text-white text-lg">{flashcard.answer}</p>
               </div>
             </div>
           </div>
@@ -158,7 +121,7 @@ export const FlashcardsQuestions: React.FC<FlashcardsQuestionsProps> = ({
           </button>
           <button
             onClick={handleNext}
-            disabled={currentIndex === items.length - 1}
+            disabled={currentIndex === data.length - 1}
             className="text-sm px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             Next
@@ -169,85 +132,78 @@ export const FlashcardsQuestions: React.FC<FlashcardsQuestionsProps> = ({
     );
   }
 
-  if (type === 'question' && isQuestion(currentItem)) {
-    return (
-      <div className="bg-gray-800 rounded-xl p-6 max-w-xl w-full">
-        <div className="flex justify-between items-center mb-3">
-          <div className="text-gray-400 text-sm">
-            Question {currentIndex + 1} of {items.length}
-          </div>
-        </div>
-        <div className="mb-6">
-          <p className="text-white text-lg mb-4">{currentItem.question}</p>
-          <div className="space-y-3">
-            {currentItem.options.map((option, index) => (
-              <button
-                key={index}
-                onClick={() => handleOptionSelect(index)}
-                disabled={selectedAnswer !== null}
-                className={`w-full text-left p-3 rounded-lg transition-colors ${
-                  selectedAnswer === null
-                    ? 'bg-gray-700 hover:bg-gray-600'
-                    : selectedAnswer === index
-                    ? index === currentItem.correctAnswer
-                      ? 'bg-green-600'
-                      : 'bg-red-600'
-                    : index === currentItem.correctAnswer
-                    ? 'bg-green-600'
-                    : 'bg-gray-700'
-                } ${
-                  selectedAnswer !== null && 'cursor-default'
-                } text-white flex justify-between items-center`}
-              >
-                <span>{option}</span>
-                {selectedAnswer !== null && index === currentItem.correctAnswer && (
-                  <Check className="w-5 h-5 text-white" />
-                )}
-                {selectedAnswer === index && index !== currentItem.correctAnswer && (
-                  <X className="w-5 h-5 text-white" />
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
-        {showExplanation && (
-          <div className="mt-4 p-4 bg-gray-700 rounded-lg">
-            <p className="text-white">{currentItem.explanation}</p>
-          </div>
-        )}
-        <div className="mt-4 flex justify-between items-center">
-          <button
-            onClick={handlePrevious}
-            disabled={currentIndex === 0}
-            className="text-sm px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-          >
-            <ChevronLeft className="w-4 h-4" />
-            Previous
-          </button>
-          <button
-            onClick={resetCard}
-            className="text-sm px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white transition-colors flex items-center gap-2"
-          >
-            <RotateCcw className="w-4 h-4" />
-            Try Again
-          </button>
-          <button
-            onClick={handleNext}
-            disabled={currentIndex === items.length - 1}
-            className="text-sm px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-          >
-            Next
-            <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // Fallback for invalid type/data combination
+  // Quiz Question
+  const quiz = currentItem as Question;
   return (
     <div className="bg-gray-800 rounded-xl p-6 max-w-xl w-full">
-      <p className="text-red-400 text-center">Invalid type or data format</p>
+      <div className="flex justify-between items-center mb-3">
+        <div className="text-gray-400 text-sm">
+          Question {currentIndex + 1} of {data.length}
+        </div>
+      </div>
+      <div className="mb-6">
+        <p className="text-white text-lg mb-4">{quiz.question}</p>
+        <div className="space-y-3">
+          {quiz.options.map((option, index) => (
+            <button
+              key={index}
+              onClick={() => handleOptionSelect(index)}
+              disabled={selectedAnswer !== null}
+              className={`w-full text-left p-3 rounded-lg transition-colors ${
+                selectedAnswer === null
+                  ? 'bg-gray-700 hover:bg-gray-600'
+                  : selectedAnswer === index
+                  ? index === quiz.correctAnswer
+                    ? 'bg-green-600'
+                    : 'bg-red-600'
+                  : index === quiz.correctAnswer
+                  ? 'bg-green-600'
+                  : 'bg-gray-700'
+              } ${
+                selectedAnswer !== null && 'cursor-default'
+              } text-white flex justify-between items-center`}
+            >
+              <span>{option}</span>
+              {selectedAnswer !== null && index === quiz.correctAnswer && (
+                <Check className="w-5 h-5 text-white" />
+              )}
+              {selectedAnswer === index && index !== quiz.correctAnswer && (
+                <X className="w-5 h-5 text-white" />
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+      {showExplanation && (
+        <div className="mt-4 p-4 bg-gray-700 rounded-lg">
+          <p className="text-white">{quiz.explanation}</p>
+        </div>
+      )}
+      <div className="mt-4 flex justify-between items-center">
+        <button
+          onClick={handlePrevious}
+          disabled={currentIndex === 0}
+          className="text-sm px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+        >
+          <ChevronLeft className="w-4 h-4" />
+          Previous
+        </button>
+        <button
+          onClick={resetCard}
+          className="text-sm px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white transition-colors flex items-center gap-2"
+        >
+          <RotateCcw className="w-4 h-4" />
+          Try Again
+        </button>
+        <button
+          onClick={handleNext}
+          disabled={currentIndex === data.length - 1}
+          className="text-sm px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+        >
+          Next
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
     </div>
   );
 };

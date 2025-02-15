@@ -232,11 +232,14 @@ Please answer with direct, helpful info regarding the user's items.
     if (!response.ok) throw new Error('Chat API request failed');
     const result = await response.json();
 
-    let rawText = (result[0]?.generated_text as string) || '';
+let rawText = (result[0]?.generated_text as string) || '';
 
-    // Quick cleanup to remove system instructions
-    // or extraneous disclaimers. Adjust as needed.
-    rawText = rawText.replace(/(\[\/?INST\]|<</g, '').trim();
+// Quick cleanup to remove system instructions and extraneous disclaimers
+rawText = rawText
+  .replace(/\[\/?INST\]/g, '')    // Remove [INST] and [/INST]
+  .replace(/<<SYS>>|<<\/SYS>>/g, '')  // Remove <<SYS>> and <</SYS>>
+  .replace(/^[\s\n]+|[\s\n]+$/g, ''); // Trim whitespace and newlines
+
 
     // 6. Beautify the text for your chat UI
     const beautified = beautifyAssistantReply(rawText);

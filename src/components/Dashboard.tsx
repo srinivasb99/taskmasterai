@@ -1,5 +1,3 @@
-
-
 import React, { useEffect, useState, useRef } from 'react';
 import { Navigate } from 'react-router-dom';
 import {
@@ -148,9 +146,10 @@ You're TaskMaster, an advanced AI. Continue the conversation, referencing the it
         body: JSON.stringify({
           inputs: prompt,
           parameters: {
-            max_new_tokens: 300,
-            temperature: 0.7,
+            max_new_tokens: 400,
+            temperature: 0.5,
             top_p: 0.9,
+            return_full_text: false,
             repetition_penalty: 1.2,
             return_full_text: false,
             do_sample: true,

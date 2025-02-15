@@ -7,9 +7,9 @@ import {
   Sparkles,
   CheckCircle,
   MessageCircle,
-  X,
-  RotateCcw, 
+  RotateCcw,
   Square,
+  X,
   Timer as TimerIcon,
   Send,
 } from 'lucide-react';
@@ -47,6 +47,7 @@ const [userName, setUserName] = useState("Loading...");
 const [quote, setQuote] = useState(getRandomQuote());
 const [greeting, setGreeting] = useState(getTimeBasedGreeting());
 
+// ---------------------
 // Types for timer messages
 interface TimerMessage {
   type: 'timer';
@@ -60,6 +61,9 @@ interface ChatMessage {
   timer?: TimerMessage;
 }
 
+// ---------------------
+// CHAT MODAL (NEW AI CHAT FUNCTIONALITY)
+// ---------------------
 const [isChatModalOpen, setIsChatModalOpen] = useState(false);
 const [chatMessage, setChatMessage] = useState('');
 const [chatHistory, setChatHistory] = useState<ChatMessage[]>([
@@ -150,7 +154,6 @@ const formatItemsForChat = () => {
 
   return lines.join('\n');
 };
-
 
 // Timer component inline
 const InlineTimer = ({ duration, onComplete, id }: { duration: number; onComplete: () => void; id: string }) => {
@@ -446,7 +449,6 @@ Simply provide clear, direct responses as if you're having a natural conversatio
     setIsChatLoading(false);
   }
 };
-
 
   // ---------------------
   // 2. COLLECTION STATES
@@ -1109,7 +1111,7 @@ return (
   )}
 </div>
 
-     {/* Chat Modal */}
+    {/* Chat Modal */}
     {isChatModalOpen && (
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
         <div className="bg-gray-800 rounded-xl w-full max-w-2xl mx-4 max-h-[80vh] flex flex-col">

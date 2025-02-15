@@ -41,7 +41,7 @@ export function Dashboard() {
   const [greeting, setGreeting] = useState(getTimeBasedGreeting());
 
 // ---------------------
-// CHAT MODAL (UPDATED AI CHAT FUNCTIONALITY)
+// CHAT MODAL (NEW AI CHAT FUNCTIONALITY)
 // ---------------------
 const [isChatModalOpen, setIsChatModalOpen] = useState(false);
 const [chatMessage, setChatMessage] = useState('');
@@ -58,10 +58,13 @@ useEffect(() => {
   }
 }, [chatHistory]);
 
-// 1. Format the user’s items for context
-function formatItemsForChat(): string {
-  let lines: string[] = [];
-  lines.push('Here are your items:');
+// Utility: Format the user's tasks/goals/projects/plans as text
+const formatItemsForChat = () => {
+  const lines: string[] = [];
+
+  // Example: tasks, goals, etc. are in your state: tasks, goals, projects, plans
+  // We'll just gather them. You can customize formatting.
+  lines.push('Your items:\n');
 
   tasks.forEach((t) => {
     const due = t.data.dueDate?.toDate?.();
@@ -71,7 +74,6 @@ function formatItemsForChat(): string {
       }`
     );
   });
-
   goals.forEach((g) => {
     const due = g.data.dueDate?.toDate?.();
     lines.push(
@@ -80,7 +82,6 @@ function formatItemsForChat(): string {
       }`
     );
   });
-
   projects.forEach((p) => {
     const due = p.data.dueDate?.toDate?.();
     lines.push(
@@ -89,7 +90,6 @@ function formatItemsForChat(): string {
       }`
     );
   });
-
   plans.forEach((p) => {
     const due = p.data.dueDate?.toDate?.();
     lines.push(
@@ -100,113 +100,42 @@ function formatItemsForChat(): string {
   });
 
   return lines.join('\n');
-}
+};
 
-function beautifyAssistantReply(text: string): string {
-  // Split into paragraphs while preserving meaningful whitespace
-  const paragraphs = text
-    .split(/\n(?:\s*\n)+/)
-    .map(p => p.trim())
-    .filter(p => p.length > 0);
-
-  return paragraphs
-    .map(paragraph => {
-      // Check for different types of content and apply appropriate styling
-      
-      // Lists (numbered or bulleted)
-      if (/^(\d+[\.)]|\-|\•|\*)\s/.test(paragraph)) {
-        return `<p class="mb-3 pl-4 border-l-2 border-blue-500 text-blue-300">${paragraph}</p>`;
-      }
-      
-      // Code blocks or technical content
-      if (paragraph.includes('```') || /`[^`]+`/.test(paragraph)) {
-        const formattedCode = paragraph
-          .replace(/```(\w+)?\n?([\s\S]+?)```/g, '<code class="block bg-gray-900 p-3 rounded-md font-mono text-green-400">$2</code>')
-          .replace(/`([^`]+)`/g, '<code class="bg-gray-900 px-1 rounded font-mono text-green-400">$1</code>');
-        return `<p class="mb-4">${formattedCode}</p>`;
-      }
-      
-      // Important notes or warnings
-      if (/^(note|warning|important):/i.test(paragraph)) {
-        return `<p class="mb-3 p-3 bg-gray-700/50 rounded-lg text-yellow-300 font-medium">${paragraph}</p>`;
-      }
-      
-      // Headings
-      if (/^(#+ )/.test(paragraph)) {
-        const level = paragraph.match(/^#+/)[0].length;
-        const text = paragraph.replace(/^#+ /, '');
-        const sizes = {
-          1: 'text-2xl',
-          2: 'text-xl',
-          3: 'text-lg'
-        };
-        return `<h${level} class="mb-3 ${sizes[level] || 'text-base'} font-semibold text-blue-400">${text}</h${level}>`;
-      }
-      
-      // Links
-      if (/\[([^\]]+)\]\(([^\)]+)\)/.test(paragraph)) {
-        const formattedLinks = paragraph.replace(
-          /\[([^\]]+)\]\(([^\)]+)\)/g,
-          '<a href="$2" class="text-blue-400 hover:text-blue-300 underline" target="_blank" rel="noopener noreferrer">$1</a>'
-        );
-        return `<p class="mb-3">${formattedLinks}</p>`;
-      }
-      
-      // Emphasis
-      const formattedEmphasis = paragraph
-        .replace(/\*\*([^*]+)\*\*/g, '<strong class="font-semibold text-blue-300">$1</strong>')
-        .replace(/\*([^*]+)\*/g, '<em class="text-gray-300 italic">$1</em>')
-        .replace(/_([^_]+)_/g, '<em class="text-gray-300 italic">$1</em>');
-      
-      // Default paragraph styling
-      return `<p class="mb-3 leading-relaxed text-gray-200">${formattedEmphasis}</p>`;
-    })
-    .join('\n');
-}
-
-
-// 3. The updated handleChatSubmit
+// NEW handleChatSubmit that calls Hugging Face
 const handleChatSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
   if (!chatMessage.trim()) return;
 
-  // Add user message to chat
+  // 1. Add user's message to chat
   const userMsg = { role: 'user' as const, content: chatMessage };
   setChatHistory((prev) => [...prev, userMsg]);
   setChatMessage('');
 
-  // Build conversation context
-  // Combine prior assistant/user lines + the user’s items
-  const conversationSoFar = chatHistory
-    .map(
-      (m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`
-    )
+  // 2. Build conversation context
+  // We'll combine prior assistant/user lines + the user's items
+  // for a more "aware" conversation about tasks, goals, etc.
+  const conversation = chatHistory
+    .map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
     .join('\n');
-  const itemsText = formatItemsForChat();
+  const itemsText = formatItemsForChat(); // Gather tasks, etc.
 
-  // 4. Construct the prompt
-  // Add a note that "the current year is 2025" and avoid disclaimers
   const prompt = `
 [CONTEXT]
-The current year is 2025. 
-You are TaskMaster, an advanced AI productivity assistant.
-Do not include disclaimers like "[RESPONSE]" or "To respond, simply type..."
-
-Below is the user's data:
 ${itemsText}
 
 [CONVERSATION SO FAR]
-${conversationSoFar}
+${conversation}
 
-[USER'S NEW MESSAGE]
+[NEW USER MESSAGE]
 User: ${userMsg.content}
 
-Please answer with direct, helpful info regarding the user's items.
+You're TaskMaster, an advanced AI. Continue the conversation, referencing the items above as needed. The current year is 2025. Do not include disclaimers like "[RESPONSE]" or "To respond, simply type..." Please answer with direct, helpful info regarding the user's items.
 `;
 
+  // 3. Call Hugging Face to get the AI's response
   setIsChatLoading(true);
   try {
-    // 5. Call Hugging Face for an AI response
     const response = await fetch(
       'https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct',
       {
@@ -232,22 +161,17 @@ Please answer with direct, helpful info regarding the user's items.
     if (!response.ok) throw new Error('Chat API request failed');
     const result = await response.json();
 
-let rawText = (result[0]?.generated_text as string) || '';
+    // 4. Extract the model's text from the result
+    const rawText = (result[0]?.generated_text as string) || '';
+    // Optionally, do a quick cleanup
+    const assistantReply = rawText
+      .replace(/\[\/?INST\]|<</g, '')
+      .trim();
 
-// Quick cleanup to remove system instructions and extraneous disclaimers
-rawText = rawText
-  .replace(/\[\/?INST\]/g, '')    // Remove [INST] and [/INST]
-  .replace(/<<SYS>>|<<\/SYS>>/g, '')  // Remove <<SYS>> and <</SYS>>
-  .replace(/^[\s\n]+|[\s\n]+$/g, ''); // Trim whitespace and newlines
-
-
-    // 6. Beautify the text for your chat UI
-    const beautified = beautifyAssistantReply(rawText);
-
-    // Add assistant's reply to chat
+    // 5. Add assistant's reply to chat
     setChatHistory((prev) => [
       ...prev,
-      { role: 'assistant', content: beautified },
+      { role: 'assistant', content: assistantReply },
     ]);
   } catch (err) {
     console.error('Chat error:', err);
@@ -263,7 +187,6 @@ rawText = rawText
     setIsChatLoading(false);
   }
 };
-
 
 
   // ---------------------

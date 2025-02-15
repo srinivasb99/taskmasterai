@@ -20,7 +20,7 @@ import {
   updateChatSession, 
   onChatSessionsSnapshot,
   generateChatTitle 
-} from './lib/chat-firebase';
+} from '../lib/chat-firebase';
 import { Sidebar } from './Sidebar';
 import { Timer } from './Timer';
 import { FlashcardsQuestions } from './FlashcardsQuestions';

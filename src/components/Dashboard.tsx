@@ -47,8 +47,6 @@ const [userName, setUserName] = useState("Loading...");
 const [quote, setQuote] = useState(getRandomQuote());
 const [greeting, setGreeting] = useState(getTimeBasedGreeting());
 
-
-
 // Types for timer messages
 interface TimerMessage {
   type: 'timer';
@@ -62,10 +60,97 @@ interface ChatMessage {
   timer?: TimerMessage;
 }
 
-  // State declarations first
-  const [isChatModalOpen, setIsChatModalOpen] = useState(false);
-  const [chatMessage, setChatMessage] = useState('');
-  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([
+const [isChatModalOpen, setIsChatModalOpen] = useState(false);
+const [chatMessage, setChatMessage] = useState('');
+const [chatHistory, setChatHistory] = useState<ChatMessage[]>([
+  {
+    role: 'assistant',
+    content: "👋 Hi I'm TaskMaster, How can I help you today? Need help with your items? Simply ask me!"
+  }
+]);
+const [isChatLoading, setIsChatLoading] = useState(false);
+const chatEndRef = useRef<HTMLDivElement>(null);
+
+// Timer handling functions
+const handleTimerComplete = (timerId: string) => {
+  setChatHistory(prev => [
+    ...prev,
+    {
+      role: 'assistant',
+      content: "⏰ Time's up! Your timer has finished."
+    }
+  ]);
+};
+
+const parseTimerRequest = (message: string): number | null => {
+  const timeRegex = /(\d+)\s*(minutes?|mins?|hours?|hrs?|seconds?|secs?)/i;
+  const match = message.match(timeRegex);
+  
+  if (!match) return null;
+  
+  const amount = parseInt(match[1]);
+  const unit = match[2].toLowerCase();
+  
+  if (unit.startsWith('hour') || unit.startsWith('hr')) {
+    return amount * 3600;
+  } else if (unit.startsWith('min')) {
+    return amount * 60;
+  } else if (unit.startsWith('sec')) {
+    return amount;
+  }
+  
+  return null;
+};
+
+// Whenever chatHistory changes, scroll to the bottom of the chat
+useEffect(() => {
+  if (chatEndRef.current) {
+    chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+  }
+}, [chatHistory]);
+
+// Utility: Format the user's tasks/goals/projects/plans as text
+const formatItemsForChat = () => {
+  const lines: string[] = [];
+
+  lines.push(`${userName}'s items:\n`);
+
+  tasks.forEach((t) => {
+    const due = t.data.dueDate?.toDate?.();
+    lines.push(
+      `Task: ${t.data.task || 'Untitled'}${
+        due ? ` (Due: ${due.toLocaleDateString()})` : ''
+      }`
+    );
+  });
+  goals.forEach((g) => {
+    const due = g.data.dueDate?.toDate?.();
+    lines.push(
+      `Goal: ${g.data.goal || 'Untitled'}${
+        due ? ` (Due: ${due.toLocaleDateString()})` : ''
+      }`
+    );
+  });
+  projects.forEach((p) => {
+    const due = p.data.dueDate?.toDate?.();
+    lines.push(
+      `Project: ${p.data.project || 'Untitled'}${
+        due ? ` (Due: ${due.toLocaleDateString()})` : ''
+      }`
+    );
+  });
+  plans.forEach((p) => {
+    const due = p.data.dueDate?.toDate?.();
+    lines.push(
+      `Plan: ${p.data.plan || 'Untitled'}${
+        due ? ` (Due: ${due.toLocaleDateString()})` : ''
+      }`
+    );
+  });
+
+  return lines.join('\n');
+};
+
 
 // Timer component inline
 const InlineTimer = ({ duration, onComplete, id }: { duration: number; onComplete: () => void; id: string }) => {
@@ -178,7 +263,6 @@ useEffect(() => {
     chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
   }
 }, [chatHistory]);
-
 
 // Utility: Format the user's tasks/goals/projects/plans as text
 const formatItemsForChat = () => {
@@ -298,10 +382,12 @@ CRITICAL RESPONSE GUIDELINES:
 3. Only mention time/date if specifically asked
 4. Remember all items belong to ${userName}, not you
 5. FORBIDDEN: Meta-commentary about the conversation (e.g., "Now it's your turn", "Let's continue where we left off")
-6. FORBIDDEN: Explaining what you're about to do
-7. FORBIDDEN: Using phrases like "Based on the context" or "According to the information"
+6. FORBIDDEN: Phrases like "I understand", "I see", "I notice"
+7. FORBIDDEN: Explaining what you're about to do
+8. FORBIDDEN: Using phrases like "Based on the context" or "According to the information"
 
 You can use Markdown formatting, including:
+- Math equations using LaTeX syntax (e.g., $E = mc^2$)
 - Lists and bullet points
 - Code blocks with syntax highlighting
 - Tables

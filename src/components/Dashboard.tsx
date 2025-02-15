@@ -46,9 +46,15 @@ const [isChatModalOpen, setIsChatModalOpen] = useState(false);
 const [chatMessage, setChatMessage] = useState('');
 const [chatHistory, setChatHistory] = useState<
   Array<{ role: 'user' | 'assistant'; content: string }>
->([]);
+>([
+  {
+    role: 'assistant',
+    content: "👋 Hi I'm TaskMaster, How can I help you today? Need help with your items? Simply ask me!"
+  }
+]);
 const [isChatLoading, setIsChatLoading] = useState(false);
 const chatEndRef = useRef<HTMLDivElement>(null);
+
 
 // Whenever chatHistory changes, scroll to the bottom of the chat
 useEffect(() => {

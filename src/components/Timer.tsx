@@ -11,7 +11,21 @@ export const Timer: React.FC<TimerProps> = ({ initialDuration, onComplete }) => 
   const [isRunning, setIsRunning] = useState(true);
   const [isCompleted, setIsCompleted] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout>();
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUrl = "https://firebasestorage.googleapis.com/v0/b/deepworkai-c3419.appspot.com/o/ios-17-ringtone-tilt-gg8jzmiv_pUhS32fz.mp3?alt=media&token=a0a522e0-8a49-408a-9dfe-17e41d3bc801";
+
+  useEffect(() => {
+    // Initialize audio
+    audioRef.current = new Audio(audioUrl);
+    audioRef.current.loop = true;
+
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!isRunning || isCompleted) {
@@ -29,9 +43,10 @@ export const Timer: React.FC<TimerProps> = ({ initialDuration, onComplete }) => 
           }
           setIsCompleted(true);
           setIsRunning(false);
-          // Play sound when timer completes
-          const audio = new Audio(audioUrl);
-          audio.play().catch(console.error);
+          // Start playing looped audio
+          if (audioRef.current) {
+            audioRef.current.play().catch(console.error);
+          }
           onComplete();
           return 0;
         }
@@ -49,10 +64,18 @@ export const Timer: React.FC<TimerProps> = ({ initialDuration, onComplete }) => 
   const minutes = Math.floor(timeLeft / 60);
   const seconds = timeLeft % 60;
 
+  const stopAudio = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+  };
+
   const handleReset = () => {
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
     }
+    stopAudio();
     setTimeLeft(initialDuration);
     setIsRunning(false);
     setIsCompleted(false);
@@ -62,6 +85,7 @@ export const Timer: React.FC<TimerProps> = ({ initialDuration, onComplete }) => 
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
     }
+    stopAudio();
     setIsRunning(false);
     setTimeLeft(0);
     setIsCompleted(true);
@@ -75,7 +99,6 @@ export const Timer: React.FC<TimerProps> = ({ initialDuration, onComplete }) => 
 
   return (
     <div className="flex items-center space-x-2 bg-gray-900 rounded-lg px-4 py-2">
-      <TimerIcon className="w-5 h-5 text-blue-400" />
       <span className="font-mono text-lg text-blue-300">
         {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
       </span>

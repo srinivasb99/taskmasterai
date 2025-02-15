@@ -689,25 +689,22 @@ return (
       <Sidebar userName={userName} />
       <main className="ml-64 p-8 overflow-auto h-screen">
         <header className="dashboard-header mb-6 transform transition-all duration-500 ease-out translate-y-0 opacity-100">
-          <h1 className="text-4xl font-bold mb-2 text-white">
+         <h1 className="text-4xl font-bold mb-2 text-white">
             {greeting.emoji} {greeting.greeting}, <span className="font-normal">{userName || "Loading..."}</span>
           </h1>
           <p className="text-gray-400 italic text-lg">
             "{quote.text}" - <span className="text-purple-400">{quote.author}</span>
           </p>
         </header>
-
-        {/* Smart Overview Card */}
-        <div
-          className={`bg-gray-800 rounded-xl p-6 relative min-h-[200px] transform transition-all duration-500 ease-out ${
-            cardVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
-          } hover:shadow-lg hover:shadow-purple-500/10`}
-        >
-          <div className="flex items-center mb-4">
-            <h2 className="text-xl font-semibold text-blue-300 mr-2 flex items-center">
-              <Sparkles className="w-5 h-5 mr-2 text-yellow-400" />
-              Smart Overview
-            </h2>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="flex flex-col gap-6">
+            {/* Smart Overview Card */}
+<div className={`bg-gray-800 rounded-xl p-6 relative min-h-[200px] transform transition-all duration-500 ease-out ${cardVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'} hover:shadow-lg hover:shadow-purple-500/10`}>
+  <div className="flex items-center mb-4">
+    <h2 className="text-xl font-semibold text-blue-300 mr-2 flex items-center">
+      <Sparkles className="w-5 h-5 mr-2 text-yellow-400" />
+      Smart Overview
+    </h2>
             <button
               onClick={() => setIsChatModalOpen(true)}
               className="p-2 text-blue-300 hover:text-blue-400 hover:bg-blue-500/10 rounded-full transition-colors duration-200"

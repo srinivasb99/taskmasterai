@@ -87,6 +87,8 @@ interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   timer?: TimerMessage;
+  flashcard?: FlashcardMessage;
+  question?: QuestionMessage;
 }
 
 // ---------------------
@@ -346,7 +348,7 @@ const handleChatSubmit = async (e: React.FormEvent) => {
     })
   };
 
-  const prompt = `
+ const prompt = `
 [CONTEXT]
 User's Name: ${userName}
 Current Date: ${currentDateTime.date}
@@ -360,78 +362,72 @@ ${conversation}
 [NEW USER MESSAGE]
 ${userName}: ${userMsg.content}
 
-You're TaskMaster, an advanced AI assistant helping ${userName}. Respond naturally to ${userName}'s message while referencing their items listed above as needed. The current year is 2025.
+You're TaskMaster, an AI assistant helping ${userName}. When responding, follow these rules:
 
-CRITICAL RESPONSE GUIDELINES:
-1. Provide direct, helpful answers about ${userName}'s items
-2. Keep responses concise and focused
-3. Only mention time/date if specifically asked
-4. Remember all items belong to ${userName}, not you
-5. FORBIDDEN: Meta-commentary about the conversation
-6. FORBIDDEN: Phrases like "I understand", "I see", "I notice"
-7. FORBIDDEN: Explaining what you're about to do
-8. FORBIDDEN: Using phrases like "Based on the context" or "According to the information"
+1. RESPONSE STRUCTURE:
+   - First provide a brief, natural text response
+   - If educational content is needed, include EXACTLY ONE properly formatted JSON object
+   - Place JSON in a code block with triple backticks and "json" language identifier
+   - NEVER include JSON syntax in regular text
+   - NEVER mix JSON with regular text
+   - NEVER create multiple JSON blocks
 
-EDUCATIONAL CONTENT GENERATION:
-When the user requests learning materials or study aids, you SHOULD generate:
-
-1. Flashcards:
-   - Create when user wants to memorize concepts
-   - Format:
-     {
-       "type": "flashcard",
-       "data": {
-         "id": "unique-id",
-         "question": "Clear, concise question",
-         "answer": "Comprehensive answer",
-         "topic": "Subject area"
-       }
-     }
-
-2. Quiz Questions:
-   - Create when testing knowledge
-   - Format:
-     {
-       "type": "question",
-       "data": {
-         "id": "unique-id",
-         "question": "Clear question text",
-         "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
-         "correctAnswer": 0,
-         "explanation": "Why this answer is correct"
-       }
-     }
-
-Response Format:
-1. For regular responses:
-   - Use clear, natural language
-   - Include Markdown formatting as needed
-
-2. For educational content:
-   - First provide a brief text response
-   - Then include ONE flashcard or question object
-   - Use proper JSON format within triple backticks
-   Example:
-   Here's a flashcard about React hooks:
+2. JSON FORMATS:
+   For flashcards:
    \`\`\`json
    {
      "type": "flashcard",
      "data": {
-       "id": "hook-1",
-       "question": "What is useState?",
-       "answer": "A React Hook that lets you add state to functional components",
-       "topic": "React Hooks"
+       "id": "unique-id",
+       "question": "Clear question",
+       "answer": "Clear answer",
+       "topic": "Subject area"
      }
    }
    \`\`\`
 
-You can use Markdown formatting, including:
-- Lists and bullet points
-- Code blocks with syntax highlighting
-- Tables
-- Bold and italic text
+   For quiz questions:
+   \`\`\`json
+   {
+     "type": "question",
+     "data": {
+       "id": "unique-id",
+       "question": "Clear question text",
+       "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
+       "correctAnswer": 0,
+       "explanation": "Why this answer is correct"
+     }
+   }
+   \`\`\`
 
-Simply provide clear, direct responses as if you're having a natural conversation. Focus on ${userName}'s needs and their items.
+3. CRITICAL RULES:
+   - Keep text responses concise and natural
+   - NEVER explain JSON structure in text
+   - NEVER include partial or malformed JSON
+   - NEVER mix educational content types
+   - NEVER create multiple cards/questions
+   - ALWAYS validate JSON structure before including it
+
+Example correct response:
+Here's a flashcard about photosynthesis:
+
+\`\`\`json
+{
+  "type": "flashcard",
+  "data": {
+    "id": "photo-1",
+    "question": "What is photosynthesis?",
+    "answer": "The process by which plants convert sunlight into energy",
+    "topic": "Biology"
+  }
+}
+\`\`\`
+
+FORBIDDEN:
+- Meta-commentary about the conversation
+- Phrases like "I understand", "I see", "I notice"
+- Explaining what you're about to do
+- Using phrases like "Based on the context"
 `;
 
   setIsChatLoading(true);
@@ -447,7 +443,7 @@ Simply provide clear, direct responses as if you're having a natural conversatio
         body: JSON.stringify({
           inputs: prompt,
           parameters: {
-            max_new_tokens: 400,
+            max_new_tokens: 1000,
             temperature: 0.5,
             top_p: 0.9,
             return_full_text: false,
@@ -461,8 +457,7 @@ Simply provide clear, direct responses as if you're having a natural conversatio
     if (!response.ok) throw new Error('Chat API request failed');
     const result = await response.json();
 
-    const rawText = (result[0]?.generated_text as string) || '';
-    let assistantReply = rawText
+    let assistantReply = (result[0]?.generated_text as string || '')
       .replace(/\[\/?INST\]|<</g, '')
       .trim();
 
@@ -470,25 +465,36 @@ Simply provide clear, direct responses as if you're having a natural conversatio
     const jsonMatch = assistantReply.match(/```json\n([\s\S]*?)\n```/);
     if (jsonMatch) {
       try {
-        const jsonContent = JSON.parse(jsonMatch[1]);
+        const jsonContent = JSON.parse(jsonMatch[1].trim());
         // Remove the JSON block from the text response
         assistantReply = assistantReply.replace(/```json\n[\s\S]*?\n```/, '').trim();
         
-        // Add the educational content to the chat message
-        setChatHistory((prev) => [
-          ...prev,
-          {
-            role: 'assistant',
-            content: assistantReply,
-            ...(jsonContent.type === 'flashcard' && { flashcard: jsonContent }),
-            ...(jsonContent.type === 'question' && { question: jsonContent })
-          },
-        ]);
+        // Validate JSON structure
+        if (
+          jsonContent.type &&
+          jsonContent.data &&
+          (jsonContent.type === 'flashcard' || jsonContent.type === 'question')
+        ) {
+          setChatHistory((prev) => [
+            ...prev,
+            {
+              role: 'assistant',
+              content: assistantReply,
+              ...(jsonContent.type === 'flashcard' && { flashcard: jsonContent }),
+              ...(jsonContent.type === 'question' && { question: jsonContent })
+            },
+          ]);
+        } else {
+          throw new Error('Invalid JSON structure');
+        }
       } catch (e) {
         console.error('Failed to parse JSON content:', e);
         setChatHistory((prev) => [
           ...prev,
-          { role: 'assistant', content: assistantReply },
+          { 
+            role: 'assistant', 
+            content: 'I apologize, but I encountered an error processing the educational content. Let me try again with a simpler response.\n\n' + assistantReply 
+          },
         ]);
       }
     } else {
@@ -511,6 +517,7 @@ Simply provide clear, direct responses as if you're having a natural conversatio
     setIsChatLoading(false);
   }
 };
+
   // ---------------------
   // 2. COLLECTION STATES
   // ---------------------
@@ -1172,57 +1179,57 @@ return (
   )}
 </div>
 
-   {/* Chat Modal */}
-    {isChatModalOpen && (
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
-        <div className="bg-gray-800 rounded-xl w-full max-w-2xl mx-4 max-h-[80vh] flex flex-col">
-          <div className="p-4 border-b border-gray-700 flex justify-between items-center">
-            <h3 className="text-lg font-semibold text-blue-300 flex items-center">
-              <MessageCircle className="w-5 h-5 mr-2" />
-              Chat with TaskMaster
-              <span className="ml-2 text-xs bg-gradient-to-r from-pink-500 to-purple-500 text-gray-300 px-2 py-0.5 rounded-full">BETA</span>
-              <span className="ml-2 text-xs bg-blue text-gray-300 px-2 py-0.5 rounded-full">Chat history is not saved.</span>
-            </h3>
-            <button
-              onClick={() => setIsChatModalOpen(false)}
-              className="text-gray-400 hover:text-gray-200 transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
+ {/* Chat Modal */}
+{isChatModalOpen && (
+  <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
+    <div className="bg-gray-800 rounded-xl w-full max-w-2xl mx-4 max-h-[80vh] flex flex-col">
+      <div className="p-4 border-b border-gray-700 flex justify-between items-center">
+        <h3 className="text-lg font-semibold text-blue-300 flex items-center">
+          <MessageCircle className="w-5 h-5 mr-2" />
+          Chat with TaskMaster
+          <span className="ml-2 text-xs bg-gradient-to-r from-pink-500 to-purple-500 text-gray-300 px-2 py-0.5 rounded-full">BETA</span>
+          <span className="ml-2 text-xs bg-blue text-gray-300 px-2 py-0.5 rounded-full">Chat history is not saved.</span>
+        </h3>
+        <button
+          onClick={() => setIsChatModalOpen(false)}
+          className="text-gray-400 hover:text-gray-200 transition-colors"
+        >
+          <X className="w-5 h-5" />
+        </button>
+      </div>
 
-          <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={chatEndRef}>
-            {chatHistory.map((message, index) => (
-              <div
-                key={index}
-                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={chatEndRef}>
+        {chatHistory.map((message, index) => (
+          <div
+            key={index}
+            className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+          >
+            <div
+              className={`max-w-[80%] rounded-lg px-4 py-2 ${
+                message.role === 'user'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-700 text-gray-200'
+              }`}
+            >
+              <ReactMarkdown
+                remarkPlugins={[remarkMath, remarkGfm]}
+                rehypePlugins={[rehypeKatex]}
+                components={{
+                  p: ({ children }) => <p className="mb-2">{children}</p>,
+                  ul: ({ children }) => <ul className="list-disc ml-4 mb-2">{children}</ul>,
+                  ol: ({ children }) => <ol className="list-decimal ml-4 mb-2">{children}</ol>,
+                  li: ({ children }) => <li className="mb-1">{children}</li>,
+                  code: ({ inline, children }) =>
+                    inline ? (
+                      <code className="bg-gray-800 px-1 rounded">{children}</code>
+                    ) : (
+                      <pre className="bg-gray-800 p-2 rounded-lg overflow-x-auto">
+                        <code>{children}</code>
+                      </pre>
+                    ),
+                }}
               >
-                <div
-                  className={`max-w-[80%] rounded-lg px-4 py-2 ${
-                    message.role === 'user'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-700 text-gray-200'
-                  }`}
-                >
-                  <ReactMarkdown
-                    remarkPlugins={[remarkMath, remarkGfm]}
-                    rehypePlugins={[rehypeKatex]}
-                    components={{
-                      p: ({ children }) => <p className="mb-2">{children}</p>,
-                      ul: ({ children }) => <ul className="list-disc ml-4 mb-2">{children}</ul>,
-                      ol: ({ children }) => <ol className="list-decimal ml-4 mb-2">{children}</ol>,
-                      li: ({ children }) => <li className="mb-1">{children}</li>,
-                      code: ({ inline, children }) =>
-                        inline ? (
-                          <code className="bg-gray-800 px-1 rounded">{children}</code>
-                        ) : (
-                          <pre className="bg-gray-800 p-2 rounded-lg overflow-x-auto">
-                            <code>{children}</code>
-                          </pre>
-                        ),
-                    }}
-                  >
-                    {message.content}
+                {message.content}
               </ReactMarkdown>
               {message.timer && (
                 <div className="mt-2">
@@ -1233,8 +1240,9 @@ return (
                       initialDuration={message.timer.duration}
                       onComplete={() => handleTimerComplete(message.timer!.id)}
                     />
-                    </div>
-                  )}
+                  </div>
+                </div>
+              )}
                   {message.flashcard && (
                     <div className="mt-2">
                       <FlashcardsQuestions
@@ -1290,6 +1298,8 @@ return (
         </div>
       </div>
     )}
+
+
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
           <div className="flex flex-col gap-6">

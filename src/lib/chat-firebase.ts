@@ -1,17 +1,17 @@
-import { db } from './firebase';
-import {
+import { 
   collection,
   doc,
   setDoc,
+  getDoc,
   updateDoc,
   query,
   where,
   orderBy,
   onSnapshot,
-  DocumentData,
   serverTimestamp,
-  getDoc,
+  DocumentData
 } from 'firebase/firestore';
+import { db } from './firebase';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -47,97 +47,124 @@ interface ChatSession {
   title: string;
   messages: ChatMessage[];
   userId: string;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: any;
+  updatedAt: any;
 }
 
+// Create a new chat session
 export async function createChatSession(userId: string): Promise<string> {
-  const chatRef = doc(collection(db, 'chats'));
-  const session: ChatSession = {
+  const chatRef = doc(collection(db, 'aichats'));
+  const initialMessage: ChatMessage = {
+    role: 'assistant',
+    content: "👋 Hi I'm TaskMaster, How can I help you today? Need help with your items? Simply ask me!"
+  };
+
+  const chatData: ChatSession = {
     id: chatRef.id,
     title: 'New Chat',
-    messages: [{
-      role: 'assistant',
-      content: "👋 Hi I'm TaskMaster, How can I help you today? Need help with your items? Simply ask me!"
-    }],
+    messages: [initialMessage],
     userId,
-    createdAt: new Date(),
-    updatedAt: new Date()
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
   };
-  
-  await setDoc(chatRef, session);
+
+  await setDoc(chatRef, chatData);
   return chatRef.id;
 }
 
+// Update a chat session
 export async function updateChatSession(
   chatId: string,
   updates: Partial<ChatSession>
 ) {
-  const chatRef = doc(db, 'chats', chatId);
+  const chatRef = doc(db, 'aichats', chatId);
   await updateDoc(chatRef, {
     ...updates,
     updatedAt: serverTimestamp()
   });
 }
 
-export async function updateChatTitle(chatId: string, title: string) {
-  await updateDoc(doc(db, 'chats', chatId), {
-    title,
-    updatedAt: serverTimestamp()
-  });
+// Get a chat session
+export async function getChatSession(chatId: string): Promise<ChatSession | null> {
+  const chatRef = doc(db, 'aichats', chatId);
+  const chatSnap = await getDoc(chatRef);
+  
+  if (!chatSnap.exists()) return null;
+  return chatSnap.data() as ChatSession;
 }
 
+// Listen to user's chat sessions
 export function onChatSessionsSnapshot(
   userId: string,
-  callback: (sessions: ChatSession[]) => void
+  callback: (sessions: Array<{ id: string; data: DocumentData }>) => void
 ) {
   const q = query(
-    collection(db, 'chats'),
+    collection(db, 'aichats'),
     where('userId', '==', userId),
     orderBy('updatedAt', 'desc')
   );
 
   return onSnapshot(q, (snapshot) => {
-    const sessions: ChatSession[] = [];
+    const results: Array<{ id: string; data: DocumentData }> = [];
     snapshot.forEach((doc) => {
-      sessions.push({ id: doc.id, ...doc.data() } as ChatSession);
+      results.push({ id: doc.id, data: doc.data() });
     });
-    callback(sessions);
+    callback(results);
   });
 }
 
+// Generate a title for the chat based on the conversation
 export async function generateChatTitle(messages: ChatMessage[]): Promise<string> {
-  // Get the first few messages to generate a title
-  const context = messages
-    .slice(0, 3)
-    .map(m => m.content)
-    .join(' ');
+  // Find the first user message to base the title on
+  const firstUserMessage = messages.find(m => m.role === 'user');
+  if (!firstUserMessage) return 'New Chat';
 
-  try {
-    const response = await fetch(
-      'https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct',
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${process.env.HUGGING_FACE_API_KEY}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          inputs: `Generate a very short (3-5 words) title for this chat based on its content: ${context}`,
-          parameters: {
-            max_new_tokens: 20,
-            temperature: 0.7,
-            return_full_text: false
-          }
-        })
-      }
-    );
-
-    if (!response.ok) throw new Error('Failed to generate title');
-    const result = await response.json();
-    return result[0].generated_text.trim() || 'New Chat';
-  } catch (error) {
-    console.error('Error generating chat title:', error);
-    return 'New Chat';
+  // Take the first 30 characters of the user's message
+  let title = firstUserMessage.content.slice(0, 30);
+  
+  // If we truncated the message, add an ellipsis
+  if (firstUserMessage.content.length > 30) {
+    title += '...';
   }
+
+  return title;
+}
+
+// Delete a chat session
+export async function deleteChatSession(chatId: string) {
+  const chatRef = doc(db, 'aichats', chatId);
+  await updateDoc(chatRef, {
+    deleted: true,
+    deletedAt: serverTimestamp()
+  });
+}
+
+// Archive a chat session
+export async function archiveChatSession(chatId: string) {
+  const chatRef = doc(db, 'aichats', chatId);
+  await updateDoc(chatRef, {
+    archived: true,
+    archivedAt: serverTimestamp()
+  });
+}
+
+// Get archived chat sessions
+export function onArchivedChatSessionsSnapshot(
+  userId: string,
+  callback: (sessions: Array<{ id: string; data: DocumentData }>) => void
+) {
+  const q = query(
+    collection(db, 'aichats'),
+    where('userId', '==', userId),
+    where('archived', '==', true),
+    orderBy('archivedAt', 'desc')
+  );
+
+  return onSnapshot(q, (snapshot) => {
+    const results: Array<{ id: string; data: DocumentData }> = [];
+    snapshot.forEach((doc) => {
+      results.push({ id: doc.id, data: doc.data() });
+    });
+    callback(results);
+  });
 }

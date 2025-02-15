@@ -418,18 +418,10 @@ let assistantReply = (result[0]?.generated_text as string || '')
   .replace(/\[\/?INST\]|<</g, '')
   .replace(/^[•\-]\s.*$/gm, '') // Remove lines starting with bullet points or dashes
   .replace(/^Now it's your turn to respond to.*$/gm, '') // Remove lines starting with "Now it's your turn to respond to"
-  .replace(/[`'"]/g, '') // Remove backticks, single quotes, and double quotes
-  .replace(/```/g, '') // Remove code block markers
   .split('\n')
-  .filter(line => 
-    !line.trim().startsWith('•') && 
-    !line.trim().startsWith('-') && 
-    !line.trim().startsWith('Now it\'s your turn') &&
-    line.trim() !== '' // Remove empty lines
-  )
+  .filter(line => !line.trim().startsWith('•') && !line.trim().startsWith('-')) // Additional filter for bullet points
   .join('\n')
   .trim()
-  .replace(/\n{3,}/g, '\n\n'); // Replace multiple consecutive newlines with double newlines
 
     // Parse any JSON content in the response
     const jsonMatch = assistantReply.match(/```json\n([\s\S]*?)\n```/);

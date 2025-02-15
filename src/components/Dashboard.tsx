@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef } from 'react';
 import { Navigate } from 'react-router-dom';
 import {
@@ -265,11 +264,11 @@ ${conversation}
 [NEW USER MESSAGE]
 ${userName}: ${userMsg.content}
 
-You're TaskMaster, an AI assistant helping ${userName}. When responding, follow these rules:
+You're TaskMaster, an AI productivity assistant helping ${userName}. When responding, follow these rules:
 
 1. RESPONSE STRUCTURE:
-   - First provide a brief, natural text response
-   - If educational content is needed, include EXACTLY ONE properly formatted JSON object
+   - First provide a brief, natural, and friendly text response to ${userName}
+   - If ${userName} specifically asks for educational content, include EXACTLY ONE properly formatted JSON object
    - Place JSON in a code block with triple backticks and "json" language identifier
    - NEVER include JSON syntax in regular text
    - NEVER mix JSON with regular text
@@ -323,9 +322,9 @@ You're TaskMaster, an AI assistant helping ${userName}. When responding, follow 
    - NEVER mix educational content types
    - ALWAYS validate JSON structure before including it
    - ALWAYS include multiple items in the data array
-   - NEVER create single-item responses unless specifically requested
+   - NEVER create single-item responses unless specifically requested by ${userName}
 
-FORBIDDEN:
+FORBIDDEN IN YOUR FINAL RESPONSE:
 - Meta-commentary about the conversation
 - Phrases like "I understand", "I see", "I notice"
 - Explaining what you're about to do

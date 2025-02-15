@@ -75,36 +75,7 @@ const [chatHistory, setChatHistory] = useState<ChatMessage[]>([
 const [isChatLoading, setIsChatLoading] = useState(false);
 const chatEndRef = useRef<HTMLDivElement>(null);
 
-// Timer handling functions
-const handleTimerComplete = (timerId: string) => {
-  setChatHistory(prev => [
-    ...prev,
-    {
-      role: 'assistant',
-      content: "⏰ Time's up! Your timer has finished."
-    }
-  ]);
-};
 
-const parseTimerRequest = (message: string): number | null => {
-  const timeRegex = /(\d+)\s*(minutes?|mins?|hours?|hrs?|seconds?|secs?)/i;
-  const match = message.match(timeRegex);
-  
-  if (!match) return null;
-  
-  const amount = parseInt(match[1]);
-  const unit = match[2].toLowerCase();
-  
-  if (unit.startsWith('hour') || unit.startsWith('hr')) {
-    return amount * 3600;
-  } else if (unit.startsWith('min')) {
-    return amount * 60;
-  } else if (unit.startsWith('sec')) {
-    return amount;
-  }
-  
-  return null;
-};
 
 // Whenever chatHistory changes, scroll to the bottom of the chat
 useEffect(() => {
@@ -113,47 +84,6 @@ useEffect(() => {
   }
 }, [chatHistory]);
 
-// Utility: Format the user's tasks/goals/projects/plans as text
-const formatItemsForChat = () => {
-  const lines: string[] = [];
-
-  lines.push(`${userName}'s items:\n`);
-
-  tasks.forEach((t) => {
-    const due = t.data.dueDate?.toDate?.();
-    lines.push(
-      `Task: ${t.data.task || 'Untitled'}${
-        due ? ` (Due: ${due.toLocaleDateString()})` : ''
-      }`
-    );
-  });
-  goals.forEach((g) => {
-    const due = g.data.dueDate?.toDate?.();
-    lines.push(
-      `Goal: ${g.data.goal || 'Untitled'}${
-        due ? ` (Due: ${due.toLocaleDateString()})` : ''
-      }`
-    );
-  });
-  projects.forEach((p) => {
-    const due = p.data.dueDate?.toDate?.();
-    lines.push(
-      `Project: ${p.data.project || 'Untitled'}${
-        due ? ` (Due: ${due.toLocaleDateString()})` : ''
-      }`
-    );
-  });
-  plans.forEach((p) => {
-    const due = p.data.dueDate?.toDate?.();
-    lines.push(
-      `Plan: ${p.data.plan || 'Untitled'}${
-        due ? ` (Due: ${due.toLocaleDateString()})` : ''
-      }`
-    );
-  });
-
-  return lines.join('\n');
-};
 
 // Timer component inline
 const InlineTimer = ({ duration, onComplete, id }: { duration: number; onComplete: () => void; id: string }) => {
@@ -1111,7 +1041,7 @@ return (
   )}
 </div>
 
-    {/* Chat Modal */}
+  {/* Chat Modal */}
     {isChatModalOpen && (
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
         <div className="bg-gray-800 rounded-xl w-full max-w-2xl mx-4 max-h-[80vh] flex flex-col">

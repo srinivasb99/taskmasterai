@@ -1255,34 +1255,37 @@ return (
                   }}
                 >
                   {message.content}
-                </ReactMarkdown>
-                {message.timer && (
-                  <div className="mt-2">
+              </ReactMarkdown>
+              {message.timer && (
+                <div className="mt-2">
+                  <div className="flex items-center space-x-2 bg-gray-900 rounded-lg px-4 py-2">
+                    <TimerIcon className="w-5 h-5 text-blue-400" />
                     <Timer
                       key={message.timer.id}
                       initialDuration={message.timer.duration}
                       onComplete={() => handleTimerComplete(message.timer!.id)}
                     />
                   </div>
-                )}
-                {message.flashcard && (
-                  <div className="mt-2">
-                    <FlashcardsQuestions
-                      type="flashcard"
-                      data={message.flashcard.data[0]}
-                      onComplete={() => {}}
-                    />
-                  </div>
-                )}
-                {message.question && (
-                  <div className="mt-2">
-                    <FlashcardsQuestions
-                      type="question"
-                      data={message.question.data[0]}
-                      onComplete={() => {}}
-                    />
-                  </div>
-                )}
+                </div>
+              )}
+{message.flashcard && (
+  <div className="mt-2">
+    <FlashcardsQuestions
+      type="flashcard"
+      data={message.flashcard.data}
+      onComplete={() => {}}
+    />
+  </div>
+)}
+{message.question && (
+  <div className="mt-2">
+    <FlashcardsQuestions
+      type="question"
+      data={message.question.data}
+      onComplete={() => {}}
+    />
+  </div>
+)}
               </div>
             </div>
           ))}

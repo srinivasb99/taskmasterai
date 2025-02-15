@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef } from 'react';
 import { Navigate } from 'react-router-dom';
 import {
@@ -40,42 +39,154 @@ export function Dashboard() {
   const [quote, setQuote] = useState(getRandomQuote());
   const [greeting, setGreeting] = useState(getTimeBasedGreeting());
 
-  // ---------------------
-  // CHAT MODAL
-  // ---------------------
-  const [isChatModalOpen, setIsChatModalOpen] = useState(false);
-  const [chatMessage, setChatMessage] = useState('');
-  const [chatHistory, setChatHistory] = useState<Array<{ role: 'user' | 'assistant', content: string }>>([]);
-  const [isChatLoading, setIsChatLoading] = useState(false);
-  const chatEndRef = useRef<HTMLDivElement>(null);
+// ---------------------
+// CHAT MODAL (NEW AI CHAT FUNCTIONALITY)
+// ---------------------
+const [isChatModalOpen, setIsChatModalOpen] = useState(false);
+const [chatMessage, setChatMessage] = useState('');
+const [chatHistory, setChatHistory] = useState<
+  Array<{ role: 'user' | 'assistant'; content: string }>
+>([]);
+const [isChatLoading, setIsChatLoading] = useState(false);
+const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // Scroll the chat to the bottom whenever chatHistory changes
-  useEffect(() => {
-    if (chatEndRef.current) {
-      chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [chatHistory]);
+// Whenever chatHistory changes, scroll to the bottom of the chat
+useEffect(() => {
+  if (chatEndRef.current) {
+    chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+  }
+}, [chatHistory]);
 
-  // Minimal handleChatSubmit to prevent errors
-  const handleChatSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!chatMessage.trim()) return;
-    
-    // Add user's message to the chat
-    setChatHistory((prev) => [...prev, { role: 'user', content: chatMessage }]);
-    setChatMessage('');
-    
-    // Simulate loading/response
-    setIsChatLoading(true);
-    // Example: after 1 second, respond with a placeholder
-    setTimeout(() => {
-      setIsChatLoading(false);
-      setChatHistory((prev) => [
-        ...prev,
-        { role: 'assistant', content: "Hello from TaskMaster! (Placeholder response)" },
-      ]);
-    }, 1000);
-  };
+// Utility: Format the user's tasks/goals/projects/plans as text
+const formatItemsForChat = () => {
+  const lines: string[] = [];
+
+  // Example: tasks, goals, etc. are in your state: tasks, goals, projects, plans
+  // We'll just gather them. You can customize formatting.
+  lines.push('Your items:\n');
+
+  tasks.forEach((t) => {
+    const due = t.data.dueDate?.toDate?.();
+    lines.push(
+      `Task: ${t.data.task || 'Untitled'}${
+        due ? ` (Due: ${due.toLocaleDateString()})` : ''
+      }`
+    );
+  });
+  goals.forEach((g) => {
+    const due = g.data.dueDate?.toDate?.();
+    lines.push(
+      `Goal: ${g.data.goal || 'Untitled'}${
+        due ? ` (Due: ${due.toLocaleDateString()})` : ''
+      }`
+    );
+  });
+  projects.forEach((p) => {
+    const due = p.data.dueDate?.toDate?.();
+    lines.push(
+      `Project: ${p.data.project || 'Untitled'}${
+        due ? ` (Due: ${due.toLocaleDateString()})` : ''
+      }`
+    );
+  });
+  plans.forEach((p) => {
+    const due = p.data.dueDate?.toDate?.();
+    lines.push(
+      `Plan: ${p.data.plan || 'Untitled'}${
+        due ? ` (Due: ${due.toLocaleDateString()})` : ''
+      }`
+    );
+  });
+
+  return lines.join('\n');
+};
+
+// NEW handleChatSubmit that calls Hugging Face
+const handleChatSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  if (!chatMessage.trim()) return;
+
+  // 1. Add user's message to chat
+  const userMsg = { role: 'user' as const, content: chatMessage };
+  setChatHistory((prev) => [...prev, userMsg]);
+  setChatMessage('');
+
+  // 2. Build conversation context
+  // We'll combine prior assistant/user lines + the user's items
+  // for a more "aware" conversation about tasks, goals, etc.
+  const conversation = chatHistory
+    .map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
+    .join('\n');
+  const itemsText = formatItemsForChat(); // Gather tasks, etc.
+
+  const prompt = `
+[CONTEXT]
+${itemsText}
+
+[CONVERSATION SO FAR]
+${conversation}
+
+[NEW USER MESSAGE]
+User: ${userMsg.content}
+
+You're TaskMaster, an advanced AI. Continue the conversation, referencing the items above as needed.
+`;
+
+  // 3. Call Hugging Face to get the AI's response
+  setIsChatLoading(true);
+  try {
+    const response = await fetch(
+      'https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${hfApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          inputs: prompt,
+          parameters: {
+            max_new_tokens: 300,
+            temperature: 0.7,
+            top_p: 0.9,
+            repetition_penalty: 1.2,
+            return_full_text: false,
+            do_sample: true,
+          },
+        }),
+      }
+    );
+
+    if (!response.ok) throw new Error('Chat API request failed');
+    const result = await response.json();
+
+    // 4. Extract the model's text from the result
+    const rawText = (result[0]?.generated_text as string) || '';
+    // Optionally, do a quick cleanup
+    const assistantReply = rawText
+      .replace(/\[\/?INST\]|<</g, '')
+      .trim();
+
+    // 5. Add assistant's reply to chat
+    setChatHistory((prev) => [
+      ...prev,
+      { role: 'assistant', content: assistantReply },
+    ]);
+  } catch (err) {
+    console.error('Chat error:', err);
+    setChatHistory((prev) => [
+      ...prev,
+      {
+        role: 'assistant',
+        content:
+          'Sorry, I had an issue responding. Please try again in a moment.',
+      },
+    ]);
+  } finally {
+    setIsChatLoading(false);
+  }
+};
+
 
   // ---------------------
   // 2. COLLECTION STATES
@@ -697,9 +808,11 @@ return (
             "{quote.text}" - <span className="text-purple-400">{quote.author}</span>
           </p>
         </header>
-<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
 {/* Smart Overview Card */}
-<div className={`bg-gray-800 rounded-xl p-6 relative min-h-[200px] transform transition-all duration-500 ease-out ${cardVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'} hover:shadow-lg hover:shadow-purple-500/10`}>
+<div
+  className={`bg-gray-800 rounded-xl p-6 relative min-h-[200px] transform transition-all duration-500 ease-out ${cardVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'} hover:shadow-lg hover:shadow-purple-500/10`}
+>
   <div className="flex items-center mb-4">
     <h2 className="text-xl font-semibold text-blue-300 mr-2 flex items-center">
       <Sparkles className="w-5 h-5 mr-2 text-yellow-400" />
@@ -715,9 +828,6 @@ return (
     <span className="text-xs bg-gradient-to-r from-pink-500 to-purple-500 text-white px-3 py-1 rounded-full font-medium ml-2">
       BETA
     </span>
-    <span className="text-xs text-gray-400">
-      TaskMaster can make mistakes. Verify details.
-    </span>
   </div>
 
   {overviewLoading ? (
@@ -727,10 +837,15 @@ return (
       <div className="h-4 bg-gray-700 rounded-full w-4/5 animate-pulse delay-150"></div>
     </div>
   ) : (
-    <div 
-      className="text-sm text-gray-300 prose prose-invert"
-      dangerouslySetInnerHTML={{ __html: smartOverview }}
-    />
+    <>
+      <div
+        className="text-sm text-gray-300 prose prose-invert"
+        dangerouslySetInnerHTML={{ __html: smartOverview }}
+      />
+      <div className="text-left mt-4 text-xs text-gray-400">
+        TaskMaster can make mistakes. Verify details.
+      </div>
+    </>
   )}
 </div>
 

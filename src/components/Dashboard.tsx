@@ -8,6 +8,8 @@ import {
   CheckCircle,
   MessageCircle,
   X,
+  RotateCcw, 
+  Square,
   Timer as TimerIcon,
   Send,
 } from 'lucide-react';
@@ -45,7 +47,6 @@ const [userName, setUserName] = useState("Loading...");
 const [quote, setQuote] = useState(getRandomQuote());
 const [greeting, setGreeting] = useState(getTimeBasedGreeting());
 
-// ---------------------
 // Types for timer messages
 interface TimerMessage {
   type: 'timer';
@@ -59,19 +60,79 @@ interface ChatMessage {
   timer?: TimerMessage;
 }
 
-// ---------------------
-// CHAT MODAL (NEW AI CHAT FUNCTIONALITY)
-// ---------------------
-const [isChatModalOpen, setIsChatModalOpen] = useState(false);
-const [chatMessage, setChatMessage] = useState('');
-const [chatHistory, setChatHistory] = useState<ChatMessage[]>([
-  {
-    role: 'assistant',
-    content: "👋 Hi I'm TaskMaster, How can I help you today? Need help with your items? Simply ask me!"
-  }
-]);
-const [isChatLoading, setIsChatLoading] = useState(false);
-const chatEndRef = useRef<HTMLDivElement>(null);
+// Timer component inline
+const InlineTimer = ({ duration, onComplete, id }: { duration: number; onComplete: () => void; id: string }) => {
+  const [timeLeft, setTimeLeft] = useState(duration);
+  const [isRunning, setIsRunning] = useState(true);
+  const audioRef = useRef<HTMLAudioElement>(null);
+
+  useEffect(() => {
+    if (!isRunning) return;
+
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          setIsRunning(false);
+          if (audioRef.current) {
+            audioRef.current.play().catch(console.error);
+          }
+          onComplete();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [isRunning, onComplete]);
+
+  const minutes = Math.floor(timeLeft / 60);
+  const seconds = timeLeft % 60;
+
+  const handleReset = () => {
+    setTimeLeft(duration);
+    setIsRunning(false);
+  };
+
+  const handleStop = () => {
+    setIsRunning(false);
+    setTimeLeft(0);
+    onComplete();
+  };
+
+  return (
+    <div className="flex items-center space-x-2 bg-gray-900 rounded-lg px-4 py-2">
+      <audio ref={audioRef} src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" />
+      <TimerIcon className="w-5 h-5 text-blue-400" />
+      <span className="font-mono text-lg text-blue-300">
+        {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
+      </span>
+      <div className="flex space-x-2">
+        <button
+          onClick={() => setIsRunning(!isRunning)}
+          disabled={timeLeft === 0}
+          className="text-xs px-2 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isRunning ? 'Pause' : 'Resume'}
+        </button>
+        <button
+          onClick={handleStop}
+          disabled={timeLeft === 0}
+          className="text-xs px-2 py-1 rounded bg-red-600 hover:bg-red-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <Square className="w-3 h-3" />
+        </button>
+        <button
+          onClick={handleReset}
+          className="text-xs px-2 py-1 rounded bg-green-600 hover:bg-green-700 text-white transition-colors"
+        >
+          <RotateCcw className="w-3 h-3" />
+        </button>
+      </div>
+    </div>
+  );
+};
 
 // Timer handling functions
 const handleTimerComplete = (timerId: string) => {
@@ -151,47 +212,6 @@ const formatItemsForChat = () => {
   });
 
   return lines.join('\n');
-};
-
-// Timer component inline
-const InlineTimer = ({ duration, onComplete, id }: { duration: number; onComplete: () => void; id: string }) => {
-  const [timeLeft, setTimeLeft] = useState(duration);
-  const [isRunning, setIsRunning] = useState(true);
-
-  useEffect(() => {
-    if (!isRunning) return;
-
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          onComplete();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [isRunning, onComplete]);
-
-  const minutes = Math.floor(timeLeft / 60);
-  const seconds = timeLeft % 60;
-
-  return (
-    <div className="flex items-center space-x-2 bg-gray-900 rounded-lg px-4 py-2">
-      <TimerIcon className="w-5 h-5 text-blue-400" />
-      <span className="font-mono text-lg text-blue-300">
-        {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
-      </span>
-      <button
-        onClick={() => setIsRunning(!isRunning)}
-        className="text-xs px-2 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white transition-colors"
-      >
-        {isRunning ? 'Pause' : 'Resume'}
-      </button>
-    </div>
-  );
 };
 
 // NEW handleChatSubmit that calls Hugging Face
@@ -997,7 +1017,7 @@ return (
   )}
 </div>
 
-    {/* Chat Modal */}
+     {/* Chat Modal */}
     {isChatModalOpen && (
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
         <div className="bg-gray-800 rounded-xl w-full max-w-2xl mx-4 max-h-[80vh] flex flex-col">

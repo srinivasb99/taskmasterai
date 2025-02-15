@@ -89,19 +89,28 @@ useEffect(() => {
 const InlineTimer = ({ duration, onComplete, id }: { duration: number; onComplete: () => void; id: string }) => {
   const [timeLeft, setTimeLeft] = useState(duration);
   const [isRunning, setIsRunning] = useState(true);
-  const audioRef = useRef<HTMLAudioElement>(null);
+  const [isCompleted, setIsCompleted] = useState(false);
+  const intervalRef = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
-    if (!isRunning) return;
+    if (!isRunning || isCompleted) {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+      return;
+    }
 
-    const timer = setInterval(() => {
+    intervalRef.current = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
-          clearInterval(timer);
-          setIsRunning(false);
-          if (audioRef.current) {
-            audioRef.current.play().catch(console.error);
+          if (intervalRef.current) {
+            clearInterval(intervalRef.current);
           }
+          setIsCompleted(true);
+          setIsRunning(false);
+          // Play sound
+          const audio = new Audio('https://assets.mixkit.co/sfx/preview/mixkit-alarm-digital-clock-beep-989.mp3');
+          audio.play().catch(console.error);
           onComplete();
           return 0;
         }
@@ -109,41 +118,57 @@ const InlineTimer = ({ duration, onComplete, id }: { duration: number; onComplet
       });
     }, 1000);
 
-    return () => clearInterval(timer);
-  }, [isRunning, onComplete]);
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [isRunning, isCompleted, onComplete]);
 
   const minutes = Math.floor(timeLeft / 60);
   const seconds = timeLeft % 60;
 
   const handleReset = () => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+    }
     setTimeLeft(duration);
     setIsRunning(false);
+    setIsCompleted(false);
   };
 
   const handleStop = () => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+    }
     setIsRunning(false);
     setTimeLeft(0);
+    setIsCompleted(true);
     onComplete();
+  };
+
+  const toggleTimer = () => {
+    if (isCompleted) return;
+    setIsRunning(!isRunning);
   };
 
   return (
     <div className="flex items-center space-x-2 bg-gray-900 rounded-lg px-4 py-2">
-      <audio ref={audioRef} src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" />
       <TimerIcon className="w-5 h-5 text-blue-400" />
       <span className="font-mono text-lg text-blue-300">
         {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
       </span>
       <div className="flex space-x-2">
         <button
-          onClick={() => setIsRunning(!isRunning)}
-          disabled={timeLeft === 0}
+          onClick={toggleTimer}
+          disabled={isCompleted}
           className="text-xs px-2 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isRunning ? 'Pause' : 'Resume'}
         </button>
         <button
           onClick={handleStop}
-          disabled={timeLeft === 0}
+          disabled={isCompleted}
           className="text-xs px-2 py-1 rounded bg-red-600 hover:bg-red-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Square className="w-3 h-3" />

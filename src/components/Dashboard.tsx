@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useRef } from 'react';
 import { Navigate } from 'react-router-dom';
 import {
@@ -101,24 +102,68 @@ function formatItemsForChat(): string {
   return lines.join('\n');
 }
 
-// 2. A small helper to “beautify” the AI’s response
 function beautifyAssistantReply(text: string): string {
-  // For example, split on double-newlines => paragraphs
-  // Then add bullet points if the line starts with a number or dash, etc.
-  // Adjust to your preference
+  // Split into paragraphs while preserving meaningful whitespace
   const paragraphs = text
-    .split(/\n\s*\n/) // separate paragraphs
-    .map((p) => p.trim())
-    .filter((p) => p.length > 0);
+    .split(/\n(?:\s*\n)+/)
+    .map(p => p.trim())
+    .filter(p => p.length > 0);
 
   return paragraphs
-    .map((p) => {
-      // If the line starts with digits or dash, we could style it
-      // For simplicity, just wrap in <p> tags for now
-      return `<p class="mb-2 leading-relaxed">${p}</p>`;
+    .map(paragraph => {
+      // Check for different types of content and apply appropriate styling
+      
+      // Lists (numbered or bulleted)
+      if (/^(\d+[\.)]|\-|\•|\*)\s/.test(paragraph)) {
+        return `<p class="mb-3 pl-4 border-l-2 border-blue-500 text-blue-300">${paragraph}</p>`;
+      }
+      
+      // Code blocks or technical content
+      if (paragraph.includes('```') || /`[^`]+`/.test(paragraph)) {
+        const formattedCode = paragraph
+          .replace(/```(\w+)?\n?([\s\S]+?)```/g, '<code class="block bg-gray-900 p-3 rounded-md font-mono text-green-400">$2</code>')
+          .replace(/`([^`]+)`/g, '<code class="bg-gray-900 px-1 rounded font-mono text-green-400">$1</code>');
+        return `<p class="mb-4">${formattedCode}</p>`;
+      }
+      
+      // Important notes or warnings
+      if (/^(note|warning|important):/i.test(paragraph)) {
+        return `<p class="mb-3 p-3 bg-gray-700/50 rounded-lg text-yellow-300 font-medium">${paragraph}</p>`;
+      }
+      
+      // Headings
+      if (/^(#+ )/.test(paragraph)) {
+        const level = paragraph.match(/^#+/)[0].length;
+        const text = paragraph.replace(/^#+ /, '');
+        const sizes = {
+          1: 'text-2xl',
+          2: 'text-xl',
+          3: 'text-lg'
+        };
+        return `<h${level} class="mb-3 ${sizes[level] || 'text-base'} font-semibold text-blue-400">${text}</h${level}>`;
+      }
+      
+      // Links
+      if (/\[([^\]]+)\]\(([^\)]+)\)/.test(paragraph)) {
+        const formattedLinks = paragraph.replace(
+          /\[([^\]]+)\]\(([^\)]+)\)/g,
+          '<a href="$2" class="text-blue-400 hover:text-blue-300 underline" target="_blank" rel="noopener noreferrer">$1</a>'
+        );
+        return `<p class="mb-3">${formattedLinks}</p>`;
+      }
+      
+      // Emphasis
+      const formattedEmphasis = paragraph
+        .replace(/\*\*([^*]+)\*\*/g, '<strong class="font-semibold text-blue-300">$1</strong>')
+        .replace(/\*([^*]+)\*/g, '<em class="text-gray-300 italic">$1</em>')
+        .replace(/_([^_]+)_/g, '<em class="text-gray-300 italic">$1</em>');
+      
+      // Default paragraph styling
+      return `<p class="mb-3 leading-relaxed text-gray-200">${formattedEmphasis}</p>`;
     })
-    .join('');
+    .join('\n');
 }
+
 
 // 3. The updated handleChatSubmit
 const handleChatSubmit = async (e: React.FormEvent) => {
@@ -191,6 +236,7 @@ Please answer with direct, helpful info regarding the user's items.
 
     // Quick cleanup to remove system instructions
     // or extraneous disclaimers. Adjust as needed.
+    rawText = rawText.replace(/(\[\/?INST\]|<</g, '').trim();
 
     // 6. Beautify the text for your chat UI
     const beautified = beautifyAssistantReply(rawText);

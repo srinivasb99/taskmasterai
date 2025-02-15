@@ -15,6 +15,12 @@ import {
   StopCircle,
   RefreshCw
 } from 'lucide-react';
+import { 
+  createChatSession, 
+  updateChatSession, 
+  onChatSessionsSnapshot,
+  generateChatTitle 
+} from './lib/chat-firebase';
 import { Sidebar } from './Sidebar';
 import { Timer } from './Timer';
 import { FlashcardsQuestions } from './FlashcardsQuestions';
@@ -97,8 +103,9 @@ interface ChatMessage {
 // CHAT MODAL (NEW AI CHAT FUNCTIONALITY)
 // ---------------------
 // Add new state for chat history and control
-const [chatSessions, setChatSessions] = useState<{ id: string; title: string; messages: ChatMessage[] }[]>([]);
+const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
 const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+const [isChatLoading, setIsChatLoading] = useState(false);
 const [abortController, setAbortController] = useState<AbortController | null>(null);
 const [isChatModalOpen, setIsChatModalOpen] = useState(false);
 const [chatMessage, setChatMessage] = useState('');
@@ -108,9 +115,22 @@ const [chatHistory, setChatHistory] = useState<ChatMessage[]>([
     content: "👋 Hi I'm TaskMaster, How can I help you today? Need help with your items? Simply ask me!"
   }
 ]);
-const [isChatLoading, setIsChatLoading] = useState(false);
 const chatEndRef = useRef<HTMLDivElement>(null);
 
+// Add useEffect for loading chat sessions
+useEffect(() => {
+  if (!auth.currentUser) return;
+  
+  const unsubscribe = onChatSessionsSnapshot(auth.currentUser.uid, (sessions) => {
+    setChatSessions(sessions);
+    if (!currentSessionId && sessions.length > 0) {
+      setCurrentSessionId(sessions[0].id);
+      setChatHistory(sessions[0].messages);
+    }
+  });
+
+  return () => unsubscribe();
+}, [auth.currentUser]);
 
 
 // Whenever chatHistory changes, scroll to the bottom of the chat
@@ -133,20 +153,16 @@ const handleTimerComplete = (timerId: string) => {
   ]);
 };
 
-// Function to create a new chat session
-const createNewSession = () => {
-  const id = Math.random().toString(36).substr(2, 9);
-  const newSession = {
-    id,
-    title: `Chat ${chatSessions.length + 1}`,
-    messages: [{
-      role: 'assistant',
-      content: "👋 Hi I'm TaskMaster, How can I help you today?"
-    }]
-  };
-  setChatSessions(prev => [...prev, newSession]);
-  setCurrentSessionId(id);
-  setChatHistory(newSession.messages);
+// Update createNewSession
+const createNewSession = async () => {
+  if (!auth.currentUser) return;
+  
+  const sessionId = await createChatSession(auth.currentUser.uid);
+  setCurrentSessionId(sessionId);
+  const newSession = chatSessions.find(s => s.id === sessionId);
+  if (newSession) {
+    setChatHistory(newSession.messages);
+  }
 };
 
 // Function to switch between chat sessions
@@ -203,12 +219,6 @@ const parseTimerRequest = (message: string): number | null => {
   return null;
 };
 
-// Whenever chatHistory changes, scroll to the bottom of the chat
-useEffect(() => {
-  if (chatEndRef.current) {
-    chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
-  }
-}, [chatHistory]);
 
 // Utility: Format the user's tasks/goals/projects/plans as text
 const formatItemsForChat = () => {
@@ -252,10 +262,9 @@ const formatItemsForChat = () => {
   return lines.join('\n');
 };
 
-// NEW handleChatSubmit with updated prompt
 const handleChatSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
-  if (!chatMessage.trim()) return;
+  if (!chatMessage.trim() || !currentSessionId || !auth.currentUser) return;
 
   // Check for timer request
   const timerDuration = parseTimerRequest(chatMessage);
@@ -264,24 +273,39 @@ const handleChatSubmit = async (e: React.FormEvent) => {
     content: chatMessage
   };
   
-  setChatHistory(prev => [...prev, userMsg]);
+  // Update UI immediately
+  const updatedHistory = [...chatHistory, userMsg];
+  setChatHistory(updatedHistory);
   setChatMessage('');
 
+  // Create new AbortController
+  const controller = new AbortController();
+  setAbortController(controller);
+  setIsChatLoading(true);
+  
   // If it's a timer request, add timer immediately
   if (timerDuration) {
     const timerId = Math.random().toString(36).substr(2, 9);
-    setChatHistory(prev => [
-      ...prev,
-      {
-        role: 'assistant',
-        content: `Starting a timer for ${timerDuration} seconds.`,
-        timer: {
-          type: 'timer',
-          duration: timerDuration,
-          id: timerId
-        }
+    const timerResponse = {
+      role: 'assistant',
+      content: `Starting a timer for ${timerDuration} seconds.`,
+      timer: {
+        type: 'timer',
+        duration: timerDuration,
+        id: timerId
       }
-    ]);
+    };
+    
+    const updatedWithTimer = [...updatedHistory, timerResponse];
+    setChatHistory(updatedWithTimer);
+    
+    // Update Firestore
+    await updateChatSession(currentSessionId, {
+      messages: updatedWithTimer
+    });
+    
+    setIsChatLoading(false);
+    setAbortController(null);
     return;
   }
 
@@ -306,7 +330,7 @@ const handleChatSubmit = async (e: React.FormEvent) => {
     })
   };
 
-const prompt = `
+  const prompt = `
 [CONTEXT]
 User's Name: ${userName}
 Current Date: ${currentDateTime.date}
@@ -340,12 +364,6 @@ You're TaskMaster, an AI productivity assistant helping ${userName}. When respon
          "question": "Question 1",
          "answer": "Answer 1",
          "topic": "Subject area"
-       },
-       {
-         "id": "unique-id-2",
-         "question": "Question 2",
-         "answer": "Answer 2",
-         "topic": "Subject area"
        }
      ]
    }
@@ -360,13 +378,6 @@ You're TaskMaster, an AI productivity assistant helping ${userName}. When respon
          "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
          "correctAnswer": 0,
          "explanation": "Explanation 1"
-       },
-       {
-         "id": "unique-id-2",
-         "question": "Question 2",
-         "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
-         "correctAnswer": 1,
-         "explanation": "Explanation 2"
        }
      ]
    }
@@ -387,7 +398,6 @@ FORBIDDEN IN YOUR FINAL RESPONSE:
 - Using phrases like "Based on the context"
 `;
 
-  setIsChatLoading(true);
   try {
     const response = await fetch(
       'https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct',
@@ -408,23 +418,27 @@ FORBIDDEN IN YOUR FINAL RESPONSE:
             do_sample: true,
           },
         }),
+        signal: controller.signal,
       }
     );
 
     if (!response.ok) throw new Error('Chat API request failed');
     const result = await response.json();
 
-let assistantReply = (result[0]?.generated_text as string || '')
-  .replace(/\[\/?INST\]|<</g, '')
-  .replace(/^[•\-]\s.*$/gm, '') // Remove lines starting with bullet points or dashes
-  .replace(/^Now it's your turn to respond to.*$/gm, '') // Remove lines starting with "Now it's your turn to respond to"
-  .split('\n')
-  .filter(line => !line.trim().startsWith('•') && !line.trim().startsWith('-')) // Additional filter for bullet points
-  .join('\n')
-  .trim()
+    let assistantReply = (result[0]?.generated_text as string || '')
+      .replace(/\[\/?INST\]|<</g, '')
+      .replace(/^[•\-]\s.*$/gm, '')
+      .replace(/^Now it's your turn to respond to.*$/gm, '')
+      .replace(/^Here is your chance to respond.*$/gm, '')
+      .split('\n')
+      .filter(line => !line.trim().startsWith('•') && !line.trim().startsWith('-'))
+      .join('\n')
+      .trim();
 
     // Parse any JSON content in the response
     const jsonMatch = assistantReply.match(/```json\n([\s\S]*?)\n```/);
+    let assistantMessage: ChatMessage;
+
     if (jsonMatch) {
       try {
         const jsonContent = JSON.parse(jsonMatch[1].trim());
@@ -437,48 +451,72 @@ let assistantReply = (result[0]?.generated_text as string || '')
           jsonContent.data &&
           (jsonContent.type === 'flashcard' || jsonContent.type === 'question')
         ) {
-          setChatHistory((prev) => [
-            ...prev,
-            {
-              role: 'assistant',
-              content: assistantReply,
-              ...(jsonContent.type === 'flashcard' && { flashcard: jsonContent }),
-              ...(jsonContent.type === 'question' && { question: jsonContent })
-            },
-          ]);
+          assistantMessage = {
+            role: 'assistant',
+            content: assistantReply,
+            ...(jsonContent.type === 'flashcard' && { flashcard: jsonContent }),
+            ...(jsonContent.type === 'question' && { question: jsonContent })
+          };
         } else {
           throw new Error('Invalid JSON structure');
         }
       } catch (e) {
         console.error('Failed to parse JSON content:', e);
-        setChatHistory((prev) => [
-          ...prev,
-          { 
-            role: 'assistant', 
-            content: 'I apologize, but I encountered an error processing the educational content. Let me try again with a simpler response.\n\n' + assistantReply 
-          },
-        ]);
+        assistantMessage = { 
+          role: 'assistant', 
+          content: 'I apologize, but I encountered an error processing the educational content. Let me try again with a simpler response.\n\n' + assistantReply 
+        };
       }
     } else {
-      setChatHistory((prev) => [
-        ...prev,
-        { role: 'assistant', content: assistantReply },
-      ]);
-    }
-  } catch (err) {
-    console.error('Chat error:', err);
-    setChatHistory((prev) => [
-      ...prev,
-      {
+      assistantMessage = {
         role: 'assistant',
-        content:
-          'Sorry, I had an issue responding. Please try again in a moment.',
-      },
-    ]);
+        content: assistantReply
+      };
+    }
+
+    const finalHistory = [...updatedHistory, assistantMessage];
+    setChatHistory(finalHistory);
+
+    // Update Firestore
+    await updateChatSession(currentSessionId, {
+      messages: finalHistory
+    });
+
+    // Generate and update title if this is the first user message
+    if (chatHistory.length <= 1) {
+      const newTitle = await generateChatTitle(finalHistory);
+      await updateChatSession(currentSessionId, { title: newTitle });
+    }
+
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      const abortMessage = {
+        role: 'assistant',
+        content: 'Response was stopped.'
+      };
+      const finalHistory = [...updatedHistory, abortMessage];
+      setChatHistory(finalHistory);
+      await updateChatSession(currentSessionId, {
+        messages: finalHistory
+      });
+    } else {
+      console.error('Chat error:', err);
+      const errorMessage = {
+        role: 'assistant',
+        content: 'Sorry, I had an issue responding. Please try again in a moment.'
+      };
+      const finalHistory = [...updatedHistory, errorMessage];
+      setChatHistory(finalHistory);
+      await updateChatSession(currentSessionId, {
+        messages: finalHistory
+      });
+    }
   } finally {
+    setAbortController(null);
     setIsChatLoading(false);
   }
 };
+
 
   // ---------------------
   // 2. COLLECTION STATES
@@ -1295,24 +1333,28 @@ return (
         </div>
 
         {/* Chat Input */}
-        <form onSubmit={handleChatSubmit} className="p-4 border-t border-gray-700">
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={chatMessage}
-              onChange={(e) => setChatMessage(e.target.value)}
-              placeholder="Ask TaskMaster about your items or set a timer..."
-              className="flex-1 bg-gray-700 text-gray-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <button
-              type="submit"
-              disabled={isChatLoading}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Send className="w-5 h-5" />
-            </button>
-          </div>
-        </form>
+<form onSubmit={handleChatSubmit} className="p-4 border-t border-gray-700">
+  <div className="flex gap-2">
+    <input
+      type="text"
+      value={chatMessage}
+      onChange={(e) => setChatMessage(e.target.value)}
+      placeholder="Ask TaskMaster about your items or set a timer..."
+      className="flex-1 bg-gray-700 text-gray-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+    />
+    <button
+      type={isChatLoading ? 'button' : 'submit'}
+      onClick={isChatLoading ? stopResponse : undefined}
+      className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+    >
+      {isChatLoading ? (
+        <StopCircle className="w-5 h-5" />
+      ) : (
+        <Send className="w-5 h-5" />
+      )}
+    </button>
+  </div>
+</form>
       </div>
     </div>
   </div>

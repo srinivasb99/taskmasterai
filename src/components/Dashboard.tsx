@@ -1220,43 +1220,44 @@ return (
         </div>
       </div>
 
-      {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col">
-        <div className="p-4 border-b border-gray-700 flex justify-between items-center">
-          <h3 className="text-lg font-semibold text-blue-300 flex items-center gap-2">
-            <MessageCircle className="w-5 h-5" />
-            Chat with TaskMaster
-            <span className="text-xs bg-gradient-to-r from-pink-500 to-purple-500 text-gray-300 px-2 py-0.5 rounded-full">
-              BETA
-            </span>
-          </h3>
-          <div className="flex items-center gap-2">
-            {isChatLoading && (
-              <button
-                onClick={stopResponse}
-                className="text-gray-400 hover:text-gray-200 transition-colors p-1 rounded hover:bg-gray-700"
-                title="Stop generating"
-              >
-                <StopCircle className="w-5 h-5" />
-              </button>
-            )}
-            <button
-              onClick={regenerateResponse}
-              className="text-gray-400 hover:text-gray-200 transition-colors p-1 rounded hover:bg-gray-700"
-              disabled={isChatLoading || chatHistory.length < 2}
-              title="Regenerate response"
-            >
-              <RefreshCw className="w-5 h-5" />
-            </button>
-            <button
-              onClick={() => setIsChatModalOpen(false)}
-              className="text-gray-400 hover:text-gray-200 transition-colors p-1 rounded hover:bg-gray-700"
-              title="Close"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
+{/* Main Chat Area */}
+<div className="flex-1 flex flex-col">
+  <div className="p-4 border-b border-gray-700 flex justify-between items-center">
+    <h3 className="text-lg font-semibold text-blue-300 flex items-center gap-2">
+      <MessageCircle className="w-5 h-5" />
+      Chat with TaskMaster
+      <span className="text-xs bg-gradient-to-r from-pink-500 to-purple-500 text-gray-300 px-2 py-0.5 rounded-full">
+        BETA
+      </span>
+    </h3>
+    <div className="flex items-center gap-2">
+      {isChatLoading && (
+        <button
+          onClick={stopResponse}
+          className="text-gray-400 hover:text-gray-200 transition-colors p-1 rounded hover:bg-gray-700"
+          title="Stop generating"
+        >
+          <StopCircle className="w-5 h-5" />
+        </button>
+      )}
+      <button
+        onClick={regenerateResponse}
+        className="text-gray-400 hover:text-gray-200 transition-colors p-1 rounded hover:bg-gray-700"
+        disabled={!chatHistory || chatHistory.length < 2 || isChatLoading}
+        title="Regenerate response"
+      >
+        <RefreshCw className="w-5 h-5" />
+      </button>
+      <button
+        onClick={() => setIsChatModalOpen(false)}
+        className="text-gray-400 hover:text-gray-200 transition-colors p-1 rounded hover:bg-gray-700"
+        title="Close"
+      >
+        <X className="w-5 h-5" />
+      </button>
+    </div>
+  </div>
+
 
         {/* Chat Messages */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={chatEndRef}>

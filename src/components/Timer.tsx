@@ -1,18 +1,29 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Timer as TimerIcon, RotateCcw, Square } from 'lucide-react';
+import { Square, RotateCcw } from 'lucide-react';
 
 interface TimerProps {
-  duration: number;
+  initialDuration: number;
   onComplete: () => void;
-  id: string;
 }
 
-export const Timer: React.FC<TimerProps> = ({ duration, onComplete, id }) => {
-  const [timeLeft, setTimeLeft] = useState(duration);
+export const Timer: React.FC<TimerProps> = ({ initialDuration, onComplete }) => {
+  const [timeLeft, setTimeLeft] = useState(initialDuration);
   const [isRunning, setIsRunning] = useState(true);
   const [isCompleted, setIsCompleted] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout>();
-  const audioUrl = "https://firebasestorage.googleapis.com/v0/b/deepworkai-c3419.appspot.com/o/ios-17-ringtone-tilt-gg8jzmiv_pUhS32fz.mp3?alt=media&token=a0a522e0-8a49-408a-9dfe-17e41d3bc801";
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    // Create audio element
+    audioRef.current = new Audio('https://assets.mixkit.co/sfx/preview/mixkit-alarm-digital-clock-beep-989.mp3');
+    
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!isRunning || isCompleted) {
@@ -30,9 +41,9 @@ export const Timer: React.FC<TimerProps> = ({ duration, onComplete, id }) => {
           }
           setIsCompleted(true);
           setIsRunning(false);
-          // Play sound
-          const audio = new Audio(audioUrl);
-          audio.play().catch(console.error);
+          if (audioRef.current) {
+            audioRef.current.play().catch(console.error);
+          }
           onComplete();
           return 0;
         }
@@ -54,7 +65,7 @@ export const Timer: React.FC<TimerProps> = ({ duration, onComplete, id }) => {
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
     }
-    setTimeLeft(duration);
+    setTimeLeft(initialDuration);
     setIsRunning(false);
     setIsCompleted(false);
   };
@@ -69,20 +80,14 @@ export const Timer: React.FC<TimerProps> = ({ duration, onComplete, id }) => {
     onComplete();
   };
 
-  const toggleTimer = () => {
-    if (isCompleted) return;
-    setIsRunning(!isRunning);
-  };
-
   return (
-    <div className="flex items-center space-x-2 bg-gray-900 rounded-lg px-4 py-2">
-      <TimerIcon className="w-5 h-5 text-blue-400" />
+    <div className="flex items-center space-x-2">
       <span className="font-mono text-lg text-blue-300">
         {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
       </span>
       <div className="flex space-x-2">
         <button
-          onClick={toggleTimer}
+          onClick={() => setIsRunning(!isRunning)}
           disabled={isCompleted}
           className="text-xs px-2 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >

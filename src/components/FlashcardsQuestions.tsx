@@ -18,7 +18,7 @@ interface Question {
 
 interface FlashcardsQuestionsProps {
   type: 'flashcard' | 'question';
-  data: Flashcard | Question;
+  data: Flashcard[] | Question[];
   onComplete: () => void;
 }
 
@@ -27,6 +27,7 @@ export const FlashcardsQuestions: React.FC<FlashcardsQuestionsProps> = ({
   data,
   onComplete,
 }) => {
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [showExplanation, setShowExplanation] = useState(false);
@@ -36,7 +37,7 @@ export const FlashcardsQuestions: React.FC<FlashcardsQuestionsProps> = ({
   };
 
   const handleOptionSelect = (index: number) => {
-    if (selectedAnswer !== null) return; // Prevent changing answer after selection
+    if (selectedAnswer !== null) return;
     setSelectedAnswer(index);
     setShowExplanation(true);
   };
@@ -47,11 +48,32 @@ export const FlashcardsQuestions: React.FC<FlashcardsQuestionsProps> = ({
     setShowExplanation(false);
   };
 
+  const handleNext = () => {
+    if (currentIndex < data.length - 1) {
+      setCurrentIndex(currentIndex + 1);
+      resetCard();
+    }
+  };
+
+  const handlePrevious = () => {
+    if (currentIndex > 0) {
+      setCurrentIndex(currentIndex - 1);
+      resetCard();
+    }
+  };
+
+  const currentItem = data[currentIndex];
+
   if (type === 'flashcard') {
-    const flashcard = data as Flashcard;
+    const flashcard = currentItem as Flashcard;
     return (
       <div className="bg-gray-800 rounded-xl p-6 max-w-xl w-full">
-        <div className="mb-3 text-blue-300 text-sm">Topic: {flashcard.topic}</div>
+        <div className="flex justify-between items-center mb-3">
+          <div className="text-blue-300 text-sm">Topic: {flashcard.topic}</div>
+          <div className="text-gray-400 text-sm">
+            {currentIndex + 1} / {data.length}
+          </div>
+        </div>
         <div
           className={`relative min-h-[200px] cursor-pointer perspective-1000`}
           onClick={handleFlip}
@@ -77,7 +99,15 @@ export const FlashcardsQuestions: React.FC<FlashcardsQuestionsProps> = ({
             </div>
           </div>
         </div>
-        <div className="mt-4 flex justify-center space-x-4">
+        <div className="mt-4 flex justify-between items-center">
+          <button
+            onClick={handlePrevious}
+            disabled={currentIndex === 0}
+            className="text-sm px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            Previous
+          </button>
           <button
             onClick={resetCard}
             className="text-sm px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white transition-colors flex items-center gap-2"
@@ -85,15 +115,28 @@ export const FlashcardsQuestions: React.FC<FlashcardsQuestionsProps> = ({
             <RotateCcw className="w-4 h-4" />
             Reset
           </button>
+          <button
+            onClick={handleNext}
+            disabled={currentIndex === data.length - 1}
+            className="text-sm px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            Next
+            <ChevronRight className="w-4 h-4" />
+          </button>
         </div>
       </div>
     );
   }
 
   // Quiz Question
-  const quiz = data as Question;
+  const quiz = currentItem as Question;
   return (
     <div className="bg-gray-800 rounded-xl p-6 max-w-xl w-full">
+      <div className="flex justify-end mb-3">
+        <div className="text-gray-400 text-sm">
+          {currentIndex + 1} / {data.length}
+        </div>
+      </div>
       <div className="mb-6">
         <p className="text-white text-lg mb-4">{quiz.question}</p>
         <div className="space-y-3">
@@ -132,13 +175,29 @@ export const FlashcardsQuestions: React.FC<FlashcardsQuestionsProps> = ({
           <p className="text-white">{quiz.explanation}</p>
         </div>
       )}
-      <div className="mt-4 flex justify-center space-x-4">
+      <div className="mt-4 flex justify-between items-center">
+        <button
+          onClick={handlePrevious}
+          disabled={currentIndex === 0}
+          className="text-sm px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+        >
+          <ChevronLeft className="w-4 h-4" />
+          Previous
+        </button>
         <button
           onClick={resetCard}
           className="text-sm px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white transition-colors flex items-center gap-2"
         >
           <RotateCcw className="w-4 h-4" />
           Try Again
+        </button>
+        <button
+          onClick={handleNext}
+          disabled={currentIndex === data.length - 1}
+          className="text-sm px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+        >
+          Next
+          <ChevronRight className="w-4 h-4" />
         </button>
       </div>
     </div>

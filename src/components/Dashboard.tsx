@@ -373,7 +373,7 @@ CRITICAL RESPONSE GUIDELINES:
 8. FORBIDDEN: Using phrases like "Based on the context" or "According to the information"
 
 EDUCATIONAL CONTENT GENERATION:
-When the user requests learning materials or study aids, you can generate:
+When the user requests learning materials or study aids, you SHOULD generate:
 
 1. Flashcards:
    - Create when user wants to memorize concepts
@@ -426,7 +426,6 @@ Response Format:
    \`\`\`
 
 You can use Markdown formatting, including:
-- Math equations using LaTeX syntax (e.g., $E = mc^2$)
 - Lists and bullet points
 - Code blocks with syntax highlighting
 - Tables
@@ -1181,7 +1180,8 @@ return (
             <h3 className="text-lg font-semibold text-blue-300 flex items-center">
               <MessageCircle className="w-5 h-5 mr-2" />
               Chat with TaskMaster
-              <span className="ml-2 text-xs bg-gradient-to-r from-pink-500 to-purple-500 text-white-300 px-2 py-0.5 rounded-full">BETA</span>
+              <span className="ml-2 text-xs bg-gradient-to-r from-pink-500 to-purple-500 text-gray-300 px-2 py-0.5 rounded-full">BETA</span>
+              <span className="ml-2 text-xs bg-blue text-gray-300 px-2 py-0.5 rounded-full">Chat history is not saved.</span>
             </h3>
             <button
               onClick={() => setIsChatModalOpen(false)}

@@ -75,19 +75,22 @@ interface QuestionData {
 
 interface FlashcardMessage {
   type: 'flashcard';
-  data: FlashcardData;
+  data: FlashcardData[];
 }
 
 interface QuestionMessage {
   type: 'question';
-  data: QuestionData;
+  data: QuestionData[];
 }
 
 interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   timer?: TimerMessage;
+  flashcard?: FlashcardMessage;
+  question?: QuestionMessage;
 }
+
 
 // ---------------------
 // CHAT MODAL (NEW AI CHAT FUNCTIONALITY)

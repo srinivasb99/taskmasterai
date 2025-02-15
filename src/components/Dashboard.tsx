@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef } from 'react';
 import { Navigate } from 'react-router-dom';
 import {
@@ -374,7 +373,7 @@ CRITICAL RESPONSE GUIDELINES:
 8. FORBIDDEN: Using phrases like "Based on the context" or "According to the information"
 
 EDUCATIONAL CONTENT GENERATION:
-When the user requests learning materials or study aids, you can generate:
+When the user requests learning materials or study aids, you SHOULD generate:
 
 1. Flashcards:
    - Create when user wants to memorize concepts
@@ -427,7 +426,6 @@ Response Format:
    \`\`\`
 
 You can use Markdown formatting, including:
-- Math equations using LaTeX syntax (e.g., $E = mc^2$)
 - Lists and bullet points
 - Code blocks with syntax highlighting
 - Tables
@@ -1174,7 +1172,8 @@ return (
   )}
 </div>
 
-  {isChatModalOpen && (
+   {/* Chat Modal */}
+    {isChatModalOpen && (
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
         <div className="bg-gray-800 rounded-xl w-full max-w-2xl mx-4 max-h-[80vh] flex flex-col">
           <div className="p-4 border-b border-gray-700 flex justify-between items-center">
@@ -1238,7 +1237,7 @@ return (
                     <div className="mt-2">
                       <FlashcardsQuestions
                         type="flashcard"
-                        data={message.flashcard.data}
+                        data={[message.flashcard.data]}
                         onComplete={() => {}}
                       />
                     </div>
@@ -1247,7 +1246,7 @@ return (
                     <div className="mt-2">
                       <FlashcardsQuestions
                         type="question"
-                        data={message.question.data}
+                        data={[message.question.data]}
                         onComplete={() => {}}
                       />
                     </div>
@@ -1289,7 +1288,6 @@ return (
         </div>
       </div>
     )}
-
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
           <div className="flex flex-col gap-6">

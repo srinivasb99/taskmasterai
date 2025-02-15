@@ -1,5 +1,4 @@
 
-
 import React, { useEffect, useState, useRef } from 'react';
 import { Navigate } from 'react-router-dom';
 import {
@@ -698,11 +697,9 @@ return (
             "{quote.text}" - <span className="text-purple-400">{quote.author}</span>
           </p>
         </header>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 {/* Smart Overview Card */}
-<div
-  className={`bg-gray-800 rounded-xl p-6 relative min-h-[200px] transform transition-all duration-500 ease-out ${cardVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'} hover:shadow-lg hover:shadow-purple-500/10`}
->
+<div className={`bg-gray-800 rounded-xl p-6 relative min-h-[200px] transform transition-all duration-500 ease-out ${cardVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'} hover:shadow-lg hover:shadow-purple-500/10`}>
   <div className="flex items-center mb-4">
     <h2 className="text-xl font-semibold text-blue-300 mr-2 flex items-center">
       <Sparkles className="w-5 h-5 mr-2 text-yellow-400" />
@@ -718,6 +715,9 @@ return (
     <span className="text-xs bg-gradient-to-r from-pink-500 to-purple-500 text-white px-3 py-1 rounded-full font-medium ml-2">
       BETA
     </span>
+    <span className="text-xs text-gray-400">
+      TaskMaster can make mistakes. Verify details.
+    </span>
   </div>
 
   {overviewLoading ? (
@@ -727,15 +727,10 @@ return (
       <div className="h-4 bg-gray-700 rounded-full w-4/5 animate-pulse delay-150"></div>
     </div>
   ) : (
-    <>
-      <div
-        className="text-sm text-gray-300 prose prose-invert"
-        dangerouslySetInnerHTML={{ __html: smartOverview }}
-      />
-      <div className="text-center mt-4 text-xs text-gray-400">
-        TaskMaster can make mistakes. Verify details.
-      </div>
-    </>
+    <div 
+      className="text-sm text-gray-300 prose prose-invert"
+      dangerouslySetInnerHTML={{ __html: smartOverview }}
+    />
   )}
 </div>
 

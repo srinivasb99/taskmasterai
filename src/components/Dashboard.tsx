@@ -8,10 +8,16 @@ import {
   CheckCircle,
   MessageCircle,
   X,
+  Timer as TimerIcon,
   Send,
 } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { getTimeBasedGreeting, getRandomQuote } from '../lib/greetings';
+import ReactMarkdown from 'react-markdown';
+import remarkMath from 'remark-math';
+import remarkGfm from 'remark-gfm';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
 import {
   onFirebaseAuthStateChanged,
   onCollectionSnapshot,
@@ -40,13 +46,25 @@ const [quote, setQuote] = useState(getRandomQuote());
 const [greeting, setGreeting] = useState(getTimeBasedGreeting());
 
 // ---------------------
+// Types for timer messages
+interface TimerMessage {
+  type: 'timer';
+  duration: number;
+  id: string;
+}
+
+interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  timer?: TimerMessage;
+}
+
+// ---------------------
 // CHAT MODAL (NEW AI CHAT FUNCTIONALITY)
 // ---------------------
 const [isChatModalOpen, setIsChatModalOpen] = useState(false);
 const [chatMessage, setChatMessage] = useState('');
-const [chatHistory, setChatHistory] = useState<
-  Array<{ role: 'user' | 'assistant'; content: string }>
->([
+const [chatHistory, setChatHistory] = useState<ChatMessage[]>([
   {
     role: 'assistant',
     content: "👋 Hi I'm TaskMaster, How can I help you today? Need help with your items? Simply ask me!"
@@ -55,6 +73,36 @@ const [chatHistory, setChatHistory] = useState<
 const [isChatLoading, setIsChatLoading] = useState(false);
 const chatEndRef = useRef<HTMLDivElement>(null);
 
+// Timer handling functions
+const handleTimerComplete = (timerId: string) => {
+  setChatHistory(prev => [
+    ...prev,
+    {
+      role: 'assistant',
+      content: "⏰ Time's up! Your timer has finished."
+    }
+  ]);
+};
+
+const parseTimerRequest = (message: string): number | null => {
+  const timeRegex = /(\d+)\s*(minutes?|mins?|hours?|hrs?|seconds?|secs?)/i;
+  const match = message.match(timeRegex);
+  
+  if (!match) return null;
+  
+  const amount = parseInt(match[1]);
+  const unit = match[2].toLowerCase();
+  
+  if (unit.startsWith('hour') || unit.startsWith('hr')) {
+    return amount * 3600;
+  } else if (unit.startsWith('min')) {
+    return amount * 60;
+  } else if (unit.startsWith('sec')) {
+    return amount;
+  }
+  
+  return null;
+};
 
 // Whenever chatHistory changes, scroll to the bottom of the chat
 useEffect(() => {
@@ -67,7 +115,6 @@ useEffect(() => {
 const formatItemsForChat = () => {
   const lines: string[] = [];
 
-  // Example: tasks, goals, etc. are in your state: tasks, goals, projects, plans
   lines.push(`${userName}'s items:\n`);
 
   tasks.forEach((t) => {
@@ -106,25 +153,86 @@ const formatItemsForChat = () => {
   return lines.join('\n');
 };
 
+// Timer component inline
+const InlineTimer = ({ duration, onComplete, id }: { duration: number; onComplete: () => void; id: string }) => {
+  const [timeLeft, setTimeLeft] = useState(duration);
+  const [isRunning, setIsRunning] = useState(true);
+
+  useEffect(() => {
+    if (!isRunning) return;
+
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          onComplete();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [isRunning, onComplete]);
+
+  const minutes = Math.floor(timeLeft / 60);
+  const seconds = timeLeft % 60;
+
+  return (
+    <div className="flex items-center space-x-2 bg-gray-900 rounded-lg px-4 py-2">
+      <TimerIcon className="w-5 h-5 text-blue-400" />
+      <span className="font-mono text-lg text-blue-300">
+        {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
+      </span>
+      <button
+        onClick={() => setIsRunning(!isRunning)}
+        className="text-xs px-2 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+      >
+        {isRunning ? 'Pause' : 'Resume'}
+      </button>
+    </div>
+  );
+};
+
 // NEW handleChatSubmit that calls Hugging Face
 const handleChatSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
   if (!chatMessage.trim()) return;
 
-  // 1. Add user's message to chat
-  const userMsg = { role: 'user' as const, content: chatMessage };
-  setChatHistory((prev) => [...prev, userMsg]);
+  // Check for timer request
+  const timerDuration = parseTimerRequest(chatMessage);
+  const userMsg: ChatMessage = { 
+    role: 'user',
+    content: chatMessage
+  };
+  
+  setChatHistory(prev => [...prev, userMsg]);
   setChatMessage('');
 
-  // 2. Build conversation context
-  // We'll combine prior assistant/user lines + the user's items
-  // for a more "aware" conversation about tasks, goals, etc.
+  // If it's a timer request, add timer immediately
+  if (timerDuration) {
+    const timerId = Math.random().toString(36).substr(2, 9);
+    setChatHistory(prev => [
+      ...prev,
+      {
+        role: 'assistant',
+        content: `Starting a timer for ${timerDuration} seconds.`,
+        timer: {
+          type: 'timer',
+          duration: timerDuration,
+          id: timerId
+        }
+      }
+    ]);
+    return;
+  }
+
+  // Regular chat processing
   const conversation = chatHistory
     .map((m) => `${m.role === 'user' ? userName : 'Assistant'}: ${m.content}`)
     .join('\n');
-  const itemsText = formatItemsForChat(); // Gather tasks, etc.
+  const itemsText = formatItemsForChat();
 
-  // Get current date and time
   const now = new Date();
   const currentDateTime = {
     date: now.toLocaleDateString('en-US', {
@@ -166,11 +274,16 @@ CRITICAL RESPONSE GUIDELINES:
 7. FORBIDDEN: Explaining what you're about to do
 8. FORBIDDEN: Using phrases like "Based on the context" or "According to the information"
 
+You can use Markdown formatting, including:
+- Math equations using LaTeX syntax (e.g., $E = mc^2$)
+- Lists and bullet points
+- Code blocks with syntax highlighting
+- Tables
+- Bold and italic text
+
 Simply provide clear, direct responses as if you're having a natural conversation. Focus on ${userName}'s needs and their items.
 `;
 
-
-  // 3. Call Hugging Face to get the AI's response
   setIsChatLoading(true);
   try {
     const response = await fetch(
@@ -189,7 +302,6 @@ Simply provide clear, direct responses as if you're having a natural conversatio
             top_p: 0.9,
             return_full_text: false,
             repetition_penalty: 1.2,
-            return_full_text: false,
             do_sample: true,
           },
         }),
@@ -199,14 +311,11 @@ Simply provide clear, direct responses as if you're having a natural conversatio
     if (!response.ok) throw new Error('Chat API request failed');
     const result = await response.json();
 
-    // 4. Extract the model's text from the result
     const rawText = (result[0]?.generated_text as string) || '';
-    // Optionally, do a quick cleanup
     const assistantReply = rawText
       .replace(/\[\/?INST\]|<</g, '')
       .trim();
 
-    // 5. Add assistant's reply to chat
     setChatHistory((prev) => [
       ...prev,
       { role: 'assistant', content: assistantReply },
@@ -889,74 +998,104 @@ return (
 </div>
 
     {/* Chat Modal */}
-{isChatModalOpen && (
-  <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
-    <div className="bg-gray-800 rounded-xl w-full max-w-2xl mx-4 max-h-[80vh] flex flex-col">
-      <div className="p-4 border-b border-gray-700 flex justify-between items-center">
-        <h3 className="text-lg font-semibold text-blue-300 flex items-center">
-          <MessageCircle className="w-5 h-5 mr-2" />
-          Chat with TaskMaster
-          <span className="ml-2 text-xs bg-gradient-to-r from-pink-500 to-purple-500 text-white-300 px-2 py-0.5 rounded-full">BETA</span>
-        </h3>
-        <button
-          onClick={() => setIsChatModalOpen(false)}
-          className="text-gray-400 hover:text-gray-200 transition-colors"
-        >
-          <X className="w-5 h-5" />
-        </button>
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={chatEndRef}>
-        {chatHistory.map((message, index) => (
-          <div
-            key={index}
-            className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
-            <div
-              className={`max-w-[80%] rounded-lg px-4 py-2 ${
-                message.role === 'user'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-700 text-gray-200'
-              }`}
+    {isChatModalOpen && (
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
+        <div className="bg-gray-800 rounded-xl w-full max-w-2xl mx-4 max-h-[80vh] flex flex-col">
+          <div className="p-4 border-b border-gray-700 flex justify-between items-center">
+            <h3 className="text-lg font-semibold text-blue-300 flex items-center">
+              <MessageCircle className="w-5 h-5 mr-2" />
+              Chat with TaskMaster
+              <span className="ml-2 text-xs bg-gradient-to-r from-pink-500 to-purple-500 text-white-300 px-2 py-0.5 rounded-full">BETA</span>
+            </h3>
+            <button
+              onClick={() => setIsChatModalOpen(false)}
+              className="text-gray-400 hover:text-gray-200 transition-colors"
             >
-              {message.content}
-            </div>
+              <X className="w-5 h-5" />
+            </button>
           </div>
-        ))}
-        {isChatLoading && (
-          <div className="flex justify-start">
-            <div className="bg-gray-700 text-gray-200 rounded-lg px-4 py-2 max-w-[80%]">
-              <div className="flex space-x-2">
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100"></div>
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200"></div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
 
-      <form onSubmit={handleChatSubmit} className="p-4 border-t border-gray-700">
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={chatMessage}
-            onChange={(e) => setChatMessage(e.target.value)}
-            placeholder="Ask TaskMaster about your items..."
-            className="flex-1 bg-gray-700 text-gray-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <button
-            type="submit"
-            disabled={isChatLoading}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Send className="w-5 h-5" />
-          </button>
+          <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={chatEndRef}>
+            {chatHistory.map((message, index) => (
+              <div
+                key={index}
+                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              >
+                <div
+                  className={`max-w-[80%] rounded-lg px-4 py-2 ${
+                    message.role === 'user'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-700 text-gray-200'
+                  }`}
+                >
+                  <ReactMarkdown
+                    remarkPlugins={[remarkMath, remarkGfm]}
+                    rehypePlugins={[rehypeKatex]}
+                    components={{
+                      p: ({ children }) => <p className="mb-2">{children}</p>,
+                      ul: ({ children }) => <ul className="list-disc ml-4 mb-2">{children}</ul>,
+                      ol: ({ children }) => <ol className="list-decimal ml-4 mb-2">{children}</ol>,
+                      li: ({ children }) => <li className="mb-1">{children}</li>,
+                      code: ({ inline, children }) =>
+                        inline ? (
+                          <code className="bg-gray-800 px-1 rounded">{children}</code>
+                        ) : (
+                          <pre className="bg-gray-800 p-2 rounded-lg overflow-x-auto">
+                            <code>{children}</code>
+                          </pre>
+                        ),
+                    }}
+                  >
+                    {message.content}
+                  </ReactMarkdown>
+                  {message.timer && (
+                    <div className="mt-2">
+                      <InlineTimer
+                        duration={message.timer.duration}
+                        onComplete={() => handleTimerComplete(message.timer!.id)}
+                        id={message.timer.id}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+            {isChatLoading && (
+              <div className="flex justify-start">
+                <div className="bg-gray-700 text-gray-200 rounded-lg px-4 py-2 max-w-[80%]">
+                  <div className="flex space-x-2">
+                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100"></div>
+                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200"></div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <form onSubmit={handleChatSubmit} className="p-4 border-t border-gray-700">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={chatMessage}
+                onChange={(e) => setChatMessage(e.target.value)}
+                placeholder="Ask TaskMaster about your items or set a timer..."
+                className="flex-1 bg-gray-700 text-gray-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                type="submit"
+                disabled={isChatLoading}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Send className="w-5 h-5" />
+              </button>
+            </div>
+          </form>
         </div>
-      </form>
-    </div>
-  </div>
-)}
+      </div>
+    )}
+  </>
+);
 
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">

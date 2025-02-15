@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useRef } from 'react';
 import { Navigate } from 'react-router-dom';
 import {
@@ -18,6 +19,7 @@ import { Timer } from './Timer';
 import { FlashcardsQuestions } from './FlashcardsQuestions';
 import { getTimeBasedGreeting, getRandomQuote } from '../lib/greetings';
 import ReactMarkdown from 'react-markdown';
+import remarkMath from 'remark-math';
 import remarkGfm from 'remark-gfm';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
@@ -425,6 +427,7 @@ Response Format:
    \`\`\`
 
 You can use Markdown formatting, including:
+- Math equations using LaTeX syntax (e.g., $E = mc^2$)
 - Lists and bullet points
 - Code blocks with syntax highlighting
 - Tables

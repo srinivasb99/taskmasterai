@@ -1223,14 +1223,16 @@ return (
                     }}
                   >
                     {message.content}
-                  </ReactMarkdown>
-                  {message.timer && (
-                    <div className="mt-2">
-                      <InlineTimer
-                        duration={message.timer.duration}
-                        onComplete={() => handleTimerComplete(message.timer!.id)}
-                        id={message.timer.id}
-                      />
+              </ReactMarkdown>
+              {message.timer && (
+                <div className="mt-2">
+                  <div className="flex items-center space-x-2 bg-gray-900 rounded-lg px-4 py-2">
+                    <TimerIcon className="w-5 h-5 text-blue-400" />
+                    <Timer
+                      key={message.timer.id}
+                      initialDuration={message.timer.duration}
+                      onComplete={() => handleTimerComplete(message.timer!.id)}
+                    />
                     </div>
                   )}
                   {message.flashcard && (

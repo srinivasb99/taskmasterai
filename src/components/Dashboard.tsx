@@ -49,7 +49,12 @@ const [userName, setUserName] = useState("Loading...");
 const [quote, setQuote] = useState(getRandomQuote());
 const [greeting, setGreeting] = useState(getTimeBasedGreeting());
 
-const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+ // Collapsible sidebar state
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  // Example toggle function
+  const handleToggleSidebar = () => {
+    setIsSidebarCollapsed((prev) => !prev);
+  };
 
 // ---------------------
 // Types for timer messages
@@ -1052,19 +1057,25 @@ return (
 }
 
 
-  return (
+ return (
     <div className="bg-gray-900 text-white min-h-screen w-full overflow-hidden">
+      {/* Pass collapse state & toggle handler to Sidebar */}
       <Sidebar 
-        userName={userName} 
+        userName={userName}
         isCollapsed={isSidebarCollapsed}
-        onToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+        onToggle={handleToggleSidebar}
       />
-      <main className={`transition-all duration-300 ease-in-out min-h-screen
-        ${isSidebarCollapsed ? 'ml-20' : 'ml-64'} 
-        p-4 lg:p-8 overflow-auto`}>
-        <header className="dashboard-header mb-6 transform transition-all duration-500 ease-out translate-y-0 opacity-100">
+
+      {/* Adjust the main content's left margin depending on sidebar width */}
+      <main
+        className={`transition-all duration-300 ease-in-out min-h-screen
+          ${isSidebarCollapsed ? 'ml-20' : 'ml-64'} 
+          p-4 lg:p-8 overflow-auto`}
+      >
+        <header className="dashboard-header mb-6 transform transition-all duration-500 ease-out">
           <h1 className="text-4xl font-bold mb-2 text-white">
-            {greeting.emoji} {greeting.greeting}, <span className="font-bold">{userName || "Loading..."}</span>
+            {greeting.emoji} {greeting.greeting},{' '}
+            <span className="font-bold">{userName || 'Loading...'}</span>
           </h1>
           <p className="text-gray-400 italic text-lg">
             "{quote.text}" - <span className="text-purple-400">{quote.author}</span>

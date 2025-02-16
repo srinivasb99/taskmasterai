@@ -10,15 +10,19 @@ import {
   Bot,
   Crown,
   CircleUserRound,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react';
 import { Logo } from './Logo';
 import { useLocation } from 'react-router-dom';
 
 interface SidebarProps {
   userName: string;
+  onToggle?: () => void;
+  isCollapsed?: boolean;
 }
 
-export function Sidebar({ userName }: SidebarProps) {
+export function Sidebar({ userName, onToggle, isCollapsed = false }: SidebarProps) {
   const location = useLocation();
 
   // Define the menu items with label, icon component, and path
@@ -34,7 +38,19 @@ export function Sidebar({ userName }: SidebarProps) {
   ];
 
   return (
-    <div className="fixed top-0 left-0 h-full w-64 bg-gray-900 flex flex-col py-6 px-3 font-poppins">
+    <div className="fixed top-0 left-0 h-full w-64 bg-gray-900 flex flex-col py-6 px-3 font-poppins border-r border-gray-800/50">
+      {/* Toggle Button */}
+      <button
+        onClick={onToggle}
+        className="absolute -right-4 top-6 bg-gray-900 p-1.5 rounded-full border border-gray-800/50 text-gray-400 hover:text-white transition-colors z-50"
+      >
+        {isCollapsed ? (
+          <PanelLeftOpen className="w-4 h-4" strokeWidth={2} />
+        ) : (
+          <PanelLeftClose className="w-4 h-4" strokeWidth={2} />
+        )}
+      </button>
+
       {/* Logo Section */}
       <div className="px-4 mb-6">
         <Logo className="w-8 h-8" />

@@ -340,7 +340,7 @@ Follow these instructions strictly.
         body: JSON.stringify({
           inputs: prompt,
           parameters: {
-            max_new_tokens: 4000,
+            max_new_tokens: 3000,
             temperature: 0.5,
             top_p: 0.9,
             return_full_text: false,

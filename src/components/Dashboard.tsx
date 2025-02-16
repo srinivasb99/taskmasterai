@@ -266,12 +266,13 @@ Guidelines:
    - Do not include any internal instructions, meta commentary, or explanations of your process.
    - Do not include any introductory or meta phrases such as "Here's my response to continue the conversation:" or similar wording.
    - Reference ${userName}'s items only when ${userName} explicitly asks about them.
+   - Do not include any extraneous content, code blocks, or language identifiers (e.g. \`\`\`python or \`\`\`bash) unless explicitly requested.
 
 2. Educational Content (JSON):
    - If ${userName} explicitly requests educational content (flashcards or quiz questions), reply with exactly one JSON object.
    - The JSON must be provided in a single code block with triple backticks and the "json" language identifier.
    - Use one of the following formats:
-   
+
 3. JSON FORMATS:
    For flashcards:
    {
@@ -317,10 +318,10 @@ Guidelines:
    - Ensure the JSON is complete, valid, and always contains multiple items in the "data" array.
 
 4. Response Structure:
-   - Provide a conversational response to ${userName}
+   - Provide a conversational response directly to ${userName} without any additional introductory or extraneous phrases.
    - Do not mix JSON with regular text.
    - Avoid any phrases that indicate internal processing or introduce your response.
-   - ALWAYS answer to ${userName}
+   - ALWAYS answer directly to ${userName}.
 
 Follow these instructions strictly.
 `;

@@ -347,7 +347,7 @@ FORBIDDEN IN YOUR FINAL RESPONSE:
         body: JSON.stringify({
           inputs: prompt,
           parameters: {
-            max_new_tokens: 4000,
+            max_new_tokens: 2000,
             temperature: 0.5,
             top_p: 0.9,
             return_full_text: false,
@@ -671,7 +671,7 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
           body: JSON.stringify({
             inputs: prompt,
             parameters: {
-              max_new_tokens: 300,
+              max_new_tokens: 1000,
               temperature: 0.7,
               top_p: 0.9,
               repetition_penalty: 1.2,

@@ -641,6 +641,13 @@ Follow these guidelines exactly:
    - If the item has a due date, mention it
    - Provide ONE specific, actionable next step or strategy
    - Focus on HOW to achieve the item, not just restating it
+
+FORBIDDEN IN YOUR FINAL RESPONSE:
+- Meta-commentary about the conversation
+- Phrases like "I understand", "I see", "I notice"
+- Explaining what you're about to do
+- Using phrases like "Based on the context"
+
 Remember: Focus on actionable strategies and specific next steps, not just describing the items.
 <</SYS>>[/INST]`;
 
@@ -1025,22 +1032,17 @@ return (
 
 
   return (
-<div className="bg-gray-900 text-white min-h-screen w-full overflow-hidden">
-  {/* Sidebar - hidden on mobile */}
-  <div className="hidden lg:block">
-    <Sidebar userName={userName} />
-  </div>
-  
-  {/* Main content - full width on mobile, with sidebar margin on desktop */}
-  <main className="w-full lg:ml-64 p-4 lg:p-8 overflow-auto h-screen">
-    <header className="dashboard-header mb-6 transform transition-all duration-500 ease-out translate-y-0 opacity-100">
-      <h1 className="text-3xl lg:text-4xl font-bold mb-2 text-white">
-        {greeting.emoji} {greeting.greeting}, <span className="font-bold">{userName || "Loading..."}</span>
-      </h1>
-      <p className="text-gray-400 italic text-base lg:text-lg">
-        "{quote.text}" - <span className="text-purple-400">{quote.author}</span>
-      </p>
-    </header>
+    <div className="bg-gray-900 text-white min-h-screen w-full overflow-hidden">
+      <Sidebar userName={userName} />
+      <main className="ml-64 p-8 overflow-auto h-screen">
+        <header className="dashboard-header mb-6 transform transition-all duration-500 ease-out translate-y-0 opacity-100">
+          <h1 className="text-4xl font-bold mb-2 text-white">
+            {greeting.emoji} {greeting.greeting}, <span className="font-bold">{userName || "Loading..."}</span>
+          </h1>
+          <p className="text-gray-400 italic text-lg">
+            "{quote.text}" - <span className="text-purple-400">{quote.author}</span>
+          </p>
+        </header>
 
 {/* Smart Overview Card */}
 <div

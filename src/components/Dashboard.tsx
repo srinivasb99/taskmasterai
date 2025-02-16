@@ -347,12 +347,13 @@ FORBIDDEN IN YOUR FINAL RESPONSE:
         body: JSON.stringify({
           inputs: prompt,
           parameters: {
-            max_new_tokens: 3000,
+            max_new_tokens: 4000,
             temperature: 0.5,
             top_p: 0.9,
             return_full_text: false,
-            repetition_penalty: 1.2,
+            repetition_penalty: 1.3,
             do_sample: true,
+            presence_penalty: 0.7
           },
         }),
       }
@@ -676,7 +677,8 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
               top_p: 0.85,
               repetition_penalty: 1.2,
               return_full_text: false,
-              do_sample: true
+              do_sample: true,
+              presence_penalty: 0.8
             }
           }),
         });

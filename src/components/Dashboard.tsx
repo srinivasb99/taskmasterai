@@ -263,14 +263,15 @@ Guidelines:
 
 1. General Conversation:
    - Respond in a friendly, natural tone that matches ${userName}'s style.
-   - Do not include internal instructions, meta commentary, or explanations of your process.
+   - Do not include any internal instructions, meta commentary, or explanations of your process.
+   - Do not include any introductory or meta phrases such as "Here's my response to continue the conversation:" or similar wording.
    - Reference ${userName}'s items only when the user explicitly asks about them.
 
 2. Educational Content (JSON):
    - If ${userName} explicitly requests educational content (flashcards or quiz questions), reply with exactly one JSON object.
    - The JSON must be provided in a single code block with triple backticks and the "json" language identifier.
    - Use one of the following formats:
-
+   
 3. JSON FORMATS:
    For flashcards:
    {
@@ -318,7 +319,7 @@ Guidelines:
 4. Response Structure:
    - Provide natural, conversational responses.
    - Do not mix JSON with regular text.
-   - Avoid phrases that explain your internal process or instructions.
+   - Avoid any phrases that indicate internal processing or introduce your response.
 
 Follow these instructions strictly.
 `;
@@ -625,30 +626,30 @@ Follow these instructions strictly.
       setLastGeneratedData(formattedData);
 
       try {
-        // 3. Construct AI prompt
-// 3. Construct AI prompt
-const prompt = `[INST] <<SYS>>
+       // 3. Construct AI prompt
+        const prompt = `[INST] <<SYS>>
 You are TaskMaster, an advanced AI productivity assistant. Analyze the following items and generate a Smart Overview:
 
 ${formattedData}
 
 Follow these guidelines exactly:
-1. Begin with "Hello ${userName}," followed by a very brief one-sentence overview summarizing the items provided.
-2. List exactly 3 actionable priorities derived solely from the items above.
+1. Start with "Hello ${userName}," followed by a VERY brief overview of what exists (1 sentence max)
+2. List EXACTLY 3 actionable priorities based ONLY on the actual items shown above
 3. For each priority:
-   - Start with a number (1., 2., 3.).
-   - Reference specific items from the data; if an item has a due date, include it.
-   - Provide ONE specific, actionable next step or strategy focused on HOW to accomplish the priority.
-   - Do not merely restate the item details.
+   - Start with a number (1., 2., 3.)
+   - Reference specific items from the data
+   - If the item has a due date, mention it
+   - Provide ONE specific, actionable next step or strategy
+   - Focus on HOW to achieve the item, not just restating it
 
 FORBIDDEN IN YOUR FINAL RESPONSE:
-- Meta-commentary or internal processing details.
-- Phrases such as "I understand", "I see", "I notice", or any explanation of your process.
-- Phrases like "Based on the context".
+- Meta-commentary about the conversation
+- Phrases like "I understand", "I see", "I notice"
+- Explaining what you're about to do
+- Using phrases like "Based on the context"
 
-Focus strictly on generating actionable strategies and specific next steps.
+Remember: Focus on actionable strategies and specific next steps, not just describing the items.
 <</SYS>>[/INST]`;
-
 
         // 4. Call Hugging Face API
         const response = await fetch("https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct", {
@@ -660,10 +661,10 @@ Focus strictly on generating actionable strategies and specific next steps.
           body: JSON.stringify({
             inputs: prompt,
             parameters: {
-              max_new_tokens: 1000,
-              temperature: 0.3,
-              top_p: 0.9,
-              repetition_penalty: 1.5,
+              max_new_tokens: 500,
+              temperature: 0.4,
+              top_p: 0.85,
+              repetition_penalty: 1.1,
               return_full_text: false,
               do_sample: true,
               presence_penalty: 0.1

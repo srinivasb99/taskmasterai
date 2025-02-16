@@ -626,29 +626,29 @@ Follow these instructions strictly.
 
       try {
         // 3. Construct AI prompt
-        const prompt = `[INST] <<SYS>>
+// 3. Construct AI prompt
+const prompt = `[INST] <<SYS>>
 You are TaskMaster, an advanced AI productivity assistant. Analyze the following items and generate a Smart Overview:
 
 ${formattedData}
 
 Follow these guidelines exactly:
-1. Start with "Hello ${userName}," followed by a VERY brief overview of what exists (1 sentence max)
-2. List EXACTLY 3 actionable priorities based ONLY on the actual items shown above
+1. Begin with "Hello ${userName}," followed by a very brief one-sentence overview summarizing the items provided.
+2. List exactly 3 actionable priorities derived solely from the items above.
 3. For each priority:
-   - Start with a number (1., 2., 3.)
-   - Reference specific items from the data
-   - If the item has a due date, mention it
-   - Provide ONE specific, actionable next step or strategy
-   - Focus on HOW to achieve the item, not just restating it
+   - Start with a number (1., 2., 3.).
+   - Reference specific items from the data; if an item has a due date, include it.
+   - Provide ONE specific, actionable next step or strategy focused on HOW to accomplish the priority.
+   - Do not merely restate the item details.
 
 FORBIDDEN IN YOUR FINAL RESPONSE:
-- Meta-commentary about the conversation
-- Phrases like "I understand", "I see", "I notice"
-- Explaining what you're about to do
-- Using phrases like "Based on the context"
+- Meta-commentary or internal processing details.
+- Phrases such as "I understand", "I see", "I notice", or any explanation of your process.
+- Phrases like "Based on the context".
 
-Remember: Focus on actionable strategies and specific next steps, not just describing the items.
+Focus strictly on generating actionable strategies and specific next steps.
 <</SYS>>[/INST]`;
+
 
         // 4. Call Hugging Face API
         const response = await fetch("https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct", {
@@ -663,7 +663,7 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
               max_new_tokens: 1000,
               temperature: 0.3,
               top_p: 0.9,
-              repetition_penalty: 1.2,
+              repetition_penalty: 1.5,
               return_full_text: false,
               do_sample: true,
               presence_penalty: 0.1

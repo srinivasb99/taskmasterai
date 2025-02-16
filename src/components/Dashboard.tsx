@@ -672,88 +672,101 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
           }),
         });
 
-        if (!response.ok) throw new Error("API request failed");
+if (!response.ok) throw new Error("API request failed");
 
-        // 5. Process and clean response
-        const result = await response.json();
-        const rawText = result[0]?.generated_text || '';
+// 5. Process and clean response
+const result = await response.json();
+const rawText = result[0]?.generated_text || '';
 
-        // 6. Clean and validate
-        const cleanAndValidate = (text: string) => {
-          // Additional filters - phrases to trigger text removal
-          const excludePhrases = [
-            "I see I made some minor errors",
-            "Here is the corrected response",
-            "was removed as per request",
-            "since I am forced to put something here",
-            "-> You are TaskMaster",
-            "The is:",
-            "Note:",
-            "You are TaskMaster, an advanced AI productivity assistant. Analyze the following items and generate a Smart Overview:",
-            "Follow these guidelines exactly:",
-            "- Start with a number"
-          ];
+// 6. Clean and validate
+const cleanAndValidate = (text: string) => {
+  // Additional filters - phrases to trigger text removal
+  const excludePhrases = [
+    "I see I made some minor errors",
+    "Here is the corrected response",
+    "was removed as per request",
+    "since I am forced to put something here",
+    "-> You are TaskMaster",
+    "The is:",
+    "Note:",
+    "You are TaskMaster, an advanced AI productivity assistant. Analyze the following items and generate a Smart Overview:",
+    "Follow these guidelines exactly:",
+    "- Start with a number"
+  ];
 
-          // Remove text after any excluded phrase
-          let cleanedText = text;
-          for (const phrase of excludePhrases) {
-            const index = cleanedText.indexOf(phrase);
-            if (index !== -1) {
-              cleanedText = cleanedText.substring(0, index).trim();
-            }
-          }
+  // Remove text after any excluded phrase
+  let cleanedText = text;
+  for (const phrase of excludePhrases) {
+    const index = cleanedText.indexOf(phrase);
+    if (index !== -1) {
+      cleanedText = cleanedText.substring(0, index).trim();
+    }
+  }
 
-          // Basic cleanup
-          cleanedText = cleanedText
-            .replace(/\[\/?(INST|SYS)\]|<\/?s>|\[\/?(FONT|COLOR)\]/gi, '')
-            .replace(/(\*\*|###|boxed|final answer|step \d+:)/gi, '')
-            .replace(/\$\{.*?\}\$/g, '')
-            .replace(/\[\/?[^\]]+\]/g, '')
-            .replace(/\{.*?\}/g, '')
-            .replace(/📋|📅|🎯|📊/g, '')
-            .replace(/\b(TASKS?|GOALS?|PROJECTS?|PLANS?)\b:/gi, '')
-            .replace(/\n\s*\n/g, '\n');
+  // Basic cleanup
+  cleanedText = cleanedText
+    .replace(/\[\/?(INST|SYS)\]|<\/?s>|\[\/?(FONT|COLOR)\]/gi, '')
+    .replace(/(\*\*|###|boxed|final answer|step \d+:)/gi, '')
+    .replace(/\$\{.*?\}\$/g, '')
+    .replace(/\[\/?[^\]]+\]/g, '')
+    .replace(/\{.*?\}\}/g, '')
+    .replace(/📋|📅|🎯|📊/g, '')
+    .replace(/\b(TASKS?|GOALS?|PROJECTS?|PLANS?)\b:/gi, '')
+    .replace(/\n\s*\n/g, '\n');
 
-          return cleanedText
-            .split('\n')
-            .map(line => line.trim())
-            .filter(line => {
-              // Remove empty lines and lines with only special characters
-              return line.length > 0 && !/^[^a-zA-Z0-9]+$/.test(line);
-            })
-            .join('\n');
-        };
+  // Split cleaned text into lines and filter out empty or irrelevant lines
+  let lines = cleanedText
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line.length > 0 && !/^[^a-zA-Z0-9]+$/.test(line));
 
-        const cleanedText = cleanAndValidate(rawText);
+  // If there are two lines starting with "Hello", remove all lines after the second occurrence
+  let helloCount = 0;
+  const truncatedLines = [];
+  for (const line of lines) {
+    truncatedLines.push(line);
+    if (line.startsWith("Hello")) {
+      helloCount++;
+      if (helloCount === 2) {
+        break;
+      }
+    }
+  }
 
-        // Check for duplicate
-        if (cleanedText === lastResponse) {
-          setOverviewLoading(false);
-          return;
-        }
-        setLastResponse(cleanedText);
+  return truncatedLines.join('\n');
+};
 
-        const cleanTextLines = cleanedText
-          .split('\n')
-          .filter(line => line.length > 0);
+const cleanedText = cleanAndValidate(rawText);
 
-        // 7. Format HTML
-        const formattedHtml = cleanTextLines
-          .map((line, index) => {
-            if (index === 0) {
-              // Greeting
-              return `<div class="text-green-400 text-lg font-medium mb-4">${line}</div>`;
-            } else if (line.match(/^\d+\./)) {
-              // Priority item
-              return `<div class="text-blue-300 mb-3 pl-4 border-l-2 border-blue-500">${line}</div>`;
-            } else {
-              // Other content
-              return `<div class="text-gray-300 mb-3">${line}</div>`;
-            }
-          })
-          .join('');
+// Check for duplicate
+if (cleanedText === lastResponse) {
+  setOverviewLoading(false);
+  return;
+}
+setLastResponse(cleanedText);
 
-        setSmartOverview(formattedHtml);
+const cleanTextLines = cleanedText
+  .split('\n')
+  .filter(line => line.length > 0);
+
+// 7. Format HTML
+const formattedHtml = cleanTextLines
+  .map((line, index) => {
+    if (index === 0) {
+      // Greeting
+      return `<div class="text-green-400 text-lg font-medium mb-4">${line}</div>`;
+    } else if (line.match(/^\d+\./)) {
+      // Priority item
+      return `<div class="text-blue-300 mb-3 pl-4 border-l-2 border-blue-500">${line}</div>`;
+    } else {
+      // Other content
+      return `<div class="text-gray-300 mb-3">${line}</div>`;
+    }
+  })
+  .join('');
+
+setSmartOverview(formattedHtml);
+
 
       } catch (error) {
         console.error("Overview generation error:", error);

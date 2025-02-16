@@ -353,7 +353,7 @@ FORBIDDEN IN YOUR FINAL RESPONSE:
             return_full_text: false,
             repetition_penalty: 1.3,
             do_sample: true,
-            presence_penalty: 0.7
+            presence_penalty: 0.5
           },
         }),
       }
@@ -678,7 +678,7 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
               repetition_penalty: 1.2,
               return_full_text: false,
               do_sample: true,
-              presence_penalty: 0.8
+              presence_penalty: 0.1
             }
           }),
         });

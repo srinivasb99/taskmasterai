@@ -347,7 +347,7 @@ FORBIDDEN IN YOUR FINAL RESPONSE:
         body: JSON.stringify({
           inputs: prompt,
           parameters: {
-            max_new_tokens: 1000,
+            max_new_tokens: 4000,
             temperature: 0.5,
             top_p: 0.9,
             return_full_text: false,
@@ -401,7 +401,7 @@ FORBIDDEN IN YOUR FINAL RESPONSE:
           ...prev,
           { 
             role: 'assistant', 
-            content: 'I apologize, but I encountered an error processing the educational content. Let me try again with a simpler response.\n\n' + assistantReply 
+            content: '' + assistantReply 
           },
         ]);
       }

@@ -38,7 +38,14 @@ export function Sidebar({ userName, onToggle, isCollapsed = false }: SidebarProp
   ];
 
   return (
-    <div className="fixed top-0 left-0 h-full w-64 bg-gray-900 flex flex-col py-6 px-3 font-poppins border-r border-gray-800/50">
+    <div
+      className={`
+        fixed top-0 left-0 h-full bg-gray-900 flex flex-col
+        py-6 px-3 font-poppins border-r border-gray-800/50
+        transition-all duration-300 ease-in-out
+        ${isCollapsed ? 'w-20' : 'w-64'}
+      `}
+    >
       {/* Toggle Button */}
       <button
         onClick={onToggle}
@@ -52,8 +59,13 @@ export function Sidebar({ userName, onToggle, isCollapsed = false }: SidebarProp
       </button>
 
       {/* Logo Section */}
-      <div className="px-4 mb-6">
-        <Logo className="w-8 h-8" />
+      <div className="mb-6 flex items-center justify-center">
+        {/* Hide the text/logos if collapsed; or scale them down—your call */}
+        {!isCollapsed && (
+          <Logo className="w-8 h-8" />
+        )}
+        {/* Optionally, if you want *some* logo in collapsed mode, you could
+            put an alternative small logo or icon here. */}
       </div>
 
       {/* Menu Items */}
@@ -61,34 +73,52 @@ export function Sidebar({ userName, onToggle, isCollapsed = false }: SidebarProp
         {menuItems.map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname === item.path;
+
           return (
             <button
               key={item.label}
               className={`flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 rounded-lg transition-all duration-200
-                ${isActive 
-                  ? 'bg-gray-800/80 text-white font-medium' 
-                  : 'hover:bg-gray-800/50 hover:text-white'
-                }`}
+                ${
+                  isActive
+                    ? 'bg-gray-800/80 text-white font-medium'
+                    : 'hover:bg-gray-800/50 hover:text-white'
+                }
+              `}
             >
               <Icon className="w-4.5 h-4.5" strokeWidth={2} />
-              <span>{item.label}</span>
+              {/* Hide or show the label based on isCollapsed */}
+              {!isCollapsed && <span>{item.label}</span>}
             </button>
           );
         })}
       </div>
 
       {/* Premium Button */}
-      <button className="mt-auto mx-3 mb-4 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-white rounded-lg transition-all duration-200 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 shadow-lg shadow-indigo-500/20">
+      <button
+        className="mt-auto mx-3 mb-4 flex items-center justify-center gap-2 px-4 py-2.5
+          text-sm font-medium text-white rounded-lg
+          transition-all duration-200
+          bg-gradient-to-r from-violet-600 to-indigo-600
+          hover:from-violet-500 hover:to-indigo-500 shadow-lg shadow-indigo-500/20
+        "
+      >
         <Crown className="w-4 h-4" strokeWidth={2} />
-        <span>Upgrade to Premium</span>
+        {!isCollapsed && <span>Upgrade to Premium</span>}
       </button>
 
       {/* User Profile */}
-      <div className="mx-3 flex items-center gap-3 px-4 py-2.5 text-gray-300 rounded-lg hover:bg-gray-800/50 transition-colors">
+      <div
+        className={`mx-3 flex items-center gap-3 px-4 py-2.5 text-gray-300
+          rounded-lg hover:bg-gray-800/50 transition-colors
+          ${isCollapsed ? 'justify-center' : ''} 
+        `}
+      >
         <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-800">
           <CircleUserRound className="w-5 h-5" strokeWidth={2} />
         </div>
-        <span className="text-sm font-medium">{userName || 'Loading...'}</span>
+        {!isCollapsed && (
+          <span className="text-sm font-medium">{userName || 'Loading...'}</span>
+        )}
       </div>
     </div>
   );

@@ -353,9 +353,7 @@ Follow these instructions strictly.
 
      let assistantReply = (result[0]?.generated_text as string || '')
       .replace(/\[\/?INST\]|<</g, '')
-      .replace(/^[•\-]\s.*$/gm, '') // Remove lines starting with bullet points or dashes
       .split('\n')
-      .filter(line => !line.trim().startsWith('•') && !line.trim().startsWith('-')) // Additional filter for bullet points
       .join('\n')
       .trim()
 

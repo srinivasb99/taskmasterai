@@ -1218,7 +1218,7 @@ return (
                   <div className="mb-4">
                     <div className="flex justify-between mb-2">
                       <p>Tasks</p>
-                      <p className="text-blue-400">
+                      <p className="text-green-400">
                         {completedTasks}/{totalTasks}
                       </p>
                     </div>

@@ -273,8 +273,7 @@ const handleChatSubmit = async (e: React.FormEvent) => {
     const controller = new AbortController();
     setAbortController(controller);
   
-  // Check for timer request
-  const timerDuration = parseTimerRequest(chatMessage);
+
   const userMsg: ChatMessage = {
       role: 'user',
       content: chatMessage

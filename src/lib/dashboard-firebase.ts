@@ -8,7 +8,6 @@ import { auth, db } from './firebase';
 export const weatherApiKey = 'e3f77d4d29e24862b4f190231241611';
 export const hfApiKey = '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';
 
-// Add these new interfaces at the top of the file
 interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
@@ -36,32 +35,31 @@ interface ChatMessage {
       explanation: string;
     }>;
   };
+  timestamp?: any; // FirebaseFirestore.Timestamp
 }
 
 interface ChatSession {
   id: string;
   title: string;
   userId: string;
+  messages: ChatMessage[];
   createdAt: any; // FirebaseFirestore.Timestamp
   updatedAt: any; // FirebaseFirestore.Timestamp
-  messages: ChatMessage[];
 }
 
 // Add these new functions after your existing exports
 
 /**
- * Creates a new chat session in Firestore
+ * Creates a new chat session
  */
-export async function createChatSession(
-  userId: string,
-  title: string
-): Promise<string> {
+export async function createChatSession(userId: string, title: string): Promise<string> {
   const docRef = await addDoc(collection(db, 'aichats'), {
     userId,
     title,
     messages: [{
       role: 'assistant',
-      content: "👋 Hi I'm TaskMaster, How can I help you today? Need help with your items? Simply ask me!"
+      content: "👋 Hi I'm TaskMaster, How can I help you today? Need help with your items? Simply ask me!",
+      timestamp: serverTimestamp()
     }],
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
@@ -70,14 +68,20 @@ export async function createChatSession(
 }
 
 /**
- * Updates an existing chat session with new messages
+ * Adds a message to a chat session
  */
-export async function updateChatSession(
+export async function addMessageToChatSession(
   sessionId: string,
-  messages: ChatMessage[]
+  message: Omit<ChatMessage, 'timestamp'>
 ) {
-  await updateDoc(doc(db, 'aichats', sessionId), {
-    messages,
+  const messageWithTimestamp = {
+    ...message,
+    timestamp: serverTimestamp()
+  };
+
+  const sessionRef = doc(db, 'aichats', sessionId);
+  await updateDoc(sessionRef, {
+    messages: arrayUnion(messageWithTimestamp),
     updatedAt: serverTimestamp()
   });
 }
@@ -103,11 +107,11 @@ export async function deleteChatSession(sessionId: string) {
 }
 
 /**
- * Real-time listener for all chat sessions belonging to a user
+ * Gets all chat sessions for a user
  */
 export function onChatSessionsSnapshot(
   userId: string,
-  callback: (sessions: Array<{ id: string; data: ChatSession }>) => void
+  callback: (sessions: ChatSession[]) => void
 ) {
   const q = query(
     collection(db, 'aichats'),
@@ -116,24 +120,24 @@ export function onChatSessionsSnapshot(
   );
 
   return onSnapshot(q, (snapshot) => {
-    const results: Array<{ id: string; data: ChatSession }> = [];
+    const sessions: ChatSession[] = [];
     snapshot.forEach((doc) => {
-      results.push({
+      sessions.push({
         id: doc.id,
-        data: doc.data() as ChatSession
-      });
+        ...doc.data()
+      } as ChatSession);
     });
-    callback(results);
+    callback(sessions);
   });
 }
 
 /**
- * Gets a single chat session by ID
+ * Gets a single chat session
  */
 export async function getChatSession(sessionId: string): Promise<ChatSession | null> {
   const docSnap = await getDoc(doc(db, 'aichats', sessionId));
   if (!docSnap.exists()) return null;
-  return docSnap.data() as ChatSession;
+  return { id: docSnap.id, ...docSnap.data() } as ChatSession;
 }
 
 /**

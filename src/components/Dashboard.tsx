@@ -271,59 +271,56 @@ Guidelines:
    - The JSON must be provided in a single code block with triple backticks and the "json" language identifier.
    - Use one of the following formats:
 
-     For flashcards:
-     ```json
-     {
-       "type": "flashcard",
-       "data": [
-         {
-           "id": "unique-id-1",
-           "question": "Question 1",
-           "answer": "Answer 1",
-           "topic": "Subject area"
-         },
-         {
-           "id": "unique-id-2",
-           "question": "Question 2",
-           "answer": "Answer 2",
-           "topic": "Subject area"
-         }
-       ]
-     }
-     ```
+3. JSON FORMATS:
+   For flashcards:
+   {
+     "type": "flashcard",
+     "data": [
+       {
+         "id": "unique-id-1",
+         "question": "Question 1",
+         "answer": "Answer 1",
+         "topic": "Subject area"
+       },
+       {
+         "id": "unique-id-2",
+         "question": "Question 2",
+         "answer": "Answer 2",
+         "topic": "Subject area"
+       }
+     ]
+   }
 
-     For quiz questions:
-     ```json
-     {
-       "type": "question",
-       "data": [
-         {
-           "id": "unique-id-1",
-           "question": "Question 1",
-           "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
-           "correctAnswer": 0,
-           "explanation": "Explanation 1"
-         },
-         {
-           "id": "unique-id-2",
-           "question": "Question 2",
-           "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
-           "correctAnswer": 1,
-           "explanation": "Explanation 2"
-         }
-       ]
-     }
-     ```
+   For quiz questions:
+   {
+     "type": "question",
+     "data": [
+       {
+         "id": "unique-id-1",
+         "question": "Question 1",
+         "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
+         "correctAnswer": 0,
+         "explanation": "Explanation 1"
+       },
+       {
+         "id": "unique-id-2",
+         "question": "Question 2",
+         "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
+         "correctAnswer": 1,
+         "explanation": "Explanation 2"
+       }
+     ]
+   }
+
    - Do not include any JSON unless explicitly requested.
    - Ensure the JSON is complete, valid, and always contains multiple items in the "data" array.
 
-3. Response Structure:
+4. Response Structure:
    - Provide natural, conversational responses.
    - Do not mix JSON with regular text.
    - Avoid phrases that explain your internal process or instructions.
 
 Follow these instructions strictly.
-
 `;
 
   setIsChatLoading(true);

@@ -4,6 +4,7 @@ import {
   PlusCircle,
   Edit,
   Trash,
+  Trash2,
   Sparkles,
   CheckCircle,
   MessageCircle,

@@ -1056,9 +1056,13 @@ return (
     <div className="bg-gray-900 text-white min-h-screen w-full overflow-hidden">
       <Sidebar 
         userName={userName} 
-        onToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)} 
-        isCollapsed={isSidebarCollapsed} 
+        isCollapsed={isSidebarCollapsed}
+        onToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
       />
+      <main className={`transition-all duration-300 ease-in-out min-h-screen
+        ${isSidebarCollapsed ? 'ml-20' : 'ml-64'} 
+        p-4 lg:p-8 overflow-auto`}
+      >
       <main className="ml-64 p-8 overflow-auto h-screen">
         <header className="dashboard-header mb-6 transform transition-all duration-500 ease-out translate-y-0 opacity-100">
           <h1 className="text-4xl font-bold mb-2 text-white">

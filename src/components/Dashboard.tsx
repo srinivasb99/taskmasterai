@@ -351,11 +351,13 @@ Follow these instructions strictly.
     if (!response.ok) throw new Error('Chat API request failed');
     const result = await response.json();
 
-     let assistantReply = (result[0]?.generated_text as string || '')
-      .replace(/\[\/?INST\]|<</g, '')
-      .split('\n')
-      .join('\n')
-      .trim()
+let assistantReply = (result[0]?.generated_text as string || '')
+  .replace(/\[\/?INST\]|<</g, '')
+  .split('\n')
+  .filter(line => !/^(print|python)/i.test(line.trim()))
+  .join('\n')
+  .trim();
+
 
     // Parse any JSON content in the response
     const jsonMatch = assistantReply.match(/```json\n([\s\S]*?)\n```/);

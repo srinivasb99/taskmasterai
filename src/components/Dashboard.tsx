@@ -347,12 +347,12 @@ FORBIDDEN IN YOUR FINAL RESPONSE:
         body: JSON.stringify({
           inputs: prompt,
           parameters: {
-            max_new_tokens: 2000,
+            max_new_tokens: 6000,
             temperature: 0.5,
-            top_p: 0.9,
+            top_p: 0.85,
             return_full_text: false,
             repetition_penalty: 1.2,
-            do_sample: true,
+            do_sample: false,
           },
         }),
       }

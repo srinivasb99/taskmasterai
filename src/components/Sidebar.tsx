@@ -1,15 +1,15 @@
 import React from 'react';
 import {
-  Home,
+  LayoutDashboard,
   Settings,
-  StickyNote,
-  Calendar,
-  Users,
-  Globe,
-  Zap,
-  Cpu,
-  Gem,
-  User,
+  FileText,
+  CalendarDays,
+  Users2,
+  Globe2,
+  ZapOff,
+  Bot,
+  Crown,
+  CircleUserRound,
 } from 'lucide-react';
 import { Logo } from './Logo';
 import { useLocation } from 'react-router-dom';
@@ -21,58 +21,58 @@ interface SidebarProps {
 export function Sidebar({ userName }: SidebarProps) {
   const location = useLocation();
 
-  // Define the menu items with label, icon component, and path.
+  // Define the menu items with label, icon component, and path
   const menuItems = [
-    { label: 'Dashboard', icon: Home, path: '/dashboard' },
+    { label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
+    { label: 'Notes', icon: FileText, path: '/notes' },
+    { label: 'Calendar', icon: CalendarDays, path: '/calendar' },
+    { label: 'Friends', icon: Users2, path: '/friends' },
+    { label: 'Community', icon: Globe2, path: '/community' },
+    { label: 'Focus Mode', icon: ZapOff, path: '/distraction-control' },
+    { label: 'AI Assistant', icon: Bot, path: '/ai' },
     { label: 'Settings', icon: Settings, path: '/settings' },
-    { label: 'Notes', icon: StickyNote, path: '/notes' },
-    { label: 'Calendar', icon: Calendar, path: '/calendar' },
-    { label: 'Friends', icon: Users, path: '/friends' },
-    { label: 'Community', icon: Globe, path: '/community' },
-    { label: 'Distraction Control', icon: Zap, path: '/distraction-control' },
-    { label: 'AI Chat Bot', icon: Cpu, path: '/ai' },
   ];
 
   return (
-    <div className="sidebar fixed top-0 left-0 h-full w-56 bg-gray-800 flex flex-col p-3 gap-3 rounded-tr-xl rounded-br-xl font-poppins">
-      {/* Logo Container */}
-      <div className="logo-container flex items-center mb-6">
-        <Logo className="mr-2 w-8 h-8" />
-      </div>
-
+    <div className="fixed top-0 left-0 h-full w-64 bg-gray-900 flex flex-col py-6 px-3 font-poppins">
       {/* Menu Items */}
-      <div className="menu flex flex-col gap-2 flex-grow">
+      <div className="flex flex-col gap-1.5">
         {menuItems.map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname === item.path;
           return (
             <button
               key={item.label}
-              className={`flex items-center gap-2 px-3 py-2 text-white rounded-full transition-transform duration-300 transform hover:scale-105 hover:bg-gray-700 ${
-                isActive ? 'bg-gray-700' : ''
-              }`}
+              className={`flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 rounded-lg transition-all duration-200
+                ${isActive 
+                  ? 'bg-gray-800/80 text-white font-medium' 
+                  : 'hover:bg-gray-800/50 hover:text-white'
+                }`}
             >
-              <Icon className="w-4 h-4" />
+              <Icon className="w-4.5 h-4.5" strokeWidth={2} />
               <span>{item.label}</span>
             </button>
           );
         })}
-
-        {/* Upgrade to Premium Button */}
-        <button
-          className="flex items-center gap-2 px-3 py-2 text-white rounded-full transition-transform duration-300 transform hover:scale-105 bg-gradient-to-r from-indigo-500 to-purple-500 font-semibold"
-        >
-          <Gem className="w-4 h-4" />
-          <span className="whitespace-nowrap text-xs">Upgrade to Premium</span>
-        </button>
       </div>
 
+      {/* Logo Section */}
+      <div className="mt-auto mb-8 px-4">
+        <Logo className="w-8 h-8" />
+      </div>
+
+      {/* Premium Button */}
+      <button className="mx-3 mb-4 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-white rounded-lg transition-all duration-200 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 shadow-lg shadow-indigo-500/20">
+        <Crown className="w-4 h-4" strokeWidth={2} />
+        <span>Upgrade to Premium</span>
+      </button>
+
       {/* User Profile */}
-      <div className="user-profile mt-auto flex items-center gap-2 text-white cursor-pointer p-2 hover:bg-gray-700 rounded-full transition-colors">
-        <div className="icon-container w-6 h-6 bg-gray-700 rounded-full flex items-center justify-center">
-          <User className="w-3 h-3" />
+      <div className="mx-3 flex items-center gap-3 px-4 py-2.5 text-gray-300 rounded-lg hover:bg-gray-800/50 transition-colors">
+        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-800">
+          <CircleUserRound className="w-5 h-5" strokeWidth={2} />
         </div>
-        <span className="text-sm">{userName || 'Loading...'}</span>
+        <span className="text-sm font-medium">{userName || 'Loading...'}</span>
       </div>
     </div>
   );

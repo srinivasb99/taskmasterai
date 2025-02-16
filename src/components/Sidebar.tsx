@@ -35,6 +35,11 @@ export function Sidebar({ userName }: SidebarProps) {
 
   return (
     <div className="fixed top-0 left-0 h-full w-64 bg-gray-900 flex flex-col py-6 px-3 font-poppins">
+      {/* Logo Section */}
+      <div className="px-4 mb-6">
+        <Logo className="w-8 h-8" />
+      </div>
+
       {/* Menu Items */}
       <div className="flex flex-col gap-1.5">
         {menuItems.map((item) => {
@@ -56,13 +61,8 @@ export function Sidebar({ userName }: SidebarProps) {
         })}
       </div>
 
-      {/* Logo Section */}
-      <div className="mt-auto mb-8 px-4">
-        <Logo className="w-8 h-8" />
-      </div>
-
       {/* Premium Button */}
-      <button className="mx-3 mb-4 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-white rounded-lg transition-all duration-200 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 shadow-lg shadow-indigo-500/20">
+      <button className="mt-auto mx-3 mb-4 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-white rounded-lg transition-all duration-200 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 shadow-lg shadow-indigo-500/20">
         <Crown className="w-4 h-4" strokeWidth={2} />
         <span>Upgrade to Premium</span>
       </button>

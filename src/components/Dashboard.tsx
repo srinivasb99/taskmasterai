@@ -196,7 +196,22 @@ const createNewSession = async () => {
     }
   };
 
-
+// Function to regenerate the last response
+const regenerateResponse = async () => {
+  if (chatHistory.length < 2) return;
+  
+  const lastUserMessage = chatHistory.slice(0, -1).findLast(msg => msg.role === 'user');
+  if (!lastUserMessage) return;
+  
+  // Remove the last assistant message
+  setChatHistory(prev => prev.slice(0, -1));
+  
+  // Trigger a new submission with the last user message
+  const userMsg = lastUserMessage.content;
+  setChatMessage(userMsg);
+  await handleChatSubmit(new Event('submit') as any);
+};
+  
 const parseTimerRequest = (message: string): number | null => {
   const timeRegex = /(\d+)\s*(minutes?|mins?|hours?|hrs?|seconds?|secs?)/i;
   const match = message.match(timeRegex);

@@ -1,10 +1,10 @@
+
 import React, { useEffect, useState, useRef } from 'react';
 import { Navigate } from 'react-router-dom';
 import {
   PlusCircle,
   Edit,
   Trash,
-  Trash2,
   Sparkles,
   CheckCircle,
   MessageCircle,
@@ -13,8 +13,6 @@ import {
   X,
   Timer as TimerIcon,
   Send,
-  StopCircle,
-  RefreshCw
 } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { Timer } from './Timer';
@@ -41,46 +39,16 @@ import {
   deleteCustomTimer,
   weatherApiKey,
   hfApiKey,
-  createChatSession,
-  addMessageToChatSession,
-  onChatSessionsSnapshot,
-  deleteChatSession,
-  updateChatSessionTitle
 } from '../lib/dashboard-firebase';
-import { auth } from '../lib/firebase';
 
-interface ChatMessage {
-  role: 'user' | 'assistant';
-  content: string;
-  timer?: {
-    type: 'timer';
-    duration: number;
-    id: string;
-  };
-  flashcard?: {
-    type: 'flashcard';
-    data: {
-      question: string;
-      answer: string;
-    };
-  };
-  question?: {
-    type: 'question';
-    data: {
-      question: string;
-      options: string[];
-      correctAnswer: number;
-    };
-  };
-}
-
-interface ChatSession {
-  id: string;
-  title: string;
-  messages: ChatMessage[];
-  createdAt: number;
-}
-
+export function Dashboard() {
+  // ---------------------
+// 1. USER & GENERAL STATE
+// ---------------------
+const [user, setUser] = useState<firebase.default.User | null>(null);
+const [userName, setUserName] = useState("Loading...");
+const [quote, setQuote] = useState(getRandomQuote());
+const [greeting, setGreeting] = useState(getTimeBasedGreeting());
 
 // ---------------------
 // Types for timer messages
@@ -116,45 +84,28 @@ interface QuestionMessage {
   data: QuestionData[];   // Changed to array
 }
 
-export function Dashboard() {
-  // ---------------------
-// 1. USER & GENERAL STATE
-// ---------------------
-const [user, setUser] = useState<firebase.default.User | null>(null);
-const [userName, setUserName] = useState("Loading...");
-const [quote, setQuote] = useState(getRandomQuote());
-const [greeting, setGreeting] = useState(getTimeBasedGreeting());
-
+interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  timer?: TimerMessage;
+  flashcard?: FlashcardMessage;
+  question?: QuestionMessage;
+}
 
 // ---------------------
 // CHAT MODAL (NEW AI CHAT FUNCTIONALITY)
 // ---------------------
-// Add new state for chat history and control
-  const [isChatModalOpen, setIsChatModalOpen] = useState(false);
-  const [chatMessage, setChatMessage] = useState('');
-  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
-  const [isChatLoading, setIsChatLoading] = useState(false);
-  const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
-  const [abortController, setAbortController] = useState<AbortController | null>(null);
-  const chatEndRef = useRef<HTMLDivElement>(null);
+const [isChatModalOpen, setIsChatModalOpen] = useState(false);
+const [chatMessage, setChatMessage] = useState('');
+const [chatHistory, setChatHistory] = useState<ChatMessage[]>([
+  {
+    role: 'assistant',
+    content: "👋 Hi I'm TaskMaster, How can I help you today? Need help with your items? Simply ask me!"
+  }
+]);
+const [isChatLoading, setIsChatLoading] = useState(false);
+const chatEndRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!auth.currentUser) return;
-
-    const unsubscribe = onChatSessionsSnapshot(
-      auth.currentUser.uid,
-      (sessions) => {
-        setChatSessions(sessions);
-        if (!currentSessionId && sessions.length > 0) {
-          setCurrentSessionId(sessions[0].id);
-          setChatHistory(sessions[0].messages);
-        }
-      }
-    );
-
-    return () => unsubscribe();
-  }, [auth.currentUser]);
 
 
 
@@ -170,48 +121,6 @@ const handleTimerComplete = (timerId: string) => {
   ]);
 };
 
-const createNewSession = async () => {
-    if (!auth.currentUser) return;
-    
-    const sessionId = await createChatSession(
-      auth.currentUser.uid,
-      `Chat ${chatSessions.length + 1}`
-    );
-    setCurrentSessionId(sessionId);
-  };
-
-  const deleteSession = async (sessionId: string) => {
-    if (!confirm('Are you sure you want to delete this chat?')) return;
-    
-    await deleteChatSession(sessionId);
-    if (currentSessionId === sessionId) {
-      const remainingSessions = chatSessions.filter(s => s.id !== sessionId);
-      if (remainingSessions.length > 0) {
-        setCurrentSessionId(remainingSessions[0].id);
-        setChatHistory(remainingSessions[0].messages);
-      } else {
-        setCurrentSessionId(null);
-        setChatHistory([]);
-      }
-    }
-  };
-
-// Function to regenerate the last response
-const regenerateResponse = async () => {
-  if (chatHistory.length < 2) return;
-  
-  const lastUserMessage = chatHistory.slice(0, -1).findLast(msg => msg.role === 'user');
-  if (!lastUserMessage) return;
-  
-  // Remove the last assistant message
-  setChatHistory(prev => prev.slice(0, -1));
-  
-  // Trigger a new submission with the last user message
-  const userMsg = lastUserMessage.content;
-  setChatMessage(userMsg);
-  await handleChatSubmit(new Event('submit') as any);
-};
-  
 const parseTimerRequest = (message: string): number | null => {
   const timeRegex = /(\d+)\s*(minutes?|mins?|hours?|hrs?|seconds?|secs?)/i;
   const match = message.match(timeRegex);
@@ -283,25 +192,25 @@ const formatItemsForChat = () => {
 
 // NEW handleChatSubmit with updated prompt
 const handleChatSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!chatMessage.trim() || !currentSessionId || !auth.currentUser) return;
+  e.preventDefault();
+  if (!chatMessage.trim()) return;
 
-    const controller = new AbortController();
-    setAbortController(controller);
+  // Check for timer request
+  const timerDuration = parseTimerRequest(chatMessage);
+  const userMsg: ChatMessage = { 
+    role: 'user',
+    content: chatMessage
+  };
   
+  setChatHistory(prev => [...prev, userMsg]);
+  setChatMessage('');
 
-  const userMsg: ChatMessage = {
-      role: 'user',
-      content: chatMessage
-    };
-
-    await addMessageToChatSession(currentSessionId, userMsg);
-    setChatMessage('');
-
-    const timerDuration = parseTimerRequest(chatMessage);
-    if (timerDuration) {
-      const timerId = Math.random().toString(36).substr(2, 9);
-      const timerMsg: ChatMessage = {
+  // If it's a timer request, add timer immediately
+  if (timerDuration) {
+    const timerId = Math.random().toString(36).substr(2, 9);
+    setChatHistory(prev => [
+      ...prev,
+      {
         role: 'assistant',
         content: `Starting a timer for ${timerDuration} seconds.`,
         timer: {
@@ -309,10 +218,10 @@ const handleChatSubmit = async (e: React.FormEvent) => {
           duration: timerDuration,
           id: timerId
         }
-      };
-      await addMessageToChatSession(currentSessionId, timerMsg);
-      return;
-    }
+      }
+    ]);
+    return;
+  }
 
   // Regular chat processing
   const conversation = chatHistory
@@ -418,93 +327,96 @@ FORBIDDEN IN YOUR FINAL RESPONSE:
 
   setIsChatLoading(true);
   try {
-      const response = await fetch(
-        'https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct',
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${hfApiKey}`,
-            'Content-Type': 'application/json',
+    const response = await fetch(
+      'https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${hfApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          inputs: prompt,
+          parameters: {
+            max_new_tokens: 1000,
+            temperature: 0.5,
+            top_p: 0.9,
+            return_full_text: false,
+            repetition_penalty: 1.2,
+            do_sample: true,
           },
-          body: JSON.stringify({
-            inputs: prompt,
-            parameters: {
-              max_new_tokens: 1000,
-              temperature: 0.5,
-              top_p: 0.9,
-              return_full_text: false,
-              repetition_penalty: 1.2,
-              do_sample: true,
-            },
-          }),
-          signal: controller.signal,
-        }
-      );
-    
+        }),
+      }
+    );
+
     if (!response.ok) throw new Error('Chat API request failed');
     const result = await response.json();
 
-let assistantReply = (result[0]?.generated_text as string || '')
-  .replace(/\[\/?INST\]|<</g, '')
-  .replace(/^[•\-]\s.*$/gm, '') // Remove lines starting with bullet points or dashes
-  .replace(/^Now it's your turn to respond to.*$/gm, '') // Remove lines starting with "Now it's your turn to respond to"
-  .split('\n')
-  .filter(line => !line.trim().startsWith('•') && !line.trim().startsWith('-')) // Additional filter for bullet points
-  .join('\n')
-  .trim()
+     let assistantReply = (result[0]?.generated_text as string || '')
+      .replace(/\[\/?INST\]|<</g, '')
+      .replace(/^[•\-]\s.*$/gm, '') // Remove lines starting with bullet points or dashes
+      .split('\n')
+      .filter(line => !line.trim().startsWith('•') && !line.trim().startsWith('-')) // Additional filter for bullet points
+      .join('\n')
+      .trim()
 
     // Parse any JSON content in the response
-  const jsonMatch = assistantReply.match(/```json\n([\s\S]*?)\n```/);
-      if (jsonMatch) {
-        try {
-          const jsonContent = JSON.parse(jsonMatch[1].trim());
-          assistantReply = assistantReply.replace(/```json\n[\s\S]*?\n```/, '').trim();
-          
-          if (jsonContent.type && jsonContent.data) {
-            const assistantMsg: ChatMessage = {
+    const jsonMatch = assistantReply.match(/```json\n([\s\S]*?)\n```/);
+    if (jsonMatch) {
+      try {
+        const jsonContent = JSON.parse(jsonMatch[1].trim());
+        // Remove the JSON block from the text response
+        assistantReply = assistantReply.replace(/```json\n[\s\S]*?\n```/, '').trim();
+        
+        // Validate JSON structure
+        if (
+          jsonContent.type &&
+          jsonContent.data &&
+          (jsonContent.type === 'flashcard' || jsonContent.type === 'question')
+        ) {
+          setChatHistory((prev) => [
+            ...prev,
+            {
               role: 'assistant',
               content: assistantReply,
               ...(jsonContent.type === 'flashcard' && { flashcard: jsonContent }),
               ...(jsonContent.type === 'question' && { question: jsonContent })
-            };
-            await addMessageToChatSession(currentSessionId, assistantMsg);
-          }
-        } catch (e) {
-          console.error('Failed to parse JSON content:', e);
-          await addMessageToChatSession(currentSessionId, {
-            role: 'assistant',
-            content: assistantReply
-          });
+            },
+          ]);
+        } else {
+          throw new Error('Invalid JSON structure');
         }
-      } else {
-        await addMessageToChatSession(currentSessionId, {
-          role: 'assistant',
-          content: assistantReply
-        });
+      } catch (e) {
+        console.error('Failed to parse JSON content:', e);
+        setChatHistory((prev) => [
+          ...prev,
+          { 
+            role: 'assistant', 
+            content: 'I apologize, but I encountered an error processing the educational content. Let me try again with a simpler response.\n\n' + assistantReply 
+          },
+        ]);
       }
-    } catch (err) {
-      if (err.name === 'AbortError') {
-        await addMessageToChatSession(currentSessionId, {
-          role: 'assistant',
-          content: 'Response was stopped.'
-        });
-      } else {
-        console.error('Chat error:', err);
-        await addMessageToChatSession(currentSessionId, {
-          role: 'assistant',
-          content: 'Sorry, I had an issue responding. Please try again in a moment.'
-        });
-      }
-    } finally {
-      setAbortController(null);
-      setIsChatLoading(false);
+    } else {
+      setChatHistory((prev) => [
+        ...prev,
+        { role: 'assistant', content: assistantReply },
+      ]);
     }
-  };
-
-    if (!auth.currentUser) {
-    return <Navigate to="/login" />;
+  } catch (err) {
+    console.error('Chat error:', err);
+    setChatHistory((prev) => [
+      ...prev,
+      {
+        role: 'assistant',
+        content:
+          'Sorry, I had an issue responding. Please try again in a moment.',
+      },
+    ]);
+  } finally {
+    setIsChatLoading(false);
   }
-  
+};
+
   // ---------------------
   // 2. COLLECTION STATES
   // ---------------------
@@ -1166,193 +1078,126 @@ return (
   )}
 </div>
 
-{/* Chat Modal */}
+ {/* Chat Modal */}
 {isChatModalOpen && (
   <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
-    <div className="bg-gray-800 rounded-xl w-full max-w-[90vw] h-[90vh] mx-4 flex">
-      {/* Chat History Sidebar */}
-      <div className="w-64 border-r border-gray-700 flex flex-col">
-        <div className="p-4 border-b border-gray-700">
-          <button
-            onClick={createNewSession}
-            className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+    <div className="bg-gray-800 rounded-xl w-full max-w-2xl mx-4 max-h-[80vh] flex flex-col">
+      <div className="p-4 border-b border-gray-700 flex justify-between items-center">
+        <h3 className="text-lg font-semibold text-blue-300 flex items-center">
+          <MessageCircle className="w-5 h-5 mr-2" />
+          Chat with TaskMaster
+          <span className="ml-2 text-xs bg-gradient-to-r from-pink-500 to-purple-500 text-gray-300 px-2 py-0.5 rounded-full">BETA</span>
+          <span className="ml-2 text-xs bg-blue text-gray-300 px-2 py-0.5 rounded-full">Chat history is not saved.</span>
+        </h3>
+        <button
+          onClick={() => setIsChatModalOpen(false)}
+          className="text-gray-400 hover:text-gray-200 transition-colors"
+        >
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={chatEndRef}>
+        {chatHistory.map((message, index) => (
+          <div
+            key={index}
+            className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
           >
-            <MessageCircle className="w-4 h-4" />
-            New Chat
-          </button>
-        </div>
-        <div className="flex-1 overflow-y-auto p-2 space-y-2">
-          {chatSessions.map(session => (
             <div
-              key={session.id}
-              className={`group flex items-center justify-between p-3 rounded-lg transition-colors ${
-                currentSessionId === session.id
-                  ? 'bg-gray-700 text-white'
-                  : 'text-gray-300 hover:bg-gray-700'
+              className={`max-w-[80%] rounded-lg px-4 py-2 ${
+                message.role === 'user'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-700 text-gray-200'
               }`}
             >
-              <button
-                onClick={() => {
-                  setCurrentSessionId(session.id);
-                  setChatHistory(session.messages);
+              <ReactMarkdown
+                remarkPlugins={[remarkMath, remarkGfm]}
+                rehypePlugins={[rehypeKatex]}
+                components={{
+                  p: ({ children }) => <p className="mb-2">{children}</p>,
+                  ul: ({ children }) => <ul className="list-disc ml-4 mb-2">{children}</ul>,
+                  ol: ({ children }) => <ol className="list-decimal ml-4 mb-2">{children}</ol>,
+                  li: ({ children }) => <li className="mb-1">{children}</li>,
+                  code: ({ inline, children }) =>
+                    inline ? (
+                      <code className="bg-gray-800 px-1 rounded">{children}</code>
+                    ) : (
+                      <pre className="bg-gray-800 p-2 rounded-lg overflow-x-auto">
+                        <code>{children}</code>
+                      </pre>
+                    ),
                 }}
-                className="flex-1 text-left flex items-center gap-2"
               >
-                <MessageCircle className="w-4 h-4" />
-                <span className="truncate">{session.title}</span>
-              </button>
-              <button
-                onClick={() => deleteSession(session.id)}
-                className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-400 transition-opacity"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col">
-        <div className="p-4 border-b border-gray-700 flex justify-between items-center">
-          <h3 className="text-lg font-semibold text-blue-300 flex items-center gap-2">
-            <MessageCircle className="w-5 h-5" />
-            Chat with TaskMaster
-            <span className="text-xs bg-gradient-to-r from-pink-500 to-purple-500 text-gray-300 px-2 py-0.5 rounded-full">
-              BETA
-            </span>
-          </h3>
-          <div className="flex items-center gap-2">
-            {isChatLoading && (
-              <button
-                onClick={stopResponse}
-                className="text-gray-400 hover:text-gray-200 transition-colors p-1 rounded hover:bg-gray-700"
-                title="Stop generating"
-              >
-                <StopCircle className="w-5 h-5" />
-              </button>
-            )}
-            <button
-              onClick={regenerateResponse}
-              className="text-gray-400 hover:text-gray-200 transition-colors p-1 rounded hover:bg-gray-700"
-              disabled={isChatLoading || chatHistory.length < 2}
-              title="Regenerate response"
-            >
-              <RefreshCw className="w-5 h-5" />
-            </button>
-            <button
-              onClick={() => setIsChatModalOpen(false)}
-              className="text-gray-400 hover:text-gray-200 transition-colors p-1 rounded hover:bg-gray-700"
-              title="Close"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-
-        {/* Chat Messages */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={chatEndRef}>
-          {chatHistory.map((message, index) => (
-            <div
-              key={index}
-              className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
-              <div
-                className={`max-w-[80%] rounded-lg px-4 py-2 ${
-                  message.role === 'user'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-700 text-gray-200'
-                }`}
-              >
-                <ReactMarkdown
-                  remarkPlugins={[remarkMath, remarkGfm]}
-                  rehypePlugins={[rehypeKatex]}
-                  components={{
-                    p: ({ children }) => <p className="mb-2">{children}</p>,
-                    ul: ({ children }) => <ul className="list-disc ml-4 mb-2">{children}</ul>,
-                    ol: ({ children }) => <ol className="list-decimal ml-4 mb-2">{children}</ol>,
-                    li: ({ children }) => <li className="mb-1">{children}</li>,
-                    code: ({ inline, children }) =>
-                      inline ? (
-                        <code className="bg-gray-800 px-1 rounded">{children}</code>
-                      ) : (
-                        <pre className="bg-gray-800 p-2 rounded-lg overflow-x-auto">
-                          <code>{children}</code>
-                        </pre>
-                      ),
-                  }}
-                >
-                  {message.content}
-                </ReactMarkdown>
-                {message.timer && (
-                  <div className="mt-2">
-                    <div className="flex items-center space-x-2 bg-gray-900 rounded-lg px-4 py-2">
-                      <TimerIcon className="w-5 h-5 text-blue-400" />
-                      <Timer
-                        key={message.timer.id}
-                        initialDuration={message.timer.duration}
-                        onComplete={() => handleTimerComplete(message.timer!.id)}
-                      />
-                    </div>
-                  </div>
-                )}
-                {message.flashcard && (
-                  <div className="mt-2">
-                    <FlashcardsQuestions
-                      type="flashcard"
-                      data={message.flashcard.data}
-                      onComplete={() => {}}
+                {message.content}
+              </ReactMarkdown>
+              {message.timer && (
+                <div className="mt-2">
+                  <div className="flex items-center space-x-2 bg-gray-900 rounded-lg px-4 py-2">
+                    <TimerIcon className="w-5 h-5 text-blue-400" />
+                    <Timer
+                      key={message.timer.id}
+                      initialDuration={message.timer.duration}
+                      onComplete={() => handleTimerComplete(message.timer!.id)}
                     />
                   </div>
-                )}
-                {message.question && (
-                  <div className="mt-2">
-                    <FlashcardsQuestions
-                      type="question"
-                      data={message.question.data}
-                      onComplete={() => {}}
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
-          {isChatLoading && (
-            <div className="flex justify-start">
-              <div className="bg-gray-700 text-gray-200 rounded-lg px-4 py-2 max-w-[80%]">
-                <div className="flex space-x-2">
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100"></div>
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200"></div>
                 </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Chat Input */}
-        <form onSubmit={handleChatSubmit} className="p-4 border-t border-gray-700">
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={chatMessage}
-              onChange={(e) => setChatMessage(e.target.value)}
-              placeholder="Ask TaskMaster about your items or set a timer..."
-              className="flex-1 bg-gray-700 text-gray-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <button
-              type="submit"
-              disabled={isChatLoading || !currentSessionId}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Send className="w-5 h-5" />
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+              )}
+{message.flashcard && (
+  <div className="mt-2">
+    <FlashcardsQuestions
+      type="flashcard"
+      data={message.flashcard.data}
+      onComplete={() => {}}
+    />
   </div>
 )}
+{message.question && (
+  <div className="mt-2">
+    <FlashcardsQuestions
+      type="question"
+      data={message.question.data}
+      onComplete={() => {}}
+    />
+  </div>
+)}
+                </div>
+              </div>
+            ))}
+            {isChatLoading && (
+              <div className="flex justify-start">
+                <div className="bg-gray-700 text-gray-200 rounded-lg px-4 py-2 max-w-[80%]">
+                  <div className="flex space-x-2">
+                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100"></div>
+                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200"></div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <form onSubmit={handleChatSubmit} className="p-4 border-t border-gray-700">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={chatMessage}
+                onChange={(e) => setChatMessage(e.target.value)}
+                placeholder="Ask TaskMaster about your items or set a timer..."
+                className="flex-1 bg-gray-700 text-gray-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                type="submit"
+                disabled={isChatLoading}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Send className="w-5 h-5" />
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    )}
+
 
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">

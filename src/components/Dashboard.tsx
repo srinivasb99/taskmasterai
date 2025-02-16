@@ -353,7 +353,6 @@ FORBIDDEN IN YOUR FINAL RESPONSE:
             return_full_text: false,
             repetition_penalty: 1.2,
             do_sample: true,
-            presence_penalty: 0.2
           },
         }),
       }
@@ -672,9 +671,9 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
           body: JSON.stringify({
             inputs: prompt,
             parameters: {
-              max_new_tokens: 2000,
+              max_new_tokens: 1000,
               temperature: 0.3,
-              top_p: 0.85,
+              top_p: 0.9,
               repetition_penalty: 1.2,
               return_full_text: false,
               do_sample: true,

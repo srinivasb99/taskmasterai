@@ -351,9 +351,9 @@ FORBIDDEN IN YOUR FINAL RESPONSE:
             temperature: 0.5,
             top_p: 0.9,
             return_full_text: false,
-            repetition_penalty: 1.3,
+            repetition_penalty: 1.2,
             do_sample: true,
-            presence_penalty: 0.5
+            presence_penalty: 0.2
           },
         }),
       }

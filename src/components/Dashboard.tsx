@@ -720,17 +720,18 @@ const cleanAndValidate = (text: string) => {
     .map(line => line.trim())
     .filter(line => line.length > 0 && !/^[^a-zA-Z0-9]+$/.test(line));
 
-  // If there are two lines starting with "Hello", remove all lines after the second occurrence
+  // If there are two lines starting with "Hello", remove all lines after the second occurrence,
+  // including the line that contains the second "Hello"
   let helloCount = 0;
   const truncatedLines = [];
   for (const line of lines) {
-    truncatedLines.push(line);
     if (line.startsWith("Hello")) {
       helloCount++;
       if (helloCount === 2) {
         break;
       }
     }
+    truncatedLines.push(line);
   }
 
   return truncatedLines.join('\n');
@@ -766,6 +767,7 @@ const formattedHtml = cleanTextLines
   .join('');
 
 setSmartOverview(formattedHtml);
+
 
 
       } catch (error) {

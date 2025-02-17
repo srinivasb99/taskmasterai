@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useRef } from 'react';
 import { Navigate } from 'react-router-dom';
 import {
@@ -41,23 +42,6 @@ import {
   hfApiKey,
 } from '../lib/dashboard-firebase';
 
-interface DashboardProps {
-  userName: string;
-  greeting: {
-    emoji: string;
-    greeting: string;
-  };
-  quote: {
-    text: string;
-    author: string;
-  };
-  tasks: Array<{ id: string; data: any }>;
-  goals: Array<{ id: string; data: any }>;
-  projects: Array<{ id: string; data: any }>;
-  plans: Array<{ id: string; data: any }>;
-  Sidebar: React.FC<{ userName: string }>;
-}
-
 export function Dashboard() {
   // ---------------------
 // 1. USER & GENERAL STATE
@@ -73,8 +57,6 @@ const [greeting, setGreeting] = useState(getTimeBasedGreeting());
     return stored ? JSON.parse(stored) : false;
   });
 
-  const [deadlines, setDeadlines] = useState<Map<string, Array<{type: string; name: string; dueDate: Date}>>>(new Map());
-
   // Update localStorage whenever the state changes
   useEffect(() => {
     localStorage.setItem('isSidebarCollapsed', JSON.stringify(isSidebarCollapsed));
@@ -86,8 +68,8 @@ const [greeting, setGreeting] = useState(getTimeBasedGreeting());
   };
 
   // Get current date info
-const [today] = useState(new Date());
-const [currentWeek, setCurrentWeek] = useState<Date[]>([]);
+  const today = new Date();
+  const currentWeek = getWeekDates(today);
 
   // Function to get week dates
   function getWeekDates(date: Date) {
@@ -107,43 +89,6 @@ const [currentWeek, setCurrentWeek] = useState<Date[]>([]);
   function formatDateForComparison(date: Date) {
     return date.toISOString().split('T')[0];
   }
-
-useEffect(() => {
-  setCurrentWeek(getWeekDates(today));
-}, [today]);
-
-
-  // Process deadlines
-  useEffect(() => {
-    const deadlineMap = new Map<string, Array<{type: string; name: string; dueDate: Date}>>();
-
-    const processItems = (items: Array<{ id: string; data: any }>, type: string) => {
-      items.forEach(item => {
-        if (item.data.dueDate && !item.data.completed) {
-          const dueDate = item.data.dueDate.toDate ? item.data.dueDate.toDate() : new Date(item.data.dueDate);
-          const dateKey = formatDateForComparison(dueDate);
-          const name = item.data[type.toLowerCase()] || 'Untitled';
-          
-          if (!deadlineMap.has(dateKey)) {
-            deadlineMap.set(dateKey, []);
-          }
-          deadlineMap.get(dateKey)?.push({
-            type,
-            name,
-            dueDate
-          });
-        }
-      });
-    };
-
-    processItems(tasks, 'Task');
-    processItems(goals, 'Goal');
-    processItems(projects, 'Project');
-    processItems(plans, 'Plan');
-
-    setDeadlines(deadlineMap);
-  }, [tasks, goals, projects, plans]);
-
 
 
 // ---------------------
@@ -1176,7 +1121,7 @@ return (
             </p>
           </header>
 
-          {/* Calendar Card */}
+         {/* Calendar Card */}
           <div className="bg-gray-800 rounded-xl p-6 min-w-[300px] h-[140px] transform hover:scale-[1.02] transition-all duration-300">
             <div className="flex items-center gap-2 mb-4">
               <CalendarIcon className="w-5 h-5 text-blue-400" />
@@ -1189,33 +1134,20 @@ return (
                 </div>
               ))}
               {currentWeek.map((date, index) => {
-                const dateKey = formatDateForComparison(date);
-                const isToday = dateKey === formatDateForComparison(today);
-                const hasDeadline = deadlines.has(dateKey);
-                const dateDeadlines = deadlines.get(dateKey) || [];
+                const isToday = formatDateForComparison(date) === formatDateForComparison(today);
+                const hasDeadline = false; // You can check against your deadlines here
 
                 return (
                   <div
                     key={index}
-                    className={`group relative p-1 text-center rounded-lg transition-all duration-200
+                    className={`relative p-2 text-center rounded-lg transition-all duration-200
                       ${isToday ? 'bg-blue-500/20 text-blue-300 font-bold' : 'text-gray-300'}
                       ${hasDeadline ? 'ring-2 ring-purple-500/50' : ''}
                       hover:bg-gray-700/50`}
-                    title={hasDeadline ? dateDeadlines.map(d => `${d.type}: ${d.name}`).join('\n') : undefined}
                   >
-                    <span className="text-xs">{date.getDate()}</span>
+                    <span className="text-sm">{date.getDate()}</span>
                     {hasDeadline && (
-                      <>
-                        <div className="absolute bottom-0.5 left-1/2 transform -translate-x-1/2 w-1 h-1 rounded-full bg-purple-500"></div>
-                        {/* Tooltip */}
-                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-48 bg-gray-900 rounded-lg p-2 text-xs text-left opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                          {dateDeadlines.map((deadline, i) => (
-                            <div key={i} className="mb-1 last:mb-0">
-                              <span className="font-semibold">{deadline.type}:</span> {deadline.name}
-                            </div>
-                          ))}
-                        </div>
-                      </>
+                      <div className="absolute bottom-1 left-1/2 transform -translate-x-1/2 w-1 h-1 rounded-full bg-purple-500"></div>
                     )}
                   </div>
                 );

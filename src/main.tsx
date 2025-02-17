@@ -28,6 +28,16 @@ const PageTitle = ({ title, children }: { title: string; children: React.ReactNo
   </>
 );
 
+// Special root title component that doesn't add the "| TaskMaster" suffix
+const RootTitle = ({ children }: { children: React.ReactNode }) => (
+  <>
+    <Helmet>
+      <title>TaskMaster AI</title>
+    </Helmet>
+    {children}
+  </>
+);
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <HelmetProvider>
@@ -58,7 +68,7 @@ createRoot(document.getElementById('root')!).render(
             
             <Route path="/school" element={<PageTitle title="School"><SchoolPage /></PageTitle>} />
             
-            <Route path="/" element={<PageTitle title="Home"><App /></PageTitle>} />
+            <Route path="/" element={<RootTitle><App /></RootTitle>} />
             
           </Routes>
         </AuthProvider>

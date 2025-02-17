@@ -1,14 +1,12 @@
-import { getDocument, GlobalWorkerOptions, PDFDocumentProxy } from 'pdfjs-dist';
+import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist';
 import { createWorker } from 'tesseract.js';
 import { v4 as uuidv4 } from 'uuid';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { addDoc, collection, Timestamp } from 'firebase/firestore';
-import { storage, db } from './firebase';
+import { storage } from './firebase';
 
 // Set PDF.js worker source
-GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${GlobalWorkerOptions.version}/pdf.worker.min.js`;
+GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
 
-// Types
 interface ProcessingProgress {
   progress: number;
   status: string;
@@ -81,11 +79,15 @@ export async function processPDF(
         // Create canvas and render PDF page
         const canvas = document.createElement('canvas');
         const context = canvas.getContext('2d');
+        if (!context) {
+          throw new Error('Failed to get canvas context');
+        }
+        
         canvas.height = viewport.height;
         canvas.width = viewport.width;
         
         await page.render({
-          canvasContext: context!,
+          canvasContext: context,
           viewport: viewport
         }).promise;
         

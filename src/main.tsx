@@ -15,6 +15,7 @@ import PrivacyPolicy from './components/Privacy-Policy';
 import { Dashboard } from './components/Dashboard';
 import Contact from './components/Contact';
 import AIChat from './components/AI-Chat';
+import Notes from './components/Notes';
 import SchoolPage from './components/SchoolPage';
 import './index.css';
 
@@ -65,6 +66,8 @@ createRoot(document.getElementById('root')!).render(
             <Route path="/contact" element={<PageTitle title="Contact Us"><Contact /></PageTitle>} />
             
             <Route path="/ai" element={<PageTitle title="AI Assistant"><AIChat /></PageTitle>} />
+
+            <Route path="/notes" element={<PageTitle title="Notes"><Notes /></PageTitle>} />
             
             <Route path="/school" element={<PageTitle title="School"><SchoolPage /></PageTitle>} />
             

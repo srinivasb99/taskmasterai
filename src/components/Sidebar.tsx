@@ -15,12 +15,16 @@ import {
 } from 'lucide-react';
 import { Logo } from './Logo';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { auth } from '../lib/firebase';
 
 interface SidebarProps {
   userName: string;
   onToggle?: () => void;
   isCollapsed?: boolean;
 }
+
+// List of developer emails
+const DEV_EMAILS = ['bajinsrinivasr@lexington1.net'];
 
 export function Sidebar({
   userName,
@@ -30,6 +34,8 @@ export function Sidebar({
   const location = useLocation();
   const navigate = useNavigate();
   const isSettingsPage = location.pathname === '/settings';
+  const currentUser = auth.currentUser;
+  const isDev = currentUser?.email && DEV_EMAILS.includes(currentUser.email);
 
   // Define the menu items with label, icon component, and path
   const menuItems = [
@@ -75,9 +81,9 @@ export function Sidebar({
             />
           </svg>
         ) : (
-      <a href="/">
-          <Logo className="w-8 h-8" />
-      </a>
+          <a href="/">
+            <Logo className="w-8 h-8" />
+          </a>
         )}
       </div>
 
@@ -145,12 +151,27 @@ export function Sidebar({
               ${isCollapsed ? 'justify-center' : ''}
             `}
           >
-            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-800">
-              <CircleUserRound className="w-5 h-5" strokeWidth={2} />
+            <div className="relative flex items-center justify-center w-8 h-8 rounded-full overflow-hidden bg-gray-800">
+              {currentUser?.photoURL ? (
+                <img
+                  src={currentUser.photoURL}
+                  alt={userName}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <CircleUserRound className="w-5 h-5" strokeWidth={2} />
+              )}
             </div>
             {!isCollapsed && (
               <div className="flex flex-col">
-                <span className="text-sm font-medium">{userName || 'Loading...'}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium">{userName || 'Loading...'}</span>
+                  {isDev && (
+                    <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-gradient-to-r from-yellow-400 to-orange-500 text-white rounded-full">
+                      DEV
+                    </span>
+                  )}
+                </div>
                 <span className="text-xs text-gray-500">Basic Plan</span>
               </div>
             )}

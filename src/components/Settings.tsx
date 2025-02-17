@@ -9,7 +9,7 @@ interface SettingsProps {
   userEmail: string;
 }
 
-export const Settings: React.FC<SettingsProps> = ({ userName, userEmail }) => {
+const Settings: React.FC<SettingsProps> = ({ userName, userEmail }) => {
   const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -328,3 +328,5 @@ export const Settings: React.FC<SettingsProps> = ({ userName, userEmail }) => {
     </div>
   );
 };
+
+export default Settings;

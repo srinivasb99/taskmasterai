@@ -100,10 +100,21 @@ export function Notes() {
   const [editingTags, setEditingTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState('');
 
+  // Question answers state
+  const [questionAnswers, setQuestionAnswers] = useState<{[key: string]: number | null}>({});
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const youtubeInputRef = useRef<HTMLInputElement>(null);
   const audioInputRef = useRef<HTMLInputElement>(null);
   const textInputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Handle answer selection
+  const handleAnswerSelect = (questionIndex: number, selectedOption: number) => {
+    setQuestionAnswers(prev => ({
+      ...prev,
+      [questionIndex]: selectedOption
+    }));
+  };
 
   // Update localStorage whenever the sidebar state changes
   useEffect(() => {
@@ -359,9 +370,9 @@ export function Notes() {
       <main className={`flex-1 overflow-hidden transition-all duration-300 ${
         isSidebarCollapsed ? 'ml-16' : 'ml-64'
       }`}>
-        <div className="h-full flex">
+        <div className="h-full flex flex-col md:flex-row">
           {/* Main Content Area */}
-          <div className="flex-1 overflow-y-auto p-8">
+          <div className="flex-1 overflow-y-auto p-4 md:p-8">
             {/* Header */}
             <div className="mb-8">
               <div className="flex items-center justify-between">
@@ -522,15 +533,54 @@ export function Notes() {
                             <div key={index} className="bg-gray-700 rounded-lg p-4">
                               <p className="text-white mb-4">{q.question}</p>
                               <div className="space-y-2">
-                                {q.options.map((option, optIndex) => (
-                                  <button
-                                    key={optIndex}
-                                    className="w-full text-left p-3 rounded-lg transition-colors bg-gray-600 text-gray-300 hover:bg-gray-500"
-                                  >
-                                    {option}
-                                  </button>
-                                ))}
+                                {q.options.map((option, optIndex) => {
+                                  const isAnswered = questionAnswers[index] !== undefined;
+                                  const isSelected = questionAnswers[index] === optIndex;
+                                  const isCorrect = optIndex === q.correctAnswer;
+                                  
+                                  let buttonClass = "w-full text-left p-3 rounded-lg transition-colors ";
+                                  
+                                  if (isAnswered) {
+                                    if (isSelected) {
+                                      buttonClass += isCorrect 
+                                        ? "bg-green-500/20 text-green-300 border-2 border-green-500"
+                                        : "bg-red-500/20 text-red-300 border-2 border-red-500";
+                                    } else if (isCorrect) {
+                                      buttonClass += "bg-green-500/20 text-green-300";
+                                    } else {
+                                      buttonClass += "bg-gray-600 text-gray-400";
+                                    }
+                                  } else {
+                                    buttonClass += "bg-gray-600 text-gray-300 hover:bg-gray-500";
+                                  }
+
+                                  return (
+                                    <button
+                                      key={optIndex}
+                                      onClick={() => !isAnswered && handleAnswerSelect(index, optIndex)}
+                                      disabled={isAnswered}
+                                      className={buttonClass}
+                                    >
+                                      <div className="flex items-center justify-between">
+                                        <span>{option}</span>
+                                        {isAnswered && isSelected && (
+                                          isCorrect 
+                                            ? <Check className="w-5 h-5 text-green-400" />
+                                            : <X className="w-5 h-5 text-red-400" />
+                                        )}
+                                      </div>
+                                    </button>
+                                  );
+                                })}
                               </div>
+                              {questionAnswers[index] !== undefined && (
+                                <div className="mt-4 p-4 rounded-lg bg-gray-600">
+                                  <p className="text-sm text-gray-300">
+                                    <span className="font-medium text-white">Explanation: </span>
+                                    {q.explanation}
+                                  </p>
+                                </div>
+                              )}
                             </div>
                           ))}
                         </div>
@@ -551,7 +601,7 @@ export function Notes() {
           </div>
 
           {/* Notes List Sidebar */}
-          <div className="w-96 border-l border-gray-800 flex flex-col bg-gray-800/50">
+          <div className="w-full md:w-96 border-t md:border-t-0 md:border-l border-gray-800 flex flex-col bg-gray-800/50">
             {/* Search and Filter */}
             <div className="p-4 border-b border-gray-800">
               <div className="relative">

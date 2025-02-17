@@ -69,9 +69,8 @@ export function Sidebar({
         )}
       </div>
 
-      {/* Main section: menu + toggle + premium, grows until user profile at bottom */}
-      <div className="flex flex-col gap-1.5 flex-grow">
-        {/* Menu Items */}
+      {/* Upper Section: Menu Items and Toggle Button */}
+      <div className="flex flex-col gap-1.5">
         {menuItems.map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname === item.path;
@@ -93,7 +92,7 @@ export function Sidebar({
           );
         })}
 
-        {/* Toggle Button: above Premium */}
+        {/* Toggle Button (collapse/expand) remains here */}
         <button
           onClick={onToggle}
           className={`
@@ -108,11 +107,14 @@ export function Sidebar({
             <PanelLeftClose className="w-5 h-5" strokeWidth={2} />
           )}
         </button>
+      </div>
 
-        {/* Premium Button: further down, but above the profile */}
+      {/* Bottom Section: Premium Button and User Profile */}
+      <div className="mt-auto flex flex-col gap-4">
+        {/* Premium Button placed right above the profile */}
         <button
           className={`
-            mx-3 mt-4 flex items-center justify-center gap-2
+            mx-3 flex items-center justify-center gap-2
             px-4 py-2.5 text-sm font-medium text-white rounded-lg
             transition-all duration-200 bg-gradient-to-r from-violet-600 to-indigo-600
             hover:from-violet-500 hover:to-indigo-500 shadow-lg shadow-indigo-500/20
@@ -123,22 +125,22 @@ export function Sidebar({
             <span className="whitespace-nowrap">Upgrade to Premium</span>
           )}
         </button>
-      </div>
 
-      {/* User Profile pinned at the bottom */}
-      <div
-        className={`
-          mx-3 mt-auto flex items-center gap-3 px-4 py-2.5 text-gray-300
-          rounded-lg hover:bg-gray-800/50 transition-colors
-          ${isCollapsed ? 'justify-center' : ''}
-        `}
-      >
-        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-800">
-          <CircleUserRound className="w-5 h-5" strokeWidth={2} />
+        {/* User Profile pinned at the bottom */}
+        <div
+          className={`
+            mx-3 flex items-center gap-3 px-4 py-2.5 text-gray-300
+            rounded-lg hover:bg-gray-800/50 transition-colors
+            ${isCollapsed ? 'justify-center' : ''}
+          `}
+        >
+          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-800">
+            <CircleUserRound className="w-5 h-5" strokeWidth={2} />
+          </div>
+          {!isCollapsed && (
+            <span className="text-sm font-medium">{userName || 'Loading...'}</span>
+          )}
         </div>
-        {!isCollapsed && (
-          <span className="text-sm font-medium">{userName || 'Loading...'}</span>
-        )}
       </div>
     </div>
   );

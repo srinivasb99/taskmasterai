@@ -24,7 +24,13 @@ interface SidebarProps {
 }
 
 // List of developer emails
-const DEV_EMAILS = ['bajinsrinivasr@lexington1.net, srinibaj10@gmail.com, fugegate@gmail.com'];
+const DEV_EMAILS = [
+  'bajinsrinivasr@lexington1.net',
+  'srinibaj10@gmail.com',
+  'fugegate@gmail.com',
+  'taskmasteraione@gmail.com',
+  'taskmasteroneai@gmail.com
+];
 
 export function Sidebar({
   userName,
@@ -105,7 +111,7 @@ export function Sidebar({
                 }
               `}
             >
-              <Icon className="w-5 h-5" strokeWidth={2} />
+              <Icon className="w-5 h-5 min-w-[1.25rem]" strokeWidth={2} />
               {!isCollapsed && <span>{item.label}</span>}
             </button>
           );
@@ -117,9 +123,9 @@ export function Sidebar({
           className="absolute -right-4 top-6 bg-gray-900 p-1.5 rounded-full border border-gray-800/50 text-gray-400 hover:text-white transition-colors z-50"
         >
           {isCollapsed ? (
-            <PanelLeftOpen className="w-4 h-4" strokeWidth={2} />
+            <PanelLeftOpen className="w-4 h-4 min-w-[1rem]" strokeWidth={2} />
           ) : (
-            <PanelLeftClose className="w-4 h-4" strokeWidth={2} />
+            <PanelLeftClose className="w-4 h-4 min-w-[1rem]" strokeWidth={2} />
           )}
         </button>
       </div>
@@ -132,13 +138,16 @@ export function Sidebar({
             onClick={handleUpgradeClick}
             className={`
               mx-3 flex items-center justify-center
-              px-4 py-2.5 text-white rounded-lg
+              text-white rounded-lg
               transition-all duration-200 bg-gradient-to-r from-violet-600 to-indigo-600
               hover:from-violet-500 hover:to-indigo-500 shadow-lg shadow-indigo-500/20
-              ${isCollapsed ? 'aspect-square p-0' : ''}
+              ${isCollapsed ? 'aspect-square p-2.5' : 'px-4 py-2.5'}
             `}
           >
-            <Crown className={`${isCollapsed ? 'w-6 h-6' : 'w-5 h-5 mr-2'}`} strokeWidth={2} />
+            <Crown 
+              className={`min-w-[1.25rem] ${isCollapsed ? 'w-6 h-6' : 'w-5 h-5 mr-2'}`} 
+              strokeWidth={2} 
+            />
             {!isCollapsed && (
               <span className="text-sm font-medium whitespace-nowrap">Upgrade to Premium</span>
             )}
@@ -148,9 +157,9 @@ export function Sidebar({
           <button
             onClick={() => navigate('/settings')}
             className={`
-              mx-3 flex items-center gap-3 px-4 py-2.5 text-gray-300
+              mx-3 flex items-center gap-3 text-gray-300
               rounded-lg hover:bg-gray-800/50 transition-colors
-              ${isCollapsed ? 'justify-center p-2' : ''}
+              ${isCollapsed ? 'justify-center p-2' : 'px-4 py-2.5'}
             `}
           >
             <div className="relative flex items-center justify-center w-8 h-8 rounded-full overflow-hidden bg-gray-800">
@@ -161,7 +170,7 @@ export function Sidebar({
                   className="w-full h-full object-cover"
                 />
               ) : (
-                <CircleUserRound className="w-5 h-5" strokeWidth={2} />
+                <CircleUserRound className="w-5 h-5 min-w-[1.25rem]" strokeWidth={2} />
               )}
             </div>
             {!isCollapsed && (

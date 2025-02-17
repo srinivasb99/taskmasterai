@@ -6,9 +6,10 @@ import {
   EmailAuthProvider,
   deleteUser,
   signOut,
-  User
+  User,
+  onAuthStateChanged
 } from 'firebase/auth';
-import { doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { doc, updateDoc, deleteDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
 
 interface UpdateProfileData {
@@ -38,6 +39,20 @@ const reauthenticateUser = async (currentPassword: string) => {
   }
 };
 
+// Get user data from Firestore
+export const getUserData = async (userId: string) => {
+  try {
+    const userDoc = await getDoc(doc(db, 'users', userId));
+    if (userDoc.exists()) {
+      return userDoc.data();
+    }
+    return null;
+  } catch (error) {
+    console.error('Error fetching user data:', error);
+    return null;
+  }
+};
+
 // Update user profile information
 export const updateUserProfile = async ({
   name,
@@ -57,26 +72,31 @@ export const updateUserProfile = async ({
       await reauthenticateUser(currentPassword);
     }
 
+    const updates: Promise<void>[] = [];
+
     // Update display name if provided
     if (name && name !== user.displayName) {
-      await updateProfile(user, { displayName: name });
-      // Update user document in Firestore
-      const userDoc = doc(db, 'users', user.uid);
-      await updateDoc(userDoc, { name });
+      updates.push(
+        updateProfile(user, { displayName: name }),
+        updateDoc(doc(db, 'users', user.uid), { name })
+      );
     }
 
     // Update email if provided
     if (email && email !== user.email) {
-      await updateEmail(user, email);
-      // Update user document in Firestore
-      const userDoc = doc(db, 'users', user.uid);
-      await updateDoc(userDoc, { email });
+      updates.push(
+        updateEmail(user, email),
+        updateDoc(doc(db, 'users', user.uid), { email })
+      );
     }
 
     // Update password if provided
     if (newPassword) {
-      await updatePassword(user, newPassword);
+      updates.push(updatePassword(user, newPassword));
     }
+
+    // Execute all updates
+    await Promise.all(updates);
   } catch (error: any) {
     if (error instanceof AuthError) throw error;
     
@@ -113,11 +133,10 @@ export const deleteUserAccount = async (currentPassword: string): Promise<void> 
     // Reauthenticate before deletion
     await reauthenticateUser(currentPassword);
 
-    // Delete user data from Firestore
-    const userDoc = doc(db, 'users', user.uid);
-    await deleteDoc(userDoc);
-
-    // Delete user account
+    // Delete user data from Firestore first
+    await deleteDoc(doc(db, 'users', user.uid));
+    
+    // Then delete the user account
     await deleteUser(user);
   } catch (error: any) {
     if (error instanceof AuthError) throw error;
@@ -134,4 +153,9 @@ export const deleteUserAccount = async (currentPassword: string): Promise<void> 
 // Get current user
 export const getCurrentUser = (): User | null => {
   return auth.currentUser;
+};
+
+// Subscribe to auth state changes
+export const onAuthStateChange = (callback: (user: User | null) => void) => {
+  return onAuthStateChanged(auth, callback);
 };

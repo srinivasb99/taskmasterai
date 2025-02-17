@@ -41,6 +41,23 @@ import {
   hfApiKey,
 } from '../lib/dashboard-firebase';
 
+interface DashboardProps {
+  userName: string;
+  greeting: {
+    emoji: string;
+    greeting: string;
+  };
+  quote: {
+    text: string;
+    author: string;
+  };
+  tasks: Array<{ id: string; data: any }>;
+  goals: Array<{ id: string; data: any }>;
+  projects: Array<{ id: string; data: any }>;
+  plans: Array<{ id: string; data: any }>;
+  Sidebar: React.FC<{ userName: string }>;
+}
+
 export function Dashboard() {
   // ---------------------
 // 1. USER & GENERAL STATE

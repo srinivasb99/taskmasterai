@@ -17,7 +17,7 @@
     "firebase": "^10.8.1",
     "katex": "^0.16.9",
     "lucide-react": "^0.344.0",
-    "pdfjs-dist": "^4.10.38",
+    "pdfjs-dist": "^3.11.174",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-helmet-async": "^2.0.4",

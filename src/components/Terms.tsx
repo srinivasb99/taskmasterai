@@ -55,7 +55,7 @@ function Terms() {
               <a href="pricing" className="text-gray-300 hover:text-indigo-400 transition-colors">Pricing</a>
               <a href="contact" className="text-gray-300 hover:text-indigo-400 transition-colors">Contact</a>
               <a 
-                href={user ? "/dashboard.html" : "/signup"} 
+                href={user ? "/dashboard" : "/signup"} 
                 className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-full transition-all transform hover:scale-105"
               >
                 {user ? "Dashboard" : "Get Started Today"}
@@ -90,7 +90,7 @@ function Terms() {
                   Contact
                 </a>
                 <a
-                  href={user ? "/dashboard.html" : "/signup"}
+                  href={user ? "/dashboard" : "/signup"}
                   className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-full text-center transition-all transform hover:scale-105"
                   onClick={toggleMenu}
                 >

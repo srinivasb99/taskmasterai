@@ -22,7 +22,11 @@ interface SidebarProps {
   isCollapsed?: boolean;
 }
 
-export function Sidebar({ userName, onToggle, isCollapsed = false }: SidebarProps) {
+export function Sidebar({
+  userName,
+  onToggle,
+  isCollapsed = false,
+}: SidebarProps) {
   const location = useLocation();
 
   // Define the menu items with label, icon component, and path
@@ -46,8 +50,8 @@ export function Sidebar({ userName, onToggle, isCollapsed = false }: SidebarProp
         ${isCollapsed ? 'w-20' : 'w-64'}
       `}
     >
-      {/* Logo Section */}
-      <div className="mb-6 flex items-center justify-center">
+      {/* Logo Section: slightly more to the left but still centered-ish */}
+      <div className="mb-6 flex items-center pl-3">
         {isCollapsed ? (
           <svg
             className="w-8 h-8 text-indigo-500"
@@ -89,40 +93,11 @@ export function Sidebar({ userName, onToggle, isCollapsed = false }: SidebarProp
         })}
       </div>
 
-      {/* Premium Button */}
-      <button
-        className={`
-          mx-3 mt-auto mb-4 flex items-center justify-center gap-2
-          px-4 py-2.5 text-sm font-medium text-white rounded-lg
-          transition-all duration-200 bg-gradient-to-r from-violet-600 to-indigo-600
-          hover:from-violet-500 hover:to-indigo-500 shadow-lg shadow-indigo-500/20
-        `}
-      >
-        <Crown className="w-5 h-5" strokeWidth={2} />
-        {!isCollapsed && <span>Upgrade to Premium</span>}
-      </button>
-
-      {/* User Profile */}
-      <div
-        className={`
-          mx-3 flex items-center gap-3 px-4 py-2.5 text-gray-300 rounded-lg
-          hover:bg-gray-800/50 transition-colors
-          ${isCollapsed ? 'justify-center' : ''}
-        `}
-      >
-        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-800">
-          <CircleUserRound className="w-5 h-5" strokeWidth={2} />
-        </div>
-        {!isCollapsed && (
-          <span className="text-sm font-medium">{userName || 'Loading...'}</span>
-        )}
-      </div>
-
-      {/* Toggle Button at the Bottom */}
+      {/* Toggle Button: now above Premium */}
       <button
         onClick={onToggle}
         className={`
-          mx-3 mb-2 flex items-center justify-center p-2
+          mx-3 mt-4 flex items-center justify-center p-2
           border border-gray-800/50 rounded-full text-gray-400
           hover:text-white transition-colors
         `}
@@ -133,6 +108,35 @@ export function Sidebar({ userName, onToggle, isCollapsed = false }: SidebarProp
           <PanelLeftClose className="w-5 h-5" strokeWidth={2} />
         )}
       </button>
+
+      {/* Premium Button */}
+      <button
+        className={`
+          mx-3 mt-4 flex items-center justify-center gap-2
+          px-4 py-2.5 text-sm font-medium text-white rounded-lg
+          transition-all duration-200 bg-gradient-to-r from-violet-600 to-indigo-600
+          hover:from-violet-500 hover:to-indigo-500 shadow-lg shadow-indigo-500/20
+        `}
+      >
+        <Crown className="w-5 h-5" strokeWidth={2} />
+        {!isCollapsed && <span>Upgrade to Premium</span>}
+      </button>
+
+      {/* User Profile pinned at the bottom */}
+      <div
+        className={`
+          mx-3 mt-auto flex items-center gap-3 px-4 py-2.5 text-gray-300
+          rounded-lg hover:bg-gray-800/50 transition-colors
+          ${isCollapsed ? 'justify-center' : ''}
+        `}
+      >
+        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-800">
+          <CircleUserRound className="w-5 h-5" strokeWidth={2} />
+        </div>
+        {!isCollapsed && (
+          <span className="text-sm font-medium">{userName || 'Loading...'}</span>
+        )}
+      </div>
     </div>
   );
 }

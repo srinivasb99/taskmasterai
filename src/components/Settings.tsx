@@ -15,7 +15,6 @@ const Settings: React.FC<SettingsProps> = ({ userName, userEmail }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [subscription, setSubscription] = useState('Basic'); // Default to Basic
   
   // Sidebar state
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
@@ -131,7 +130,6 @@ const Settings: React.FC<SettingsProps> = ({ userName, userEmail }) => {
         isCollapsed={isSidebarCollapsed} 
         onToggle={handleToggleSidebar}
         userName={userName}
-        subscription={subscription}
       />
       
       <main className={`flex-1 overflow-y-auto transition-all duration-300 ${
@@ -156,26 +154,22 @@ const Settings: React.FC<SettingsProps> = ({ userName, userEmail }) => {
                 Current Subscription
               </h2>
               <span className="px-3 py-1 bg-blue-500 text-white rounded-full text-sm">
-                {subscription}
+                Basic
               </span>
             </div>
             <div className="text-gray-300">
-              {subscription === 'Basic' && (
-                <>
-                  <p className="mb-2">Your free plan includes:</p>
-                  <ul className="list-disc list-inside space-y-1 text-sm">
-                    <li>2 PDF Uploads & 2 AI-Generated Text Outputs</li>
-                    <li>10 AI Chat Interactions per Month</li>
-                    <li>1 AI-Generated Note from Audio & YouTube Links</li>
-                    <li>500 Tokens Included</li>
-                    <li>Add Up to 3 Friends</li>
-                  </ul>
-                  <button className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-white rounded-lg transition-all duration-200 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 shadow-lg shadow-indigo-500/20">
-                    <Crown className="w-5 h-5" strokeWidth={2} />
-                    Upgrade to Premium
-                  </button>
-                </>
-              )}
+              <p className="mb-2">Your free plan includes:</p>
+              <ul className="list-disc list-inside space-y-1 text-sm">
+                <li>2 PDF Uploads & 2 AI-Generated Text Outputs</li>
+                <li>10 AI Chat Interactions per Month</li>
+                <li>1 AI-Generated Note from Audio & YouTube Links</li>
+                <li>500 Tokens Included</li>
+                <li>Add Up to 3 Friends</li>
+              </ul>
+              <button className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-white rounded-lg transition-all duration-200 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 shadow-lg shadow-indigo-500/20">
+                <Crown className="w-5 h-5" strokeWidth={2} />
+                Upgrade to Premium
+              </button>
             </div>
           </div>
 

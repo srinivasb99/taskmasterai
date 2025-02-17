@@ -39,7 +39,8 @@ import {
   weatherApiKey,
   hfApiKey,
 } from '../lib/dashboard-firebase';
-import { auth } from '../lib/firebase';
+import { auth, User } from 'firebase/auth';
+import { onAuthStateChanged } from 'firebase/auth';
 
 
 // Helper functions (place these OUTSIDE and BEFORE your component)
@@ -61,16 +62,13 @@ const formatDateForComparison = (date: Date): string => {
 };
 
 export function Dashboard() {
-
-
-
   // ---------------------
-// 1. USER & GENERAL STATE
-// ---------------------
-const [user, setUser] = useState<firebase.default.User | null>(null);
-const [userName, setUserName] = useState("Loading...");
-const [quote, setQuote] = useState(getRandomQuote());
-const [greeting, setGreeting] = useState(getTimeBasedGreeting());
+  // 1. USER & GENERAL STATE
+  // ---------------------
+  const [user, setUser] = useState<User | null>(null);
+  const [userName, setUserName] = useState<string>("Loading...");
+  const [quote, setQuote] = useState(getRandomQuote());
+  const [greeting, setGreeting] = useState(getTimeBasedGreeting());
 
   // Initialize state from localStorage
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
@@ -83,11 +81,27 @@ const [greeting, setGreeting] = useState(getTimeBasedGreeting());
     localStorage.setItem('isSidebarCollapsed', JSON.stringify(isSidebarCollapsed));
   }, [isSidebarCollapsed]);
 
+  // Auth state listener
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      setUser(firebaseUser);
+      if (firebaseUser) {
+        setUserName(firebaseUser.displayName || "User");
+      } else {
+        // Redirect to login if not authenticated
+        return <Navigate to="/login" replace />;
+      }
+    });
+
+    // Cleanup subscription
+    return () => unsubscribe();
+  }, []);
+
   // Example toggle function
   const handleToggleSidebar = () => {
     setIsSidebarCollapsed((prev) => !prev);
   };
-
+  
 const [currentWeek, setCurrentWeek] = useState<Date[]>(getWeekDates(new Date()));
 const today = new Date();
 
@@ -1090,15 +1104,19 @@ setSmartOverview(formattedHtml);
   const completedPlans = plans.filter((pl) => pl.data.completed).length;
   const plansProgress = totalPlans > 0 ? (completedPlans / totalPlans) * 100 : 0;
 
-if (user === null) {
-return (
-<div className="flex items-center justify-center h-screen bg-gray-900 text-white">
-<div className="animate-pulse">
-<p className="text-xl">Loading dashboard...</p>
-<div className="mt-4 h-2 w-32 bg-gray-700 rounded"></div>
-</div>
-</div>
-);
+// Render loading state while checking auth
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gray-900 text-white">
+        <div className="animate-pulse">
+          <p className="text-xl">Loading dashboard...</p>
+          <div className="mt-4 h-2 w-32 bg-gray-700 rounded"></div>
+        </div>
+      </div>
+    );
+  }
+
+  // ... (rest of the render code remains the same)
 }
 
 

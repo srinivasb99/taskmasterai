@@ -764,21 +764,24 @@ const cleanAndValidate = (text: string) => {
     .map(line => line.trim())
     .filter(line => line.length > 0 && !/^[^a-zA-Z0-9]+$/.test(line));
 
-  // If there are two lines starting with "Hello", remove all lines after the second occurrence,
-  // including the line that contains the second "Hello"
-  let helloCount = 0;
-  const truncatedLines = [];
-  for (const line of lines) {
-    if (line.startsWith("Hello")) {
-      helloCount++;
-      if (helloCount === 2) {
-        break;
-      }
-    }
-    truncatedLines.push(line);
+// Check for both "Hello" and "This is:" patterns and remove subsequent lines
+let helloCount = 0;
+const truncatedLines = [];
+for (const line of lines) {
+  if (line.startsWith("This is:")) {
+    break;
   }
+  
+  if (line.startsWith("Hello")) {
+    helloCount++;
+    if (helloCount === 2) {
+      break;
+    }
+  }
+  truncatedLines.push(line);
+}
 
-  return truncatedLines.join('\n');
+return truncatedLines.join('\n');
 };
 
 const cleanedText = cleanAndValidate(rawText);
@@ -789,6 +792,7 @@ if (cleanedText === lastResponse) {
   return;
 }
 setLastResponse(cleanedText);
+
 
 const cleanTextLines = cleanedText
   .split('\n')
@@ -1106,7 +1110,7 @@ return (
           ${isSidebarCollapsed ? 'ml-20' : 'ml-64'} 
           p-4 lg:p-8 overflow-auto`}
       >
- {/* Header Section with Calendar */}
+{/* Header Section with Calendar */}
 <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6 mb-6">
   {/* Greeting Section */}
   <header className="dashboard-header transform transition-all duration-500 ease-out translate-y-0 opacity-100 pt-16 lg:pt-0">
@@ -1121,89 +1125,101 @@ return (
   </header>
 
   {/* Calendar Card */}
-  <div className="bg-gray-800 rounded-xl p-3 min-w-[300px] w-[300px] h-[120px] transform hover:scale-[1.02] transition-all duration-300">
-    <div className="flex justify-between items-center mb-2">
+  <div className="bg-gray-800 rounded-xl p-2 min-w-[500px] w-[500px] h-[80px] transform hover:scale-[1.02] transition-all duration-300">
+    <div className="grid grid-cols-9 gap-1 h-full">
+      {/* Previous Week Button */}
       <button 
         onClick={() => {
           const prevWeek = new Date(currentWeek[0]);
           prevWeek.setDate(prevWeek.getDate() - 7);
           setCurrentWeek(getWeekDates(prevWeek));
         }}
-        className="text-gray-400 hover:text-white transition-colors w-6 h-6 flex items-center justify-center"
+        className="text-gray-400 hover:text-white transition-colors w-8 h-full flex items-center justify-center"
       >
         ←
       </button>
+
+      {/* Calendar Content */}
+      <div className="col-span-7">
+        <div className="grid grid-cols-7 gap-1 h-full">
+          {/* Day Labels */}
+          <div className="col-span-7 grid grid-cols-7 gap-1">
+            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+              <div key={day} className="text-center text-gray-400 text-[10px] font-medium">
+                {day}
+              </div>
+            ))}
+          </div>
+
+          {/* Date Cells */}
+          {currentWeek.map((date, index) => {
+            // 1. Combine all items with a 'type' label
+            const tasksWithType = tasks.map((t) => ({ ...t, type: 'Task' }));
+            const goalsWithType = goals.map((g) => ({ ...g, type: 'Goal' }));
+            const projectsWithType = projects.map((p) => ({ ...p, type: 'Project' }));
+            const plansWithType = plans.map((p) => ({ ...p, type: 'Plan' }));
+
+            // 2. Merge into a single array
+            const allItems = [
+              ...tasksWithType,
+              ...goalsWithType,
+              ...projectsWithType,
+              ...plansWithType,
+            ];
+            
+            // Safely check for deadlines on this date
+            const hasDeadline = allItems?.some(item => {
+              if (!item?.data?.dueDate) return false;
+              
+              let itemDate;
+              try {
+                itemDate = typeof item.data.dueDate.toDate === 'function'
+                  ? item.data.dueDate.toDate()
+                  : new Date(item.data.dueDate);
+                
+                // Ensure we're comparing dates at midnight for accurate comparison
+                itemDate.setHours(0, 0, 0, 0);
+                const compareDate = new Date(date);
+                compareDate.setHours(0, 0, 0, 0);
+                
+                return itemDate.getTime() === compareDate.getTime();
+              } catch (e) {
+                console.error('Error parsing date:', e);
+                return false;
+              }
+            }) || false;
+
+            const isToday = formatDateForComparison(date) === formatDateForComparison(today);
+
+            return (
+              <div
+                key={index}
+                className={`relative w-full h-6 text-center rounded-lg transition-all duration-200
+                  ${isToday ? 'bg-blue-500/20 text-blue-300 font-bold' : 'text-gray-300'}
+                  ${hasDeadline ? 'bg-red-500/10 hover:bg-red-500/20' : 'hover:bg-gray-700/50'}
+                  cursor-pointer flex items-center justify-center`}
+              >
+                <span className="text-xs">{date.getDate()}</span>
+                {hasDeadline && (
+                  <div className="absolute bottom-0.5 left-1/2 transform -translate-x-1/2 w-1 h-1 rounded-full bg-red-400"></div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Next Week Button */}
       <button 
         onClick={() => {
           const nextWeek = new Date(currentWeek[0]);
           nextWeek.setDate(nextWeek.getDate() + 7);
           setCurrentWeek(getWeekDates(nextWeek));
         }}
-        className="text-gray-400 hover:text-white transition-colors w-6 h-6 flex items-center justify-center"
+        className="text-gray-400 hover:text-white transition-colors w-8 h-full flex items-center justify-center"
       >
         →
       </button>
-    </div>
-    <div className="grid grid-cols-7 gap-1">
-      {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-        <div key={day} className="text-center text-gray-400 text-[10px] font-medium">
-          {day}
-        </div>
-      ))}
-      {currentWeek.map((date, index) => {
-        // 1. Combine all items with a 'type' label
-        const tasksWithType = tasks.map((t) => ({ ...t, type: 'Task' }));
-        const goalsWithType = goals.map((g) => ({ ...g, type: 'Goal' }));
-        const projectsWithType = projects.map((p) => ({ ...p, type: 'Project' }));
-        const plansWithType = plans.map((p) => ({ ...p, type: 'Plan' }));
-
-        // 2. Merge into a single array
-        const allItems = [
-          ...tasksWithType,
-          ...goalsWithType,
-          ...projectsWithType,
-          ...plansWithType,
-        ];
-        
-        // Safely check for deadlines on this date
-        const hasDeadline = allItems?.some(item => {
-          if (!item?.data?.dueDate) return false;
-          
-          let itemDate;
-          try {
-            itemDate = typeof item.data.dueDate.toDate === 'function'
-              ? item.data.dueDate.toDate()
-              : new Date(item.data.dueDate);
-            
-            // Ensure we're comparing dates at midnight for accurate comparison
-            itemDate.setHours(0, 0, 0, 0);
-            const compareDate = new Date(date);
-            compareDate.setHours(0, 0, 0, 0);
-            
-            return itemDate.getTime() === compareDate.getTime();
-          } catch (e) {
-            console.error('Error parsing date:', e);
-            return false;
-          }
-        }) || false;
-
-        const isToday = formatDateForComparison(date) === formatDateForComparison(today);
-
-        return (
-          <div
-            key={index}
-            className={`relative w-8 h-8 text-center rounded-lg transition-all duration-200
-              ${isToday ? 'bg-blue-500/20 text-blue-300 font-bold' : 'text-gray-300'}
-              ${hasDeadline ? 'bg-red-500/10 hover:bg-red-500/20' : 'hover:bg-gray-700/50'}
-              cursor-pointer flex items-center justify-center`}
-          >
-            <span className="text-xs">{date.getDate()}</span>
-            {hasDeadline && (
-              <div className="absolute bottom-1 left-1/2 transform -translate-x-1/2 w-1 h-1 rounded-full bg-red-400"></div>
-            )}
-          </div>
-        );
-      })}
     </div>
   </div>
 </div>

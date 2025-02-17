@@ -10,7 +10,6 @@ import {
   RotateCcw,
   Square,
   X,
-  CalendarIcon,
   Timer as TimerIcon,
   Send,
 } from 'lucide-react';
@@ -1121,12 +1120,8 @@ return (
   </header>
 
   {/* Calendar Card */}
-  <div className="bg-gray-800 rounded-xl p-2 min-w-[300px] h-[100px] transform hover:scale-[1.02] transition-all duration-300">
-    <div className="flex items-center gap-1.5 mb-1.5">
-      <CalendarIcon className="w-3.5 h-3.5 text-blue-400" />
-      <h2 className="text-base font-semibold text-blue-300">This Week</h2>
-    </div>
-    <div className="grid grid-cols-7 gap-0.5">
+  <div className="bg-gray-800 rounded-xl p-2 min-w-[600px] h-[80px] transform hover:scale-[1.02] transition-all duration-300">
+    <div className="grid grid-cols-7 gap-0.5 h-full">
       {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
         <div key={day} className="text-center text-gray-400 text-[8px] font-medium">
           {day}
@@ -1154,6 +1149,7 @@ return (
     </div>
   </div>
 </div>
+
 
 
 

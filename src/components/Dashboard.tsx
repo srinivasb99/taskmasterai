@@ -73,6 +73,8 @@ const [greeting, setGreeting] = useState(getTimeBasedGreeting());
     return stored ? JSON.parse(stored) : false;
   });
 
+    const [deadlines, setDeadlines] = useState<Map<string, Array<{type: string; name: string; dueDate: Date}>>>(new Map());
+
   // Update localStorage whenever the state changes
   useEffect(() => {
     localStorage.setItem('isSidebarCollapsed', JSON.stringify(isSidebarCollapsed));

@@ -1167,13 +1167,22 @@ return (
                   ...plansWithType,
                 ];
         
-        // Check for deadlines on this date
-        const hasDeadline = allItems.some(item => {
-          const itemDate = item.data.dueDate.toDate
-            ? item.data.dueDate.toDate()
-            : new Date(item.data.dueDate);
+        // Safely check for deadlines on this date
+        const hasDeadline = allItems?.some(item => {
+          if (!item?.data?.dueDate) return false;
+          
+          let itemDate;
+          try {
+            itemDate = typeof item.data.dueDate.toDate === 'function'
+              ? item.data.dueDate.toDate()
+              : new Date(item.data.dueDate);
+          } catch (e) {
+            console.error('Error parsing date:', e);
+            return false;
+          }
+          
           return itemDate.toISOString().split('T')[0] === dateStr;
-        });
+        }) || false;
 
         return (
           <div

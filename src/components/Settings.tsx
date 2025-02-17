@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Settings as SettingsIcon, Mail, Key, LogOut, Trash2, Save, X, AlertCircle } from 'lucide-react';
+import { User, Settings as SettingsIcon, Mail, Key, LogOut, Trash2, Save, X, AlertCircle, Crown } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { updateUserProfile, signOutUser, deleteUserAccount, AuthError, getCurrentUser } from '../lib/settings-firebase';
-import { auth } from '../lib/firebase';
 
 interface SettingsProps {
   userName: string;
@@ -16,6 +15,7 @@ const Settings: React.FC<SettingsProps> = ({ userName, userEmail }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [subscription, setSubscription] = useState('Basic'); // Default to Basic
   
   // Sidebar state
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
@@ -66,12 +66,10 @@ const Settings: React.FC<SettingsProps> = ({ userName, userEmail }) => {
         throw new AuthError('You must be logged in to update your profile');
       }
 
-      // Validate passwords match if new password is being set
       if (formData.newPassword && formData.newPassword !== formData.confirmPassword) {
         throw new AuthError('New passwords do not match');
       }
 
-      // Prepare update data
       const updateData = {
         name: formData.name !== userName ? formData.name : undefined,
         email: formData.email !== userEmail ? formData.email : undefined,
@@ -79,11 +77,9 @@ const Settings: React.FC<SettingsProps> = ({ userName, userEmail }) => {
         newPassword: formData.newPassword || undefined,
       };
 
-      // Only proceed if there are changes
       if (Object.values(updateData).some(value => value !== undefined)) {
         await updateUserProfile(updateData);
         setIsEditing(false);
-        // Reset password fields
         setFormData(prev => ({
           ...prev,
           currentPassword: '',
@@ -131,7 +127,12 @@ const Settings: React.FC<SettingsProps> = ({ userName, userEmail }) => {
 
   return (
     <div className="flex h-screen bg-gray-900">
-      <Sidebar isCollapsed={isSidebarCollapsed} onToggle={handleToggleSidebar} />
+      <Sidebar 
+        isCollapsed={isSidebarCollapsed} 
+        onToggle={handleToggleSidebar}
+        userName={userName}
+        subscription={subscription}
+      />
       
       <main className={`flex-1 overflow-y-auto transition-all duration-300 ${
         isSidebarCollapsed ? 'ml-16' : 'ml-64'
@@ -145,6 +146,36 @@ const Settings: React.FC<SettingsProps> = ({ userName, userEmail }) => {
             <p className="text-gray-400 mt-2">
               Manage your account settings and preferences
             </p>
+          </div>
+
+          {/* Subscription Status Card */}
+          <div className="bg-gray-800 rounded-xl p-6 mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+                <Crown className="w-5 h-5 text-yellow-400" />
+                Current Subscription
+              </h2>
+              <span className="px-3 py-1 bg-blue-500 text-white rounded-full text-sm">
+                {subscription}
+              </span>
+            </div>
+            <div className="text-gray-300">
+              {subscription === 'Basic' && (
+                <>
+                  <p className="mb-2">Your free plan includes:</p>
+                  <ul className="list-disc list-inside space-y-1 text-sm">
+                    <li>2 PDF Uploads & 2 AI-Generated Text Outputs</li>
+                    <li>10 AI Chat Interactions per Month</li>
+                    <li>1 AI-Generated Note from Audio & YouTube Links</li>
+                    <li>500 Tokens Included</li>
+                    <li>Add Up to 3 Friends</li>
+                  </ul>
+                  <button className="mt-4 px-4 py-2 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-lg hover:from-purple-600 hover:to-blue-600 transition-all">
+                    Upgrade to Premium
+                  </button>
+                </>
+              )}
+            </div>
           </div>
 
           {/* Error Message */}

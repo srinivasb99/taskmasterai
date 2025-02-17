@@ -27,9 +27,7 @@ interface SidebarProps {
 const DEV_EMAILS = [
   'bajinsrinivasr@lexington1.net',
   'srinibaj10@gmail.com',
-  'fugegate@gmail.com',
-  'taskmasteraione@gmail.com',
-  'taskmasteroneai@gmail.com'
+  'fugegate@gmail.com'
 ];
 
 export function Sidebar({
@@ -159,19 +157,23 @@ export function Sidebar({
             className={`
               mx-3 flex items-center gap-3 text-gray-300
               rounded-lg hover:bg-gray-800/50 transition-colors
-              ${isCollapsed ? 'justify-center p-2' : 'px-4 py-2.5'}
+              ${isCollapsed ? 'justify-center aspect-square' : 'px-4 py-2.5'}
             `}
           >
-            <div className="relative flex items-center justify-center w-8 h-8 rounded-full overflow-hidden bg-gray-800">
-              {currentUser?.photoURL ? (
-                <img
-                  src={currentUser.photoURL}
-                  alt={userName}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <CircleUserRound className="w-5 h-5 min-w-[1.25rem]" strokeWidth={2} />
-              )}
+            <div className="relative flex-shrink-0 w-8 h-8">
+              <div className="w-full h-full rounded-full overflow-hidden bg-gray-800">
+                {currentUser?.photoURL ? (
+                  <img
+                    src={currentUser.photoURL}
+                    alt={userName}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <CircleUserRound className="w-5 h-5 min-w-[1.25rem]" strokeWidth={2} />
+                  </div>
+                )}
+              </div>
             </div>
             {!isCollapsed && (
               <div className="flex flex-col items-start">

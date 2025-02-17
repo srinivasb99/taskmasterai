@@ -29,7 +29,7 @@ const DEV_EMAILS = [
   'srinibaj10@gmail.com',
   'fugegate@gmail.com',
   'taskmasteraione@gmail.com',
-  'taskmasteroneai@gmail.com
+  'taskmasteroneai@gmail.com'
 ];
 
 export function Sidebar({

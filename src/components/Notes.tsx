@@ -15,7 +15,9 @@ import {
   FileQuestion,
   BookOpen,
   Sparkles,
-  Loader2
+  Loader2,
+  Save,
+  Tag
 } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { auth } from '../lib/firebase';
@@ -35,7 +37,7 @@ import remarkGfm from 'remark-gfm';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
 import { processPDF } from '../lib/pdf-processor';
-import { saveNote } from '../lib/notes-firebase';
+import { saveNote, saveManualNote } from '../lib/notes-firebase';
 
 // Types
 interface Note {
@@ -73,6 +75,7 @@ export function Notes() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showManualNoteModal, setShowManualNoteModal] = useState(false);
   const [uploadType, setUploadType] = useState<'text' | 'pdf' | 'youtube' | 'audio' | null>(null);
   const [uploadProgress, setUploadProgress] = useState<UploadProgressState>({
     progress: 0,
@@ -85,6 +88,12 @@ export function Notes() {
     const stored = localStorage.getItem('isSidebarCollapsed');
     return stored ? JSON.parse(stored) : false;
   });
+
+  // Manual note state
+  const [manualNoteTitle, setManualNoteTitle] = useState('');
+  const [manualNoteContent, setManualNoteContent] = useState('');
+  const [manualNoteTags, setManualNoteTags] = useState<string[]>([]);
+  const [newTag, setNewTag] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const youtubeInputRef = useRef<HTMLInputElement>(null);
@@ -150,11 +159,58 @@ export function Notes() {
     });
   };
 
+  const openManualNoteModal = () => {
+    setShowManualNoteModal(true);
+    setManualNoteTitle('');
+    setManualNoteContent('');
+    setManualNoteTags([]);
+    setNewTag('');
+  };
+
+  const closeManualNoteModal = () => {
+    setShowManualNoteModal(false);
+    setManualNoteTitle('');
+    setManualNoteContent('');
+    setManualNoteTags([]);
+    setNewTag('');
+  };
+
+  const handleAddTag = () => {
+    if (newTag.trim() && !manualNoteTags.includes(newTag.trim())) {
+      setManualNoteTags([...manualNoteTags, newTag.trim()]);
+      setNewTag('');
+    }
+  };
+
+  const handleRemoveTag = (tagToRemove: string) => {
+    setManualNoteTags(manualNoteTags.filter(tag => tag !== tagToRemove));
+  };
+
+  const handleSaveManualNote = async () => {
+    if (!user) return;
+    if (!manualNoteTitle.trim() || !manualNoteContent.trim()) {
+      // Show error message
+      return;
+    }
+
+    try {
+      await saveManualNote(
+        user.uid,
+        manualNoteTitle.trim(),
+        manualNoteContent.trim(),
+        manualNoteTags
+      );
+      closeManualNoteModal();
+    } catch (error) {
+      console.error('Error saving manual note:', error);
+      // Show error message
+    }
+  };
+
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || !user) return;
 
-    // Handle file upload based on type
     if (uploadType === 'pdf') {
       try {
         const processedPDF = await processPDF(
@@ -184,46 +240,7 @@ export function Notes() {
           error: error instanceof Error ? error.message : 'Failed to process PDF'
         }));
       }
-    } else if (uploadType === 'audio') {
-      // TODO: Implement audio processing
     }
-  };
-
-  const handleYoutubeLink = async (url: string) => {
-    if (!user) return;
-
-    try {
-      const processedYouTube = await processYouTube(
-        url,
-        user.uid,
-        huggingFaceApiKey,
-        setUploadProgress
-      );
-
-      await saveNote({
-        title: processedYouTube.title,
-        content: processedYouTube.content,
-        type: 'youtube',
-        keyPoints: processedYouTube.keyPoints,
-        questions: processedYouTube.questions,
-        sourceUrl: processedYouTube.sourceUrl,
-        userId: user.uid,
-        isPublic: false,
-        tags: []
-      });
-
-      closeUploadModal();
-    } catch (error) {
-      console.error('Error processing YouTube video:', error);
-      setUploadProgress(prev => ({
-        ...prev,
-        error: error instanceof Error ? error.message : 'Failed to process YouTube video'
-      }));
-    }
-  };
-
-  const handleTextInput = async (text: string) => {
-    // TODO: Implement text processing
   };
 
   // Show loading state while checking auth
@@ -404,6 +421,11 @@ export function Notes() {
                             Audio
                           </span>
                         )}
+                        {note.type === 'text' && (
+                          <span className="px-2 py-0.5 text-xs bg-green-500/20 text-green-300 rounded-full">
+                            Text
+                          </span>
+                        )}
                         {note.isPublic && (
                           <span className="px-2 py-0.5 text-xs bg-green-500/20 text-green-300 rounded-full">
                             Public
@@ -418,13 +440,22 @@ export function Notes() {
 
             {/* New Note Button */}
             <div className="p-4 border-t border-gray-800">
-              <button
-                onClick={() => setShowUploadModal(true)}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-                New Note
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={openManualNoteModal}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors"
+                >
+                  <FileText className="w-4 h-4" />
+                  Personal Note
+                </button>
+                <button
+                  onClick={() => setShowUploadModal(true)}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  AI Note
+                </button>
+              </div>
             </div>
           </div>
 
@@ -511,6 +542,102 @@ export function Notes() {
             )}
           </div>
         </div>
+
+        {/* Manual Note Modal */}
+        {showManualNoteModal && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+            <div className="bg-gray-800 rounded-xl p-6 max-w-2xl w-full mx-4">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-semibold text-white">Create Manual Note</h2>
+                <button
+                  onClick={closeManualNoteModal}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {/* Title Input */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Title
+                  </label>
+                  <input
+                    type="text"
+                    value={manualNoteTitle}
+                    onChange={(e) => setManualNoteTitle(e.target.value)}
+                    placeholder="Enter note title..."
+                    className="w-full bg-gray-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                {/* Content Input */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Content (Markdown supported)
+                  </label>
+                  <textarea
+                    value={manualNoteContent}
+                    onChange={(e) => setManualNoteContent(e.target.value)}
+                    placeholder="Enter note content..."
+                    rows={10}
+                    className="w-full bg-gray-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                {/* Tags Input */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Tags
+                  </label>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {manualNoteTags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="px-2 py-1 bg-blue-500/20 text-blue-300 rounded-full text-sm flex items-center gap-1"
+                      >
+                        {tag}
+                        <button
+                          onClick={() => handleRemoveTag(tag)}
+                          className="hover:text-blue-200"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newTag}
+                      onChange={(e) => setNewTag(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && handleAddTag()}
+                      placeholder="Add a tag..."
+                      className="flex-1 bg-gray-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <button
+                      onClick={handleAddTag}
+                      className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-2"
+                    >
+                      <Tag className="w-4 h-4" />
+                      Add
+                    </button>
+                  </div>
+                </div>
+
+                {/* Save Button */}
+                <button
+                  onClick={handleSaveManualNote}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                >
+                  <Save className="w-4 h-4" />
+                  Save Note
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Upload Modal */}
         {showUploadModal && (
@@ -608,7 +735,7 @@ export function Notes() {
                         className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
                       >
                         Generate Note
-                        <ChevronRight className="w-4 h-4" />
+                        <Ch evronRight className="w-4 h-4" />
                       </button>
                     </div>
                   )}

@@ -1,4 +1,4 @@
-import { addDoc, collection, Timestamp } from 'firebase/firestore';
+import { addDoc, collection, Timestamp, updateDoc, doc } from 'firebase/firestore';
 import { db } from './firebase';
 
 interface Note {
@@ -32,7 +32,7 @@ export async function saveNote(note: Omit<Note, 'createdAt' | 'updatedAt'>) {
   }
 }
 
-export async function saveManualNote(userId: string, title: string, content: string, tags: string[] = []) {
+export async function savePersonalNote(userId: string, title: string, content: string, tags: string[] = []) {
   try {
     const docRef = await addDoc(collection(db, 'notes'), {
       title,
@@ -46,7 +46,20 @@ export async function saveManualNote(userId: string, title: string, content: str
     });
     return docRef.id;
   } catch (error) {
-    console.error('Error saving manual note:', error);
+    console.error('Error saving personal note:', error);
+    throw error;
+  }
+}
+
+export async function updateNote(noteId: string, updates: Partial<Note>) {
+  try {
+    const noteRef = doc(db, 'notes', noteId);
+    await updateDoc(noteRef, {
+      ...updates,
+      updatedAt: Timestamp.now()
+    });
+  } catch (error) {
+    console.error('Error updating note:', error);
     throw error;
   }
 }

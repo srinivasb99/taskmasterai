@@ -6,6 +6,7 @@ import {
   Timer as TimerIcon,
   Bot,
   X,
+  AlertTriangle,
 } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { Timer } from './Timer';
@@ -445,11 +446,28 @@ Guidelines:
         <div className="h-full flex flex-col">
           {/* Header */}
           <div className="p-4 border-b border-gray-800">
-            <div className="flex items-center gap-3">
-              <Bot className="w-6 h-6 text-blue-400" />
-              <div>
-                <h1 className="text-xl font-semibold text-white">AI Assistant</h1>
-                <p className="text-sm text-gray-400">Chat with TaskMaster</p>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Bot className="w-6 h-6 text-blue-400" />
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h1 className="text-xl font-semibold text-white">AI Assistant</h1>
+                    <span className="px-2 py-0.5 text-xs font-medium bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-full">
+                      BETA
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-400">Chat with TaskMaster</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2 text-xs text-gray-400">
+                  <AlertTriangle className="w-4 h-4 text-yellow-400" />
+                  <span>Chat history is not saved</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-gray-400">
+                  <AlertTriangle className="w-4 h-4 text-yellow-400" />
+                  <span>TaskMaster can make mistakes. Verify details.</span>
+                </div>
               </div>
             </div>
           </div>

@@ -47,7 +47,7 @@ export function HeroSection() {
               </a>
             )}
             
-            <a href={user ? "/dashboard.html" : "#demo"} 
+            <a href={user ? "/dashboard" : "/demo"} 
                className="inline-flex items-center px-8 py-3 bg-gray-800/50 text-white rounded-full text-lg font-semibold border border-gray-700/50 backdrop-blur-sm transition-all hover:bg-gray-700/50">
               {user ? 'Go to Dashboard' : 'Watch demo'}
             </a>

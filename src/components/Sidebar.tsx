@@ -48,7 +48,7 @@ export function Sidebar({
   };
 
   const handleUpgradeClick = () => {
-    navigate('/settings');
+    navigate('/pricing');
   };
 
   return (

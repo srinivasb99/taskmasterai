@@ -17,7 +17,9 @@ import {
   Sparkles,
   Loader2,
   Save,
-  Tag
+  Tag,
+  Edit2,
+  Check
 } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { auth } from '../lib/firebase';
@@ -37,7 +39,8 @@ import remarkGfm from 'remark-gfm';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
 import { processPDF } from '../lib/pdf-processor';
-import { saveNote, saveManualNote } from '../lib/notes-firebase';
+import { processYouTube } from '../lib/youtube-processor';
+import { saveNote, savePersonalNote, updateNote } from '../lib/notes-firebase';
 
 // Types
 interface Note {
@@ -94,6 +97,8 @@ export function Notes() {
   const [manualNoteContent, setManualNoteContent] = useState('');
   const [manualNoteTags, setManualNoteTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingNote, setEditingNote] = useState<Note | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const youtubeInputRef = useRef<HTMLInputElement>(null);
@@ -189,22 +194,45 @@ export function Notes() {
   const handleSaveManualNote = async () => {
     if (!user) return;
     if (!manualNoteTitle.trim() || !manualNoteContent.trim()) {
-      // Show error message
+      setUploadProgress(prev => ({
+        ...prev,
+        error: 'Title and content are required'
+      }));
       return;
     }
 
     try {
-      await saveManualNote(
-        user.uid,
-        manualNoteTitle.trim(),
-        manualNoteContent.trim(),
-        manualNoteTags
-      );
+      if (editingNote) {
+        await updateNote(editingNote.id, {
+          title: manualNoteTitle.trim(),
+          content: manualNoteContent.trim(),
+          tags: manualNoteTags
+        });
+      } else {
+        await savePersonalNote(
+          user.uid,
+          manualNoteTitle.trim(),
+          manualNoteContent.trim(),
+          manualNoteTags
+        );
+      }
       closeManualNoteModal();
+      setEditingNote(null);
     } catch (error) {
-      console.error('Error saving manual note:', error);
-      // Show error message
+      console.error('Error saving note:', error);
+      setUploadProgress(prev => ({
+        ...prev,
+        error: 'Failed to save note'
+      }));
     }
+  };
+
+  const handleEditNote = (note: Note) => {
+    setEditingNote(note);
+    setManualNoteTitle(note.title);
+    setManualNoteContent(note.content);
+    setManualNoteTags(note.tags || []);
+    setShowManualNoteModal(true);
   };
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -240,6 +268,39 @@ export function Notes() {
           error: error instanceof Error ? error.message : 'Failed to process PDF'
         }));
       }
+    }
+  };
+
+  const handleYoutubeSubmit = async (url: string) => {
+    if (!user) return;
+
+    try {
+      const processedYoutube = await processYouTube(
+        url,
+        user.uid,
+        huggingFaceApiKey,
+        setUploadProgress
+      );
+
+      await saveNote({
+        title: processedYoutube.title,
+        content: processedYoutube.content,
+        type: 'youtube',
+        keyPoints: processedYoutube.keyPoints,
+        questions: processedYoutube.questions,
+        sourceUrl: processedYoutube.sourceUrl,
+        userId: user.uid,
+        isPublic: false,
+        tags: []
+      });
+
+      closeUploadModal();
+    } catch (error) {
+      console.error('Error processing YouTube video:', error);
+      setUploadProgress(prev => ({
+        ...prev,
+        error: error instanceof Error ? error.message : 'Failed to process YouTube video'
+      }));
     }
   };
 
@@ -284,7 +345,7 @@ export function Notes() {
                     BETA
                   </span>
                 </div>
-                <p className="text-sm text-gray-400">AI-Powered Note Generation</p>
+                <p className="text-sm text-gray-400">Personal & AI-Generated Notes</p>
               </div>
             </div>
             <div className="flex items-center gap-4">
@@ -316,7 +377,7 @@ export function Notes() {
                   className="w-full bg-gray-800 text-gray-200 pl-10 pr-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-              <div className="flex gap-2 mt-3">
+              <div className="flex gap-2 mt-3 overflow-x-auto pb-2">
                 <button
                   onClick={() => setFilterType('all')}
                   className={`px-3 py-1 text-xs rounded-full transition-colors ${
@@ -335,7 +396,7 @@ export function Notes() {
                       : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
                   }`}
                 >
-                  Text
+                  Personal
                 </button>
                 <button
                   onClick={() => setFilterType('pdf')}
@@ -377,68 +438,99 @@ export function Notes() {
                   <FileQuestion className="w-12 h-12 text-gray-600 mb-4" />
                   <p className="text-gray-400 mb-2">No notes yet</p>
                   <p className="text-sm text-gray-500 mb-4">
-                    Create your first note by clicking the "New Note" button below
+                    Create your first note by clicking one of the buttons below
                   </p>
-                  <button
-                    onClick={() => setShowUploadModal(true)}
-                    className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-                  >
-                    Create Note
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={openManualNoteModal}
+                      className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors"
+                    >
+                      Personal Note
+                    </button>
+                    <button
+                      onClick={() => setShowUploadModal(true)}
+                      className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                    >
+                      AI Note
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div className="divide-y divide-gray-800">
-                  {notes.map((note) => (
-                    <button
-                      key={note.id}
-                      onClick={() => setSelectedNote(note)}
-                      className={`w-full p-4 text-left transition-colors hover:bg-gray-800 ${
-                        selectedNote?.id === note.id ? 'bg-gray-800' : ''
-                      }`}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <h3 className="text-white font-medium mb-1">{note.title}</h3>
-                          <p className="text-sm text-gray-400 line-clamp-2">{note.content}</p>
+                  {notes
+                    .filter(note => {
+                      if (filterType !== 'all' && note.type !== filterType) return false;
+                      if (searchQuery) {
+                        const search = searchQuery.toLowerCase();
+                        return (
+                          note.title.toLowerCase().includes(search) ||
+                          note.content.toLowerCase().includes(search) ||
+                          note.tags?.some(tag => tag.toLowerCase().includes(search))
+                        );
+                      }
+                      return true;
+                    })
+                    .map((note) => (
+                      <div
+                        key={note.id}
+                        className={`p-4 transition-colors hover:bg-gray-800 ${
+                          selectedNote?.id === note.id ? 'bg-gray-800' : ''
+                        }`}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1 cursor-pointer" onClick={() => setSelectedNote(note)}>
+                            <h3 className="text-white font-medium mb-1">{note.title}</h3>
+                            <p className="text-sm text-gray-400 line-clamp-2">{note.content}</p>
+                          </div>
+                          <button
+                            onClick={() => handleEditNote(note)}
+                            className="ml-2 p-1 text-gray-400 hover:text-white transition-colors"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
                         </div>
-                        <span className="text-xs text-gray-500">
-                          {note.updatedAt.toDate().toLocaleDateString()}
-                        </span>
+                        <div className="flex items-center gap-2 mt-2">
+                          {note.type === 'text' && (
+                            <span className="px-2 py-0.5 text-xs bg-green-500/20 text-green-300 rounded-full">
+                              Personal
+                            </span>
+                          )}
+                          {note.type === 'pdf' && (
+                            <span className="px-2 py-0.5 text-xs bg-red-500/20 text-red-300 rounded-full">
+                              PDF
+                            </span>
+                          )}
+                          {note.type === 'youtube' && (
+                            <span className="px-2 py-0.5 text-xs bg-red-500/20 text-red-300 rounded-full">
+                              YouTube
+                            </span>
+                          )}
+                          {note.type === 'audio' && (
+                            <span className="px-2 py-0.5 text-xs bg-blue-500/20 text-blue-300 rounded-full">
+                              Audio
+                            </span>
+                          )}
+                          {note.isPublic && (
+                            <span className="px-2 py-0.5 text-xs bg-green-500/20 text-green-300 rounded-full">
+                              Public
+                            </span>
+                          )}
+                          {note.tags?.map(tag => (
+                            <span
+                              key={tag}
+                              className="px-2 py-0.5 text-xs bg-blue-500/20 text-blue-300 rounded-full"
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2 mt-2">
-                        {note.type === 'pdf' && (
-                          <span className="px-2 py-0.5 text-xs bg-red-500/20 text-red-300 rounded-full">
-                            PDF
-                          </span>
-                        )}
-                        {note.type === 'youtube' && (
-                          <span className="px-2 py-0.5 text-xs bg-red-500/20 text-red-300 rounded-full">
-                            YouTube
-                          </span>
-                        )}
-                        {note.type === 'audio' && (
-                          <span className="px-2 py-0.5 text-xs bg-blue-500/20 text-blue-300 rounded-full">
-                            Audio
-                          </span>
-                        )}
-                        {note.type === 'text' && (
-                          <span className="px-2 py-0.5 text-xs bg-green-500/20 text-green-300 rounded-full">
-                            Text
-                          </span>
-                        )}
-                        {note.isPublic && (
-                          <span className="px-2 py-0.5 text-xs bg-green-500/20 text-green-300 rounded-full">
-                            Public
-                          </span>
-                        )}
-                      </div>
-                    </button>
-                  ))}
+                    ))}
                 </div>
               )}
             </div>
 
-            {/* New Note Button */}
+            {/* New Note Buttons */}
             <div className="p-4 border-t border-gray-800">
               <div className="flex gap-2">
                 <button
@@ -464,12 +556,32 @@ export function Notes() {
             {selectedNote ? (
               <div className="p-6">
                 <div className="mb-6">
-                  <h2 className="text-2xl font-semibold text-white mb-2">{selectedNote.title}</h2>
-                  <div className="flex items-center gap-3 text-sm text-gray-400">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-2xl font-semibold text-white">{selectedNote.title}</h2>
+                    <button
+                      onClick={() => handleEditNote(selectedNote)}
+                      className="p-2 text-gray-400 hover:text-white transition-colors rounded-lg hover:bg-gray-800"
+                    >
+                      <Edit2 className="w-5 h-5" />
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-3 text-sm text-gray-400 mt-2">
                     <span>Created {selectedNote.createdAt.toDate().toLocaleDateString()}</span>
                     <span>•</span>
                     <span>Updated {selectedNote.updatedAt.toDate().toLocaleDateString()}</span>
                   </div>
+                  {selectedNote.tags?.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      {selectedNote.tags.map(tag => (
+                        <span
+                          key={tag}
+                          className="px-2 py-0.5 text-xs bg-blue-500/20 text-blue-300 rounded-full"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div className="prose prose-invert max-w-none">
                   <ReactMarkdown
@@ -514,17 +626,12 @@ export function Notes() {
                             {q.options.map((option, optIndex) => (
                               <button
                                 key={optIndex}
-                                className={`w-full text-left p-3 rounded-lg transition-colors ${
-                                  optIndex === q.correctAnswer
-                                    ? 'bg-green-500/20 text-green-300'
-                                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                }`}
+                                className="w-full text-left p-3 rounded-lg transition-colors bg-gray-700 text-gray-300 hover:bg-gray-600"
                               >
                                 {option}
                               </button>
                             ))}
                           </div>
-                          <p className="mt-4 text-sm text-gray-400">{q.explanation}</p>
                         </div>
                       ))}
                     </div>
@@ -543,12 +650,14 @@ export function Notes() {
           </div>
         </div>
 
-        {/* Manual Note Modal */}
+        {/* Manual/Edit Note Modal */}
         {showManualNoteModal && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
             <div className="bg-gray-800 rounded-xl p-6 max-w-2xl w-full mx-4">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-semibold text-white">Create Manual Note</h2>
+                <h2 className="text-xl font-semibold text-white">
+                  {editingNote ? 'Edit Note' : 'Create Personal Note'}
+                </h2>
                 <button
                   onClick={closeManualNoteModal}
                   className="text-gray-400 hover:text-white transition-colors"
@@ -626,13 +735,21 @@ export function Notes() {
                   </div>
                 </div>
 
+                {/* Error Message */}
+                {uploadProgress.error && (
+                  <div className="p-4 bg-red-500/20 text-red-300 rounded-lg flex items-start gap-3">
+                    <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                    <p>{uploadProgress.error}</p>
+                  </div>
+                )}
+
                 {/* Save Button */}
                 <button
                   onClick={handleSaveManualNote}
                   className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
                 >
                   <Save className="w-4 h-4" />
-                  Save Note
+                  {editingNote ? 'Save Changes' : 'Save Note'}
                 </button>
               </div>
             </div>
@@ -644,7 +761,8 @@ export function Notes() {
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
             <div className="bg-gray-800 rounded-xl p-6 max-w-md w-full mx-4">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-semibold text-white">Create New Note</h2>
+                <h2 className="text-xl font-semibold text-white">Create AI Note ```
+                </h2>
                 <button
                   onClick={closeUploadModal}
                   className="text-gray-400 hover:text-white transition-colors"
@@ -729,13 +847,14 @@ export function Notes() {
                         type="text"
                         placeholder="Enter YouTube URL..."
                         className="w-full bg-gray-700 text-white rounded-lg px-4 py-2 mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        ref={youtubeInputRef}
                       />
                       <button
-                        onClick={() => {/* Handle YouTube URL submission */}}
+                        onClick={() => youtubeInputRef.current?.value && handleYoutubeSubmit(youtubeInputRef.current.value)}
                         className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
                       >
                         Generate Note
-                        <Ch evronRight className="w-4 h-4" />
+                        <ChevronRight className="w-4 h-4" />
                       </button>
                     </div>
                   )}

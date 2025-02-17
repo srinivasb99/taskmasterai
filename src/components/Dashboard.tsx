@@ -64,6 +64,7 @@ export function Dashboard() {
   // ---------------------
   // 1. USER & GENERAL STATE
   // ---------------------
+  const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [userName, setUserName] = useState<string>("Loading...");
   const [quote, setQuote] = useState(getRandomQuote());
@@ -80,16 +81,14 @@ export function Dashboard() {
     localStorage.setItem('isSidebarCollapsed', JSON.stringify(isSidebarCollapsed));
   }, [isSidebarCollapsed]);
 
-  // Auth state listener
+ // Auth state listener
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
       if (firebaseUser) {
         setUserName(firebaseUser.displayName || "User");
-      } else {
-        // Redirect to login if not authenticated
-        return <Navigate to="/login" replace />;
       }
+      setLoading(false);
     });
 
     // Cleanup subscription
@@ -1104,10 +1103,22 @@ setSmartOverview(formattedHtml);
   const plansProgress = totalPlans > 0 ? (completedPlans / totalPlans) * 100 : 0;
 
 
-// Render loading state while checking auth
-if (!user) {
-  return <Navigate to="/login" replace />;
-}
+// Show loading state while checking auth
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gray-900 text-white">
+        <div className="animate-pulse">
+          <p className="text-xl">Loading...</p>
+          <div className="mt-4 h-2 w-32 bg-gray-700 rounded"></div>
+        </div>
+      </div>
+    );
+  }
+
+  // Redirect to login if not authenticated
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
 
 
 

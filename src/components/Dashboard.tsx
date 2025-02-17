@@ -1116,8 +1116,6 @@ setSmartOverview(formattedHtml);
     );
   }
 
-  // ... (rest of the render code remains the same)
-}
 
 
  return (

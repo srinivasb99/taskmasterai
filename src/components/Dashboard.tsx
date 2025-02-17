@@ -1120,10 +1120,10 @@ return (
   </header>
 
   {/* Calendar Card */}
-  <div className="bg-gray-800 rounded-xl p-2 min-w-[600px] h-[80px] transform hover:scale-[1.02] transition-all duration-300">
+  <div className="bg-gray-800 rounded-xl p-2 min-w-[500px] h-[80px] transform hover:scale-[1.02] transition-all duration-300">
     <div className="grid grid-cols-7 gap-0.5 h-full">
       {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-        <div key={day} className="text-center text-gray-400 text-[8px] font-medium">
+        <div key={day} className="text-center text-gray-400 text-xs font-medium">
           {day}
         </div>
       ))}
@@ -1139,7 +1139,7 @@ return (
               ${hasDeadline ? 'ring-1 ring-purple-500/50' : ''}
               hover:bg-gray-700/50`}
           >
-            <span className="text-[9px]">{date.getDate()}</span>
+            <span className="text-sm">{date.getDate()}</span>
             {hasDeadline && (
               <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-0.5 h-0.5 rounded-full bg-purple-500"></div>
             )}
@@ -1149,6 +1149,7 @@ return (
     </div>
   </div>
 </div>
+
 
 
 

@@ -73,7 +73,7 @@ const [greeting, setGreeting] = useState(getTimeBasedGreeting());
     return stored ? JSON.parse(stored) : false;
   });
 
-    const [deadlines, setDeadlines] = useState<Map<string, Array<{type: string; name: string; dueDate: Date}>>>(new Map());
+  const [deadlines, setDeadlines] = useState<Map<string, Array<{type: string; name: string; dueDate: Date}>>>(new Map());
 
   // Update localStorage whenever the state changes
   useEffect(() => {
@@ -86,8 +86,8 @@ const [greeting, setGreeting] = useState(getTimeBasedGreeting());
   };
 
   // Get current date info
-  const today = new Date();
-  const currentWeek = getWeekDates(today);
+const [today] = useState(new Date());
+const [currentWeek, setCurrentWeek] = useState<Date[]>([]);
 
   // Function to get week dates
   function getWeekDates(date: Date) {
@@ -107,6 +107,11 @@ const [greeting, setGreeting] = useState(getTimeBasedGreeting());
   function formatDateForComparison(date: Date) {
     return date.toISOString().split('T')[0];
   }
+
+useEffect(() => {
+  setCurrentWeek(getWeekDates(today));
+}, [today]);
+
 
   // Process deadlines
   useEffect(() => {

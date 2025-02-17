@@ -170,7 +170,8 @@ const Settings: React.FC<SettingsProps> = ({ userName, userEmail }) => {
                     <li>500 Tokens Included</li>
                     <li>Add Up to 3 Friends</li>
                   </ul>
-                  <button className="mt-4 px-4 py-2 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-lg hover:from-purple-600 hover:to-blue-600 transition-all">
+                  <button className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-white rounded-lg transition-all duration-200 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 shadow-lg shadow-indigo-500/20">
+                    <Crown className="w-5 h-5" strokeWidth={2} />
                     Upgrade to Premium
                   </button>
                 </>

@@ -80,14 +80,16 @@ export function Dashboard() {
     localStorage.setItem('isSidebarCollapsed', JSON.stringify(isSidebarCollapsed));
   }, [isSidebarCollapsed]);
 
- // Auth state listener
+  // Auth state listener
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
       if (firebaseUser) {
         setUserName(firebaseUser.displayName || "User");
+      } else {
+        // Redirect to login if not authenticated
+        return <Navigate to="/login" replace />;
       }
-      setLoading(false);
     });
 
     // Cleanup subscription
@@ -1102,12 +1104,10 @@ setSmartOverview(formattedHtml);
   const plansProgress = totalPlans > 0 ? (completedPlans / totalPlans) * 100 : 0;
 
 
-
-
-  // Redirect to login if not authenticated
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
+// Render loading state while checking auth
+if (!user) {
+  return <Navigate to="/login" replace />;
+}
 
 
 

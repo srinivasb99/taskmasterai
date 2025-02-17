@@ -35,31 +35,31 @@ createRoot(document.getElementById('root')!).render(
         <AuthProvider>
           <Routes>
             <Route path="/login" element={<PageTitle title="Login"><Login /></PageTitle>} />
-            }
+            
             <Route path="/signup" element={<PageTitle title="Sign Up"><SignUpPage /></PageTitle>} />
-            }
+            
             <Route path="/pricing" element={<PageTitle title="Pricing"><Pricing /></PageTitle>} />
-            }
+            
             <Route path="/terms" element={<PageTitle title="Terms of Service"><Terms /></PageTitle>} />
-            }
+            
             <Route path="/settings" element={<PageTitle title="Settings"><Settings /></PageTitle>} />
-            }
+            
             <Route path="/splashscreen" element={<PageTitle title="Welcome"><SplashScreen /></PageTitle>} />
-            }
+            
             <Route path="/privacy-policy" element={<PageTitle title="Privacy Policy"><PrivacyPolicy /></PageTitle>} />
-            }
+            
             <Route path="/forgot-password" element={<PageTitle title="Reset Password"><ForgotPassword /></PageTitle>} />
-            }
+            
             <Route path="/dashboard" element={<PageTitle title="Dashboard"><Dashboard /></PageTitle>} />
-            }
+            
             <Route path="/contact" element={<PageTitle title="Contact Us"><Contact /></PageTitle>} />
-            }
+            
             <Route path="/ai" element={<PageTitle title="AI Assistant"><AIChat /></PageTitle>} />
-            }
+            
             <Route path="/school" element={<PageTitle title="School"><SchoolPage /></PageTitle>} />
-            }
+            
             <Route path="/" element={<PageTitle title="Home"><App /></PageTitle>} />
-            }
+            
           </Routes>
         </AuthProvider>
       </BrowserRouter>

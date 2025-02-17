@@ -1120,28 +1120,58 @@ return (
   </header>
 
   {/* Calendar Card */}
-  <div className="bg-gray-800 rounded-xl p-2 min-w-[500px] h-[80px] transform hover:scale-[1.02] transition-all duration-300">
-    <div className="grid grid-cols-7 gap-0.5 h-full">
+  <div className="bg-gray-800 rounded-xl p-3 min-w-[500px] h-[80px] transform hover:scale-[1.02] transition-all duration-300">
+    <div className="flex justify-between items-center mb-2">
+      <button 
+        onClick={() => {
+          const prevWeek = new Date(currentWeek[0]);
+          prevWeek.setDate(prevWeek.getDate() - 7);
+          setCurrentWeek(getWeekDates(prevWeek));
+        }}
+        className="text-gray-400 hover:text-white transition-colors"
+      >
+        ←
+      </button>
+      <button 
+        onClick={() => {
+          const nextWeek = new Date(currentWeek[0]);
+          nextWeek.setDate(nextWeek.getDate() + 7);
+          setCurrentWeek(getWeekDates(nextWeek));
+        }}
+        className="text-gray-400 hover:text-white transition-colors"
+      >
+        →
+      </button>
+    </div>
+    <div className="grid grid-cols-7 gap-0.5">
       {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
         <div key={day} className="text-center text-gray-400 text-xs font-medium">
           {day}
         </div>
       ))}
       {currentWeek.map((date, index) => {
+        const dateStr = date.toISOString().split('T')[0];
         const isToday = formatDateForComparison(date) === formatDateForComparison(today);
-        const hasDeadline = false; // You can check against your deadlines here
+        
+        // Check for deadlines on this date
+        const hasDeadline = allItems.some(item => {
+          const itemDate = item.data.dueDate.toDate
+            ? item.data.dueDate.toDate()
+            : new Date(item.data.dueDate);
+          return itemDate.toISOString().split('T')[0] === dateStr;
+        });
 
         return (
           <div
             key={index}
             className={`relative p-0.5 text-center rounded-lg transition-all duration-200
               ${isToday ? 'bg-blue-500/20 text-blue-300 font-bold' : 'text-gray-300'}
-              ${hasDeadline ? 'ring-1 ring-purple-500/50' : ''}
-              hover:bg-gray-700/50`}
+              ${hasDeadline ? 'bg-red-500/10 hover:bg-red-500/20' : 'hover:bg-gray-700/50'}
+              cursor-pointer`}
           >
             <span className="text-sm">{date.getDate()}</span>
             {hasDeadline && (
-              <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-0.5 h-0.5 rounded-full bg-purple-500"></div>
+              <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-1 h-1 rounded-full bg-red-400"></div>
             )}
           </div>
         );
@@ -1149,6 +1179,7 @@ return (
     </div>
   </div>
 </div>
+
 
 
 

@@ -89,6 +89,38 @@ const [greeting, setGreeting] = useState(getTimeBasedGreeting());
     return date.toISOString().split('T')[0];
   }
 
+  // Process deadlines
+  useEffect(() => {
+    const deadlineMap = new Map<string, Array<{type: string; name: string; dueDate: Date}>>();
+
+    const processItems = (items: Array<{ id: string; data: any }>, type: string) => {
+      items.forEach(item => {
+        if (item.data.dueDate && !item.data.completed) {
+          const dueDate = item.data.dueDate.toDate ? item.data.dueDate.toDate() : new Date(item.data.dueDate);
+          const dateKey = formatDateForComparison(dueDate);
+          const name = item.data[type.toLowerCase()] || 'Untitled';
+          
+          if (!deadlineMap.has(dateKey)) {
+            deadlineMap.set(dateKey, []);
+          }
+          deadlineMap.get(dateKey)?.push({
+            type,
+            name,
+            dueDate
+          });
+        }
+      });
+    };
+
+    processItems(tasks, 'Task');
+    processItems(goals, 'Goal');
+    processItems(projects, 'Project');
+    processItems(plans, 'Plan');
+
+    setDeadlines(deadlineMap);
+  }, [tasks, goals, projects, plans]);
+
+
 
 // ---------------------
 // Types for timer messages
@@ -1120,33 +1152,46 @@ return (
             </p>
           </header>
 
-                    {/* Calendar Card */}
-          <div className="bg-gray-800 rounded-xl p-6 min-w-[300px] transform hover:scale-[1.02] transition-all duration-300">
+          {/* Calendar Card */}
+          <div className="bg-gray-800 rounded-xl p-6 min-w-[300px] h-[140px] transform hover:scale-[1.02] transition-all duration-300">
             <div className="flex items-center gap-2 mb-4">
               <CalendarIcon className="w-5 h-5 text-blue-400" />
               <h2 className="text-xl font-semibold text-blue-300">This Week</h2>
             </div>
             <div className="grid grid-cols-7 gap-2">
               {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-                <div key={day} className="text-center text-gray-400 text-sm font-medium">
+                <div key={day} className="text-center text-gray-400 text-xs font-medium">
                   {day}
                 </div>
               ))}
               {currentWeek.map((date, index) => {
-                const isToday = formatDateForComparison(date) === formatDateForComparison(today);
-                const hasDeadline = false; // You can check against your deadlines here
+                const dateKey = formatDateForComparison(date);
+                const isToday = dateKey === formatDateForComparison(today);
+                const hasDeadline = deadlines.has(dateKey);
+                const dateDeadlines = deadlines.get(dateKey) || [];
 
                 return (
                   <div
                     key={index}
-                    className={`relative p-2 text-center rounded-lg transition-all duration-200
+                    className={`group relative p-1 text-center rounded-lg transition-all duration-200
                       ${isToday ? 'bg-blue-500/20 text-blue-300 font-bold' : 'text-gray-300'}
                       ${hasDeadline ? 'ring-2 ring-purple-500/50' : ''}
                       hover:bg-gray-700/50`}
+                    title={hasDeadline ? dateDeadlines.map(d => `${d.type}: ${d.name}`).join('\n') : undefined}
                   >
-                    <span className="text-sm">{date.getDate()}</span>
+                    <span className="text-xs">{date.getDate()}</span>
                     {hasDeadline && (
-                      <div className="absolute bottom-1 left-1/2 transform -translate-x-1/2 w-1 h-1 rounded-full bg-purple-500"></div>
+                      <>
+                        <div className="absolute bottom-0.5 left-1/2 transform -translate-x-1/2 w-1 h-1 rounded-full bg-purple-500"></div>
+                        {/* Tooltip */}
+                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-48 bg-gray-900 rounded-lg p-2 text-xs text-left opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                          {dateDeadlines.map((deadline, i) => (
+                            <div key={i} className="mb-1 last:mb-0">
+                              <span className="font-semibold">{deadline.type}:</span> {deadline.name}
+                            </div>
+                          ))}
+                        </div>
+                      </>
                     )}
                   </div>
                 );

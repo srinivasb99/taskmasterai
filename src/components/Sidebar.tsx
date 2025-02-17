@@ -14,7 +14,7 @@ import {
   PanelLeftOpen,
 } from 'lucide-react';
 import { Logo } from './Logo';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 interface SidebarProps {
   userName: string;
@@ -28,6 +28,7 @@ export function Sidebar({
   isCollapsed = false,
 }: SidebarProps) {
   const location = useLocation();
+  const navigate = useNavigate();
   const isSettingsPage = location.pathname === '/settings';
 
   // Define the menu items with label, icon component, and path
@@ -41,6 +42,14 @@ export function Sidebar({
     { label: 'AI Assistant', icon: Bot, path: '/ai' },
     { label: 'Settings', icon: Settings, path: '/settings' },
   ];
+
+  const handleNavigation = (path: string) => {
+    navigate(path);
+  };
+
+  const handleUpgradeClick = () => {
+    navigate('/settings');
+  };
 
   return (
     <div
@@ -79,6 +88,7 @@ export function Sidebar({
           return (
             <button
               key={item.label}
+              onClick={() => handleNavigation(item.path)}
               className={`flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 rounded-lg transition-all duration-200
                 ${
                   isActive
@@ -111,6 +121,7 @@ export function Sidebar({
         <div className="mt-auto flex flex-col gap-4">
           {/* Premium Button - Always show when not on settings page */}
           <button
+            onClick={handleUpgradeClick}
             className={`
               mx-3 flex items-center justify-center gap-2
               px-4 py-2.5 text-sm font-medium text-white rounded-lg

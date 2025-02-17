@@ -1107,7 +1107,6 @@ return (
           p-4 lg:p-8 overflow-auto`}
       >
   {/* Header Section with Calendar */}
-  return (
     <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6 mb-6">
       {/* Greeting Section */}
       <header className="dashboard-header transform transition-all duration-500 ease-out translate-y-0 opacity-100 pt-16 lg:pt-0">

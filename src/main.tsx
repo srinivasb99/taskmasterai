@@ -13,6 +13,7 @@ import ForgotPassword from './components/Forgot-Password'; // The Forgot-Passwor
 import PrivacyPolicy from './components/Privacy-Policy'; // The Privacy-Policy component
 import { Dashboard } from './components/Dashboard'; // Import the Dashboard component
 import Contact from './components/Contact';
+import AIChat from './components/AI-Chat';
 import SchoolPage from './components/SchoolPage'; // New ProxyPage component
 import './index.css';
 
@@ -31,6 +32,7 @@ createRoot(document.getElementById('root')!).render(
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/dashboard" element={<Dashboard />} /> {/* New Dashboard route */}
           <Route path="/contact" element={<Contact />} />
+          <Route path="/ai" element={<AIChat />} />
           <Route path="/school" element={<SchoolPage />} /> {/* New Proxy route */}
           <Route path="/" element={<App />} />
         </Routes>

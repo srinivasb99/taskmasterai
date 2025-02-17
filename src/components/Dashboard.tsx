@@ -64,7 +64,6 @@ export function Dashboard() {
   // ---------------------
   // 1. USER & GENERAL STATE
   // ---------------------
-  const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [userName, setUserName] = useState<string>("Loading...");
   const [quote, setQuote] = useState(getRandomQuote());

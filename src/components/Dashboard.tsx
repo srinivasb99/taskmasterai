@@ -1130,7 +1130,7 @@ return (
   </header>
 
   {/* Calendar Card */}
-  <div className="bg-gray-800 rounded-xl p-2 min-w-[500px] max-w-[800px] w-full h-[80px] transform hover:scale-[1.02] transition-all duration-300 flex-shrink-0 lg:flex-shrink">
+  <div className="bg-gray-800 rounded-xl p-2 min-w-[300px] max-w-[500px] w-full h-[80px] transform hover:scale-[1.02] transition-all duration-300 flex-shrink-0 lg:flex-shrink">
     <div className="grid grid-cols-9 gap-1 h-full">
       {/* Previous Week Button */}
       <button 

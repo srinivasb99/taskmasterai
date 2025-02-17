@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef } from 'react';
 import { Navigate } from 'react-router-dom';
 import {
@@ -1122,14 +1121,14 @@ return (
   </header>
 
   {/* Calendar Card */}
-  <div className="bg-gray-800 rounded-xl p-6 min-w-[300px] h-[100px] transform hover:scale-[1.02] transition-all duration-300">
-    <div className="flex items-center gap-2 mb-4">
-      <CalendarIcon className="w-5 h-5 text-blue-400" />
-      <h2 className="text-xl font-semibold text-blue-300">This Week</h2>
+  <div className="bg-gray-800 rounded-xl p-3 min-w-[300px] h-[90px] transform hover:scale-[1.02] transition-all duration-300">
+    <div className="flex items-center gap-2 mb-2">
+      <CalendarIcon className="w-4 h-4 text-blue-400" />
+      <h2 className="text-lg font-semibold text-blue-300">This Week</h2>
     </div>
-    <div className="grid grid-cols-7 gap-2">
+    <div className="grid grid-cols-7 gap-1">
       {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-        <div key={day} className="text-center text-gray-400 text-xs font-medium">
+        <div key={day} className="text-center text-gray-400 text-[10px] font-medium">
           {day}
         </div>
       ))}
@@ -1140,14 +1139,14 @@ return (
         return (
           <div
             key={index}
-            className={`relative p-2 text-center rounded-lg transition-all duration-200
+            className={`relative p-1 text-center rounded-lg transition-all duration-200
               ${isToday ? 'bg-blue-500/20 text-blue-300 font-bold' : 'text-gray-300'}
               ${hasDeadline ? 'ring-2 ring-purple-500/50' : ''}
               hover:bg-gray-700/50`}
           >
-            <span className="text-sm">{date.getDate()}</span>
+            <span className="text-[11px]">{date.getDate()}</span>
             {hasDeadline && (
-              <div className="absolute bottom-1 left-1/2 transform -translate-x-1/2 w-1 h-1 rounded-full bg-purple-500"></div>
+              <div className="absolute bottom-0.5 left-1/2 transform -translate-x-1/2 w-1 h-1 rounded-full bg-purple-500"></div>
             )}
           </div>
         );
@@ -1155,6 +1154,7 @@ return (
     </div>
   </div>
 </div>
+
 
           
 

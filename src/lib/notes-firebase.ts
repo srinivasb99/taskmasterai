@@ -1,4 +1,4 @@
-import { addDoc, collection, Timestamp, updateDoc, doc } from 'firebase/firestore';
+import { addDoc, collection, Timestamp, updateDoc, doc, deleteDoc } from 'firebase/firestore';
 import { db } from './firebase';
 
 interface Note {
@@ -60,6 +60,29 @@ export async function updateNote(noteId: string, updates: Partial<Note>) {
     });
   } catch (error) {
     console.error('Error updating note:', error);
+    throw error;
+  }
+}
+
+export async function deleteNote(noteId: string) {
+  try {
+    const noteRef = doc(db, 'notes', noteId);
+    await deleteDoc(noteRef);
+  } catch (error) {
+    console.error('Error deleting note:', error);
+    throw error;
+  }
+}
+
+export async function toggleNotePublicStatus(noteId: string, isPublic: boolean) {
+  try {
+    const noteRef = doc(db, 'notes', noteId);
+    await updateDoc(noteRef, {
+      isPublic,
+      updatedAt: Timestamp.now()
+    });
+  } catch (error) {
+    console.error('Error toggling note public status:', error);
     throw error;
   }
 }

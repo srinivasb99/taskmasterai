@@ -65,6 +65,30 @@ const [greeting, setGreeting] = useState(getTimeBasedGreeting());
     setIsSidebarCollapsed((prev) => !prev);
   };
 
+  // Get current date info
+  const today = new Date();
+  const currentWeek = getWeekDates(today);
+
+  // Function to get week dates
+  function getWeekDates(date: Date) {
+    const start = new Date(date);
+    start.setDate(date.getDate() - date.getDay()); // Start from Sunday
+    
+    const week = [];
+    for (let i = 0; i < 7; i++) {
+      const day = new Date(start);
+      day.setDate(start.getDate() + i);
+      week.push(day);
+    }
+    return week;
+  }
+
+  // Function to format date for comparison
+  function formatDateForComparison(date: Date) {
+    return date.toISOString().split('T')[0];
+  }
+
+
 // ---------------------
 // Types for timer messages
 interface TimerMessage {
@@ -1081,15 +1105,52 @@ return (
           ${isSidebarCollapsed ? 'ml-20' : 'ml-64'} 
           p-4 lg:p-8 overflow-auto`}
       >
-        <header className="dashboard-header mb-6 transform transition-all duration-500 ease-out">
-          <h1 className="text-4xl font-bold mb-2 text-white">
-            {greeting.emoji} {greeting.greeting},{' '}
-            <span className="font-bold">{userName || 'Loading...'}</span>
-          </h1>
-          <p className="text-gray-400 italic text-lg">
-            "{quote.text}" - <span className="text-purple-400">{quote.author}</span>
-          </p>
-        </header>
+        {/* Header Section with Calendar */}
+        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6 mb-6">
+          {/* Greeting Section */}
+          <header className="dashboard-header transform transition-all duration-500 ease-out translate-y-0 opacity-100 pt-16 lg:pt-0">
+            <h1 className="text-2xl lg:text-4xl font-bold mb-2 text-white break-words">
+              {greeting.emoji} {greeting.greeting},{' '}
+              <span className="font-bold">{userName || "Loading..."}</span>
+            </h1>
+            <p className="text-gray-400 italic text-base lg:text-lg">
+              "{quote.text}" -{' '}
+              <span className="text-purple-400">{quote.author}</span>
+            </p>
+          </header>
+
+                    {/* Calendar Card */}
+          <div className="bg-gray-800 rounded-xl p-6 min-w-[300px] transform hover:scale-[1.02] transition-all duration-300">
+            <div className="flex items-center gap-2 mb-4">
+              <CalendarIcon className="w-5 h-5 text-blue-400" />
+              <h2 className="text-xl font-semibold text-blue-300">This Week</h2>
+            </div>
+            <div className="grid grid-cols-7 gap-2">
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                <div key={day} className="text-center text-gray-400 text-sm font-medium">
+                  {day}
+                </div>
+              ))}
+              {currentWeek.map((date, index) => {
+                const isToday = formatDateForComparison(date) === formatDateForComparison(today);
+                const hasDeadline = false; // You can check against your deadlines here
+
+                return (
+                  <div
+                    key={index}
+                    className={`relative p-2 text-center rounded-lg transition-all duration-200
+                      ${isToday ? 'bg-blue-500/20 text-blue-300 font-bold' : 'text-gray-300'}
+                      ${hasDeadline ? 'ring-2 ring-purple-500/50' : ''}
+                      hover:bg-gray-700/50`}
+                  >
+                    <span className="text-sm">{date.getDate()}</span>
+                    {hasDeadline && (
+                      <div className="absolute bottom-1 left-1/2 transform -translate-x-1/2 w-1 h-1 rounded-full bg-purple-500"></div>
+                    )}
+                  </div>
+                );
+              })}
+          
 
 {/* Smart Overview Card */}
 <div

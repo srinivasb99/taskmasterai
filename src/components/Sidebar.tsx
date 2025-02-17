@@ -24,7 +24,7 @@ interface SidebarProps {
 }
 
 // List of developer emails
-const DEV_EMAILS = ['bajinsrinivasr@lexington1.net'];
+const DEV_EMAILS = ['bajinsrinivasr@lexington1.net, srinibaj10@gmail.com, fugegate@gmail.com'];
 
 export function Sidebar({
   userName,
@@ -131,15 +131,16 @@ export function Sidebar({
           <button
             onClick={handleUpgradeClick}
             className={`
-              mx-3 flex items-center justify-center gap-2
-              px-4 py-2.5 text-sm font-medium text-white rounded-lg
+              mx-3 flex items-center justify-center
+              px-4 py-2.5 text-white rounded-lg
               transition-all duration-200 bg-gradient-to-r from-violet-600 to-indigo-600
               hover:from-violet-500 hover:to-indigo-500 shadow-lg shadow-indigo-500/20
+              ${isCollapsed ? 'aspect-square p-0' : ''}
             `}
           >
-            <Crown className="w-5 h-5" strokeWidth={2} />
+            <Crown className={`${isCollapsed ? 'w-6 h-6' : 'w-5 h-5 mr-2'}`} strokeWidth={2} />
             {!isCollapsed && (
-              <span className="whitespace-nowrap">Upgrade to Premium</span>
+              <span className="text-sm font-medium whitespace-nowrap">Upgrade to Premium</span>
             )}
           </button>
 
@@ -149,7 +150,7 @@ export function Sidebar({
             className={`
               mx-3 flex items-center gap-3 px-4 py-2.5 text-gray-300
               rounded-lg hover:bg-gray-800/50 transition-colors
-              ${isCollapsed ? 'justify-center' : ''}
+              ${isCollapsed ? 'justify-center p-2' : ''}
             `}
           >
             <div className="relative flex items-center justify-center w-8 h-8 rounded-full overflow-hidden bg-gray-800">

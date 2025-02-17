@@ -1152,6 +1152,20 @@ return (
       {currentWeek.map((date, index) => {
         const dateStr = date.toISOString().split('T')[0];
         const isToday = formatDateForComparison(date) === formatDateForComparison(today);
+
+                  // 1. Combine all items with a 'type' label
+                const tasksWithType = tasks.map((t) => ({ ...t, type: 'Task' }));
+                const goalsWithType = goals.map((g) => ({ ...g, type: 'Goal' }));
+                const projectsWithType = projects.map((p) => ({ ...p, type: 'Project' }));
+                const plansWithType = plans.map((p) => ({ ...p, type: 'Plan' }));
+
+                // 2. Merge into a single array
+                const allItems = [
+                  ...tasksWithType,
+                  ...goalsWithType,
+                  ...projectsWithType,
+                  ...plansWithType,
+                ];
         
         // Check for deadlines on this date
         const hasDeadline = allItems.some(item => {

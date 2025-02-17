@@ -61,9 +61,10 @@ const formatDateForComparison = (date: Date): string => {
 };
 
 export function Dashboard() {
-  const navigate = useNavigate();
+  // ---------------------
+  // 1. USER & GENERAL STATE
+  // ---------------------
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
   const [userName, setUserName] = useState<string>("Loading...");
   const [quote, setQuote] = useState(getRandomQuote());
   const [greeting, setGreeting] = useState(getTimeBasedGreeting());
@@ -85,28 +86,20 @@ export function Dashboard() {
       setUser(firebaseUser);
       if (firebaseUser) {
         setUserName(firebaseUser.displayName || "User");
+      } else {
+        // Redirect to login if not authenticated
+        return <Navigate to="/login" replace />;
       }
-      setLoading(false);
     });
 
+    // Cleanup subscription
     return () => unsubscribe();
   }, []);
 
+  // Example toggle function
   const handleToggleSidebar = () => {
     setIsSidebarCollapsed((prev) => !prev);
   };
-
-  // Show loading state while checking auth
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-gray-900 text-white">
-        <div className="animate-pulse">
-          <p className="text-xl">Loading...</p>
-          <div className="mt-4 h-2 w-32 bg-gray-700 rounded"></div>
-        </div>
-      </div>
-    );
-  }
   
 const [currentWeek, setCurrentWeek] = useState<Date[]>(getWeekDates(new Date()));
 const today = new Date();
@@ -1111,10 +1104,6 @@ setSmartOverview(formattedHtml);
   const plansProgress = totalPlans > 0 ? (completedPlans / totalPlans) * 100 : 0;
 
 
- // Redirect to login if not authenticated
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
 
 
 

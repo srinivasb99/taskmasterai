@@ -5,22 +5,20 @@ import {
   Upload,
   Youtube,
   Mic,
-  Camera,
   Plus,
   Search,
   Filter,
-  MoreVertical,
-  Loader2,
   AlertTriangle,
   X,
   ChevronRight,
   Bot,
   FileQuestion,
   BookOpen,
-  Sparkles
+  Sparkles,
+  Loader2
 } from 'lucide-react';
 import { Sidebar } from './Sidebar';
-import { auth, db, storage } from '../lib/firebase';
+import { auth } from '../lib/firebase';
 import { User } from 'firebase/auth';
 import { 
   collection, 
@@ -28,18 +26,16 @@ import {
   where, 
   orderBy, 
   onSnapshot,
-  addDoc,
-  Timestamp,
-  updateDoc,
-  doc,
-  deleteDoc
+  Timestamp
 } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db } from '../lib/firebase';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import remarkGfm from 'remark-gfm';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
+import { processPDF } from '../lib/pdf-processor';
+import { saveNote } from '../lib/notes-firebase';
 
 // Types
 interface Note {
@@ -67,6 +63,8 @@ interface UploadProgressState {
   status: string;
   error: string | null;
 }
+
+const huggingFaceApiKey = "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";
 
 export function Notes() {
   const navigate = useNavigate();
@@ -129,7 +127,7 @@ export function Notes() {
   }, [user]);
 
   const handleToggleSidebar = () => {
-    setIsSidebarCollapsed((prev) => !prev);
+    setIsSidebarCollapsed(prev => !prev);
   };
 
   const openUploadModal = (type: 'text' | 'pdf' | 'youtube' | 'audio') => {
@@ -152,28 +150,76 @@ export function Notes() {
     });
   };
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (!file || !user) return;
 
     // Handle file upload based on type
     if (uploadType === 'pdf') {
-      handlePdfUpload(file);
+      try {
+        const processedPDF = await processPDF(
+          file,
+          user.uid,
+          huggingFaceApiKey,
+          setUploadProgress
+        );
+
+        await saveNote({
+          title: processedPDF.title,
+          content: processedPDF.content,
+          type: 'pdf',
+          keyPoints: processedPDF.keyPoints,
+          questions: processedPDF.questions,
+          sourceUrl: processedPDF.sourceUrl,
+          userId: user.uid,
+          isPublic: false,
+          tags: []
+        });
+
+        closeUploadModal();
+      } catch (error) {
+        console.error('Error processing PDF:', error);
+        setUploadProgress(prev => ({
+          ...prev,
+          error: error instanceof Error ? error.message : 'Failed to process PDF'
+        }));
+      }
     } else if (uploadType === 'audio') {
-      handleAudioUpload(file);
+      // TODO: Implement audio processing
     }
   };
 
-  const handlePdfUpload = async (file: File) => {
-    // TODO: Implement PDF processing
-  };
-
   const handleYoutubeLink = async (url: string) => {
-    // TODO: Implement YouTube processing
-  };
+    if (!user) return;
 
-  const handleAudioUpload = async (file: File) => {
-    // TODO: Implement audio processing
+    try {
+      const processedYouTube = await processYouTube(
+        url,
+        user.uid,
+        huggingFaceApiKey,
+        setUploadProgress
+      );
+
+      await saveNote({
+        title: processedYouTube.title,
+        content: processedYouTube.content,
+        type: 'youtube',
+        keyPoints: processedYouTube.keyPoints,
+        questions: processedYouTube.questions,
+        sourceUrl: processedYouTube.sourceUrl,
+        userId: user.uid,
+        isPublic: false,
+        tags: []
+      });
+
+      closeUploadModal();
+    } catch (error) {
+      console.error('Error processing YouTube video:', error);
+      setUploadProgress(prev => ({
+        ...prev,
+        error: error instanceof Error ? error.message : 'Failed to process YouTube video'
+      }));
+    }
   };
 
   const handleTextInput = async (text: string) => {

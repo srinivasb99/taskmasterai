@@ -40,7 +40,30 @@ import {
   hfApiKey,
 } from '../lib/dashboard-firebase';
 
+// Helper functions (place these OUTSIDE and BEFORE your component)
+const getWeekDates = (date: Date): Date[] => {
+  const sunday = new Date(date);
+  sunday.setDate(date.getDate() - date.getDay());
+  
+  const weekDates: Date[] = [];
+  for (let i = 0; i < 7; i++) {
+    const day = new Date(sunday);
+    day.setDate(sunday.getDate() + i);
+    weekDates.push(day);
+  }
+  return weekDates;
+};
+
+const formatDateForComparison = (date: Date): string => {
+  return date.toISOString().split('T')[0];
+};
+
 export function Dashboard() {
+
+const [currentWeek, setCurrentWeek] = useState<Date[]>(getWeekDates(new Date()));
+const today = new Date();
+
+
   // ---------------------
 // 1. USER & GENERAL STATE
 // ---------------------
@@ -65,22 +88,6 @@ const [greeting, setGreeting] = useState(getTimeBasedGreeting());
     setIsSidebarCollapsed((prev) => !prev);
   };
 
-const [currentWeek, setCurrentWeek] = useState<Date[]>(getWeekDates(new Date()));
-const today = new Date();
-
-const formatDateForComparison = (date: Date): string => {
-  return date.toISOString().split('T')[0];
-};
-
-const getWeekDates = (date: Date): Date[] => {
-  const sunday = new Date(date);
-  sunday.setDate(date.getDate() - date.getDay());
-  return Array.from({ length: 7 }, (_, i) => {
-    const day = new Date(sunday);
-    day.setDate(sunday.getDate() + i);
-    return day;
-  });
-};
 
 
 // ---------------------
@@ -1099,103 +1106,110 @@ return (
           ${isSidebarCollapsed ? 'ml-20' : 'ml-64'} 
           p-4 lg:p-8 overflow-auto`}
       >
-{/* Header Section with Calendar */}
-<div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6 mb-6">
-  {/* Greeting Section */}
-  <header className="dashboard-header transform transition-all duration-500 ease-out translate-y-0 opacity-100 pt-16 lg:pt-0">
-    <h1 className="text-2xl lg:text-4xl font-bold mb-2 text-white break-words">
-      {greeting.emoji} {greeting.greeting},{' '}
-      <span className="font-bold">{userName || "Loading..."}</span>
-    </h1>
-    <p className="text-gray-400 italic text-base lg:text-lg">
-      "{quote.text}" -{' '}
-      <span className="text-purple-400">{quote.author}</span>
-    </p>
-  </header>
+  {/* Header Section with Calendar */}
+  return (
+    <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6 mb-6">
+      {/* Greeting Section */}
+      <header className="dashboard-header transform transition-all duration-500 ease-out translate-y-0 opacity-100 pt-16 lg:pt-0">
+        <h1 className="text-2xl lg:text-4xl font-bold mb-2 text-white break-words">
+          {greeting.emoji} {greeting.greeting},{' '}
+          <span className="font-bold">{userName || "Loading..."}</span>
+        </h1>
+        <p className="text-gray-400 italic text-base lg:text-lg">
+          "{quote.text}" -{' '}
+          <span className="text-purple-400">{quote.author}</span>
+        </p>
+      </header>
 
-  {/* Calendar Card */}
-  <div className="bg-gray-800 rounded-xl p-2 min-w-[500px] h-[80px] transform hover:scale-[1.02] transition-all duration-300 overflow-hidden">
-    <div className="flex justify-between items-center mb-1">
-      <button 
-        onClick={() => {
-          const prevWeek = new Date(currentWeek[0]);
-          prevWeek.setDate(prevWeek.getDate() - 7);
-          setCurrentWeek(getWeekDates(prevWeek));
-        }}
-        className="text-gray-400 hover:text-white transition-colors px-1"
-      >
-        ←
-      </button>
-      <button 
-        onClick={() => {
-          const nextWeek = new Date(currentWeek[0]);
-          nextWeek.setDate(nextWeek.getDate() + 7);
-          setCurrentWeek(getWeekDates(nextWeek));
-        }}
-        className="text-gray-400 hover:text-white transition-colors px-1"
-      >
-        →
-      </button>
-    </div>
-    <div className="grid grid-cols-7 gap-0.5 h-[52px]">
-      {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-        <div key={day} className="text-center text-gray-400 text-[10px] font-medium leading-tight">
-          {day}
-        </div>
-      ))}
-      {currentWeek.map((date, index) => {
-        const dateStr = date.toISOString().split('T')[0];
-        const isToday = formatDateForComparison(date) === formatDateForComparison(today);
-        
-        // 1. Combine all items with a 'type' label
-        const tasksWithType = tasks.map((t) => ({ ...t, type: 'Task' }));
-        const goalsWithType = goals.map((g) => ({ ...g, type: 'Goal' }));
-        const projectsWithType = projects.map((p) => ({ ...p, type: 'Project' }));
-        const plansWithType = plans.map((p) => ({ ...p, type: 'Plan' }));
-
-        // 2. Merge into a single array
-        const allItems = [
-          ...tasksWithType,
-          ...goalsWithType,
-          ...projectsWithType,
-          ...plansWithType,
-        ];
-        
-        // Safely check for deadlines on this date
-        const hasDeadline = allItems?.some(item => {
-          if (!item?.data?.dueDate) return false;
-          
-          let itemDate;
-          try {
-            itemDate = typeof item.data.dueDate.toDate === 'function'
-              ? item.data.dueDate.toDate()
-              : new Date(item.data.dueDate);
-          } catch (e) {
-            console.error('Error parsing date:', e);
-            return false;
-          }
-          
-          return itemDate.toISOString().split('T')[0] === dateStr;
-        }) || false;
-
-        return (
-          <div
-            key={index}
-            className={`relative p-0.5 text-center rounded-lg transition-all duration-200
-              ${isToday ? 'bg-blue-500/20 text-blue-300 font-bold' : 'text-gray-300'}
-              ${hasDeadline ? 'bg-red-500/10 hover:bg-red-500/20' : 'hover:bg-gray-700/50'}
-              cursor-pointer flex items-center justify-center`}
+      {/* Calendar Card */}
+      <div className="bg-gray-800 rounded-xl p-2 min-w-[500px] h-[80px] transform hover:scale-[1.02] transition-all duration-300 overflow-hidden">
+        <div className="flex justify-between items-center mb-1">
+          <button 
+            onClick={() => {
+              const prevWeek = new Date(currentWeek[0]);
+              prevWeek.setDate(prevWeek.getDate() - 7);
+              setCurrentWeek(getWeekDates(prevWeek));
+            }}
+            className="text-gray-400 hover:text-white transition-colors px-1"
           >
-            <span className="text-xs leading-none">{date.getDate()}</span>
-            {hasDeadline && (
-              <div className="absolute bottom-0.5 left-1/2 transform -translate-x-1/2 w-1 h-1 rounded-full bg-red-400"></div>
-            )}
-          </div>
-        );
-      })}
+            ←
+          </button>
+          <button 
+            onClick={() => {
+              const nextWeek = new Date(currentWeek[0]);
+              nextWeek.setDate(nextWeek.getDate() + 7);
+              setCurrentWeek(getWeekDates(nextWeek));
+            }}
+            className="text-gray-400 hover:text-white transition-colors px-1"
+          >
+            →
+          </button>
+        </div>
+        <div className="grid grid-cols-7 gap-0.5 h-[52px]">
+          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+            <div key={day} className="text-center text-gray-400 text-[10px] font-medium leading-tight">
+              {day}
+            </div>
+          ))}
+          {currentWeek.map((date, index) => {
+            // 1. Combine all items with a 'type' label
+            const tasksWithType = tasks.map((t) => ({ ...t, type: 'Task' }));
+            const goalsWithType = goals.map((g) => ({ ...g, type: 'Goal' }));
+            const projectsWithType = projects.map((p) => ({ ...p, type: 'Project' }));
+            const plansWithType = plans.map((p) => ({ ...p, type: 'Plan' }));
+
+            // 2. Merge into a single array
+            const allItems = [
+              ...tasksWithType,
+              ...goalsWithType,
+              ...projectsWithType,
+              ...plansWithType,
+            ];
+            
+            // Safely check for deadlines on this date
+            const hasDeadline = allItems?.some(item => {
+              if (!item?.data?.dueDate) return false;
+              
+              let itemDate;
+              try {
+                itemDate = typeof item.data.dueDate.toDate === 'function'
+                  ? item.data.dueDate.toDate()
+                  : new Date(item.data.dueDate);
+                
+                // Ensure we're comparing dates at midnight for accurate comparison
+                itemDate.setHours(0, 0, 0, 0);
+                const compareDate = new Date(date);
+                compareDate.setHours(0, 0, 0, 0);
+                
+                return itemDate.getTime() === compareDate.getTime();
+              } catch (e) {
+                console.error('Error parsing date:', e);
+                return false;
+              }
+            }) || false;
+
+            const isToday = formatDateForComparison(date) === formatDateForComparison(today);
+
+            return (
+              <div
+                key={index}
+                className={`relative p-0.5 text-center rounded-lg transition-all duration-200
+                  ${isToday ? 'bg-blue-500/20 text-blue-300 font-bold' : 'text-gray-300'}
+                  ${hasDeadline ? 'bg-red-500/10 hover:bg-red-500/20' : 'hover:bg-gray-700/50'}
+                  cursor-pointer flex items-center justify-center`}
+              >
+                <span className="text-xs leading-none">{date.getDate()}</span>
+                {hasDeadline && (
+                  <div className="absolute bottom-0.5 left-1/2 transform -translate-x-1/2 w-1 h-1 rounded-full bg-red-400"></div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
-  </div>
-</div>
+  );
+};
 
 
 

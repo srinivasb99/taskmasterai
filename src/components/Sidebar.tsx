@@ -50,6 +50,8 @@ export function Sidebar({
         ${isCollapsed ? 'w-20' : 'w-64'}
       `}
     >
+
+  
       {/* Logo Section (slightly offset to the left) */}
       <div className="mb-6 flex items-center pl-3">
         {isCollapsed ? (
@@ -92,21 +94,18 @@ export function Sidebar({
           );
         })}
 
-        {/* Toggle Button (collapse/expand) remains here */}
-        <button
-          onClick={onToggle}
-          className={`
-            mx-3 mt-4 flex items-center justify-center p-2
-            border border-gray-800/50 rounded-full text-gray-400
-            hover:text-white transition-colors
-          `}
-        >
-          {isCollapsed ? (
-            <PanelLeftOpen className="w-5 h-5" strokeWidth={2} />
-          ) : (
-            <PanelLeftClose className="w-5 h-5" strokeWidth={2} />
-          )}
-        </button>
+      {/* Toggle Button */}
+      <button
+        onClick={onToggle}
+        className="absolute -right-4 top-6 bg-gray-900 p-1.5 rounded-full border border-gray-800/50 text-gray-400 hover:text-white transition-colors z-50"
+      >
+        {isCollapsed ? (
+          <PanelLeftOpen className="w-4 h-4" strokeWidth={2} />
+        ) : (
+          <PanelLeftClose className="w-4 h-4" strokeWidth={2} />
+        )}
+      </button>
+
       </div>
 
       {/* Bottom Section: Premium Button and User Profile */}

@@ -1103,18 +1103,7 @@ setSmartOverview(formattedHtml);
   const completedPlans = plans.filter((pl) => pl.data.completed).length;
   const plansProgress = totalPlans > 0 ? (completedPlans / totalPlans) * 100 : 0;
 
-// Render loading state while checking auth
-  if (!user) {
-    window.location.href = '/login';
-    return (
-      <div className="flex items-center justify-center h-screen bg-gray-900 text-white">
-        <div className="animate-pulse">
-          <p className="text-xl">Redirecting to login...</p>
-          <div className="mt-4 h-2 w-32 bg-gray-700 rounded"></div>
-        </div>
-      </div>
-    );
-  }
+
 
 
 

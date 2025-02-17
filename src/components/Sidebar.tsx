@@ -75,7 +75,9 @@ export function Sidebar({
             />
           </svg>
         ) : (
+      <a href="/">
           <Logo className="w-8 h-8" />
+      </a>
         )}
       </div>
 

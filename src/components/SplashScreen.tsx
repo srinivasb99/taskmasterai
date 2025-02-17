@@ -155,20 +155,22 @@ function SplashScreen() {
                     <h3 className="text-xl md:text-2xl font-semibold text-white">
                       {features[currentFeatureIndex].title}
                     </h3>
-                    <button
-                      onClick={() => navigate(features[currentFeatureIndex].link)}
-                      className="group px-3 py-1 text-xs font-medium text-white bg-indigo-500 rounded-full hover:bg-indigo-600 transition-all duration-300 flex items-center gap-1"
-                    >
-                      Try Now
-                      <ChevronRight className="w-3 h-3 transform group-hover:translate-x-0.5 transition-transform" />
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => navigate(features[currentFeatureIndex].link)}
+                        className="group px-3 py-1 text-xs font-medium text-white bg-indigo-500 rounded-full hover:bg-indigo-600 transition-all duration-300 flex items-center gap-1"
+                      >
+                        Try Now
+                        <ChevronRight className="w-3 h-3 transform group-hover:translate-x-0.5 transition-transform" />
+                      </button>
+                      {features[currentFeatureIndex].isNew && (
+                        <span className="px-2 py-0.5 text-xs font-medium bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-full animate-pulse-slow">
+                          BETA
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
-                {features[currentFeatureIndex].isNew && (
-                  <span className="px-2 py-0.5 text-xs font-medium bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-full animate-pulse-slow">
-                    BETA
-                  </span>
-                )}
               </div>
               <p className="text-gray-300 text-sm md:text-base leading-relaxed mb-6">
                 {features[currentFeatureIndex].description}

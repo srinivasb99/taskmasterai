@@ -49,8 +49,17 @@ const [userName, setUserName] = useState("Loading...");
 const [quote, setQuote] = useState(getRandomQuote());
 const [greeting, setGreeting] = useState(getTimeBasedGreeting());
 
- // Collapsible sidebar state
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  // Initialize state from localStorage
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    const stored = localStorage.getItem('isSidebarCollapsed');
+    return stored ? JSON.parse(stored) : false;
+  });
+
+  // Update localStorage whenever the state changes
+  useEffect(() => {
+    localStorage.setItem('isSidebarCollapsed', JSON.stringify(isSidebarCollapsed));
+  }, [isSidebarCollapsed]);
+
   // Example toggle function
   const handleToggleSidebar = () => {
     setIsSidebarCollapsed((prev) => !prev);

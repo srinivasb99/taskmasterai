@@ -65,28 +65,22 @@ const [greeting, setGreeting] = useState(getTimeBasedGreeting());
     setIsSidebarCollapsed((prev) => !prev);
   };
 
-  // Get current date info
-  const today = new Date();
-  const currentWeek = getWeekDates(today);
+const [currentWeek, setCurrentWeek] = useState<Date[]>(getWeekDates(new Date()));
+const today = new Date();
 
-  // Function to get week dates
-  function getWeekDates(date: Date) {
-    const start = new Date(date);
-    start.setDate(date.getDate() - date.getDay()); // Start from Sunday
-    
-    const week = [];
-    for (let i = 0; i < 7; i++) {
-      const day = new Date(start);
-      day.setDate(start.getDate() + i);
-      week.push(day);
-    }
-    return week;
-  }
+const formatDateForComparison = (date: Date): string => {
+  return date.toISOString().split('T')[0];
+};
 
-  // Function to format date for comparison
-  function formatDateForComparison(date: Date) {
-    return date.toISOString().split('T')[0];
-  }
+const getWeekDates = (date: Date): Date[] => {
+  const sunday = new Date(date);
+  sunday.setDate(date.getDate() - date.getDay());
+  return Array.from({ length: 7 }, (_, i) => {
+    const day = new Date(sunday);
+    day.setDate(sunday.getDate() + i);
+    return day;
+  });
+};
 
 
 // ---------------------
@@ -1120,15 +1114,15 @@ return (
   </header>
 
   {/* Calendar Card */}
-  <div className="bg-gray-800 rounded-xl p-3 min-w-[500px] h-[80px] transform hover:scale-[1.02] transition-all duration-300">
-    <div className="flex justify-between items-center mb-2">
+  <div className="bg-gray-800 rounded-xl p-2 min-w-[500px] h-[80px] transform hover:scale-[1.02] transition-all duration-300 overflow-hidden">
+    <div className="flex justify-between items-center mb-1">
       <button 
         onClick={() => {
           const prevWeek = new Date(currentWeek[0]);
           prevWeek.setDate(prevWeek.getDate() - 7);
           setCurrentWeek(getWeekDates(prevWeek));
         }}
-        className="text-gray-400 hover:text-white transition-colors"
+        className="text-gray-400 hover:text-white transition-colors px-1"
       >
         ←
       </button>
@@ -1138,34 +1132,34 @@ return (
           nextWeek.setDate(nextWeek.getDate() + 7);
           setCurrentWeek(getWeekDates(nextWeek));
         }}
-        className="text-gray-400 hover:text-white transition-colors"
+        className="text-gray-400 hover:text-white transition-colors px-1"
       >
         →
       </button>
     </div>
-    <div className="grid grid-cols-7 gap-0.5">
+    <div className="grid grid-cols-7 gap-0.5 h-[52px]">
       {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-        <div key={day} className="text-center text-gray-400 text-xs font-medium">
+        <div key={day} className="text-center text-gray-400 text-[10px] font-medium leading-tight">
           {day}
         </div>
       ))}
       {currentWeek.map((date, index) => {
         const dateStr = date.toISOString().split('T')[0];
         const isToday = formatDateForComparison(date) === formatDateForComparison(today);
+        
+        // 1. Combine all items with a 'type' label
+        const tasksWithType = tasks.map((t) => ({ ...t, type: 'Task' }));
+        const goalsWithType = goals.map((g) => ({ ...g, type: 'Goal' }));
+        const projectsWithType = projects.map((p) => ({ ...p, type: 'Project' }));
+        const plansWithType = plans.map((p) => ({ ...p, type: 'Plan' }));
 
-                  // 1. Combine all items with a 'type' label
-                const tasksWithType = tasks.map((t) => ({ ...t, type: 'Task' }));
-                const goalsWithType = goals.map((g) => ({ ...g, type: 'Goal' }));
-                const projectsWithType = projects.map((p) => ({ ...p, type: 'Project' }));
-                const plansWithType = plans.map((p) => ({ ...p, type: 'Plan' }));
-
-                // 2. Merge into a single array
-                const allItems = [
-                  ...tasksWithType,
-                  ...goalsWithType,
-                  ...projectsWithType,
-                  ...plansWithType,
-                ];
+        // 2. Merge into a single array
+        const allItems = [
+          ...tasksWithType,
+          ...goalsWithType,
+          ...projectsWithType,
+          ...plansWithType,
+        ];
         
         // Safely check for deadlines on this date
         const hasDeadline = allItems?.some(item => {
@@ -1190,11 +1184,11 @@ return (
             className={`relative p-0.5 text-center rounded-lg transition-all duration-200
               ${isToday ? 'bg-blue-500/20 text-blue-300 font-bold' : 'text-gray-300'}
               ${hasDeadline ? 'bg-red-500/10 hover:bg-red-500/20' : 'hover:bg-gray-700/50'}
-              cursor-pointer`}
+              cursor-pointer flex items-center justify-center`}
           >
-            <span className="text-sm">{date.getDate()}</span>
+            <span className="text-xs leading-none">{date.getDate()}</span>
             {hasDeadline && (
-              <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-1 h-1 rounded-full bg-red-400"></div>
+              <div className="absolute bottom-0.5 left-1/2 transform -translate-x-1/2 w-1 h-1 rounded-full bg-red-400"></div>
             )}
           </div>
         );

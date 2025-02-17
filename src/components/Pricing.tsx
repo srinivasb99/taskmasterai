@@ -98,7 +98,7 @@ function Pricing() {
               <a href="pricing" className="text-gray-300 hover:text-indigo-400 transition-colors">Pricing</a>
               <a href="contact" className="text-gray-300 hover:text-indigo-400 transition-colors">Contact</a>
               <a 
-                href={user ? "/dashboard.html" : "/signup"} 
+                href={user ? "/dashboard" : "/signup"} 
                 className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-full transition-all transform hover:scale-105"
               >
                 {user ? "Dashboard" : "Get Started Today"}
@@ -134,7 +134,7 @@ function Pricing() {
                   Contact
                 </a>
                 <a
-                  href={user ? "/dashboard.html" : "/signup"}
+                  href={user ? "/dashboard" : "/signup"}
                   className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-full text-center transition-all transform hover:scale-105"
                   onClick={toggleMenu}
                 >
@@ -183,7 +183,7 @@ function Pricing() {
               <li>Add Up to 3 Friends</li>
             </ul>
             <a 
-              href={user ? "/dashboard.html" : "/signup"}
+              href={user ? "/dashboard" : "/signup"}
               className="inline-block w-full text-center py-3 rounded-full font-semibold bg-indigo-500 text-white hover:scale-105 transition-transform"
             >
               {user ? 'Access Dashboard' : 'Sign Up Free'}

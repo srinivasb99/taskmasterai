@@ -31,3 +31,22 @@ export async function saveNote(note: Omit<Note, 'createdAt' | 'updatedAt'>) {
     throw error;
   }
 }
+
+export async function saveManualNote(userId: string, title: string, content: string, tags: string[] = []) {
+  try {
+    const docRef = await addDoc(collection(db, 'notes'), {
+      title,
+      content,
+      type: 'text',
+      userId,
+      isPublic: false,
+      tags,
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now()
+    });
+    return docRef.id;
+  } catch (error) {
+    console.error('Error saving manual note:', error);
+    throw error;
+  }
+}

@@ -8,7 +8,8 @@ import {
   LayoutDashboard,
   ExternalLink,
   ArrowLeft,
-  ArrowRight
+  ArrowRight,
+  Users2
 } from 'lucide-react';
 
 function SplashScreen() {
@@ -20,42 +21,49 @@ function SplashScreen() {
       title: 'Dashboard',
       description: 'Your command center for peak productivity. Seamlessly manage tasks, set goals, and track projects with intelligent due dates that automatically sync to your calendar. The dashboard includes customizable timers, including our signature Pomodoro timer with adjustable work/break intervals. Monitor your productivity trends, set daily/weekly targets, and celebrate your achievements with our built-in progress tracking.',
       isNew: true,
-      link: '/dashboard.html'
+      link: '/dashboard'
     },
     {
       icon: NotebookPen,
       title: 'Notes',
       description: 'Transform any content into structured knowledge. Our AI-powered note-taking system can generate comprehensive notes from text, videos, PDFs, or audio files. Each note comes with AI-generated study questions that adapt to your learning style. Open notes in dedicated tabs for focused study, export them as beautifully formatted PDFs, and control sharing permissions with granular access controls. Features smart tagging, instant search, and automatic organization.',
       isNew: true,
-      link: '/notes.html'
+      link: '/notes'
     },
     {
       icon: Users,
       title: 'Friends',
       description: 'Elevate your collaborative experience with our advanced social features. Create individual and group chats with real-time messaging, share files with drag-and-drop simplicity, and organize conversations with smart pinning. Reply to specific messages, react with custom emojis, and use threaded discussions for organized conversations. Share notes directly, collaborate on projects, and sync schedules for seamless teamwork.',
       isNew: true,
-      link: '/friends.html'
+      link: '/friends'
     },
+{
+  icon: Users2,
+  title: 'Community',
+  description: 'A collaborative space where knowledge meets AI. Share and discover files, notes, and resources with fellow users. Features include: AI-powered content analysis for shared files, smart file categorization, secure file sharing with granular privacy controls, real-time collaboration tools, community ratings and reviews, personalized content recommendations, and the ability to ask AI questions about any public content. Build your network, learn from others, and contribute to a growing knowledge base.',
+  isNew: true,
+  link: '/community'
+},
     {
       icon: Bot,
-      title: 'AI Chat Bot',
+      title: 'AI Assistant',
       description: 'Your personal productivity assistant powered by advanced AI. Get instant answers to complex questions, receive suggestions for task optimization, and get help with time management. The AI learns from your work patterns to provide personalized productivity tips, helps break down large projects into manageable tasks, and can even draft responses or summarize long content for you. With access to your notes, it can answer your questions, help you organize and retrieve information, and assist with your tasks, goals, projects, plans, and events—anything you need to stay on top of your life. Available 24/7 for everything from quick queries to deep problem-solving, it’s your ultimate tool for productivity and organization.',
       isNew: true,
-      link: '/ai.html'
+      link: '/ai'
     },
     {
       icon: Calendar,
       title: 'Calendar',
       description: 'More than just a schedule - it\'s your visual productivity timeline. Seamlessly integrates tasks, goals, and projects from your dashboard with smart due date tracking. Create and edit events with natural language input, set recurring tasks with flexible patterns, and get AI-powered suggestions for optimal scheduling. Includes multiple view options (day, week, month), time zone support, and smart conflict detection.',
       isNew: false,
-      link: '/calendar.html'
+      link: '/calendar'
     },
     {
       icon: Focus,
-      title: 'Distraction Control',
+      title: 'Focus Mode',
       description: 'Take command of your focus with our comprehensive distraction management system. Block distracting websites and apps with customizable schedules, create focus profiles for different activities, and use our smart notification management to filter only essential alerts. Enhance your concentration with our curated collection of ambient sounds, including nature sounds, white noise, and focus-optimized music. Track your focus sessions and receive insights to improve your productivity patterns.',
       isNew: false,
-      link: '/features.html'
+      link: '/focus'
     }
   ];
 
@@ -134,7 +142,7 @@ function SplashScreen() {
               </div>
             </div>
             {features[currentFeatureIndex].isNew && (
-              <span className="px-2 py-1 text-xs font-bold text-transparent bg-clip-text bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 rounded-full beta-tag">
+              <span className="px-2 py-0.5 text-xs font-medium bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-full">
                 BETA
               </span>
             )}
@@ -160,7 +168,7 @@ function SplashScreen() {
 
             {currentFeatureIndex === features.length - 1 ? (
               <a
-                href="/dashboard.html"
+                href="/dashboard"
                 className="flex items-center gap-1.5 px-4 py-2 bg-indigo-500 text-white text-sm rounded-full hover:bg-indigo-600 transition-all duration-300"
               >
                 Go to Dashboard
@@ -226,28 +234,6 @@ function SplashScreen() {
           }
         }
 
-        @keyframes glow {
-          0%, 100% {
-            text-shadow: 0 0 20px rgba(129, 140, 248, 0.5),
-                         0 0 40px rgba(129, 140, 248, 0.2);
-          }
-          50% {
-            text-shadow: 0 0 30px rgba(129, 140, 248, 0.8),
-                         0 0 60px rgba(129, 140, 248, 0.4);
-          }
-        }
-
-        @keyframes beta-pulse {
-          0%, 100% {
-            box-shadow: 0 0 15px rgba(236, 72, 153, 0.3),
-                       0 0 30px rgba(168, 85, 247, 0.2);
-          }
-          50% {
-            box-shadow: 0 0 25px rgba(236, 72, 153, 0.5),
-                       0 0 50px rgba(168, 85, 247, 0.3);
-          }
-        }
-
         .animate-slide-up {
           animation: slide-up 0.6s ease-out forwards;
         }
@@ -264,23 +250,6 @@ function SplashScreen() {
         .animate-gradient {
           background-size: 200% 200%;
           animation: gradient 4s ease infinite;
-        }
-
-        .glow-text {
-          animation: glow 2s ease-in-out infinite;
-        }
-
-        .beta-tag {
-          position: relative;
-          animation: beta-pulse 2s ease-in-out infinite;
-          background: linear-gradient(45deg, #EC4899, #A855F7, #6366F1);
-          background-size: 200% 200%;
-          animation: gradient 2s ease infinite, beta-pulse 2s ease-in-out infinite;
-          -webkit-background-clip: text;
-          padding: 0.25rem 0.75rem;
-          border-radius: 9999px;
-          font-weight: bold;
-          border: 1px solid rgba(236, 72, 153, 0.3);
         }
       `}</style>
     </div>

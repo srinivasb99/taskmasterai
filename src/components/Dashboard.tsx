@@ -1104,6 +1104,10 @@ setSmartOverview(formattedHtml);
   const plansProgress = totalPlans > 0 ? (completedPlans / totalPlans) * 100 : 0;
 
 
+// Render loading state while checking auth
+if (!user) {
+  return <Navigate to="/login" replace />;
+}
 
 
 

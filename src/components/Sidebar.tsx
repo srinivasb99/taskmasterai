@@ -50,7 +50,7 @@ export function Sidebar({
         ${isCollapsed ? 'w-20' : 'w-64'}
       `}
     >
-      {/* Logo Section: slightly more to the left but still centered-ish */}
+      {/* Logo Section (slightly offset to the left) */}
       <div className="mb-6 flex items-center pl-3">
         {isCollapsed ? (
           <svg
@@ -69,8 +69,9 @@ export function Sidebar({
         )}
       </div>
 
-      {/* Menu Items */}
-      <div className="flex flex-col gap-1.5">
+      {/* Main section: menu + toggle + premium, grows until user profile at bottom */}
+      <div className="flex flex-col gap-1.5 flex-grow">
+        {/* Menu Items */}
         {menuItems.map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname === item.path;
@@ -91,36 +92,38 @@ export function Sidebar({
             </button>
           );
         })}
+
+        {/* Toggle Button: above Premium */}
+        <button
+          onClick={onToggle}
+          className={`
+            mx-3 mt-4 flex items-center justify-center p-2
+            border border-gray-800/50 rounded-full text-gray-400
+            hover:text-white transition-colors
+          `}
+        >
+          {isCollapsed ? (
+            <PanelLeftOpen className="w-5 h-5" strokeWidth={2} />
+          ) : (
+            <PanelLeftClose className="w-5 h-5" strokeWidth={2} />
+          )}
+        </button>
+
+        {/* Premium Button: further down, but above the profile */}
+        <button
+          className={`
+            mx-3 mt-4 flex items-center justify-center gap-2
+            px-4 py-2.5 text-sm font-medium text-white rounded-lg
+            transition-all duration-200 bg-gradient-to-r from-violet-600 to-indigo-600
+            hover:from-violet-500 hover:to-indigo-500 shadow-lg shadow-indigo-500/20
+          `}
+        >
+          <Crown className="w-5 h-5" strokeWidth={2} />
+          {!isCollapsed && (
+            <span className="whitespace-nowrap">Upgrade to Premium</span>
+          )}
+        </button>
       </div>
-
-      {/* Toggle Button: now above Premium */}
-      <button
-        onClick={onToggle}
-        className={`
-          mx-3 mt-4 flex items-center justify-center p-2
-          border border-gray-800/50 rounded-full text-gray-400
-          hover:text-white transition-colors
-        `}
-      >
-        {isCollapsed ? (
-          <PanelLeftOpen className="w-5 h-5" strokeWidth={2} />
-        ) : (
-          <PanelLeftClose className="w-5 h-5" strokeWidth={2} />
-        )}
-      </button>
-
-      {/* Premium Button */}
-      <button
-        className={`
-          mx-3 mt-4 flex items-center justify-center gap-2
-          px-4 py-2.5 text-sm font-medium text-white rounded-lg
-          transition-all duration-200 bg-gradient-to-r from-violet-600 to-indigo-600
-          hover:from-violet-500 hover:to-indigo-500 shadow-lg shadow-indigo-500/20
-        `}
-      >
-        <Crown className="w-5 h-5" strokeWidth={2} />
-        {!isCollapsed && <span>Upgrade to Premium</span>}
-      </button>
 
       {/* User Profile pinned at the bottom */}
       <div

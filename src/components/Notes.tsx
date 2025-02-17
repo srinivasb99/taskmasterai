@@ -820,13 +820,13 @@ export function Notes() {
                     <div>
                       <input
                         type="text"
+                        ref={youtubeInputRef}
                         placeholder="Enter YouTube URL..."
                         className="w-full bg-gray-700 text-white rounded-lg px-4 py-2 mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        ref={youtubeInputRef}
                       />
                       <button
                         onClick={() => youtubeInputRef.current?.value && handleYoutubeLink(youtubeInputRef.current.value)}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg -blue-600 transition-colors"
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
                       >
                         Generate Note
                         <ChevronRight className="w-4 h-4" />
@@ -868,3 +868,4 @@ export function Notes() {
 }
 
 export default Notes;
+

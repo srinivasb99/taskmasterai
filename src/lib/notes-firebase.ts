@@ -63,3 +63,137 @@ export async function updateNote(noteId: string, updates: Partial<Note>) {
     throw error;
   }
 }
+
+export async function processTextToAINote(text: string, userId: string, huggingFaceApiKey: string) {
+  try {
+    // Generate summary and key points using Hugging Face API
+    const summaryPrompt = `
+Analyze the following text and generate:
+1. A clear, concise summary (2-4 sentences)
+2. 5 key points that capture the most important information
+
+Text to analyze:
+${text}
+
+Format your response exactly as follows:
+
+Summary:
+[Provide a 2-4 sentence summary]
+
+Key Points:
+1. [First key point]
+2. [Second key point]
+3. [Third key point]
+4. [Fourth key point]
+5. [Fifth key point]`;
+
+    const summaryResponse = await fetch(
+      'https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct',
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${huggingFaceApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          inputs: summaryPrompt,
+          parameters: {
+            max_length: 1000,
+            temperature: 0.3,
+            top_p: 0.9,
+            return_full_text: false
+          }
+        })
+      }
+    );
+
+    if (!summaryResponse.ok) {
+      throw new Error('Failed to generate summary');
+    }
+
+    const summaryResult = await summaryResponse.json();
+    const summaryText = summaryResult[0].generated_text;
+
+    // Parse summary and key points
+    const summary = summaryText.split('Key Points:')[0].replace('Summary:', '').trim();
+    const keyPoints = summaryText
+      .split('Key Points:')[1]
+      .split('\n')
+      .filter(line => line.trim().match(/^\d+\./))
+      .map(point => point.replace(/^\d+\.\s*/, '').trim());
+
+    // Generate study questions
+    const questionsPrompt = `
+Based on the following key points, generate 3 multiple-choice questions:
+
+${keyPoints.join('\n')}
+
+Format each question as follows:
+Question: (The question)
+A) (First option)
+B) (Second option)
+C) (Third option)
+D) (Fourth option)
+Correct: (Letter of correct answer)
+Explanation: (Why this is the correct answer)
+
+Generate 3 questions in this exact format.`;
+
+    const questionsResponse = await fetch(
+      'https://api-inference.huggingface.co/models/meta-llama/Llama-3.2-11B-Vision-Instruct',
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${huggingFaceApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          inputs: questionsPrompt,
+          parameters: {
+            max_length: 1000,
+            temperature: 0.3,
+            top_p: 0.9,
+            return_full_text: false
+          }
+        })
+      }
+    );
+
+    if (!questionsResponse.ok) {
+      throw new Error('Failed to generate questions');
+    }
+
+    const questionsResult = await questionsResponse.json();
+    const questionsText = questionsResult[0].generated_text;
+
+    // Parse questions
+    const questionBlocks = questionsText.split(/Question: /).filter(Boolean);
+    const questions = questionBlocks.map(block => {
+      const lines = block.split('\n').filter(Boolean);
+      const question = lines[0].trim();
+      const options = lines.slice(1, 5).map(opt => opt.replace(/^[A-D]\)\s*/, '').trim());
+      const correctAnswer = lines.find(l => l.startsWith('Correct:'))?.replace('Correct:', '').trim();
+      const explanation = lines.find(l => l.startsWith('Explanation:'))?.replace('Explanation:', '').trim() || '';
+
+      return {
+        question,
+        options,
+        correctAnswer: ['A', 'B', 'C', 'D'].indexOf(correctAnswer || 'A'),
+        explanation
+      };
+    });
+
+    return {
+      title: 'AI-Generated Note',
+      content: summary,
+      keyPoints,
+      questions,
+      type: 'text' as const,
+      isPublic: false,
+      tags: []
+    };
+  } catch (error) {
+    console.error('Error processing text:', error);
+    throw error;
+  }
+}

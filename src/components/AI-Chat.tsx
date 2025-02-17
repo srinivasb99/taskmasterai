@@ -260,7 +260,7 @@ export function AIChat() {
       })
     };
 
-    const prompt = `
+const prompt = `
 [CONTEXT]
 User's Name: ${userName}
 Current Date: ${currentDateTime.date}
@@ -277,6 +277,7 @@ ${userName}: ${userMsg.content}
 You are TaskMaster, a friendly and versatile AI productivity assistant. Engage in casual conversation, provide productivity advice, and discuss ${userName}'s items only when explicitly asked by ${userName}.
 
 Guidelines:
+
 1. General Conversation:
    - Respond in a friendly, natural tone matching ${userName}'s style.
    - Do not include any internal instructions, meta commentary, or explanations of your process.
@@ -300,6 +301,12 @@ Guidelines:
            "question": "Question 1",
            "answer": "Answer 1",
            "topic": "Subject area"
+         },
+         {
+           "id": "unique-id-2",
+           "question": "Question 2",
+           "answer": "Answer 2",
+           "topic": "Subject area"
          }
        ]
      }
@@ -314,16 +321,27 @@ Guidelines:
            "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
            "correctAnswer": 0,
            "explanation": "Explanation 1"
+         },
+         {
+           "id": "unique-id-2",
+           "question": "Question 2",
+           "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
+           "correctAnswer": 1,
+           "explanation": "Explanation 2"
          }
        ]
      }
+
+   - Do not include any JSON unless ${userName} explicitly requests it.
+   - The JSON must be valid, complete, and include multiple items in its "data" array.
 
 3. Response Structure:
    - Provide a direct response to ${userName} without any extraneous openings or meta-text.
    - Do not mix JSON with regular text. JSON is only for requested educational content.
    - Always address ${userName} in a friendly, helpful tone.
-`;
 
+Follow these instructions strictly.
+`;
     setIsChatLoading(true);
     try {
       const response = await fetch(
@@ -415,22 +433,7 @@ Guidelines:
     }
   };
 
-  // Show loading state while checking auth
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-gray-900 text-white">
-        <div className="animate-pulse">
-          <p className="text-xl">Loading...</p>
-          <div className="mt-4 h-2 w-32 bg-gray-700 rounded"></div>
-        </div>
-      </div>
-    );
-  }
 
-  // Redirect to login if not authenticated
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
 
   return (
     <div className="flex h-screen bg-gray-900">
@@ -518,25 +521,24 @@ Guidelines:
                       </div>
                     </div>
                   )}
-                  {message.flashcard && (
-                    <div className="mt-2">
-                      <FlashcardsQuestions
-                        type="flashcard"
-                        data={message.flashcard.data[0]}
-                        onComplete={() => {}}
-                      />
-                    </div>
-                  )}
-                  {message.question && (
-                    <div className="mt-2">
-                      <FlashcardsQuestions
-                        type="question"
-                        data={message.question.data[0]}
-                        onComplete={() => {}}
-                      />
-                    </div>
-                  )}
-                </div>
+{message.flashcard && (
+  <div className="mt-2">
+    <FlashcardsQuestions
+      type="flashcard"
+      data={message.flashcard.data}
+      onComplete={() => {}}
+    />
+  </div>
+)}
+{message.question && (
+  <div className="mt-2">
+    <FlashcardsQuestions
+      type="question"
+      data={message.question.data}
+      onComplete={() => {}}
+    />
+  </div>
+)}              </div>
               </div>
             ))}
             {isChatLoading && (

@@ -18,35 +18,29 @@ import { useLocation } from 'react-router-dom';
 
 interface SidebarProps {
   userName: string;
-  subscription: string;
   onToggle?: () => void;
   isCollapsed?: boolean;
 }
 
 export function Sidebar({
   userName,
-  subscription,
   onToggle,
   isCollapsed = false,
 }: SidebarProps) {
   const location = useLocation();
+  const isSettingsPage = location.pathname === '/settings';
 
-  // Define the menu items with label, icon component, path, and premium status
+  // Define the menu items with label, icon component, and path
   const menuItems = [
-    { label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard', premium: false },
-    { label: 'Notes', icon: FileText, path: '/notes', premium: false },
-    { label: 'Calendar', icon: CalendarDays, path: '/calendar', premium: false },
-    { label: 'Friends', icon: Users2, path: '/friends', premium: false },
-    { label: 'Community', icon: Globe2, path: '/community', premium: true },
-    { label: 'Focus Mode', icon: ZapOff, path: '/distraction-control', premium: true },
-    { label: 'AI Assistant', icon: Bot, path: '/ai', premium: false },
-    { label: 'Settings', icon: Settings, path: '/settings', premium: false },
+    { label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
+    { label: 'Notes', icon: FileText, path: '/notes' },
+    { label: 'Calendar', icon: CalendarDays, path: '/calendar' },
+    { label: 'Friends', icon: Users2, path: '/friends' },
+    { label: 'Community', icon: Globe2, path: '/community' },
+    { label: 'Focus Mode', icon: ZapOff, path: '/distraction-control' },
+    { label: 'AI Assistant', icon: Bot, path: '/ai' },
+    { label: 'Settings', icon: Settings, path: '/settings' },
   ];
-
-  // Filter menu items based on subscription
-  const availableMenuItems = menuItems.filter(
-    item => !item.premium || subscription !== 'Basic'
-  );
 
   return (
     <div
@@ -78,7 +72,7 @@ export function Sidebar({
 
       {/* Upper Section: Menu Items and Toggle Button */}
       <div className="flex flex-col gap-1.5">
-        {availableMenuItems.map((item) => {
+        {menuItems.map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname === item.path;
 
@@ -113,9 +107,9 @@ export function Sidebar({
       </div>
 
       {/* Bottom Section: Premium Button and User Profile */}
-      <div className="mt-auto flex flex-col gap-4">
-        {/* Premium Button - Only show for Basic users */}
-        {subscription === 'Basic' && (
+      {!isSettingsPage && (
+        <div className="mt-auto flex flex-col gap-4">
+          {/* Premium Button - Always show when not on settings page */}
           <button
             className={`
               mx-3 flex items-center justify-center gap-2
@@ -129,27 +123,27 @@ export function Sidebar({
               <span className="whitespace-nowrap">Upgrade to Premium</span>
             )}
           </button>
-        )}
 
-        {/* User Profile with Subscription Badge */}
-        <div
-          className={`
-            mx-3 flex items-center gap-3 px-4 py-2.5 text-gray-300
-            rounded-lg hover:bg-gray-800/50 transition-colors
-            ${isCollapsed ? 'justify-center' : ''}
-          `}
-        >
-          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-800">
-            <CircleUserRound className="w-5 h-5" strokeWidth={2} />
-          </div>
-          {!isCollapsed && (
-            <div className="flex flex-col">
-              <span className="text-sm font-medium">{userName || 'Loading...'}</span>
-              <span className="text-xs text-gray-500">{subscription} Plan</span>
+          {/* User Profile with Basic Plan Badge */}
+          <div
+            className={`
+              mx-3 flex items-center gap-3 px-4 py-2.5 text-gray-300
+              rounded-lg hover:bg-gray-800/50 transition-colors
+              ${isCollapsed ? 'justify-center' : ''}
+            `}
+          >
+            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-800">
+              <CircleUserRound className="w-5 h-5" strokeWidth={2} />
             </div>
-          )}
+            {!isCollapsed && (
+              <div className="flex flex-col">
+                <span className="text-sm font-medium">{userName || 'Loading...'}</span>
+                <span className="text-xs text-gray-500">Basic Plan</span>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

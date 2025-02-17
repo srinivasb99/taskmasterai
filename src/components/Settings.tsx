@@ -1,8 +1,29 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Settings as SettingsIcon, Mail, Key, LogOut, Trash2, Save, X, AlertCircle, Crown } from 'lucide-react';
+import { 
+  User, 
+  Settings as SettingsIcon, 
+  Mail, 
+  Key, 
+  LogOut, 
+  Trash2, 
+  Save, 
+  X, 
+  AlertCircle, 
+  Crown,
+  Upload,
+  Camera
+} from 'lucide-react';
 import { Sidebar } from './Sidebar';
-import { updateUserProfile, signOutUser, deleteUserAccount, AuthError, getCurrentUser, getUserData } from '../lib/settings-firebase';
+import { 
+  updateUserProfile, 
+  signOutUser, 
+  deleteUserAccount, 
+  AuthError, 
+  getCurrentUser, 
+  getUserData,
+  deleteProfilePicture 
+} from '../lib/settings-firebase';
 
 export function Settings() {
   const navigate = useNavigate();
@@ -10,9 +31,12 @@ export function Settings() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [userData, setUserData] = useState({
     name: '',
-    email: ''
+    email: '',
+    photoURL: ''
   });
   
   // Sidebar state
@@ -44,6 +68,7 @@ export function Settings() {
         const userData = {
           name: user.displayName || '',
           email: user.email || '',
+          photoURL: user.photoURL || '',
           ...firestoreData
         };
 
@@ -79,6 +104,63 @@ export function Settings() {
       ...formData,
       [e.target.name]: e.target.value,
     });
+  };
+
+  const handleProfilePictureClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setError('Please select an image file');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Image size should be less than 5MB');
+      return;
+    }
+
+    setIsUploading(true);
+    setError(null);
+
+    try {
+      await updateUserProfile({ photoFile: file });
+      const user = getCurrentUser();
+      if (user?.photoURL) {
+        setUserData(prev => ({ ...prev, photoURL: user.photoURL }));
+      }
+    } catch (err) {
+      setError(err instanceof AuthError ? err.message : 'Failed to upload profile picture');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleRemoveProfilePicture = async () => {
+    if (!window.confirm('Are you sure you want to remove your profile picture?')) {
+      return;
+    }
+
+    setIsUploading(true);
+    setError(null);
+
+    try {
+      const user = getCurrentUser();
+      if (user) {
+        await deleteProfilePicture(user.uid);
+        setUserData(prev => ({ ...prev, photoURL: '' }));
+      }
+    } catch (err) {
+      setError(err instanceof AuthError ? err.message : 'Failed to remove profile picture');
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -157,7 +239,16 @@ export function Settings() {
     }
   };
 
-
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gray-900 text-white">
+        <div className="animate-pulse">
+          <p className="text-xl">Loading...</p>
+          <div className="mt-4 h-2 w-32 bg-gray-700 rounded"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-gray-900">
@@ -179,6 +270,62 @@ export function Settings() {
             <p className="text-gray-400 mt-2">
               Manage your account settings and preferences
             </p>
+          </div>
+
+          {/* Profile Picture Section */}
+          <div className="bg-gray-800 rounded-xl p-6 mb-6">
+            <h2 className="text-xl font-semibold text-white mb-4">Profile Picture</h2>
+            <div className="flex items-center gap-6">
+              <div className="relative group">
+                <div className={`w-24 h-24 rounded-full overflow-hidden bg-gray-700 flex items-center justify-center
+                  ${isUploading ? 'opacity-50' : ''}`}>
+                  {userData.photoURL ? (
+                    <img
+                      src={userData.photoURL}
+                      alt="Profile"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <User className="w-12 h-12 text-gray-400" />
+                  )}
+                </div>
+                <button
+                  onClick={handleProfilePictureClick}
+                  disabled={isUploading}
+                  className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-full"
+                >
+                  <Camera className="w-6 h-6 text-white" />
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  className="hidden"
+                  disabled={isUploading}
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={handleProfilePictureClick}
+                  disabled={isUploading}
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Upload className="w-4 h-4" />
+                  {isUploading ? 'Uploading...' : 'Upload New Picture'}
+                </button>
+                {userData.photoURL && (
+                  <button
+                    onClick={handleRemoveProfilePicture}
+                    disabled={isUploading}
+                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-300 bg-red-900/20 rounded-lg hover:bg-red-900/30 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Remove Picture
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* Subscription Status Card */}

@@ -10,6 +10,7 @@ import {
   RotateCcw,
   Square,
   X,
+  CalendarIcon,
   Timer as TimerIcon,
   Send,
 } from 'lucide-react';

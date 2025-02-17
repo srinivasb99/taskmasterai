@@ -764,24 +764,30 @@ const cleanAndValidate = (text: string) => {
     .map(line => line.trim())
     .filter(line => line.length > 0 && !/^[^a-zA-Z0-9]+$/.test(line));
 
-// Check for both "Hello" and "This is:" patterns and remove subsequent lines
-let helloCount = 0;
-const truncatedLines = [];
-for (const line of lines) {
-  if (line.startsWith("This is:")) {
-    break;
-  }
-  
-  if (line.startsWith("Hello")) {
-    helloCount++;
-    if (helloCount === 2) {
+  // Check for both "Hello" and "This is:" patterns and remove subsequent lines
+  let helloCount = 0;
+  const truncatedLines = [];
+  for (const line of lines) {
+    // Skip empty lines
+    if (!line.trim()) continue;
+    
+    // Check for "This is:" first
+    if (line.trim().startsWith("This is:")) {
       break;
     }
+    
+    // Then check for "Hello" pattern
+    if (line.trim().startsWith("Hello")) {
+      helloCount++;
+      if (helloCount === 2) {
+        break;
+      }
+    }
+    
+    truncatedLines.push(line);
   }
-  truncatedLines.push(line);
-}
 
-return truncatedLines.join('\n');
+  return truncatedLines.join('\n');
 };
 
 const cleanedText = cleanAndValidate(rawText);
@@ -793,12 +799,11 @@ if (cleanedText === lastResponse) {
 }
 setLastResponse(cleanedText);
 
-
 const cleanTextLines = cleanedText
   .split('\n')
   .filter(line => line.length > 0);
 
-// 7. Format HTML
+// Format HTML
 const formattedHtml = cleanTextLines
   .map((line, index) => {
     if (index === 0) {
@@ -1125,7 +1130,7 @@ return (
   </header>
 
   {/* Calendar Card */}
-  <div className="bg-gray-800 rounded-xl p-2 min-w-[500px] w-[500px] h-[80px] transform hover:scale-[1.02] transition-all duration-300">
+  <div className="bg-gray-800 rounded-xl p-2 min-w-[600px] w-[600px] h-[80px] transform hover:scale-[1.02] transition-all duration-300">
     <div className="grid grid-cols-9 gap-1 h-full">
       {/* Previous Week Button */}
       <button 

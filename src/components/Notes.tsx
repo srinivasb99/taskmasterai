@@ -389,13 +389,17 @@ export function Notes() {
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
-                  <button
-                    onClick={() => openUploadModal('text')}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-                  >
-                    <Plus className="w-4 h-4" />
-                    New Note
-                  </button>
+<button
+  onClick={() => {
+    setUploadType(null); // Reset upload type
+    setShowUploadModal(true); // Show modal with all options
+  }}
+  className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+>
+  <Plus className="w-4 h-4" />
+  New Note
+</button>
+
                 </div>
               </div>
             </div>
@@ -667,13 +671,17 @@ export function Notes() {
                   <p className="text-sm text-gray-500 mb-4">
                     Create your first note by clicking the button below
                   </p>
-                  <button
-                    onClick={() => openUploadModal('text')}
-                    className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-2"
-                  >
-                    <Plus className="w-4 h-4" />
-                    New Note
-                  </button>
+ <button
+  onClick={() => {
+    setUploadType(null);
+    setShowUploadModal(true);
+  }}
+  className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-2"
+>
+  <Plus className="w-4 h-4" />
+  New Note
+</button>
+
                 </div>
               ) : (
                 <div className="divide-y divide-gray-800">

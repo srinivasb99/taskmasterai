@@ -39,9 +39,8 @@ import {
   weatherApiKey,
   hfApiKey,
 } from '../lib/dashboard-firebase';
-import { auth, User } from 'firebase/auth';
-import { onAuthStateChanged } from 'firebase/auth';
-
+import { auth } from '../lib/firebase'
+import { User, onAuthStateChanged } from 'firebase/auth'
 
 // Helper functions (place these OUTSIDE and BEFORE your component)
 const getWeekDates = (date: Date): Date[] => {

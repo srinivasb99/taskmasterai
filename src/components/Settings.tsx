@@ -2,19 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, Settings as SettingsIcon, Mail, Key, LogOut, Trash2, Save, X, AlertCircle, Crown } from 'lucide-react';
 import { Sidebar } from './Sidebar';
-import { updateUserProfile, signOutUser, deleteUserAccount, AuthError, getCurrentUser } from '../lib/settings-firebase';
+import { updateUserProfile, signOutUser, deleteUserAccount, AuthError, getCurrentUser, getUserData } from '../lib/settings-firebase';
 
-interface SettingsProps {
-  userName: string;
-  userEmail: string;
-}
-
-const Settings: React.FC<SettingsProps> = ({ userName, userEmail }) => {
+export function Settings() {
   const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [userData, setUserData] = useState({
+    name: '',
+    email: ''
+  });
   
   // Sidebar state
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
@@ -22,26 +21,53 @@ const Settings: React.FC<SettingsProps> = ({ userName, userEmail }) => {
     return stored ? JSON.parse(stored) : false;
   });
 
-  // Update localStorage whenever the sidebar state changes
-  useEffect(() => {
-    localStorage.setItem('isSidebarCollapsed', JSON.stringify(isSidebarCollapsed));
-  }, [isSidebarCollapsed]);
-
-  // Check for authenticated user
-  useEffect(() => {
-    const user = getCurrentUser();
-    if (!user) {
-      navigate('/login');
-    }
-  }, [navigate]);
-
+  // Form data state
   const [formData, setFormData] = useState({
-    name: userName,
-    email: userEmail,
+    name: '',
+    email: '',
     currentPassword: '',
     newPassword: '',
     confirmPassword: '',
   });
+
+  // Load user data
+  useEffect(() => {
+    const loadUserData = async () => {
+      const user = getCurrentUser();
+      if (!user) {
+        navigate('/login');
+        return;
+      }
+
+      try {
+        const firestoreData = await getUserData(user.uid);
+        const userData = {
+          name: user.displayName || '',
+          email: user.email || '',
+          ...firestoreData
+        };
+
+        setUserData(userData);
+        setFormData(prev => ({
+          ...prev,
+          name: userData.name,
+          email: userData.email
+        }));
+      } catch (error) {
+        console.error('Error loading user data:', error);
+        setError('Failed to load user data');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadUserData();
+  }, [navigate]);
+
+  // Update localStorage whenever the sidebar state changes
+  useEffect(() => {
+    localStorage.setItem('isSidebarCollapsed', JSON.stringify(isSidebarCollapsed));
+  }, [isSidebarCollapsed]);
 
   const handleToggleSidebar = () => {
     setIsSidebarCollapsed(prev => !prev);
@@ -70,8 +96,8 @@ const Settings: React.FC<SettingsProps> = ({ userName, userEmail }) => {
       }
 
       const updateData = {
-        name: formData.name !== userName ? formData.name : undefined,
-        email: formData.email !== userEmail ? formData.email : undefined,
+        name: formData.name !== userData.name ? formData.name : undefined,
+        email: formData.email !== userData.email ? formData.email : undefined,
         currentPassword: formData.currentPassword || undefined,
         newPassword: formData.newPassword || undefined,
       };
@@ -84,6 +110,13 @@ const Settings: React.FC<SettingsProps> = ({ userName, userEmail }) => {
           currentPassword: '',
           newPassword: '',
           confirmPassword: '',
+        }));
+        
+        // Update local user data
+        setUserData(prev => ({
+          ...prev,
+          name: formData.name,
+          email: formData.email
         }));
       }
     } catch (err) {
@@ -124,12 +157,23 @@ const Settings: React.FC<SettingsProps> = ({ userName, userEmail }) => {
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gray-900 text-white">
+        <div className="animate-pulse">
+          <p className="text-xl">Loading...</p>
+          <div className="mt-4 h-2 w-32 bg-gray-700 rounded"></div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen bg-gray-900">
       <Sidebar 
         isCollapsed={isSidebarCollapsed} 
         onToggle={handleToggleSidebar}
-        userName={userName}
+        userName={userData.name}
       />
       
       <main className={`flex-1 overflow-y-auto transition-all duration-300 ${
@@ -277,8 +321,8 @@ const Settings: React.FC<SettingsProps> = ({ userName, userEmail }) => {
                           setError(null);
                           setFormData(prev => ({
                             ...prev,
-                            name: userName,
-                            email: userEmail,
+                            name: userData.name,
+                            email: userData.email,
                             currentPassword: '',
                             newPassword: '',
                             confirmPassword: '',

@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, Settings as SettingsIcon, Mail, Key, LogOut, Trash2, Save, X, AlertCircle } from 'lucide-react';
 import { Sidebar } from './Sidebar';
-import { updateUserProfile, signOutUser, deleteUserAccount, AuthError } from '../lib/settings-firebase';
+import { updateUserProfile, signOutUser, deleteUserAccount, AuthError, getCurrentUser } from '../lib/settings-firebase';
+import { auth } from '../lib/firebase';
 
 interface SettingsProps {
   userName: string;
@@ -15,6 +16,26 @@ const Settings: React.FC<SettingsProps> = ({ userName, userEmail }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Sidebar state
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    const stored = localStorage.getItem('isSidebarCollapsed');
+    return stored ? JSON.parse(stored) : false;
+  });
+
+  // Update localStorage whenever the sidebar state changes
+  useEffect(() => {
+    localStorage.setItem('isSidebarCollapsed', JSON.stringify(isSidebarCollapsed));
+  }, [isSidebarCollapsed]);
+
+  // Check for authenticated user
+  useEffect(() => {
+    const user = getCurrentUser();
+    if (!user) {
+      navigate('/login');
+    }
+  }, [navigate]);
+
   const [formData, setFormData] = useState({
     name: userName,
     email: userEmail,
@@ -22,6 +43,10 @@ const Settings: React.FC<SettingsProps> = ({ userName, userEmail }) => {
     newPassword: '',
     confirmPassword: '',
   });
+
+  const handleToggleSidebar = () => {
+    setIsSidebarCollapsed(prev => !prev);
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setError(null);
@@ -37,6 +62,10 @@ const Settings: React.FC<SettingsProps> = ({ userName, userEmail }) => {
     setIsLoading(true);
 
     try {
+      if (!getCurrentUser()) {
+        throw new AuthError('You must be logged in to update your profile');
+      }
+
       // Validate passwords match if new password is being set
       if (formData.newPassword && formData.newPassword !== formData.confirmPassword) {
         throw new AuthError('New passwords do not match');
@@ -83,6 +112,10 @@ const Settings: React.FC<SettingsProps> = ({ userName, userEmail }) => {
     setIsLoading(true);
 
     try {
+      if (!getCurrentUser()) {
+        throw new AuthError('You must be logged in to delete your account');
+      }
+
       if (!formData.currentPassword) {
         throw new AuthError('Current password is required to delete account');
       }
@@ -98,9 +131,11 @@ const Settings: React.FC<SettingsProps> = ({ userName, userEmail }) => {
 
   return (
     <div className="flex h-screen bg-gray-900">
-      <Sidebar />
+      <Sidebar isCollapsed={isSidebarCollapsed} onToggle={handleToggleSidebar} />
       
-      <main className="flex-1 overflow-y-auto">
+      <main className={`flex-1 overflow-y-auto transition-all duration-300 ${
+        isSidebarCollapsed ? 'ml-16' : 'ml-64'
+      }`}>
         <div className="container mx-auto px-6 py-8">
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-white flex items-center gap-3">

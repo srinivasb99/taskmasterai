@@ -105,9 +105,9 @@ export function Sidebar({ userName, onToggle, isCollapsed = false }: SidebarProp
       {/* User Profile */}
       <div
         className={`
-          mx-3 mb-4 flex items-center px-4 py-2.5 text-gray-300
-          rounded-lg hover:bg-gray-800/50 transition-colors
-          ${isCollapsed ? 'justify-center' : 'gap-3'}
+          mx-3 flex items-center gap-3 px-4 py-2.5 text-gray-300 rounded-lg
+          hover:bg-gray-800/50 transition-colors
+          ${isCollapsed ? 'justify-center' : ''}
         `}
       >
         <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-800">

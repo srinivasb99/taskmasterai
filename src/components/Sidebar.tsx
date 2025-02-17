@@ -18,28 +18,35 @@ import { useLocation } from 'react-router-dom';
 
 interface SidebarProps {
   userName: string;
+  subscription: string;
   onToggle?: () => void;
   isCollapsed?: boolean;
 }
 
 export function Sidebar({
   userName,
+  subscription,
   onToggle,
   isCollapsed = false,
 }: SidebarProps) {
   const location = useLocation();
 
-  // Define the menu items with label, icon component, and path
+  // Define the menu items with label, icon component, path, and premium status
   const menuItems = [
-    { label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
-    { label: 'Notes', icon: FileText, path: '/notes' },
-    { label: 'Calendar', icon: CalendarDays, path: '/calendar' },
-    { label: 'Friends', icon: Users2, path: '/friends' },
-    { label: 'Community', icon: Globe2, path: '/community' },
-    { label: 'Focus Mode', icon: ZapOff, path: '/distraction-control' },
-    { label: 'AI Assistant', icon: Bot, path: '/ai' },
-    { label: 'Settings', icon: Settings, path: '/settings' },
+    { label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard', premium: false },
+    { label: 'Notes', icon: FileText, path: '/notes', premium: false },
+    { label: 'Calendar', icon: CalendarDays, path: '/calendar', premium: false },
+    { label: 'Friends', icon: Users2, path: '/friends', premium: false },
+    { label: 'Community', icon: Globe2, path: '/community', premium: true },
+    { label: 'Focus Mode', icon: ZapOff, path: '/distraction-control', premium: true },
+    { label: 'AI Assistant', icon: Bot, path: '/ai', premium: false },
+    { label: 'Settings', icon: Settings, path: '/settings', premium: false },
   ];
+
+  // Filter menu items based on subscription
+  const availableMenuItems = menuItems.filter(
+    item => !item.premium || subscription !== 'Basic'
+  );
 
   return (
     <div
@@ -50,9 +57,7 @@ export function Sidebar({
         ${isCollapsed ? 'w-20' : 'w-64'}
       `}
     >
-
-  
-      {/* Logo Section (slightly offset to the left) */}
+      {/* Logo Section */}
       <div className="mb-6 flex items-center pl-3">
         {isCollapsed ? (
           <svg
@@ -73,7 +78,7 @@ export function Sidebar({
 
       {/* Upper Section: Menu Items and Toggle Button */}
       <div className="flex flex-col gap-1.5">
-        {menuItems.map((item) => {
+        {availableMenuItems.map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname === item.path;
 
@@ -94,38 +99,39 @@ export function Sidebar({
           );
         })}
 
-      {/* Toggle Button */}
-      <button
-        onClick={onToggle}
-        className="absolute -right-4 top-6 bg-gray-900 p-1.5 rounded-full border border-gray-800/50 text-gray-400 hover:text-white transition-colors z-50"
-      >
-        {isCollapsed ? (
-          <PanelLeftOpen className="w-4 h-4" strokeWidth={2} />
-        ) : (
-          <PanelLeftClose className="w-4 h-4" strokeWidth={2} />
-        )}
-      </button>
-
+        {/* Toggle Button */}
+        <button
+          onClick={onToggle}
+          className="absolute -right-4 top-6 bg-gray-900 p-1.5 rounded-full border border-gray-800/50 text-gray-400 hover:text-white transition-colors z-50"
+        >
+          {isCollapsed ? (
+            <PanelLeftOpen className="w-4 h-4" strokeWidth={2} />
+          ) : (
+            <PanelLeftClose className="w-4 h-4" strokeWidth={2} />
+          )}
+        </button>
       </div>
 
       {/* Bottom Section: Premium Button and User Profile */}
       <div className="mt-auto flex flex-col gap-4">
-        {/* Premium Button placed right above the profile */}
-        <button
-          className={`
-            mx-3 flex items-center justify-center gap-2
-            px-4 py-2.5 text-sm font-medium text-white rounded-lg
-            transition-all duration-200 bg-gradient-to-r from-violet-600 to-indigo-600
-            hover:from-violet-500 hover:to-indigo-500 shadow-lg shadow-indigo-500/20
-          `}
-        >
-          <Crown className="w-5 h-5" strokeWidth={2} />
-          {!isCollapsed && (
-            <span className="whitespace-nowrap">Upgrade to Premium</span>
-          )}
-        </button>
+        {/* Premium Button - Only show for Basic users */}
+        {subscription === 'Basic' && (
+          <button
+            className={`
+              mx-3 flex items-center justify-center gap-2
+              px-4 py-2.5 text-sm font-medium text-white rounded-lg
+              transition-all duration-200 bg-gradient-to-r from-violet-600 to-indigo-600
+              hover:from-violet-500 hover:to-indigo-500 shadow-lg shadow-indigo-500/20
+            `}
+          >
+            <Crown className="w-5 h-5" strokeWidth={2} />
+            {!isCollapsed && (
+              <span className="whitespace-nowrap">Upgrade to Premium</span>
+            )}
+          </button>
+        )}
 
-        {/* User Profile pinned at the bottom */}
+        {/* User Profile with Subscription Badge */}
         <div
           className={`
             mx-3 flex items-center gap-3 px-4 py-2.5 text-gray-300
@@ -137,7 +143,10 @@ export function Sidebar({
             <CircleUserRound className="w-5 h-5" strokeWidth={2} />
           </div>
           {!isCollapsed && (
-            <span className="text-sm font-medium">{userName || 'Loading...'}</span>
+            <div className="flex flex-col">
+              <span className="text-sm font-medium">{userName || 'Loading...'}</span>
+              <span className="text-xs text-gray-500">{subscription} Plan</span>
+            </div>
           )}
         </div>
       </div>

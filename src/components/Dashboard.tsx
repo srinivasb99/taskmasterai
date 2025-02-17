@@ -41,6 +41,8 @@ import {
 } from '../lib/dashboard-firebase';
 import { auth } from '../lib/firebase'
 import { User, onAuthStateChanged } from 'firebase/auth'
+import { updateUserProfile, signOutUser, deleteUserAccount, AuthError, getCurrentUser } from '../lib/settings-firebase';
+
 
 // Helper functions (place these OUTSIDE and BEFORE your component)
 const getWeekDates = (date: Date): Date[] => {
@@ -64,6 +66,7 @@ export function Dashboard() {
   // ---------------------
   // 1. USER & GENERAL STATE
   // ---------------------
+  const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [userName, setUserName] = useState<string>("Loading...");
   const [quote, setQuote] = useState(getRandomQuote());
@@ -80,21 +83,13 @@ export function Dashboard() {
     localStorage.setItem('isSidebarCollapsed', JSON.stringify(isSidebarCollapsed));
   }, [isSidebarCollapsed]);
 
-  // Auth state listener
+  // Check for authenticated user
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      setUser(firebaseUser);
-      if (firebaseUser) {
-        setUserName(firebaseUser.displayName || "User");
-      } else {
-        // Redirect to login if not authenticated
-        return <Navigate to="/login" replace />;
-      }
-    });
-
-    // Cleanup subscription
-    return () => unsubscribe();
-  }, []);
+    const user = getCurrentUser();
+    if (!user) {
+      navigate('/login');
+    }
+  }, [navigate]);
 
   // Example toggle function
   const handleToggleSidebar = () => {

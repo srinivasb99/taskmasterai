@@ -1,13 +1,9 @@
-// src/components/AIChat.tsx
-
 import React, { useState, useEffect, useRef } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import {
-  MessageCircle,
   Send,
   Timer as TimerIcon,
   Bot,
-  X,
   AlertTriangle,
   Paperclip,
 } from 'lucide-react';
@@ -23,9 +19,9 @@ import { auth } from '../lib/firebase';
 import { User, onAuthStateChanged } from 'firebase/auth';
 import { onCollectionSnapshot, hfApiKey } from '../lib/dashboard-firebase';
 import { getCurrentUser } from '../lib/settings-firebase';
-// Import the HfInference client and our Firebase Storage uploader
-import { HfInference } from '@huggingface/inference';
 import { uploadAttachment } from '../lib/ai-chat-firebase';
+// Import the pipeline function from the Transformers.js library
+import { pipeline } from '@xenova/transformers';
 
 // Types for messages
 interface TimerMessage {
@@ -76,8 +72,7 @@ export function AIChat() {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([
     {
       role: 'assistant',
-      content:
-        "👋 Hi I'm TaskMaster, How can I help you today? Need help with your items? Simply ask me!",
+      content: "👋 Hi I'm TaskMaster, How can I help you today? Need help with your items? Simply ask me!",
     },
   ]);
   const [isChatLoading, setIsChatLoading] = useState(false);
@@ -86,17 +81,15 @@ export function AIChat() {
   const [goals, setGoals] = useState<Array<{ id: string; data: any }>>([]);
   const [projects, setProjects] = useState<Array<{ id: string; data: any }>>([]);
   const [plans, setPlans] = useState<Array<{ id: string; data: any }>>([]);
-
-  // New state for attachments (images, PDFs, etc.)
+  // State for attachments (images, PDFs, etc.)
   const [attachment, setAttachment] = useState<File | null>(null);
 
-  // Initialize state from localStorage
+  // Initialize sidebar state from localStorage
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     const stored = localStorage.getItem('isSidebarCollapsed');
     return stored ? JSON.parse(stored) : false;
   });
 
-  // Update localStorage whenever the state changes
   useEffect(() => {
     localStorage.setItem('isSidebarCollapsed', JSON.stringify(isSidebarCollapsed));
   }, [isSidebarCollapsed]);
@@ -124,7 +117,7 @@ export function AIChat() {
     setLoading(false);
   }, [navigate]);
 
-  // Collection snapshots
+  // Collection snapshots from Firestore
   useEffect(() => {
     if (!user) return;
 
@@ -145,7 +138,7 @@ export function AIChat() {
     setIsSidebarCollapsed((prev) => !prev);
   };
 
-  // Timer handling functions
+  // Timer handling function
   const handleTimerComplete = (timerId: string) => {
     setChatHistory((prev) => [
       ...prev,
@@ -159,69 +152,50 @@ export function AIChat() {
   const parseTimerRequest = (message: string): number | null => {
     const timeRegex = /(\d+)\s*(minutes?|mins?|hours?|hrs?|seconds?|secs?)/i;
     const match = message.match(timeRegex);
-
     if (!match) return null;
-
     const amount = parseInt(match[1]);
     const unit = match[2].toLowerCase();
-
-    if (unit.startsWith('hour') || unit.startsWith('hr')) {
-      return amount * 3600;
-    } else if (unit.startsWith('min')) {
-      return amount * 60;
-    } else if (unit.startsWith('sec')) {
-      return amount;
-    }
-
+    if (unit.startsWith('hour') || unit.startsWith('hr')) return amount * 3600;
+    if (unit.startsWith('min')) return amount * 60;
+    if (unit.startsWith('sec')) return amount;
     return null;
   };
 
-  // Scroll to bottom when chat history changes
+  // Scroll to bottom when chat history updates
   useEffect(() => {
     if (chatEndRef.current) {
       chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [chatHistory]);
 
-  // Format items for chat
+  // Format user's items for context (from tasks, goals, etc.)
   const formatItemsForChat = () => {
     const lines: string[] = [];
     lines.push(`${userName}'s items:\n`);
-
     tasks.forEach((t) => {
       const due = t.data.dueDate?.toDate?.();
-      lines.push(
-        `Task: ${t.data.task || 'Untitled'}${due ? ` (Due: ${due.toLocaleDateString()})` : ''}`
-      );
+      lines.push(`Task: ${t.data.task || 'Untitled'}${due ? ` (Due: ${due.toLocaleDateString()})` : ''}`);
     });
     goals.forEach((g) => {
       const due = g.data.dueDate?.toDate?.();
-      lines.push(
-        `Goal: ${g.data.goal || 'Untitled'}${due ? ` (Due: ${due.toLocaleDateString()})` : ''}`
-      );
+      lines.push(`Goal: ${g.data.goal || 'Untitled'}${due ? ` (Due: ${due.toLocaleDateString()})` : ''}`);
     });
     projects.forEach((p) => {
       const due = p.data.dueDate?.toDate?.();
-      lines.push(
-        `Project: ${p.data.project || 'Untitled'}${due ? ` (Due: ${due.toLocaleDateString()})` : ''}`
-      );
+      lines.push(`Project: ${p.data.project || 'Untitled'}${due ? ` (Due: ${due.toLocaleDateString()})` : ''}`);
     });
     plans.forEach((p) => {
       const due = p.data.dueDate?.toDate?.();
-      lines.push(
-        `Plan: ${p.data.plan || 'Untitled'}${due ? ` (Due: ${due.toLocaleDateString()})` : ''}`
-      );
+      lines.push(`Plan: ${p.data.plan || 'Untitled'}${due ? ` (Due: ${due.toLocaleDateString()})` : ''}`);
     });
-
     return lines.join('\n');
   };
 
   const handleChatSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Do nothing if no text and no attachment
     if (!chatMessage.trim() && !attachment) return;
 
-    // Branch for attachment-based messages using the vision model
+    // If there is an attachment, handle it using the image-to-text pipeline.
     if (attachment) {
       const combinedUserMessage = chatMessage.trim()
         ? chatMessage.trim()
@@ -230,39 +204,18 @@ export function AIChat() {
         role: 'user',
         content: `${combinedUserMessage}\n[Attachment: ${attachment.name}]`,
       };
-
       setChatHistory((prev) => [...prev, userMsg]);
       setChatMessage('');
       setIsChatLoading(true);
-
       try {
-        // Upload the attachment to Firebase Storage and get its public URL.
+        // Upload the attachment to Firebase and get its public URL.
         const publicUrl = await uploadAttachment(attachment);
-
-        // Use the public URL in the vision model request
-        const client = new HfInference(hfApiKey);
-        const chatCompletion = await client.chatCompletion({
-          model: 'meta-llama/Llama-3.2-90B-Vision-Instruct',
-          messages: [
-            {
-              role: 'user',
-              content: [
-                {
-                  type: 'text',
-                  text: combinedUserMessage,
-                },
-                {
-                  type: 'image_url',
-                  image_url: { url: publicUrl },
-                },
-              ],
-            },
-          ],
-          provider: 'fireworks-ai',
-          max_tokens: 500,
-        });
-
-        const assistantReply = chatCompletion.choices[0].message;
+        // Load the image-to-text pipeline (for image captioning)
+        const imageToText = await pipeline("image-to-text", { model: "nlpconnect/vit-gpt2-image-captioning" });
+        const result = await imageToText(publicUrl);
+        const assistantReply = result && result[0]?.generated_text
+          ? result[0].generated_text
+          : "I'm sorry, I couldn't generate a caption for that image.";
         setChatHistory((prev) => [...prev, { role: 'assistant', content: assistantReply }]);
       } catch (err) {
         console.error('Vision chat error:', err);
@@ -270,8 +223,7 @@ export function AIChat() {
           ...prev,
           {
             role: 'assistant',
-            content:
-              'Sorry, I had an issue processing your attachment. Please try again in a moment.',
+            content: 'Sorry, I had an issue processing your attachment. Please try again in a moment.',
           },
         ]);
       } finally {
@@ -281,17 +233,12 @@ export function AIChat() {
       return;
     }
 
-    // Regular text-based chat processing
+    // Regular text chat processing using text-generation pipeline.
     const timerDuration = parseTimerRequest(chatMessage);
-    const userMsg: ChatMessage = {
-      role: 'user',
-      content: chatMessage,
-    };
-
+    const userMsg: ChatMessage = { role: 'user', content: chatMessage };
     setChatHistory((prev) => [...prev, userMsg]);
     setChatMessage('');
-
-    // If it's a timer request, add timer immediately
+    // If the message is a timer request, handle it immediately.
     if (timerDuration) {
       const timerId = Math.random().toString(36).substr(2, 9);
       setChatHistory((prev) => [
@@ -299,36 +246,22 @@ export function AIChat() {
         {
           role: 'assistant',
           content: `Starting a timer for ${timerDuration} seconds.`,
-          timer: {
-            type: 'timer',
-            duration: timerDuration,
-            id: timerId,
-          },
+          timer: { type: 'timer', duration: timerDuration, id: timerId },
         },
       ]);
       return;
     }
 
+    // Build the conversation prompt with context.
     const conversation = chatHistory
       .map((m) => `${m.role === 'user' ? userName : 'Assistant'}: ${m.content}`)
       .join('\n');
     const itemsText = formatItemsForChat();
-
     const now = new Date();
     const currentDateTime = {
-      date: now.toLocaleDateString('en-US', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-      }),
-      time: now.toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true,
-      }),
+      date: now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
+      time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }),
     };
-
     const prompt = `
 [CONTEXT]
 User's Name: ${userName}
@@ -343,147 +276,22 @@ ${conversation}
 [NEW USER MESSAGE]
 ${userName}: ${userMsg.content}
 
-You are TaskMaster, a friendly and versatile AI productivity assistant. Engage in casual conversation, provide productivity advice, and discuss ${userName}'s items only when explicitly asked by ${userName}.
-
-Guidelines:
-
-1. General Conversation:
-   - Respond in a friendly, natural tone matching ${userName}'s style.
-   - Do not include any internal instructions, meta commentary, or explanations of your process.
-   - Do not include phrases such as "Here's my response to continue the conversation:"
-     or similar wording that introduces your reply.
-   - Do not include or reference code blocks for languages like Python, Bash, or any other
-     unless explicitly requested by ${userName}.
-   - Only reference ${userName}'s items if ${userName} explicitly asks about them.
-
-2. Educational Content (JSON):
-   - If ${userName} explicitly requests educational content (flashcards or quiz questions), provide exactly one JSON object.
-   - Wrap the JSON object in a single code block using triple backticks and the "json" language identifier.
-   - Use one of the following formats:
-
-     For flashcards:
-     {
-       "type": "flashcard",
-       "data": [
-         {
-           "id": "unique-id-1",
-           "question": "Question 1",
-           "answer": "Answer 1",
-           "topic": "Subject area"
-         },
-         {
-           "id": "unique-id-2",
-           "question": "Question 2",
-           "answer": "Answer 2",
-           "topic": "Subject area"
-         }
-       ]
-     }
-
-     For quiz questions:
-     {
-       "type": "question",
-       "data": [
-         {
-           "id": "unique-id-1",
-           "question": "Question 1",
-           "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
-           "correctAnswer": 0,
-           "explanation": "Explanation 1"
-         },
-         {
-           "id": "unique-id-2",
-           "question": "Question 2",
-           "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
-           "correctAnswer": 1,
-           "explanation": "Explanation 2"
-         }
-       ]
-     }
-
-   - Do not include any JSON unless ${userName} explicitly requests it.
-   - The JSON must be valid, complete, and include multiple items in its "data" array.
-
-3. Response Structure:
-   - Provide a direct response to ${userName} without any extraneous openings or meta-text.
-   - Do not mix JSON with regular text. JSON is only for requested educational content.
-   - Always address ${userName} in a friendly, helpful tone.
-
-Follow these instructions strictly.
-`;
+Please provide a direct, friendly response.
+    `;
     setIsChatLoading(true);
     try {
-      const response = await fetch(
-        'https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct',
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${hfApiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            inputs: prompt,
-            parameters: {
-              max_new_tokens: 3000,
-              temperature: 0.5,
-              top_p: 0.9,
-              return_full_text: false,
-              repetition_penalty: 1.2,
-              do_sample: true,
-            },
-          }),
-        }
-      );
-
-      if (!response.ok) throw new Error('Chat API request failed');
-      const result = await response.json();
-
-      let assistantReply = (result[0]?.generated_text as string || '')
-        .replace(/\[\/?INST\]|<</g, '')
-        .split('\n')
-        .filter((line) => !/^(print|python)/i.test(line.trim()))
-        .join('\n')
-        .trim();
-
-      // Parse any JSON content in the response
-      const jsonMatch = assistantReply.match(/```json\n([\s\S]*?)\n```/);
-      if (jsonMatch) {
-        try {
-          const jsonContent = JSON.parse(jsonMatch[1].trim());
-          assistantReply = assistantReply.replace(/```json\n[\s\S]*?\n```/, '').trim();
-
-          if (
-            jsonContent.type &&
-            jsonContent.data &&
-            (jsonContent.type === 'flashcard' || jsonContent.type === 'question')
-          ) {
-            setChatHistory((prev) => [
-              ...prev,
-              {
-                role: 'assistant',
-                content: assistantReply,
-                ...(jsonContent.type === 'flashcard' && { flashcard: jsonContent }),
-                ...(jsonContent.type === 'question' && { question: jsonContent }),
-              },
-            ]);
-          } else {
-            throw new Error('Invalid JSON structure');
-          }
-        } catch (e) {
-          console.error('Failed to parse JSON content:', e);
-          setChatHistory((prev) => [...prev, { role: 'assistant', content: assistantReply }]);
-        }
-      } else {
-        setChatHistory((prev) => [...prev, { role: 'assistant', content: assistantReply }]);
-      }
+      // Load the text-generation pipeline (using a smaller model like GPT-2)
+      const textGen = await pipeline("text-generation", { model: "gpt2" });
+      const generated = await textGen(prompt, { max_new_tokens: 150 });
+      const assistantReply = generated && generated[0]?.generated_text
+        ? generated[0].generated_text
+        : "I'm sorry, I couldn't generate a response.";
+      setChatHistory((prev) => [...prev, { role: 'assistant', content: assistantReply }]);
     } catch (err) {
       console.error('Chat error:', err);
       setChatHistory((prev) => [
         ...prev,
-        {
-          role: 'assistant',
-          content: 'Sorry, I had an issue responding. Please try again in a moment.',
-        },
+        { role: 'assistant', content: 'Sorry, I had an issue responding. Please try again in a moment.' },
       ]);
     } finally {
       setIsChatLoading(false);
@@ -493,12 +301,7 @@ Follow these instructions strictly.
   return (
     <div className="flex h-screen bg-gray-900">
       <Sidebar isCollapsed={isSidebarCollapsed} onToggle={handleToggleSidebar} userName={userName} />
-
-      <main
-        className={`flex-1 overflow-hidden transition-all duration-300 ${
-          isSidebarCollapsed ? 'ml-16' : 'ml-64'
-        }`}
-      >
+      <main className={`flex-1 overflow-hidden transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'}`}>
         <div className="h-full flex flex-col">
           {/* Header */}
           <div className="p-4 border-b border-gray-800">
@@ -508,9 +311,7 @@ Follow these instructions strictly.
                 <div>
                   <div className="flex items-center gap-2">
                     <h1 className="text-xl font-semibold text-white">AI Assistant</h1>
-                    <span className="px-2 py-0.5 text-xs font-medium bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-full">
-                      BETA
-                    </span>
+                    <span className="px-2 py-0.5 text-xs font-medium bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-full">BETA</span>
                   </div>
                   <p className="text-sm text-gray-400">Chat with TaskMaster</p>
                 </div>
@@ -527,19 +328,11 @@ Follow these instructions strictly.
               </div>
             </div>
           </div>
-
           {/* Chat Messages */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={chatEndRef}>
             {chatHistory.map((message, index) => (
-              <div
-                key={index}
-                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                <div
-                  className={`max-w-[80%] rounded-lg px-4 py-2 ${
-                    message.role === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-200'
-                  }`}
-                >
+              <div key={index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[80%] rounded-lg px-4 py-2 ${message.role === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-200'}`}>
                   <ReactMarkdown
                     remarkPlugins={[remarkMath, remarkGfm]}
                     rehypePlugins={[rehypeKatex]}
@@ -564,11 +357,7 @@ Follow these instructions strictly.
                     <div className="mt-2">
                       <div className="flex items-center space-x-2 bg-gray-900 rounded-lg px-4 py-2">
                         <TimerIcon className="w-5 h-5 text-blue-400" />
-                        <Timer
-                          key={message.timer.id}
-                          initialDuration={message.timer.duration}
-                          onComplete={() => handleTimerComplete(message.timer!.id)}
-                        />
+                        <Timer key={message.timer.id} initialDuration={message.timer.duration} onComplete={() => handleTimerComplete(message.timer!.id)} />
                       </div>
                     </div>
                   )}
@@ -597,11 +386,9 @@ Follow these instructions strictly.
               </div>
             )}
           </div>
-
           {/* Chat Input */}
           <form onSubmit={handleChatSubmit} className="p-4 border-t border-gray-800">
             <div className="flex items-center gap-2">
-              {/* File attachment button */}
               <label htmlFor="attachmentInput" className="cursor-pointer">
                 <Paperclip className="w-6 h-6 text-gray-200" />
               </label>

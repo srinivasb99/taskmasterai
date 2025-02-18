@@ -1,3 +1,5 @@
+// src/components/AIChat.tsx
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import {
@@ -19,11 +21,11 @@ import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
 import { auth } from '../lib/firebase';
 import { User, onAuthStateChanged } from 'firebase/auth';
-import {
-  onCollectionSnapshot,
-  hfApiKey,
-} from '../lib/dashboard-firebase';
+import { onCollectionSnapshot, hfApiKey } from '../lib/dashboard-firebase';
 import { getCurrentUser } from '../lib/settings-firebase';
+// Import the HfInference client and our Firebase Storage uploader
+import { HfInference } from '@huggingface/inference';
+import { uploadAttachment } from '../lib/ai-chat-firebase';
 
 // Types for messages
 interface TimerMessage {
@@ -69,13 +71,14 @@ export function AIChat() {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [userName, setUserName] = useState<string>("Loading...");
+  const [userName, setUserName] = useState<string>('Loading...');
   const [chatMessage, setChatMessage] = useState('');
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([
     {
       role: 'assistant',
-      content: "👋 Hi I'm TaskMaster, How can I help you today? Need help with your items? Simply ask me!"
-    }
+      content:
+        "👋 Hi I'm TaskMaster, How can I help you today? Need help with your items? Simply ask me!",
+    },
   ]);
   const [isChatLoading, setIsChatLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -83,8 +86,8 @@ export function AIChat() {
   const [goals, setGoals] = useState<Array<{ id: string; data: any }>>([]);
   const [projects, setProjects] = useState<Array<{ id: string; data: any }>>([]);
   const [plans, setPlans] = useState<Array<{ id: string; data: any }>>([]);
-  
-  // New state for attachment (images, PDFs, etc.)
+
+  // New state for attachments (images, PDFs, etc.)
   const [attachment, setAttachment] = useState<File | null>(null);
 
   // Initialize state from localStorage
@@ -103,7 +106,7 @@ export function AIChat() {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
       if (firebaseUser) {
-        setUserName(firebaseUser.displayName || "User");
+        setUserName(firebaseUser.displayName || 'User');
       }
       setLoading(false);
     });
@@ -114,17 +117,17 @@ export function AIChat() {
     const firebaseUser = getCurrentUser();
     if (firebaseUser) {
       setUser(firebaseUser);
-      setUserName(firebaseUser.displayName || "User");
+      setUserName(firebaseUser.displayName || 'User');
     } else {
       navigate('/login');
     }
     setLoading(false);
   }, [navigate]);
-  
+
   // Collection snapshots
   useEffect(() => {
     if (!user) return;
-    
+
     const unsubTasks = onCollectionSnapshot('tasks', user.uid, (items) => setTasks(items));
     const unsubGoals = onCollectionSnapshot('goals', user.uid, (items) => setGoals(items));
     const unsubProjects = onCollectionSnapshot('projects', user.uid, (items) => setProjects(items));
@@ -144,24 +147,24 @@ export function AIChat() {
 
   // Timer handling functions
   const handleTimerComplete = (timerId: string) => {
-    setChatHistory(prev => [
+    setChatHistory((prev) => [
       ...prev,
       {
         role: 'assistant',
-        content: "⏰ Time's up! Your timer has finished."
-      }
+        content: "⏰ Time's up! Your timer has finished.",
+      },
     ]);
   };
 
   const parseTimerRequest = (message: string): number | null => {
     const timeRegex = /(\d+)\s*(minutes?|mins?|hours?|hrs?|seconds?|secs?)/i;
     const match = message.match(timeRegex);
-    
+
     if (!match) return null;
-    
+
     const amount = parseInt(match[1]);
     const unit = match[2].toLowerCase();
-    
+
     if (unit.startsWith('hour') || unit.startsWith('hr')) {
       return amount * 3600;
     } else if (unit.startsWith('min')) {
@@ -169,7 +172,7 @@ export function AIChat() {
     } else if (unit.startsWith('sec')) {
       return amount;
     }
-    
+
     return null;
   };
 
@@ -188,33 +191,25 @@ export function AIChat() {
     tasks.forEach((t) => {
       const due = t.data.dueDate?.toDate?.();
       lines.push(
-        `Task: ${t.data.task || 'Untitled'}${
-          due ? ` (Due: ${due.toLocaleDateString()})` : ''
-        }`
+        `Task: ${t.data.task || 'Untitled'}${due ? ` (Due: ${due.toLocaleDateString()})` : ''}`
       );
     });
     goals.forEach((g) => {
       const due = g.data.dueDate?.toDate?.();
       lines.push(
-        `Goal: ${g.data.goal || 'Untitled'}${
-          due ? ` (Due: ${due.toLocaleDateString()})` : ''
-        }`
+        `Goal: ${g.data.goal || 'Untitled'}${due ? ` (Due: ${due.toLocaleDateString()})` : ''}`
       );
     });
     projects.forEach((p) => {
       const due = p.data.dueDate?.toDate?.();
       lines.push(
-        `Project: ${p.data.project || 'Untitled'}${
-          due ? ` (Due: ${due.toLocaleDateString()})` : ''
-        }`
+        `Project: ${p.data.project || 'Untitled'}${due ? ` (Due: ${due.toLocaleDateString()})` : ''}`
       );
     });
     plans.forEach((p) => {
       const due = p.data.dueDate?.toDate?.();
       lines.push(
-        `Plan: ${p.data.plan || 'Untitled'}${
-          due ? ` (Due: ${due.toLocaleDateString()})` : ''
-        }`
+        `Plan: ${p.data.plan || 'Untitled'}${due ? ` (Due: ${due.toLocaleDateString()})` : ''}`
       );
     });
 
@@ -226,57 +221,52 @@ export function AIChat() {
     // Do nothing if no text and no attachment
     if (!chatMessage.trim() && !attachment) return;
 
-    // If an attachment is present, use the vision model
+    // Branch for attachment-based messages using the vision model
     if (attachment) {
       const combinedUserMessage = chatMessage.trim()
-        ? `${chatMessage.trim()}\n[Attachment: ${attachment.name}]`
-        : `[Attachment: ${attachment.name}]`;
-      const userMsg: ChatMessage = { 
+        ? chatMessage.trim()
+        : 'Describe this image in one sentence.';
+      const userMsg: ChatMessage = {
         role: 'user',
-        content: combinedUserMessage
+        content: `${combinedUserMessage}\n[Attachment: ${attachment.name}]`,
       };
-      
-      setChatHistory(prev => [...prev, userMsg]);
+
+      setChatHistory((prev) => [...prev, userMsg]);
       setChatMessage('');
-
-      // Prepare a FormData object with the file and optional text context.
-      const formData = new FormData();
-      if (chatMessage.trim()) {
-        formData.append('text', chatMessage.trim());
-      }
-      formData.append('file', attachment);
-
       setIsChatLoading(true);
+
       try {
-        const response = await fetch(
-          'https://api-inference.huggingface.co/models/meta-llama/Llama-3.2-11B-Vision-Instruct',
-          {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${hfApiKey}`,
-              // Let the browser set the Content-Type for FormData
+        // Upload the attachment to Firebase Storage and get its public URL.
+        const publicUrl = await uploadAttachment(attachment);
+
+        // Use the public URL in the vision model request
+        const client = new HfInference(hfApiKey);
+        const chatCompletion = await client.chatCompletion({
+          model: 'meta-llama/Llama-3.2-90B-Vision-Instruct',
+          messages: [
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'text',
+                  text: combinedUserMessage,
+                },
+                {
+                  type: 'image_url',
+                  image_url: { url: publicUrl },
+                },
+              ],
             },
-            body: formData,
-          }
-        );
-  
-        if (!response.ok) throw new Error('Vision API request failed');
-        const result = await response.json();
-  
-        let assistantReply = (result[0]?.generated_text as string || '')
-          .replace(/\[\/?INST\]|<</g, '')
-          .split('\n')
-          .filter(line => !/^(print|python)/i.test(line.trim()))
-          .join('\n')
-          .trim();
-  
-        setChatHistory(prev => [
-          ...prev,
-          { role: 'assistant', content: assistantReply },
-        ]);
+          ],
+          provider: 'fireworks-ai',
+          max_tokens: 500,
+        });
+
+        const assistantReply = chatCompletion.choices[0].message;
+        setChatHistory((prev) => [...prev, { role: 'assistant', content: assistantReply }]);
       } catch (err) {
         console.error('Vision chat error:', err);
-        setChatHistory(prev => [
+        setChatHistory((prev) => [
           ...prev,
           {
             role: 'assistant',
@@ -293,18 +283,18 @@ export function AIChat() {
 
     // Regular text-based chat processing
     const timerDuration = parseTimerRequest(chatMessage);
-    const userMsg: ChatMessage = { 
+    const userMsg: ChatMessage = {
       role: 'user',
-      content: chatMessage
+      content: chatMessage,
     };
-    
-    setChatHistory(prev => [...prev, userMsg]);
+
+    setChatHistory((prev) => [...prev, userMsg]);
     setChatMessage('');
 
     // If it's a timer request, add timer immediately
     if (timerDuration) {
       const timerId = Math.random().toString(36).substr(2, 9);
-      setChatHistory(prev => [
+      setChatHistory((prev) => [
         ...prev,
         {
           role: 'assistant',
@@ -312,9 +302,9 @@ export function AIChat() {
           timer: {
             type: 'timer',
             duration: timerDuration,
-            id: timerId
-          }
-        }
+            id: timerId,
+          },
+        },
       ]);
       return;
     }
@@ -330,13 +320,13 @@ export function AIChat() {
         weekday: 'long',
         year: 'numeric',
         month: 'long',
-        day: 'numeric'
+        day: 'numeric',
       }),
       time: now.toLocaleTimeString('en-US', {
         hour: '2-digit',
         minute: '2-digit',
-        hour12: true
-      })
+        hour12: true,
+      }),
     };
 
     const prompt = `
@@ -451,7 +441,7 @@ Follow these instructions strictly.
       let assistantReply = (result[0]?.generated_text as string || '')
         .replace(/\[\/?INST\]|<</g, '')
         .split('\n')
-        .filter(line => !/^(print|python)/i.test(line.trim()))
+        .filter((line) => !/^(print|python)/i.test(line.trim()))
         .join('\n')
         .trim();
 
@@ -461,7 +451,7 @@ Follow these instructions strictly.
         try {
           const jsonContent = JSON.parse(jsonMatch[1].trim());
           assistantReply = assistantReply.replace(/```json\n[\s\S]*?\n```/, '').trim();
-          
+
           if (
             jsonContent.type &&
             jsonContent.data &&
@@ -473,7 +463,7 @@ Follow these instructions strictly.
                 role: 'assistant',
                 content: assistantReply,
                 ...(jsonContent.type === 'flashcard' && { flashcard: jsonContent }),
-                ...(jsonContent.type === 'question' && { question: jsonContent })
+                ...(jsonContent.type === 'question' && { question: jsonContent }),
               },
             ]);
           } else {
@@ -481,19 +471,10 @@ Follow these instructions strictly.
           }
         } catch (e) {
           console.error('Failed to parse JSON content:', e);
-          setChatHistory((prev) => [
-            ...prev,
-            { 
-              role: 'assistant', 
-              content: '' + assistantReply 
-            },
-          ]);
+          setChatHistory((prev) => [...prev, { role: 'assistant', content: assistantReply }]);
         }
       } else {
-        setChatHistory((prev) => [
-          ...prev,
-          { role: 'assistant', content: assistantReply },
-        ]);
+        setChatHistory((prev) => [...prev, { role: 'assistant', content: assistantReply }]);
       }
     } catch (err) {
       console.error('Chat error:', err);
@@ -501,8 +482,7 @@ Follow these instructions strictly.
         ...prev,
         {
           role: 'assistant',
-          content:
-            'Sorry, I had an issue responding. Please try again in a moment.',
+          content: 'Sorry, I had an issue responding. Please try again in a moment.',
         },
       ]);
     } finally {
@@ -512,15 +492,13 @@ Follow these instructions strictly.
 
   return (
     <div className="flex h-screen bg-gray-900">
-      <Sidebar 
-        isCollapsed={isSidebarCollapsed} 
-        onToggle={handleToggleSidebar}
-        userName={userName}
-      />
-      
-      <main className={`flex-1 overflow-hidden transition-all duration-300 ${
-        isSidebarCollapsed ? 'ml-16' : 'ml-64'
-      }`}>
+      <Sidebar isCollapsed={isSidebarCollapsed} onToggle={handleToggleSidebar} userName={userName} />
+
+      <main
+        className={`flex-1 overflow-hidden transition-all duration-300 ${
+          isSidebarCollapsed ? 'ml-16' : 'ml-64'
+        }`}
+      >
         <div className="h-full flex flex-col">
           {/* Header */}
           <div className="p-4 border-b border-gray-800">
@@ -559,9 +537,7 @@ Follow these instructions strictly.
               >
                 <div
                   className={`max-w-[80%] rounded-lg px-4 py-2 ${
-                    message.role === 'user'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-700 text-gray-200'
+                    message.role === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-200'
                   }`}
                 >
                   <ReactMarkdown
@@ -598,20 +574,12 @@ Follow these instructions strictly.
                   )}
                   {message.flashcard && (
                     <div className="mt-2">
-                      <FlashcardsQuestions
-                        type="flashcard"
-                        data={message.flashcard.data}
-                        onComplete={() => {}}
-                      />
+                      <FlashcardsQuestions type="flashcard" data={message.flashcard.data} onComplete={() => {}} />
                     </div>
                   )}
                   {message.question && (
                     <div className="mt-2">
-                      <FlashcardsQuestions
-                        type="question"
-                        data={message.question.data}
-                        onComplete={() => {}}
-                      />
+                      <FlashcardsQuestions type="question" data={message.question.data} onComplete={() => {}} />
                     </div>
                   )}
                 </div>
@@ -660,9 +628,7 @@ Follow these instructions strictly.
               </button>
             </div>
             {attachment && (
-              <div className="mt-2 text-sm text-gray-400">
-                Attached: {attachment.name}
-              </div>
+              <div className="mt-2 text-sm text-gray-400">Attached: {attachment.name}</div>
             )}
           </form>
         </div>

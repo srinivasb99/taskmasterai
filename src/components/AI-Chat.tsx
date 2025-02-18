@@ -249,7 +249,7 @@ export function AIChat() {
       setIsChatLoading(true);
       try {
         const response = await fetch(
-          'https://api-inference.huggingface.co/models/meta-llama/Llama-3.2-90B-Vision-Instruct',
+          'https://api-inference.huggingface.co/models/meta-llama/Llama-3.2-11B-Vision-Instruct',
           {
             method: 'POST',
             headers: {

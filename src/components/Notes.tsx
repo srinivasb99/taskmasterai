@@ -466,8 +466,7 @@ export function Notes() {
         userName={user.displayName || 'User'}
       />
 
-      {/* Adjust main margin based on sidebar width.
-          Here, if sidebar is not collapsed, we use w-80 (20rem) */}
+      {/* Main content margin is adjusted based on sidebar width */}
       <main
         className={`flex-1 overflow-hidden transition-all duration-300 ${
           isSidebarCollapsed ? 'ml-16' : 'ml-80'
@@ -863,6 +862,16 @@ export function Notes() {
                 >
                   YouTube
                 </button>
+                <button
+                  onClick={() => setFilterType('audio')}
+                  className={`px-3 py-1 text-xs rounded-full transition-colors ${
+                    filterType === 'audio'
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                  }`}
+                >
+                  Audio
+                </button>
               </div>
             </div>
   
@@ -920,12 +929,25 @@ export function Notes() {
                           }
                         }}
                       >
-                         <h3 className="text-white font-medium mb-1">
-                          {note.title}
-                        </h3>
-                        <p className="text-sm text-gray-400 line-clamp-2">
-                          {note.content}
-                        </p>
+                        <div className="flex items-start justify-between">
+                          <div
+                            className="flex-1 cursor-pointer"
+                            onClick={() => setSelectedNote(note)}
+                          >
+                            <h3 className="text-white font-medium mb-1">
+                              {note.title}
+                            </h3>
+                            <p className="text-sm text-gray-400 line-clamp-2">
+                              {note.content}
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => handleEditNote(note)}
+                            className="ml-2 p-1 text-gray-400 hover:text-white transition-colors"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                        </div>
                         <div className="flex items-center gap-2 mt-2">
                           {note.type === 'text' && (
                             <span className="px-2 py-0.5 text-xs bg-green-500/20 text-green-300 rounded-full">
@@ -940,6 +962,11 @@ export function Notes() {
                           {note.type === 'youtube' && (
                             <span className="px-2 py-0.5 text-xs bg-red-500/20 text-red-300 rounded-full">
                               YouTube
+                            </span>
+                          )}
+                          {note.type === 'audio' && (
+                            <span className="px-2 py-0.5 text-xs bg-blue-500/20 text-blue-300 rounded-full">
+                              Audio
                             </span>
                           )}
                           {note.isPublic && (
@@ -963,7 +990,6 @@ export function Notes() {
             </div>
           </div>
         </div>
-  
   
         {/* New Note Modal */}
         {showNewNoteModal && (

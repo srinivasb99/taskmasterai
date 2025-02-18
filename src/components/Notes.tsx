@@ -445,17 +445,6 @@ export function Notes() {
     }));
   };
 
-  // Show loading state while checking auth
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-gray-900 text-white">
-        <div className="animate-pulse">
-          <p className="text-xl">Loading...</p>
-          <div className="mt-4 h-2 w-32 bg-gray-700 rounded"></div>
-        </div>
-      </div>
-    );
-  }
 
 
   return (
@@ -795,7 +784,7 @@ export function Notes() {
 
           {/* Notes List Sidebar */}
           <div
-            className={`w-full md:w-96 border-t md:border-t-0 md:border-l border-gray-800 flex flex-col bg-gray-800/50 ${
+            className={`w-full md:w-96 h-full border-t md:border-t-0 md:border-l border-gray-800 flex flex-col bg-gray-800/50 ${
               isMobile && showNotesList ? 'block' : 'hidden md:block'
             }`}
           >

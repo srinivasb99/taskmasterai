@@ -19,3 +19,5 @@ export async function uploadAttachment(file: File): Promise<string> {
   const downloadURL = await fileRef.getDownloadURL();
   return downloadURL;
 }
+
+export default ai-chat-firebase;

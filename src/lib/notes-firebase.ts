@@ -220,3 +220,80 @@ Generate 3 questions in this exact format.`;
     throw error;
   }
 }
+
+// Add this function to regenerate study questions
+export async function regenerateStudyQuestions(noteId: string, content: string, huggingFaceApiKey: string) {
+  try {
+    const questionsPrompt = `
+Based on the following content, generate 3 multiple-choice questions:
+
+${content}
+
+Format each question as follows:
+Question: (The question)
+A) (First option)
+B) (Second option)
+C) (Third option)
+D) (Fourth option)
+Correct: (Letter of correct answer)
+Explanation: (Why this is the correct answer)
+
+Generate 3 questions in this exact format.`;
+
+    const questionsResponse = await fetch(
+      'https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct',
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${huggingFaceApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          inputs: questionsPrompt,
+          parameters: {
+            max_length: 1000,
+            temperature: 0.3,
+            top_p: 0.9,
+            return_full_text: false
+          }
+        })
+      }
+    );
+
+    if (!questionsResponse.ok) {
+      throw new Error('Failed to generate questions');
+    }
+
+    const questionsResult = await questionsResponse.json();
+    const questionsText = questionsResult[0].generated_text;
+
+    // Parse questions
+    const questionBlocks = questionsText.split(/Question: /).filter(Boolean);
+    const questions = questionBlocks.map(block => {
+      const lines = block.split('\n').filter(Boolean);
+      const question = lines[0].trim();
+      const options = lines.slice(1, 5).map(opt => opt.replace(/^[A-D]\)\s*/, '').trim());
+      const correctAnswer = lines.find(l => l.startsWith('Correct:'))?.replace('Correct:', '').trim();
+      const explanation = lines.find(l => l.startsWith('Explanation:'))?.replace('Explanation:', '').trim() || '';
+
+      return {
+        question,
+        options,
+        correctAnswer: ['A', 'B', 'C', 'D'].indexOf(correctAnswer || 'A'),
+        explanation
+      };
+    });
+
+    // Update the note with new questions
+    const noteRef = doc(db, 'notes', noteId);
+    await updateDoc(noteRef, {
+      questions,
+      updatedAt: Timestamp.now()
+    });
+
+    return questions;
+  } catch (error) {
+    console.error('Error regenerating questions:', error);
+    throw error;
+  }
+}

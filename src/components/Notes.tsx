@@ -464,10 +464,10 @@ export function Notes() {
 
   return (
     <div className="flex h-screen bg-gray-900">
-      <Sidebar
-        isCollapsed={isSidebarCollapsed}
+      <Sidebar 
+        isCollapsed={isSidebarCollapsed} 
         onToggle={handleToggleSidebar}
-        userName={user.displayName || 'User'}
+        userName={userName}
       />
 
       <main

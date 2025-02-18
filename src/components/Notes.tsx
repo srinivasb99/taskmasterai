@@ -60,6 +60,8 @@ import {
 import { NewNoteModal } from './NewNoteModal';
 import { SplitView } from './SplitView';
 import { NoteChat } from './NoteChat';
+import { getCurrentUser } from '../lib/settings-firebase';
+
 
 // Types
 interface Note {
@@ -93,6 +95,7 @@ const huggingFaceApiKey = "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";
 export function Notes() {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
+  const [userName, setUserName] = useState<string>("Loading...");
   const [loading, setLoading] = useState(true);
   const [notes, setNotes] = useState<Note[]>([]);
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
@@ -108,6 +111,18 @@ export function Notes() {
     const stored = localStorage.getItem('isSidebarCollapsed');
     return stored ? JSON.parse(stored) : false;
   });
+
+     useEffect(() => {
+    const firebaseUser = getCurrentUser();
+    if (firebaseUser) {
+      setUser(firebaseUser);
+      // Set the user's name to displayName if it exists, otherwise default to "User"
+      setUserName(firebaseUser.displayName || "User");
+    } else {
+      navigate('/login');
+    }
+    setLoading(false);
+  }, [navigate]);
 
     // Editing state
   const [isEditing, setIsEditing] = useState(false);
@@ -445,17 +460,6 @@ export function Notes() {
     }));
   };
 
-  // Show loading state while checking auth
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-gray-900 text-white">
-        <div className="animate-pulse">
-          <p className="text-xl">Loading...</p>
-          <div className="mt-4 h-2 w-32 bg-gray-700 rounded"></div>
-        </div>
-      </div>
-    );
-  }
 
 
   return (

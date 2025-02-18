@@ -60,8 +60,6 @@ import {
 import { NewNoteModal } from './NewNoteModal';
 import { SplitView } from './SplitView';
 import { NoteChat } from './NoteChat';
-import { updateUserProfile, signOutUser, deleteUserAccount, AuthError, getCurrentUser } from '../lib/settings-firebase';
-
 
 // Types
 interface Note {
@@ -157,14 +155,15 @@ export function Notes() {
     localStorage.setItem('isSidebarCollapsed', JSON.stringify(isSidebarCollapsed));
   }, [isSidebarCollapsed]);
 
-  // Check for authenticated user
+  // Auth state listener
   useEffect(() => {
-    const user = getCurrentUser();
-    if (!user) {
-      navigate('/login');
-    }
-  }, [navigate]);
+    const unsubscribe = auth.onAuthStateChanged((firebaseUser) => {
+      setUser(firebaseUser);
+      setLoading(false);
+    });
 
+    return () => unsubscribe();
+  }, []);
 
   // Notes listener
   useEffect(() => {
@@ -445,6 +444,18 @@ export function Notes() {
       [questionIndex]: selectedOption
     }));
   };
+
+  // Show loading state while checking auth
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gray-900 text-white">
+        <div className="animate-pulse">
+          <p className="text-xl">Loading...</p>
+          <div className="mt-4 h-2 w-32 bg-gray-700 rounded"></div>
+        </div>
+      </div>
+    );
+  }
 
 
   return (

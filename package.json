@@ -14,7 +14,7 @@
     "@fortawesome/react-fontawesome": "^0.2.0",
     "@stripe/stripe-js": "^2.4.0",
     "@vercel/node": "^3.0.24",
-    "@huggingface/inference": "^0.10.1",
+    "transformers": "^4.28.0",
     "firebase": "^10.8.1",
     "katex": "^0.16.9",
     "lucide-react": "^0.344.0",

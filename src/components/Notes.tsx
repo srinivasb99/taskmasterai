@@ -863,16 +863,6 @@ export function Notes() {
                 >
                   YouTube
                 </button>
-                <button
-                  onClick={() => setFilterType('audio')}
-                  className={`px-3 py-1 text-xs rounded-full transition-colors ${
-                    filterType === 'audio'
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-                  }`}
-                >
-                  Audio
-                </button>
               </div>
             </div>
   
@@ -886,18 +876,13 @@ export function Notes() {
                     Create your first note by clicking one of the buttons below
                   </p>
                   <div className="flex gap-2">
-                    <button
-                      onClick={openManualNoteModal}
-                      className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors"
-                    >
-                      Personal Note
-                    </button>
-                    <button
-                      onClick={() => setShowUploadModal(true)}
-                      className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-                    >
-                      AI Note
-                    </button>
+                  <button
+                    onClick={() => setShowNewNoteModal(true)}
+                    className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    New Note
+                  </button>
                   </div>
                 </div>
               ) : (
@@ -935,25 +920,12 @@ export function Notes() {
                           }
                         }}
                       >
-                        <div className="flex items-start justify-between">
-                          <div
-                            className="flex-1 cursor-pointer"
-                            onClick={() => setSelectedNote(note)}
-                          >
-                            <h3 className="text-white font-medium mb-1">
-                              {note.title}
-                            </h3>
-                            <p className="text-sm text-gray-400 line-clamp-2">
-                              {note.content}
-                            </p>
-                          </div>
-                          <button
-                            onClick={() => handleEditNote(note)}
-                            className="ml-2 p-1 text-gray-400 hover:text-white transition-colors"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
-                        </div>
+                         <h3 className="text-white font-medium mb-1">
+                          {note.title}
+                        </h3>
+                        <p className="text-sm text-gray-400 line-clamp-2">
+                          {note.content}
+                        </p>
                         <div className="flex items-center gap-2 mt-2">
                           {note.type === 'text' && (
                             <span className="px-2 py-0.5 text-xs bg-green-500/20 text-green-300 rounded-full">
@@ -968,11 +940,6 @@ export function Notes() {
                           {note.type === 'youtube' && (
                             <span className="px-2 py-0.5 text-xs bg-red-500/20 text-red-300 rounded-full">
                               YouTube
-                            </span>
-                          )}
-                          {note.type === 'audio' && (
-                            <span className="px-2 py-0.5 text-xs bg-blue-500/20 text-blue-300 rounded-full">
-                              Audio
                             </span>
                           )}
                           {note.isPublic && (
@@ -996,6 +963,7 @@ export function Notes() {
             </div>
           </div>
         </div>
+  
   
         {/* New Note Modal */}
         {showNewNoteModal && (

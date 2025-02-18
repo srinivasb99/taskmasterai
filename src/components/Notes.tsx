@@ -466,10 +466,9 @@ export function Notes() {
         userName={user.displayName || 'User'}
       />
 
-      {/* Main content margin is adjusted based on sidebar width */}
       <main
         className={`flex-1 overflow-hidden transition-all duration-300 ${
-          isSidebarCollapsed ? 'ml-16' : 'ml-80'
+          isSidebarCollapsed ? 'ml-16' : 'ml-64'
         }`}
       >
         <div className="h-full flex flex-col md:flex-row">
@@ -655,7 +654,7 @@ export function Notes() {
                       </button>
                     </div>
                   </div>
-  
+
                   <div className="prose prose-invert max-w-none">
                     <ReactMarkdown
                       remarkPlugins={[remarkMath, remarkGfm]}
@@ -664,7 +663,7 @@ export function Notes() {
                       {selectedNote.content}
                     </ReactMarkdown>
                   </div>
-  
+
                   {selectedNote.keyPoints && (
                     <div className="mt-8">
                       <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
@@ -686,96 +685,95 @@ export function Notes() {
                       </ul>
                     </div>
                   )}
-  
-                  {selectedNote.questions && (
-                    <div className="mt-8">
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                          <BookOpen className="w-5 h-5 text-blue-400" />
-                          Study Questions
-                        </h3>
-                        <button
-                          onClick={handleRegenerateQuestions}
-                          disabled={isRegeneratingQuestions}
-                          className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                        >
-                          {isRegeneratingQuestions ? (
-                            <>
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                              Regenerating...
-                            </>
-                          ) : (
-                            <>
-                              <RefreshCw className="w-4 h-4" />
-                              Regenerate Questions
-                            </>
-                          )}
-                        </button>
-                      </div>
-                      <div className="space-y-6">
-                        {selectedNote.questions.map((q, index) => (
-                          <div key={index} className="bg-gray-700 rounded-lg p-4">
-                            <p className="text-white mb-4">{q.question}</p>
-                            <div className="space-y-2">
-                              {q.options.map((option, optIndex) => {
-                                const isAnswered =
-                                  questionAnswers[index] !== undefined;
-                                const isSelected =
-                                  questionAnswers[index] === optIndex;
-                                const isCorrect = optIndex === q.correctAnswer;
-                                let buttonClass =
-                                  'w-full text-left p-3 rounded-lg transition-colors ';
-                                if (isAnswered) {
-                                  if (isSelected) {
-                                    buttonClass += isCorrect
-                                      ? 'bg-green-500/20 text-green-300 border-2 border-green-500'
-                                      : 'bg-red-500/20 text-red-300 border-2 border-red-500';
-                                  } else if (isCorrect) {
-                                    buttonClass += 'bg-green-500/20 text-green-300';
-                                  } else {
-                                    buttonClass += 'bg-gray-600 text-gray-400';
-                                  }
-                                } else {
-                                  buttonClass += 'bg-gray-600 text-gray-300 hover:bg-gray-500';
-                                }
-                                return (
-                                  <button
-                                    key={optIndex}
-                                    onClick={() =>
-                                      !isAnswered && handleAnswerSelect(index, optIndex)
-                                    }
-                                    disabled={isAnswered}
-                                    className={buttonClass}
-                                  >
-                                    <div className="flex items-center justify-between">
-                                      <span>{option}</span>
-                                      {isAnswered && isSelected && (
-                                        isCorrect ? (
-                                          <Check className="w-5 h-5 text-green-400" />
-                                        ) : (
-                                          <X className="w-5 h-5 text-red-400" />
-                                        )
-                                      )}
-                                    </div>
-                                  </button>
-                                );
-                              })}
-                            </div>
-                            {questionAnswers[index] !== undefined && (
-                              <div className="mt-4 p-4 rounded-lg bg-gray-600">
-                                <p className="text-sm text-gray-300">
-                                  <span className="font-medium text-white">
-                                    Explanation:{' '}
-                                  </span>
-                                  {q.explanation}
-                                </p>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+
+ {selectedNote.questions && (
+  <div className="mt-8">
+    <div className="flex items-center justify-between mb-4">
+      <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+        <BookOpen className="w-5 h-5 text-blue-400" />
+        Study Questions
+      </h3>
+      <button
+        onClick={handleRegenerateQuestions}
+        disabled={isRegeneratingQuestions}
+        className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+      >
+        {isRegeneratingQuestions ? (
+          <>
+            <Loader2 className="w-4 h-4 animate-spin" />
+            Regenerating...
+          </>
+        ) : (
+          <>
+            <RefreshCw className="w-4 h-4" />
+            Regenerate Questions
+          </>
+        )}
+      </button>
+    </div>
+    <div className="space-y-6">
+      {selectedNote.questions.map((q, index) => (
+        <div key={index} className="bg-gray-700 rounded-lg p-4">
+          <p className="text-white mb-4">{q.question}</p>
+          <div className="space-y-2">
+            {q.options.map((option, optIndex) => {
+              const isAnswered = questionAnswers[index] !== undefined;
+              const isSelected = questionAnswers[index] === optIndex;
+              const isCorrect = optIndex === q.correctAnswer;
+              let buttonClass =
+                'w-full text-left p-3 rounded-lg transition-colors ';
+              if (isAnswered) {
+                if (isSelected) {
+                  buttonClass += isCorrect
+                    ? 'bg-green-500/20 text-green-300 border-2 border-green-500'
+                    : 'bg-red-500/20 text-red-300 border-2 border-red-500';
+                } else if (isCorrect) {
+                  buttonClass += 'bg-green-500/20 text-green-300';
+                } else {
+                  buttonClass += 'bg-gray-600 text-gray-400';
+                }
+              } else {
+                buttonClass += 'bg-gray-600 text-gray-300 hover:bg-gray-500';
+              }
+              return (
+                <button
+                  key={optIndex}
+                  onClick={() =>
+                    !isAnswered && handleAnswerSelect(index, optIndex)
+                  }
+                  disabled={isAnswered}
+                  className={buttonClass}
+                >
+                  <div className="flex items-center justify-between">
+                    <span>{option}</span>
+                    {isAnswered && isSelected && (
+                      isCorrect ? (
+                        <Check className="w-5 h-5 text-green-400" />
+                      ) : (
+                        <X className="w-5 h-5 text-red-400" />
+                      )
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          {questionAnswers[index] !== undefined && (
+            <div className="mt-4 p-4 rounded-lg bg-gray-600">
+              <p className="text-sm text-gray-300">
+                <span className="font-medium text-white">
+                  Explanation:{' '}
+                </span>
+                {q.explanation}
+              </p>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  </div>
+)}
+
                 </div>
               )
             ) : (
@@ -794,10 +792,10 @@ export function Notes() {
               </div>
             )}
           </div>
-  
+
           {/* Notes List Sidebar */}
           <div
-            className={`w-full md:w-80 h-[calc(100vh-73px)] border-t md:border-t-0 md:border-l border-gray-800 flex flex-col bg-gray-800 ${
+            className={`w-full md:w-96 border-t md:border-t-0 md:border-l border-gray-800 flex flex-col bg-gray-800/50 ${
               isMobile && showNotesList ? 'block' : 'hidden md:block'
             }`}
           >
@@ -818,7 +816,7 @@ export function Notes() {
                   placeholder="Search notes..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-gray-800 text-gray-200 pl-10 pr-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full bg-gray-700 text-gray-200 pl-10 pr-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               <div className="flex gap-2 mt-3 overflow-x-auto pb-2">
@@ -827,7 +825,7 @@ export function Notes() {
                   className={`px-3 py-1 text-xs rounded-full transition-colors ${
                     filterType === 'all'
                       ? 'bg-blue-500 text-white'
-                      : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                      : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
                   }`}
                 >
                   All
@@ -837,7 +835,7 @@ export function Notes() {
                   className={`px-3 py-1 text-xs rounded-full transition-colors ${
                     filterType === 'text'
                       ? 'bg-blue-500 text-white'
-                      : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                      : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
                   }`}
                 >
                   Personal
@@ -847,7 +845,7 @@ export function Notes() {
                   className={`px-3 py-1 text-xs rounded-full transition-colors ${
                     filterType === 'pdf'
                       ? 'bg-blue-500 text-white'
-                      : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                      : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
                   }`}
                 >
                   PDF
@@ -857,24 +855,14 @@ export function Notes() {
                   className={`px-3 py-1 text-xs rounded-full transition-colors ${
                     filterType === 'youtube'
                       ? 'bg-blue-500 text-white'
-                      : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                      : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
                   }`}
                 >
                   YouTube
                 </button>
-                <button
-                  onClick={() => setFilterType('audio')}
-                  className={`px-3 py-1 text-xs rounded-full transition-colors ${
-                    filterType === 'audio'
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-                  }`}
-                >
-                  Audio
-                </button>
               </div>
             </div>
-  
+
             {/* Notes List */}
             <div className="flex-1 overflow-y-auto">
               {notes.length === 0 ? (
@@ -882,9 +870,8 @@ export function Notes() {
                   <FileQuestion className="w-12 h-12 text-gray-600 mb-4" />
                   <p className="text-gray-400 mb-2">No notes yet</p>
                   <p className="text-sm text-gray-500 mb-4">
-                    Create your first note by clicking one of the buttons below
+                    Create your first note by clicking the button below
                   </p>
-                  <div className="flex gap-2">
                   <button
                     onClick={() => setShowNewNoteModal(true)}
                     className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-2"
@@ -892,7 +879,6 @@ export function Notes() {
                     <Plus className="w-4 h-4" />
                     New Note
                   </button>
-                  </div>
                 </div>
               ) : (
                 <div className="divide-y divide-gray-800">
@@ -915,8 +901,8 @@ export function Notes() {
                     .map((note) => (
                       <div
                         key={note.id}
-                        className={`p-4 transition-colors hover:bg-gray-800 cursor-pointer ${
-                          selectedNote?.id === note.id ? 'bg-gray-800' : ''
+                        className={`p-4 transition-colors hover:bg-gray-700 cursor-pointer ${
+                          selectedNote?.id === note.id ? 'bg-gray-700' : ''
                         }`}
                         onClick={() => {
                           if (showSplitView) {
@@ -929,25 +915,12 @@ export function Notes() {
                           }
                         }}
                       >
-                        <div className="flex items-start justify-between">
-                          <div
-                            className="flex-1 cursor-pointer"
-                            onClick={() => setSelectedNote(note)}
-                          >
-                            <h3 className="text-white font-medium mb-1">
-                              {note.title}
-                            </h3>
-                            <p className="text-sm text-gray-400 line-clamp-2">
-                              {note.content}
-                            </p>
-                          </div>
-                          <button
-                            onClick={() => handleEditNote(note)}
-                            className="ml-2 p-1 text-gray-400 hover:text-white transition-colors"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
-                        </div>
+                        <h3 className="text-white font-medium mb-1">
+                          {note.title}
+                        </h3>
+                        <p className="text-sm text-gray-400 line-clamp-2">
+                          {note.content}
+                        </p>
                         <div className="flex items-center gap-2 mt-2">
                           {note.type === 'text' && (
                             <span className="px-2 py-0.5 text-xs bg-green-500/20 text-green-300 rounded-full">
@@ -962,11 +935,6 @@ export function Notes() {
                           {note.type === 'youtube' && (
                             <span className="px-2 py-0.5 text-xs bg-red-500/20 text-red-300 rounded-full">
                               YouTube
-                            </span>
-                          )}
-                          {note.type === 'audio' && (
-                            <span className="px-2 py-0.5 text-xs bg-blue-500/20 text-blue-300 rounded-full">
-                              Audio
                             </span>
                           )}
                           {note.isPublic && (
@@ -990,7 +958,7 @@ export function Notes() {
             </div>
           </div>
         </div>
-  
+
         {/* New Note Modal */}
         {showNewNoteModal && (
           <NewNoteModal
@@ -1002,7 +970,7 @@ export function Notes() {
             uploadProgress={uploadProgress}
           />
         )}
-  
+
         {/* Split View */}
         {showSplitView &&
           splitViewNotes.left &&
@@ -1019,7 +987,7 @@ export function Notes() {
               onChat={handleChatWithNote}
             />
           )}
-  
+
         {/* Chat Modal */}
         {showChatModal && chatNote && (
           <NoteChat
@@ -1036,5 +1004,6 @@ export function Notes() {
     </div>
   );
 };
+
 
 export default Notes;

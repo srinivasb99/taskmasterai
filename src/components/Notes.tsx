@@ -773,7 +773,7 @@ export function Notes() {
     </div>
   </div>
 )}
-            ) : (
+             : (
               <div className="flex flex-col items-center justify-center h-[calc(100vh-12rem)] text-center">
                 <FileText className="w-16 h-16 text-gray-600 mb-4" />
                 <h2 className="text-xl font-semibold text-white mb-2">

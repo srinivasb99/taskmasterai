@@ -1,11 +1,9 @@
-// src/lib/ai-chat-firebase.ts
-
 import firebase from './firebase';
 import 'firebase/storage';
 
 /**
  * Uploads a file (e.g. image or PDF) to Firebase Storage
- * and returns the public download URL.
+ * and returns its public download URL.
  *
  * @param file - The file to be uploaded.
  * @returns A promise that resolves with the file's download URL.

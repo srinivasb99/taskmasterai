@@ -466,9 +466,11 @@ export function Notes() {
         userName={user.displayName || 'User'}
       />
 
+      {/* Adjust main margin based on sidebar width.
+          Here, if sidebar is not collapsed, we use w-80 (20rem) */}
       <main
         className={`flex-1 overflow-hidden transition-all duration-300 ${
-          isSidebarCollapsed ? 'ml-16' : 'ml-64'
+          isSidebarCollapsed ? 'ml-16' : 'ml-80'
         }`}
       >
         <div className="h-full flex flex-col md:flex-row">
@@ -796,7 +798,7 @@ export function Notes() {
   
           {/* Notes List Sidebar */}
           <div
-            className={`w-full md:w-96 h-full border-t md:border-t-0 md:border-l border-gray-800 flex flex-col bg-gray-800/50 ${
+            className={`w-full md:w-80 h-[calc(100vh-73px)] border-t md:border-t-0 md:border-l border-gray-800 flex flex-col bg-gray-800 ${
               isMobile && showNotesList ? 'block' : 'hidden md:block'
             }`}
           >
@@ -817,7 +819,7 @@ export function Notes() {
                   placeholder="Search notes..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-gray-700 text-gray-200 pl-10 pr-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full bg-gray-800 text-gray-200 pl-10 pr-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               <div className="flex gap-2 mt-3 overflow-x-auto pb-2">
@@ -826,7 +828,7 @@ export function Notes() {
                   className={`px-3 py-1 text-xs rounded-full transition-colors ${
                     filterType === 'all'
                       ? 'bg-blue-500 text-white'
-                      : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
+                      : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
                   }`}
                 >
                   All
@@ -836,7 +838,7 @@ export function Notes() {
                   className={`px-3 py-1 text-xs rounded-full transition-colors ${
                     filterType === 'text'
                       ? 'bg-blue-500 text-white'
-                      : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
+                      : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
                   }`}
                 >
                   Personal
@@ -846,7 +848,7 @@ export function Notes() {
                   className={`px-3 py-1 text-xs rounded-full transition-colors ${
                     filterType === 'pdf'
                       ? 'bg-blue-500 text-white'
-                      : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
+                      : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
                   }`}
                 >
                   PDF
@@ -856,30 +858,47 @@ export function Notes() {
                   className={`px-3 py-1 text-xs rounded-full transition-colors ${
                     filterType === 'youtube'
                       ? 'bg-blue-500 text-white'
-                      : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
+                      : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
                   }`}
                 >
                   YouTube
+                </button>
+                <button
+                  onClick={() => setFilterType('audio')}
+                  className={`px-3 py-1 text-xs rounded-full transition-colors ${
+                    filterType === 'audio'
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                  }`}
+                >
+                  Audio
                 </button>
               </div>
             </div>
   
             {/* Notes List */}
-            <div className="flex-1 overflow-y-auto min-h-0 overscroll-contain">
+            <div className="flex-1 overflow-y-auto">
               {notes.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-center p-6">
                   <FileQuestion className="w-12 h-12 text-gray-600 mb-4" />
                   <p className="text-gray-400 mb-2">No notes yet</p>
                   <p className="text-sm text-gray-500 mb-4">
-                    Create your first note by clicking the button below
+                    Create your first note by clicking one of the buttons below
                   </p>
-                  <button
-                    onClick={() => setShowNewNoteModal(true)}
-                    className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-2"
-                  >
-                    <Plus className="w-4 h-4" />
-                    New Note
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={openManualNoteModal}
+                      className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors"
+                    >
+                      Personal Note
+                    </button>
+                    <button
+                      onClick={() => setShowUploadModal(true)}
+                      className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                    >
+                      AI Note
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div className="divide-y divide-gray-800">
@@ -902,8 +921,8 @@ export function Notes() {
                     .map((note) => (
                       <div
                         key={note.id}
-                        className={`p-4 transition-colors hover:bg-gray-700 cursor-pointer ${
-                          selectedNote?.id === note.id ? 'bg-gray-700' : ''
+                        className={`p-4 transition-colors hover:bg-gray-800 cursor-pointer ${
+                          selectedNote?.id === note.id ? 'bg-gray-800' : ''
                         }`}
                         onClick={() => {
                           if (showSplitView) {
@@ -916,12 +935,25 @@ export function Notes() {
                           }
                         }}
                       >
-                        <h3 className="text-white font-medium mb-1">
-                          {note.title}
-                        </h3>
-                        <p className="text-sm text-gray-400 line-clamp-2">
-                          {note.content}
-                        </p>
+                        <div className="flex items-start justify-between">
+                          <div
+                            className="flex-1 cursor-pointer"
+                            onClick={() => setSelectedNote(note)}
+                          >
+                            <h3 className="text-white font-medium mb-1">
+                              {note.title}
+                            </h3>
+                            <p className="text-sm text-gray-400 line-clamp-2">
+                              {note.content}
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => handleEditNote(note)}
+                            className="ml-2 p-1 text-gray-400 hover:text-white transition-colors"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                        </div>
                         <div className="flex items-center gap-2 mt-2">
                           {note.type === 'text' && (
                             <span className="px-2 py-0.5 text-xs bg-green-500/20 text-green-300 rounded-full">
@@ -936,6 +968,11 @@ export function Notes() {
                           {note.type === 'youtube' && (
                             <span className="px-2 py-0.5 text-xs bg-red-500/20 text-red-300 rounded-full">
                               YouTube
+                            </span>
+                          )}
+                          {note.type === 'audio' && (
+                            <span className="px-2 py-0.5 text-xs bg-blue-500/20 text-blue-300 rounded-full">
+                              Audio
                             </span>
                           )}
                           {note.isPublic && (

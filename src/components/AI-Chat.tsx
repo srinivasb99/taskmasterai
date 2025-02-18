@@ -7,6 +7,7 @@ import {
   Bot,
   X,
   AlertTriangle,
+  Paperclip,
 } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { Timer } from './Timer';
@@ -23,7 +24,6 @@ import {
   hfApiKey,
 } from '../lib/dashboard-firebase';
 import { getCurrentUser } from '../lib/settings-firebase';
-
 
 // Types for messages
 interface TimerMessage {
@@ -72,7 +72,6 @@ export function AIChat() {
   const [userName, setUserName] = useState<string>("Loading...");
   const [chatMessage, setChatMessage] = useState('');
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([
-  
     {
       role: 'assistant',
       content: "👋 Hi I'm TaskMaster, How can I help you today? Need help with your items? Simply ask me!"
@@ -84,6 +83,9 @@ export function AIChat() {
   const [goals, setGoals] = useState<Array<{ id: string; data: any }>>([]);
   const [projects, setProjects] = useState<Array<{ id: string; data: any }>>([]);
   const [plans, setPlans] = useState<Array<{ id: string; data: any }>>([]);
+  
+  // New state for attachment (images, PDFs, etc.)
+  const [attachment, setAttachment] = useState<File | null>(null);
 
   // Initialize state from localStorage
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
@@ -105,15 +107,13 @@ export function AIChat() {
       }
       setLoading(false);
     });
-
     return () => unsubscribe();
   }, []);
 
-   useEffect(() => {
+  useEffect(() => {
     const firebaseUser = getCurrentUser();
     if (firebaseUser) {
       setUser(firebaseUser);
-      // Set the user's name to displayName if it exists, otherwise default to "User"
       setUserName(firebaseUser.displayName || "User");
     } else {
       navigate('/login');
@@ -183,7 +183,6 @@ export function AIChat() {
   // Format items for chat
   const formatItemsForChat = () => {
     const lines: string[] = [];
-
     lines.push(`${userName}'s items:\n`);
 
     tasks.forEach((t) => {
@@ -224,9 +223,75 @@ export function AIChat() {
 
   const handleChatSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!chatMessage.trim()) return;
+    // Do nothing if no text and no attachment
+    if (!chatMessage.trim() && !attachment) return;
 
-    // Check for timer request
+    // If an attachment is present, use the vision model
+    if (attachment) {
+      const combinedUserMessage = chatMessage.trim()
+        ? `${chatMessage.trim()}\n[Attachment: ${attachment.name}]`
+        : `[Attachment: ${attachment.name}]`;
+      const userMsg: ChatMessage = { 
+        role: 'user',
+        content: combinedUserMessage
+      };
+      
+      setChatHistory(prev => [...prev, userMsg]);
+      setChatMessage('');
+
+      // Prepare a FormData object with the file and optional text context.
+      const formData = new FormData();
+      if (chatMessage.trim()) {
+        formData.append('text', chatMessage.trim());
+      }
+      formData.append('file', attachment);
+
+      setIsChatLoading(true);
+      try {
+        const response = await fetch(
+          'https://api-inference.huggingface.co/models/meta-llama/Llama-3.2-90B-Vision-Instruct',
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${hfApiKey}`,
+              // Let the browser set the Content-Type for FormData
+            },
+            body: formData,
+          }
+        );
+  
+        if (!response.ok) throw new Error('Vision API request failed');
+        const result = await response.json();
+  
+        let assistantReply = (result[0]?.generated_text as string || '')
+          .replace(/\[\/?INST\]|<</g, '')
+          .split('\n')
+          .filter(line => !/^(print|python)/i.test(line.trim()))
+          .join('\n')
+          .trim();
+  
+        setChatHistory(prev => [
+          ...prev,
+          { role: 'assistant', content: assistantReply },
+        ]);
+      } catch (err) {
+        console.error('Vision chat error:', err);
+        setChatHistory(prev => [
+          ...prev,
+          {
+            role: 'assistant',
+            content:
+              'Sorry, I had an issue processing your attachment. Please try again in a moment.',
+          },
+        ]);
+      } finally {
+        setIsChatLoading(false);
+        setAttachment(null);
+      }
+      return;
+    }
+
+    // Regular text-based chat processing
     const timerDuration = parseTimerRequest(chatMessage);
     const userMsg: ChatMessage = { 
       role: 'user',
@@ -254,7 +319,6 @@ export function AIChat() {
       return;
     }
 
-    // Regular chat processing
     const conversation = chatHistory
       .map((m) => `${m.role === 'user' ? userName : 'Assistant'}: ${m.content}`)
       .join('\n');
@@ -275,7 +339,7 @@ export function AIChat() {
       })
     };
 
-const prompt = `
+    const prompt = `
 [CONTEXT]
 User's Name: ${userName}
 Current Date: ${currentDateTime.date}
@@ -396,10 +460,8 @@ Follow these instructions strictly.
       if (jsonMatch) {
         try {
           const jsonContent = JSON.parse(jsonMatch[1].trim());
-          // Remove the JSON block from the text response
           assistantReply = assistantReply.replace(/```json\n[\s\S]*?\n```/, '').trim();
           
-          // Validate JSON structure
           if (
             jsonContent.type &&
             jsonContent.data &&
@@ -447,8 +509,6 @@ Follow these instructions strictly.
       setIsChatLoading(false);
     }
   };
-
-
 
   return (
     <div className="flex h-screen bg-gray-900">
@@ -536,24 +596,25 @@ Follow these instructions strictly.
                       </div>
                     </div>
                   )}
-{message.flashcard && (
-  <div className="mt-2">
-    <FlashcardsQuestions
-      type="flashcard"
-      data={message.flashcard.data}
-      onComplete={() => {}}
-    />
-  </div>
-)}
-{message.question && (
-  <div className="mt-2">
-    <FlashcardsQuestions
-      type="question"
-      data={message.question.data}
-      onComplete={() => {}}
-    />
-  </div>
-)}              </div>
+                  {message.flashcard && (
+                    <div className="mt-2">
+                      <FlashcardsQuestions
+                        type="flashcard"
+                        data={message.flashcard.data}
+                        onComplete={() => {}}
+                      />
+                    </div>
+                  )}
+                  {message.question && (
+                    <div className="mt-2">
+                      <FlashcardsQuestions
+                        type="question"
+                        data={message.question.data}
+                        onComplete={() => {}}
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
             ))}
             {isChatLoading && (
@@ -571,7 +632,18 @@ Follow these instructions strictly.
 
           {/* Chat Input */}
           <form onSubmit={handleChatSubmit} className="p-4 border-t border-gray-800">
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2">
+              {/* File attachment button */}
+              <label htmlFor="attachmentInput" className="cursor-pointer">
+                <Paperclip className="w-6 h-6 text-gray-200" />
+              </label>
+              <input
+                id="attachmentInput"
+                type="file"
+                onChange={(e) => setAttachment(e.target.files?.[0] || null)}
+                accept="image/*,application/pdf"
+                className="hidden"
+              />
               <input
                 type="text"
                 value={chatMessage}
@@ -587,6 +659,11 @@ Follow these instructions strictly.
                 <Send className="w-5 h-5" />
               </button>
             </div>
+            {attachment && (
+              <div className="mt-2 text-sm text-gray-400">
+                Attached: {attachment.name}
+              </div>
+            )}
           </form>
         </div>
       </main>

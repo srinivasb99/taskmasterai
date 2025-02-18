@@ -654,7 +654,7 @@ export function Notes() {
                       </button>
                     </div>
                   </div>
-
+  
                   <div className="prose prose-invert max-w-none">
                     <ReactMarkdown
                       remarkPlugins={[remarkMath, remarkGfm]}
@@ -663,7 +663,7 @@ export function Notes() {
                       {selectedNote.content}
                     </ReactMarkdown>
                   </div>
-
+  
                   {selectedNote.keyPoints && (
                     <div className="mt-8">
                       <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
@@ -685,95 +685,96 @@ export function Notes() {
                       </ul>
                     </div>
                   )}
-
- {selectedNote.questions && (
-  <div className="mt-8">
-    <div className="flex items-center justify-between mb-4">
-      <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-        <BookOpen className="w-5 h-5 text-blue-400" />
-        Study Questions
-      </h3>
-      <button
-        onClick={handleRegenerateQuestions}
-        disabled={isRegeneratingQuestions}
-        className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-      >
-        {isRegeneratingQuestions ? (
-          <>
-            <Loader2 className="w-4 h-4 animate-spin" />
-            Regenerating...
-          </>
-        ) : (
-          <>
-            <RefreshCw className="w-4 h-4" />
-            Regenerate Questions
-          </>
-        )}
-      </button>
-    </div>
-    <div className="space-y-6">
-      {selectedNote.questions.map((q, index) => (
-        <div key={index} className="bg-gray-700 rounded-lg p-4">
-          <p className="text-white mb-4">{q.question}</p>
-          <div className="space-y-2">
-            {q.options.map((option, optIndex) => {
-              const isAnswered = questionAnswers[index] !== undefined;
-              const isSelected = questionAnswers[index] === optIndex;
-              const isCorrect = optIndex === q.correctAnswer;
-              let buttonClass =
-                'w-full text-left p-3 rounded-lg transition-colors ';
-              if (isAnswered) {
-                if (isSelected) {
-                  buttonClass += isCorrect
-                    ? 'bg-green-500/20 text-green-300 border-2 border-green-500'
-                    : 'bg-red-500/20 text-red-300 border-2 border-red-500';
-                } else if (isCorrect) {
-                  buttonClass += 'bg-green-500/20 text-green-300';
-                } else {
-                  buttonClass += 'bg-gray-600 text-gray-400';
-                }
-              } else {
-                buttonClass += 'bg-gray-600 text-gray-300 hover:bg-gray-500';
-              }
-              return (
-                <button
-                  key={optIndex}
-                  onClick={() =>
-                    !isAnswered && handleAnswerSelect(index, optIndex)
-                  }
-                  disabled={isAnswered}
-                  className={buttonClass}
-                >
-                  <div className="flex items-center justify-between">
-                    <span>{option}</span>
-                    {isAnswered && isSelected && (
-                      isCorrect ? (
-                        <Check className="w-5 h-5 text-green-400" />
-                      ) : (
-                        <X className="w-5 h-5 text-red-400" />
-                      )
-                    )}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-          {questionAnswers[index] !== undefined && (
-            <div className="mt-4 p-4 rounded-lg bg-gray-600">
-              <p className="text-sm text-gray-300">
-                <span className="font-medium text-white">
-                  Explanation:{' '}
-                </span>
-                {q.explanation}
-              </p>
-            </div>
-          )}
-        </div>
-      ))}
-    </div>
-  </div>
-)}
-
+  
+                  {selectedNote.questions && (
+                    <div className="mt-8">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                          <BookOpen className="w-5 h-5 text-blue-400" />
+                          Study Questions
+                        </h3>
+                        <button
+                          onClick={handleRegenerateQuestions}
+                          disabled={isRegeneratingQuestions}
+                          className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                        >
+                          {isRegeneratingQuestions ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Regenerating...
+                            </>
+                          ) : (
+                            <>
+                              <RefreshCw className="w-4 h-4" />
+                              Regenerate Questions
+                            </>
+                          )}
+                        </button>
+                      </div>
+                      <div className="space-y-6">
+                        {selectedNote.questions.map((q, index) => (
+                          <div key={index} className="bg-gray-700 rounded-lg p-4">
+                            <p className="text-white mb-4">{q.question}</p>
+                            <div className="space-y-2">
+                              {q.options.map((option, optIndex) => {
+                                const isAnswered =
+                                  questionAnswers[index] !== undefined;
+                                const isSelected =
+                                  questionAnswers[index] === optIndex;
+                                const isCorrect = optIndex === q.correctAnswer;
+                                let buttonClass =
+                                  'w-full text-left p-3 rounded-lg transition-colors ';
+                                if (isAnswered) {
+                                  if (isSelected) {
+                                    buttonClass += isCorrect
+                                      ? 'bg-green-500/20 text-green-300 border-2 border-green-500'
+                                      : 'bg-red-500/20 text-red-300 border-2 border-red-500';
+                                  } else if (isCorrect) {
+                                    buttonClass += 'bg-green-500/20 text-green-300';
+                                  } else {
+                                    buttonClass += 'bg-gray-600 text-gray-400';
+                                  }
+                                } else {
+                                  buttonClass += 'bg-gray-600 text-gray-300 hover:bg-gray-500';
+                                }
+                                return (
+                                  <button
+                                    key={optIndex}
+                                    onClick={() =>
+                                      !isAnswered && handleAnswerSelect(index, optIndex)
+                                    }
+                                    disabled={isAnswered}
+                                    className={buttonClass}
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <span>{option}</span>
+                                      {isAnswered && isSelected && (
+                                        isCorrect ? (
+                                          <Check className="w-5 h-5 text-green-400" />
+                                        ) : (
+                                          <X className="w-5 h-5 text-red-400" />
+                                        )
+                                      )}
+                                    </div>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                            {questionAnswers[index] !== undefined && (
+                              <div className="mt-4 p-4 rounded-lg bg-gray-600">
+                                <p className="text-sm text-gray-300">
+                                  <span className="font-medium text-white">
+                                    Explanation:{' '}
+                                  </span>
+                                  {q.explanation}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )
             ) : (
@@ -792,7 +793,7 @@ export function Notes() {
               </div>
             )}
           </div>
-
+  
           {/* Notes List Sidebar */}
           <div
             className={`w-full md:w-96 h-full border-t md:border-t-0 md:border-l border-gray-800 flex flex-col bg-gray-800/50 ${
@@ -862,7 +863,7 @@ export function Notes() {
                 </button>
               </div>
             </div>
-
+  
             {/* Notes List */}
             <div className="flex-1 overflow-y-auto min-h-0 overscroll-contain">
               {notes.length === 0 ? (
@@ -958,7 +959,7 @@ export function Notes() {
             </div>
           </div>
         </div>
-
+  
         {/* New Note Modal */}
         {showNewNoteModal && (
           <NewNoteModal
@@ -970,7 +971,7 @@ export function Notes() {
             uploadProgress={uploadProgress}
           />
         )}
-
+  
         {/* Split View */}
         {showSplitView &&
           splitViewNotes.left &&
@@ -987,7 +988,7 @@ export function Notes() {
               onChat={handleChatWithNote}
             />
           )}
-
+  
         {/* Chat Modal */}
         {showChatModal && chatNote && (
           <NoteChat
@@ -1004,6 +1005,5 @@ export function Notes() {
     </div>
   );
 };
-
 
 export default Notes;

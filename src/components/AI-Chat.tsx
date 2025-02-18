@@ -22,6 +22,8 @@ import {
   onCollectionSnapshot,
   hfApiKey,
 } from '../lib/dashboard-firebase';
+import { getCurrentUser } from '../lib/settings-firebase';
+
 
 // Types for messages
 interface TimerMessage {
@@ -70,6 +72,7 @@ export function AIChat() {
   const [userName, setUserName] = useState<string>("Loading...");
   const [chatMessage, setChatMessage] = useState('');
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([
+  
     {
       role: 'assistant',
       content: "👋 Hi I'm TaskMaster, How can I help you today? Need help with your items? Simply ask me!"
@@ -106,6 +109,18 @@ export function AIChat() {
     return () => unsubscribe();
   }, []);
 
+   useEffect(() => {
+    const firebaseUser = getCurrentUser();
+    if (firebaseUser) {
+      setUser(firebaseUser);
+      // Set the user's name to displayName if it exists, otherwise default to "User"
+      setUserName(firebaseUser.displayName || "User");
+    } else {
+      navigate('/login');
+    }
+    setLoading(false);
+  }, [navigate]);
+  
   // Collection snapshots
   useEffect(() => {
     if (!user) return;

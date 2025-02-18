@@ -26,7 +26,8 @@ import {
   Lock,
   Trash2,
   Copy,
-  SplitSquareVertical
+  SplitSquareVertical,
+  RefreshCw
 } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { auth } from '../lib/firebase';
@@ -47,7 +48,15 @@ import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
 import { processPDF } from '../lib/pdf-processor';
 import { processYouTube } from '../lib/youtube-processor';
-import { saveNote, savePersonalNote, updateNote, processTextToAINote, deleteNote, toggleNotePublicStatus } from '../lib/notes-firebase';
+import { 
+  saveNote, 
+  savePersonalNote, 
+  updateNote, 
+  processTextToAINote, 
+  deleteNote, 
+  toggleNotePublicStatus,
+  regenerateStudyQuestions 
+} from '../lib/notes-firebase';
 import { NewNoteModal } from './NewNoteModal';
 import { SplitView } from './SplitView';
 import { NoteChat } from './NoteChat';
@@ -100,6 +109,19 @@ export function Notes() {
     return stored ? JSON.parse(stored) : false;
   });
 
+  // Editing state
+  const [isEditing, setIsEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editContent, setEditContent] = useState('');
+  const [editTags, setEditTags] = useState<string[]>([]);
+  const [newTag, setNewTag] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [isRegeneratingQuestions, setIsRegeneratingQuestions] = useState(false);
+
+  // Mobile state
+  const [showNotesList, setShowNotesList] = useState(true);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
   // Split view state
   const [showSplitView, setShowSplitView] = useState(false);
   const [splitViewNotes, setSplitViewNotes] = useState<{left: Note | null; right: Note | null}>({
@@ -113,6 +135,20 @@ export function Notes() {
 
   // Question answers state
   const [questionAnswers, setQuestionAnswers] = useState<{[key: string]: number | null}>({});
+
+  // Handle window resize
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (!mobile) {
+        setShowNotesList(true);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Update localStorage whenever the sidebar state changes
   useEffect(() => {
@@ -154,182 +190,70 @@ export function Notes() {
     setIsSidebarCollapsed(prev => !prev);
   };
 
-  // Handle note selection for split view
-  const handleSplitViewSelect = (note: Note) => {
-    if (!splitViewNotes.left) {
-      setSplitViewNotes({ ...splitViewNotes, left: note });
-    } else if (!splitViewNotes.right) {
-      setSplitViewNotes({ ...splitViewNotes, right: note });
-      setShowSplitView(true);
-    }
+  const handleEditNote = () => {
+    if (!selectedNote) return;
+    setEditTitle(selectedNote.title);
+    setEditContent(selectedNote.content);
+    setEditTags(selectedNote.tags || []);
+    setIsEditing(true);
   };
 
-  // Handle chat with note
-  const handleChatWithNote = (note: Note) => {
-    setChatNote(note);
-    setShowChatModal(true);
-  };
+  const handleSaveEdit = async () => {
+    if (!selectedNote || !editTitle.trim() || !editContent.trim()) return;
 
-  // Handle note deletion
-  const handleDeleteNote = async (noteId: string) => {
-    if (!window.confirm('Are you sure you want to delete this note?')) return;
-
+    setIsSaving(true);
     try {
-      await deleteNote(noteId);
-      if (selectedNote?.id === noteId) {
-        setSelectedNote(null);
-      }
-      if (splitViewNotes.left?.id === noteId || splitViewNotes.right?.id === noteId) {
-        setShowSplitView(false);
-        setSplitViewNotes({ left: null, right: null });
-      }
+      await updateNote(selectedNote.id, {
+        title: editTitle.trim(),
+        content: editContent.trim(),
+        tags: editTags,
+        updatedAt: Timestamp.now()
+      });
+      setIsEditing(false);
     } catch (error) {
-      console.error('Error deleting note:', error);
+      console.error('Error saving note:', error);
       setUploadProgress(prev => ({
         ...prev,
-        error: 'Failed to delete note'
+        error: 'Failed to save note'
       }));
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  // Handle toggling note public status
-  const handleTogglePublic = async (noteId: string, isPublic: boolean) => {
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setEditTitle('');
+    setEditContent('');
+    setEditTags([]);
+  };
+
+  const handleAddTag = () => {
+    if (newTag.trim() && !editTags.includes(newTag.trim())) {
+      setEditTags([...editTags, newTag.trim()]);
+      setNewTag('');
+    }
+  };
+
+  const handleRemoveTag = (tagToRemove: string) => {
+    setEditTags(editTags.filter(tag => tag !== tagToRemove));
+  };
+
+  const handleRegenerateQuestions = async () => {
+    if (!selectedNote) return;
+
+    setIsRegeneratingQuestions(true);
     try {
-      await toggleNotePublicStatus(noteId, isPublic);
+      await regenerateStudyQuestions(selectedNote.id, selectedNote.content, huggingFaceApiKey);
     } catch (error) {
-      console.error('Error toggling note public status:', error);
+      console.error('Error regenerating questions:', error);
       setUploadProgress(prev => ({
         ...prev,
-        error: 'Failed to update note visibility'
+        error: 'Failed to regenerate questions'
       }));
+    } finally {
+      setIsRegeneratingQuestions(false);
     }
-  };
-
-  // Handle creating a personal note
-  const handleCreatePersonalNote = async (title: string, content: string, tags: string[]) => {
-    if (!user) return;
-    try {
-      await savePersonalNote(user.uid, title, content, tags);
-    } catch (error) {
-      console.error('Error creating personal note:', error);
-      setUploadProgress(prev => ({
-        ...prev,
-        error: 'Failed to create note'
-      }));
-    }
-  };
-
-  // Handle creating an AI note from text
-  const handleCreateAINote = async (text: string) => {
-    if (!user) return;
-    try {
-      setUploadProgress({
-        progress: 20,
-        status: 'Processing text...',
-        error: null
-      });
-
-      const processedText = await processTextToAINote(text, user.uid, huggingFaceApiKey);
-
-      setUploadProgress({
-        progress: 80,
-        status: 'Saving note...',
-        error: null
-      });
-
-      await saveNote({
-        ...processedText,
-        userId: user.uid
-      });
-
-      setUploadProgress({
-        progress: 100,
-        status: 'Complete!',
-        error: null
-      });
-
-      setShowNewNoteModal(false);
-    } catch (error) {
-      console.error('Error creating AI note:', error);
-      setUploadProgress(prev => ({
-        ...prev,
-        error: error instanceof Error ? error.message : 'Failed to create AI note'
-      }));
-    }
-  };
-
-  // Handle PDF upload
-  const handlePDFUpload = async (file: File) => {
-    if (!user) return;
-    try {
-      const processedPDF = await processPDF(
-        file,
-        user.uid,
-        huggingFaceApiKey,
-        setUploadProgress
-      );
-
-      await saveNote({
-        title: processedPDF.title,
-        content: processedPDF.content,
-        type: 'pdf',
-        keyPoints: processedPDF.keyPoints,
-        questions: processedPDF.questions,
-        sourceUrl: processedPDF.sourceUrl,
-        userId: user.uid,
-        isPublic: false,
-        tags: []
-      });
-
-      setShowNewNoteModal(false);
-    } catch (error) {
-      console.error('Error processing PDF:', error);
-      setUploadProgress(prev => ({
-        ...prev,
-        error: error instanceof Error ? error.message : 'Failed to process PDF'
-      }));
-    }
-  };
-
-  // Handle YouTube link
-  const handleYoutubeLink = async (url: string) => {
-    if (!user) return;
-    try {
-      const processedYouTube = await processYouTube(
-        url,
-        user.uid,
-        huggingFaceApiKey,
-        setUploadProgress
-      );
-
-      await saveNote({
-        title: processedYouTube.title,
-        content: processedYouTube.content,
-        type: 'youtube',
-        keyPoints: processedYouTube.keyPoints,
-        questions: processedYouTube.questions,
-        sourceUrl: processedYouTube.sourceUrl,
-        userId: user.uid,
-        isPublic: false,
-        tags: []
-      });
-
-      setShowNewNoteModal(false);
-    } catch (error) {
-      console.error('Error processing YouTube video:', error);
-      setUploadProgress(prev => ({
-        ...prev,
-        error: error instanceof Error ? error.message : 'Failed to process YouTube video'
-      }));
-    }
-  };
-
-  // Handle answer selection for questions
-  const handleAnswerSelect = (questionIndex: number, selectedOption: number) => {
-    setQuestionAnswers(prev => ({
-      ...prev,
-      [questionIndex]: selectedOption
-    }));
   };
 
   // Show loading state while checking auth
@@ -363,7 +287,7 @@ export function Notes() {
       }`}>
         <div className="h-full flex flex-col md:flex-row">
           {/* Main Content Area */}
-          <div className="flex-1 overflow-y-auto p-4 md:p-8">
+          <div className={`flex-1 overflow-y-auto p-4 md:p-8 ${isMobile && !showNotesList ? 'block' : 'hidden md:block'}`}>
             {/* Header */}
             <div className="mb-8">
               <div className="flex items-center justify-between">
@@ -380,13 +304,21 @@ export function Notes() {
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
+                  {isMobile && (
+                    <button
+                      onClick={() => setShowNotesList(true)}
+                      className="md:hidden px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors"
+                    >
+                      Show Notes
+                    </button>
+                  )}
                   {!showSplitView && notes.length >= 2 && (
                     <button
                       onClick={() => {
                         setSplitViewNotes({ left: null, right: null });
                         setShowSplitView(true);
                       }}
-                      className="flex items-center gap-2 px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors"
+                      className="hidden md:flex items-center gap-2 px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors"
                     >
                       <SplitSquareVertical className="w-4 h-4" />
                       Split View
@@ -405,132 +337,240 @@ export function Notes() {
 
             {/* Note Content */}
             {selectedNote && !showSplitView ? (
-              <div className="bg-gray-800 rounded-xl p-8">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-bold text-white">{selectedNote.title}</h2>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleChatWithNote(selectedNote)}
-                      className="p-2 text-gray-400 hover:text-white transition-colors rounded-lg hover:bg-gray-700"
-                      title="Chat about this note"
-                    >
-                      <MessageCircle className="w-5 h-5" />
-                    </button>
-                    <button
-                      onClick={() => handleTogglePublic(selectedNote.id, !selectedNote.isPublic)}
-                      className="p-2 text-gray-400 hover:text-white transition-colors rounded-lg hover:bg-gray-700"
-                      title={selectedNote.isPublic ? 'Make private' : 'Make public'}
-                    >
-                      {selectedNote.isPublic ? (
-                        <Globe className="w-5 h-5" />
-                      ) : (
-                        <Lock className="w-5 h-5" />
-                      )}
-                    </button>
-                    <button
-                      onClick={() => handleDeleteNote(selectedNote.id)}
-                      className="p-2 text-gray-400 hover:text-red-400 transition-colors rounded-lg hover:bg-gray-700"
-                      title="Delete note"
-                    >
-                      <Trash2 className="w-5 h-5" />
-                    </button>
-                  </div>
-                </div>
-                
-                <div className="prose prose-invert max-w-none">
-                  <ReactMarkdown
-                    remarkPlugins={[remarkMath, remarkGfm]}
-                    rehypePlugins={[rehypeKatex]}
-                  >
-                    {selectedNote.content}
-                  </ReactMarkdown>
-                </div>
-
-                {selectedNote.keyPoints && (
-                  <div className="mt-8">
-                    <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                      <Sparkles className="w-5 h-5 text-yellow-400" />
-                      Key Points
-                    </h3>
-                    <ul className="space-y-2">
-                      {selectedNote.keyPoints.map((point, index) => (
-                        <li
-                          key={index}
-                          className="flex items-start gap-2 text-gray-300"
+              <div className="bg-gray-800 rounded-xl p-4 md:p-8">
+                {isEditing ? (
+                  // Edit Mode
+                  <div className="space-y-4">
+                    <input
+                      type="text"
+                      value={editTitle}
+                      onChange={(e) => setEditTitle(e.target.value)}
+                      className="w-full bg-gray-700 text-white text-2xl font-bold rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Note title..."
+                    />
+                    
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {editTags.map((tag) => (
+                        <span
+                          key={tag}
+                          className="px-2 py-1 bg-blue-500/20 text-blue-300 rounded-full text-sm flex items-center gap-1"
                         >
-                          <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center text-sm">
-                            {index + 1}
-                          </span>
-                          {point}
-                        </li>
+                          {tag}
+                          <button
+                            onClick={() => handleRemoveTag(tag)}
+                            className="hover:text-blue-200"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
                       ))}
-                    </ul>
-                  </div>
-                )}
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={newTag}
+                          onChange={(e) => setNewTag(e.target.value)}
+                          onKeyPress={(e) => e.key === 'Enter' && handleAddTag()}
+                          placeholder="Add a tag..."
+                          className="bg-gray-700 text-white rounded-lg px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <button
+                          onClick={handleAddTag}
+                          className="px-2 py-1 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
+                        >
+                          Add
+                        </button>
+                      </div>
+                    </div>
 
-                {selectedNote.questions && (
-                  <div className="mt-8">
-                    <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                      <BookOpen className="w-5 h-5 text-blue-400" />
-                      Study Questions
-                    </h3>
-                    <div className="space-y-6">
-                      {selectedNote.questions.map((q, index) => (
-                        <div key={index} className="bg-gray-700 rounded-lg p-4">
-                          <p className="text-white mb-4">{q.question}</p>
-                          <div className="space-y-2">
-                            {q.options.map((option, optIndex) => {
-                              const isAnswered = questionAnswers[index] !== undefined;
-                              const isSelected = questionAnswers[index] === optIndex;
-                              const isCorrect = optIndex === q.correctAnswer;
-                              
-                              let buttonClass = "w-full text-left p-3 rounded-lg transition-colors ";
-                              
-                              if (isAnswered) {
-                                if (isSelected) {
-                                  buttonClass += isCorrect 
-                                    ? "bg-green-500/20 text-green-300 border-2 border-green-500"
-                                    : "bg-red-500/20 text-red-300 border-2 border-red-500";
-                                } else if (isCorrect) {
-                                  buttonClass += "bg-green-500/20 text-green-300";
-                                } else {
-                                  buttonClass += "bg-gray-600 text-gray-400";
-                                }
-                              } else {
-                                buttonClass += "bg-gray-600 text-gray-300 hover:bg-gray-500";
-                              }
+                    <textarea
+                      value={editContent}
+                      onChange={(e) => setEditContent(e.target.value)}
+                      className="w-full h-[calc(100vh-400px)] bg-gray-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Note content (Markdown supported)..."
+                    />
 
-                              return (
-                                <button
-                                  key={optIndex}
-                                  onClick={() => !isAnswered && handleAnswerSelect(index, optIndex)}
-                                  disabled={isAnswered}
-                                  className={buttonClass}
-                                >
-                                  <div className="flex items-center justify-between">
-                                    <span>{option}</span>
-                                    {isAnswered && isSelected && (
-                                      isCorrect 
-                                        ? <Check className="w-5 h-5 text-green-400" />
-                                        : <X className="w-5 h-5 text-red-400" />
-                                    )}
-                                  </div>
-                                </button>
-                              );
-                            })}
-                          </div>
-                          {questionAnswers[index] !== undefined && (
-                            <div className="mt-4 p-4 rounded-lg bg-gray-600">
-                              <p className="text-sm text-gray-300">
-                                <span className="font-medium text-white">Explanation: </span>
-                                {q.explanation}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      ))}
+                    <div className="flex justify-end gap-3">
+                      <button
+                        onClick={handleCancelEdit}
+                        className="px-4 py-2 text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleSaveEdit}
+                        disabled={isSaving || !editTitle.trim() || !editContent.trim()}
+                        className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                      >
+                        {isSaving ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="w-4 h-4" />
+                            Save Changes
+                          </>
+                        )}
+                      </button>
                     </div>
                   </div>
+                ) : (
+                  // View Mode
+                  <>
+                    <div className="flex items-center justify-between mb-6">
+                      <h2 className="text-2xl font-bold text-white">{selectedNote.title}</h2>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={handleEditNote}
+                          className="p-2 text-gray-400 hover:text-white transition-colors rounded-lg hover:bg-gray-700"
+                          title="Edit note"
+                        >
+                          <Edit2 className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={() => handleChatWithNote(selectedNote)}
+                          className="p-2 text-gray-400 hover:text-white transition-colors rounded-lg hover:bg-gray-700"
+                          title="Chat about this note"
+                        >
+                          <MessageCircle className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={() => handleTogglePublic(selectedNote.id, !selectedNote.isPublic)}
+                          className="p-2 text-gray-400 hover:text-white transition-colors rounded-lg hover:bg-gray-700"
+                          title={selectedNote.isPublic ? 'Make private' : 'Make public'}
+                        >
+                          {selectedNote.isPublic ? (
+                            <Globe className="w-5 h-5" />
+                          ) : (
+                            <Lock className="w-5 h-5" />
+                          )}
+                        </button>
+                        <button
+                          onClick={() => handleDeleteNote(selectedNote.id)}
+                          className="p-2 text-gray-400 hover:text-red-400 transition-colors rounded-lg hover:bg-gray-700"
+                          title="Delete note"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </div>
+                    
+                    <div className="prose prose-invert max-w-none">
+                      <ReactMarkdown
+                        remarkPlugins={[remarkMath, remarkGfm]}
+                        rehypePlugins={[rehypeKatex]}
+                      >
+                        {selectedNote.content}
+                      </ReactMarkdown>
+                    </div>
+
+                    {selectedNote.keyPoints && (
+                      <div className="mt-8">
+                        <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                          <Sparkles className="w-5 h-5 text-yellow-400" />
+                          Key Points
+                        </h3>
+                        <ul className="space-y-2">
+                          {selectedNote.keyPoints.map((point, index) => (
+                            <li
+                              key={index}
+                              className="flex items-start gap-2 text-gray-300"
+                            >
+                              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center text-sm">
+                                {index + 1}
+                              </span>
+                              {point}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {selectedNote.questions && (
+                      <div className="mt-8">
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                            <BookOpen className="w-5 h-5 text-blue-400" />
+                            Study Questions
+                          </h3>
+                          <button
+                            onClick={handleRegenerateQuestions}
+                            disabled={isRegeneratingQuestions}
+                            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                          >
+                            {isRegeneratingQuestions ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Regenerating...
+                              </>
+                            ) : (
+                              <>
+                                <RefreshCw className="w-4 h-4" />
+                                Regenerate Questions
+                              </>
+                            )}
+                          </button>
+                        </div>
+                        <div className="space-y-6">
+                          {selectedNote.questions.map((q, index) => (
+                            <div key={index} className="bg-gray-700 rounded-lg p-4">
+                              <p className="text-white mb-4">{q.question}</p>
+                              <div className="space-y-2">
+                                {q.options.map((option, optIndex) => {
+                                  const isAnswered = questionAnswers[index] !== undefined;
+                                  const isSelected = questionAnswers[index] === optIndex;
+                                  const isCorrect = optIndex === q.correctAnswer;
+                                  
+                                  let buttonClass = "w-full text-left p-3 rounded-lg transition-colors ";
+                                  
+                                  if (isAnswered) {
+                                    if (isSelected) {
+                                      buttonClass += isCorrect 
+                                        ? "bg-green-500/20 text-green-300 border-2 border-green-500"
+                                        : "bg-red-500/20 text-red-300 border-2 border-red-500";
+                                    } else if (isCorrect) {
+                                      buttonClass += "bg-green-500/20 text-green-300";
+                                    } else {
+                                      buttonClass += "bg-gray-600 text-gray-400";
+                                    }
+                                  } else {
+                                    buttonClass += "bg-gray-600 text-gray-300 hover:bg-gray-500";
+                                  }
+
+                                  return (
+                                    <button
+                                      key={optIndex}
+                                      onClick={() => !isAnswered && handleAnswerSelect(index, optIndex)}
+                                      disabled={isAnswered}
+                                      className={buttonClass}
+                                    >
+                                      <div className="flex items-center justify-between">
+                                        <span>{option}</span>
+                                        {isAnswered && isSelected && (
+                                          isCorrect 
+                                            ? <Check className="w-5 h-5 text-green-400" />
+                                            : <X className="w-5 h-5 text-red-400" />
+                                        )}
+                                      </div>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                              {questionAnswers[index] !== undefined && (
+                                <div className="mt-4 p-4 rounded-lg bg-gray-600">
+                                  <p className="text-sm text-gray-300">
+                                    <span className="font-medium text-white">Explanation: </span>
+                                    {q.explanation}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             ) : (
@@ -551,9 +591,19 @@ export function Notes() {
           </div>
 
           {/* Notes List Sidebar */}
-          <div className="w-full md:w-96 border-t md:border-t-0 md:border-l border-gray-800 flex flex-col bg-gray-800/50">
+          <div className={`w-full md:w-96 border-t md:border-t-0 md:border-l border-gray-800 flex flex-col bg-gray-800/50 ${
+            isMobile && showNotesList ? 'block' : 'hidden md:block'
+          }`}>
             {/* Search and Filter */}
             <div className="p-4 border-b border-gray-800">
+              {isMobile && (
+                <button
+                  onClick={() => setShowNotesList(false)}
+                  className="mb-4 px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors w-full"
+                >
+                  Back to Note
+                </button>
+              )}
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
@@ -646,7 +696,16 @@ export function Notes() {
                         className={`p-4 transition-colors hover:bg-gray-700 cursor-pointer ${
                           selectedNote?.id === note.id ? 'bg-gray-700' : ''
                         }`}
-                        onClick={() => showSplitView ? handleSplitViewSelect(note) : setSelectedNote(note)}
+                        onClick={() => {
+                          if (showSplitView) {
+                            handleSplitViewSelect(note);
+                          } else {
+                            setSelectedNote(note);
+                            if (isMobile) {
+                              setShowNotesList(false);
+                            }
+                          }
+                        }}
                       >
                         <h3 className="text-white font-medium mb-1">{note.title}</h3>
                         <p className="text-sm text-gray-400 line-clamp-2">{note.content}</p>
@@ -690,44 +749,44 @@ export function Notes() {
 
         {/* New Note Modal */}
         {showNewNoteModal && (
-          <NewNoteModal
-            onClose={() => setShowNewNoteModal(false)}
-            onCreatePersonalNote={handleCreatePersonalNote}
-            onCreateAINote={handleCreateAINote}
-            onUploadPDF={handlePDFUpload}
-            onYoutubeLink={handleYoutubeLink}
-            uploadProgress={uploadProgress}
-          />
-        )}
+          <NewNote Modal
+          onClose={() => setShowNewNoteModal(false)}
+          onCreatePersonalNote={handleCreatePersonalNote}
+          onCreateAINote={handleCreateAINote}
+          onUploadPDF={handleUploadPDF}
+          onYoutubeLink={handleYoutubeLink}
+          uploadProgress={uploadProgress}
+        />
+      )}
 
-        {/* Split View */}
-        {showSplitView && splitViewNotes.left && splitViewNotes.right && (
-          <SplitView
-            leftNote={splitViewNotes.left}
-            rightNote={splitViewNotes.right}
-            onClose={() => {
-              setShowSplitView(false);
-              setSplitViewNotes({ left: null, right: null });
-            }}
-            onTogglePublic={handleTogglePublic}
-            onDelete={handleDeleteNote}
-            onChat={handleChatWithNote}
-          />
-        )}
+      {/* Split View */}
+      {showSplitView && splitViewNotes.left && splitViewNotes.right && (
+        <SplitView
+          leftNote={splitViewNotes.left}
+          rightNote={splitViewNotes.right}
+          onClose={() => {
+            setShowSplitView(false);
+            setSplitViewNotes({ left: null, right: null });
+          }}
+          onTogglePublic={handleTogglePublic}
+          onDelete={handleDeleteNote}
+          onChat={handleChatWithNote}
+        />
+      )}
 
-        {/* Chat Modal */}
-        {showChatModal && chatNote && (
-          <NoteChat
-            note={chatNote}
-            onClose={() => {
-              setShowChatModal(false);
-              setChatNote(null);
-            }}
-            huggingFaceApiKey={huggingFaceApiKey}
-            userName={user.displayName || 'User'}
-          />
-        )}
-      </main>
+      {/* Chat Modal */}
+      {showChatModal && chatNote && (
+        <NoteChat
+          note={chatNote}
+          onClose={() => {
+            setShowChatModal(false);
+            setChatNote(null);
+          }}
+          huggingFaceApiKey={huggingFaceApiKey}
+          userName={user.displayName || 'User'}
+        />
+      )}
+    </main>
     </div>
   );
 }

@@ -864,7 +864,7 @@ export function Notes() {
             </div>
 
             {/* Notes List */}
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto min-h-0">
               {notes.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-center p-6">
                   <FileQuestion className="w-12 h-12 text-gray-600 mb-4" />

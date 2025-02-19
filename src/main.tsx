@@ -17,9 +17,22 @@ import Contact from './components/Contact';
 import AIChat from './components/AI-Chat';
 import Notes from './components/Notes';
 import Calendar from './components/Calendar';
-
 import SchoolPage from './components/SchoolPage';
 import './index.css';
+
+// NotFound component for unmatched routes
+const NotFound = () => (
+  <div className="flex flex-col items-center justify-center h-screen bg-gray-900 text-white">
+    <h1 className="text-6xl font-bold mb-4">404</h1>
+    <p className="text-xl mb-8">Oops! The page you're looking for doesn't exist.</p>
+    <a 
+      href="/" 
+      className="px-6 py-3 bg-blue-500 rounded-lg hover:bg-blue-600 transition-colors"
+    >
+      Go Home
+    </a>
+  </div>
+);
 
 // Page title wrapper component
 const PageTitle = ({ title, children }: { title: string; children: React.ReactNode }) => (
@@ -31,7 +44,7 @@ const PageTitle = ({ title, children }: { title: string; children: React.ReactNo
   </>
 );
 
-// Special root title component that doesn't add the "| TaskMaster" suffix
+// Special root title component that doesn't add the "| TaskMaster AI" suffix
 const RootTitle = ({ children }: { children: React.ReactNode }) => (
   <>
     <Helmet>
@@ -48,35 +61,22 @@ createRoot(document.getElementById('root')!).render(
         <AuthProvider>
           <Routes>
             <Route path="/login" element={<PageTitle title="Login"><Login /></PageTitle>} />
-            
             <Route path="/signup" element={<PageTitle title="Sign Up"><SignUpPage /></PageTitle>} />
-            
             <Route path="/pricing" element={<PageTitle title="Pricing"><Pricing /></PageTitle>} />
-            
             <Route path="/terms" element={<PageTitle title="Terms of Service"><Terms /></PageTitle>} />
-            
             <Route path="/settings" element={<PageTitle title="Settings"><Settings /></PageTitle>} />
-            
             <Route path="/splashscreen" element={<PageTitle title="Welcome"><SplashScreen /></PageTitle>} />
-            
             <Route path="/privacy-policy" element={<PageTitle title="Privacy Policy"><PrivacyPolicy /></PageTitle>} />
-            
             <Route path="/forgot-password" element={<PageTitle title="Reset Password"><ForgotPassword /></PageTitle>} />
-            
             <Route path="/dashboard" element={<PageTitle title="Dashboard"><Dashboard /></PageTitle>} />
-            
             <Route path="/contact" element={<PageTitle title="Contact Us"><Contact /></PageTitle>} />
-            
             <Route path="/ai" element={<PageTitle title="AI Assistant"><AIChat /></PageTitle>} />
-
             <Route path="/calendar" element={<PageTitle title="Calendar"><Calendar /></PageTitle>} />
-
             <Route path="/notes" element={<PageTitle title="Notes"><Notes /></PageTitle>} />
-            
             <Route path="/school" element={<PageTitle title="School"><SchoolPage /></PageTitle>} />
-            
             <Route path="/" element={<RootTitle><App /></RootTitle>} />
-            
+            {/* Catch-all route for 404 - must be the last route */}
+            <Route path="*" element={<PageTitle title="404 Not Found"><NotFound /></PageTitle>} />
           </Routes>
         </AuthProvider>
       </BrowserRouter>

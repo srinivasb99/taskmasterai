@@ -16,6 +16,8 @@ import { Dashboard } from './components/Dashboard';
 import Contact from './components/Contact';
 import AIChat from './components/AI-Chat';
 import Notes from './components/Notes';
+import Calendar from './components/Calendar';
+
 import SchoolPage from './components/SchoolPage';
 import './index.css';
 
@@ -66,6 +68,8 @@ createRoot(document.getElementById('root')!).render(
             <Route path="/contact" element={<PageTitle title="Contact Us"><Contact /></PageTitle>} />
             
             <Route path="/ai" element={<PageTitle title="AI Assistant"><AIChat /></PageTitle>} />
+
+            <Route path="/calendar" element={<PageTitle title="Calendar"><Calendar /></PageTitle>} />
 
             <Route path="/notes" element={<PageTitle title="Notes"><Notes /></PageTitle>} />
             

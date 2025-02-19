@@ -1,7 +1,8 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
 import { HelmetProvider, Helmet } from 'react-helmet-async';
+import { motion } from 'framer-motion';
 import App from './App';
 import Login from './components/Login';
 import { SignUpPage } from './pages/signup-page';
@@ -20,17 +21,45 @@ import Calendar from './components/Calendar';
 import SchoolPage from './components/SchoolPage';
 import './index.css';
 
-// NotFound component for unmatched routes
+// NotFound component with advanced animations
 const NotFound = () => (
-  <div className="flex flex-col items-center justify-center h-screen bg-gray-900 text-white">
-    <h1 className="text-6xl font-bold mb-4">404</h1>
-    <p className="text-xl mb-8">Oops! The page you're looking for doesn't exist.</p>
-    <a 
-      href="/" 
-      className="px-6 py-3 bg-blue-500 rounded-lg hover:bg-blue-600 transition-colors"
+  <div className="relative flex flex-col items-center justify-center h-screen overflow-hidden bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white">
+    <motion.h1
+      className="text-9xl font-extrabold"
+      initial={{ scale: 0, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      transition={{ type: "spring", stiffness: 260, damping: 20 }}
     >
-      Go Home
-    </a>
+      404
+    </motion.h1>
+    <motion.p
+      className="mt-4 text-2xl"
+      initial={{ opacity: 0, y: 50 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.3, duration: 0.8 }}
+    >
+      Oops! The page you're looking for doesn't exist.
+    </motion.p>
+    <motion.div
+      className="mt-8"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ delay: 0.8, duration: 1 }}
+    >
+      <Link 
+        to="/dashboard" 
+        className="px-6 py-3 bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+      >
+        Go to Dashboard
+      </Link>
+    </motion.div>
+    {/* Optional animated background element */}
+    <motion.div 
+      className="absolute -z-10 w-96 h-96 bg-white opacity-10 rounded-full"
+      initial={{ scale: 0 }}
+      animate={{ scale: 1.2 }}
+      transition={{ delay: 0.5, duration: 2, repeat: Infinity, repeatType: 'mirror' }}
+    />
   </div>
 );
 

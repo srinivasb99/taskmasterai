@@ -137,6 +137,7 @@ export function Calendar() {
     
     const unsubEvents = onCollectionSnapshot('events', user.uid, (items) => 
       setEvents(items.map(item => ({
+        id: item.id,
         ...item.data,
         startDate: item.data.startDate.toDate(),
         endDate: item.data.endDate.toDate()
@@ -145,6 +146,7 @@ export function Calendar() {
     
     const unsubTasks = onCollectionSnapshot('tasks', user.uid, (items) => 
       setTasks(items.map(item => ({
+        id: item.id,
         ...item.data,
         dueDate: item.data.dueDate.toDate()
       })))
@@ -152,6 +154,7 @@ export function Calendar() {
     
     const unsubGoals = onCollectionSnapshot('goals', user.uid, (items) => 
       setGoals(items.map(item => ({
+        id: item.id,
         ...item.data,
         dueDate: item.data.dueDate.toDate()
       })))
@@ -159,6 +162,7 @@ export function Calendar() {
     
     const unsubProjects = onCollectionSnapshot('projects', user.uid, (items) => 
       setProjects(items.map(item => ({
+        id: item.id,
         ...item.data,
         dueDate: item.data.dueDate.toDate()
       })))
@@ -166,6 +170,7 @@ export function Calendar() {
     
     const unsubPlans = onCollectionSnapshot('plans', user.uid, (items) => 
       setPlans(items.map(item => ({
+        id: item.id,
         ...item.data,
         dueDate: item.data.dueDate.toDate()
       })))
@@ -289,7 +294,8 @@ export function Calendar() {
       isSameDay(plan.dueDate, date)
     );
 
-    return [...dayEvents, 
+    return [
+      ...dayEvents, 
       ...dayTasks.map(task => ({
         id: task.id,
         title: task.task,

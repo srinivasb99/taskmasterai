@@ -46,16 +46,18 @@ async function generateContentWithGemini(prompt: string): Promise<string> {
     }
     const data = await response.json();
     console.log("Gemini API raw response:", data);
-    // Adjust the following property access as needed if Gemini's response format is different.
+
+    // Adjust property access if Gemini's response format differs
     const generatedText = data?.candidates?.[0]?.output?.parts?.[0]?.text;
-    return generatedText || "";
+    // Trim trailing newlines or spaces
+    return (generatedText || "").trim();
   } catch (error) {
     console.error("Error in Gemini API call:", error);
     throw error;
   }
 }
 
-// Message type definitions
+// Types for messages
 interface TimerMessage {
   type: 'timer';
   duration: number;
@@ -114,10 +116,9 @@ export function AIChat() {
   const [goals, setGoals] = useState<Array<{ id: string; data: any }>>([]);
   const [projects, setProjects] = useState<Array<{ id: string; data: any }>>([]);
   const [plans, setPlans] = useState<Array<{ id: string; data: any }>>([]);
-  // For attachments (images, PDFs, etc.)
   const [attachment, setAttachment] = useState<File | null>(null);
 
-  // Sidebar collapse state (persisted in localStorage)
+  // Sidebar collapse state
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     const stored = localStorage.getItem('isSidebarCollapsed');
     return stored ? JSON.parse(stored) : false;
@@ -126,7 +127,7 @@ export function AIChat() {
     localStorage.setItem('isSidebarCollapsed', JSON.stringify(isSidebarCollapsed));
   }, [isSidebarCollapsed]);
 
-  // Firebase Auth listener
+  // Auth listener
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
@@ -147,7 +148,7 @@ export function AIChat() {
     setLoading(false);
   }, [navigate]);
 
-  // Listen for Firestore collection snapshots
+  // Firestore snapshots
   useEffect(() => {
     if (!user) return;
     const unsubTasks = onCollectionSnapshot('tasks', user.uid, (items) => setTasks(items));
@@ -166,7 +167,7 @@ export function AIChat() {
     setIsSidebarCollapsed((prev) => !prev);
   };
 
-  // Timer handling function
+  // Timer handling
   const handleTimerComplete = (timerId: string) => {
     setChatHistory((prev) => [
       ...prev,
@@ -174,7 +175,6 @@ export function AIChat() {
     ]);
   };
 
-  // Check for timer requests in the message text
   const parseTimerRequest = (message: string): number | null => {
     const timeRegex = /(\d+)\s*(minutes?|mins?|hours?|hrs?|seconds?|secs?)/i;
     const match = message.match(timeRegex);
@@ -187,14 +187,14 @@ export function AIChat() {
     return null;
   };
 
-  // Auto-scroll to bottom on chat update
+  // Scroll to bottom on chat update
   useEffect(() => {
     if (chatEndRef.current) {
       chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [chatHistory]);
 
-  // Build a prompt from user's items
+  // Build prompt from user's items
   const formatItemsForChat = () => {
     const lines: string[] = [];
     lines.push(`${userName}'s items:\n`);
@@ -217,12 +217,12 @@ export function AIChat() {
     return lines.join('\n');
   };
 
-  // Main chat submission handler
+  // Submit chat
   const handleChatSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatMessage.trim() && !attachment) return;
 
-    // If an attachment is provided, handle it first.
+    // If there's an attachment
     if (attachment) {
       const combinedUserMessage = chatMessage.trim() || 'Describe this image in one sentence.';
       const userMsg: ChatMessage = {
@@ -234,10 +234,9 @@ export function AIChat() {
       setIsChatLoading(true);
       try {
         const publicUrl = await uploadAttachment(attachment);
-        // Build a prompt that includes the image URL.
         const prompt = `User: ${combinedUserMessage}\nImage URL: ${publicUrl}\nAssistant:`;
         const assistantReply = await generateContentWithGemini(prompt);
-        console.log("Assistant reply from Gemini (with attachment):", assistantReply);
+        console.log("Assistant reply from Gemini (attachment):", assistantReply);
         setChatHistory((prev) => [...prev, { role: 'assistant', content: assistantReply }]);
       } catch (err) {
         console.error("Gemini API error (attachment):", err);
@@ -252,7 +251,7 @@ export function AIChat() {
       return;
     }
 
-    // For text-only messages, check for timer requests.
+    // For text-only
     const timerDuration = parseTimerRequest(chatMessage);
     const userMsg: ChatMessage = { role: 'user', content: chatMessage };
     setChatHistory((prev) => [...prev, userMsg]);
@@ -270,7 +269,6 @@ export function AIChat() {
       return;
     }
 
-    // Build a conversation prompt including context.
     const conversation = chatHistory
       .map((m) => `${m.role === 'user' ? userName : 'Assistant'}: ${m.content}`)
       .join('\n');
@@ -315,7 +313,7 @@ Assistant:
   return (
     <div className="flex h-screen bg-gray-900 text-gray-200">
       <Sidebar isCollapsed={isSidebarCollapsed} onToggle={handleToggleSidebar} userName={userName} />
-      
+
       <main className={`flex-1 overflow-hidden transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'}`}>
         <div className="h-full flex flex-col">
           {/* Header */}
@@ -375,11 +373,7 @@ Assistant:
                     <div className="mt-2">
                       <div className="flex items-center space-x-2 bg-gray-900 rounded-lg px-4 py-2">
                         <TimerIcon className="w-5 h-5 text-blue-400" />
-                        <Timer
-                          key={message.timer.id}
-                          initialDuration={message.timer.duration}
-                          onComplete={() => handleTimerComplete(message.timer!.id)}
-                        />
+                        <Timer key={message.timer.id} initialDuration={message.timer.duration} onComplete={() => handleTimerComplete(message.timer!.id)} />
                       </div>
                     </div>
                   )}

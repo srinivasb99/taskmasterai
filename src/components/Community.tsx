@@ -1,22 +1,27 @@
 import React, { useState, useEffect, ChangeEvent } from 'react';
 import { Sidebar } from './Sidebar';
 import { Loader2 } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import { getCurrentUser } from '../lib/settings-firebase';
 import { uploadCommunityFile, getCommunityFiles } from '../lib/community-firebase';
 import { pricing, db } from '../lib/firebase';
-import {
-  doc,
-  getDoc,
-  updateDoc,
-  addDoc,
-  collection,
-  query,
-  where,
-  getDocs
+import { 
+  doc, 
+  getDoc, 
+  updateDoc, 
+  addDoc, 
+  collection, 
+  query, 
+  where, 
+  getDocs 
 } from 'firebase/firestore';
 
 export function Community() {
-  const { user, loading } = useAuth();
+  const navigate = useNavigate();
+  const [user, setUser] = useState<any>(null);
+  const [userName, setUserName] = useState<string>("");
+  const [tokens, setTokens] = useState<number>(500);
+  const [loading, setLoading] = useState(true);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [communityFiles, setCommunityFiles] = useState<any[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -25,6 +30,24 @@ export function Community() {
     const stored = localStorage.getItem('isSidebarCollapsed');
     return stored ? JSON.parse(stored) : false;
   });
+
+  // Proper auth detection using getCurrentUser
+  useEffect(() => {
+    const firebaseUser = getCurrentUser();
+    if (firebaseUser) {
+      setUser(firebaseUser);
+      setUserName(firebaseUser.displayName || "User");
+      const userDocRef = doc(db, 'users', firebaseUser.uid);
+      getDoc(userDocRef).then((docSnap) => {
+        if (docSnap.exists()) {
+          setTokens(docSnap.data().tokens || 500);
+        }
+      });
+    } else {
+      navigate('/login');
+    }
+    setLoading(false);
+  }, [navigate]);
 
   // Fetch all community files
   useEffect(() => {
@@ -80,15 +103,13 @@ export function Community() {
     setUploading(false);
   };
 
-  // Unlock a file from the community (if not your own)
+  // Unlock a file if it's not yours and not already unlocked
   const unlockFile = async (file: any) => {
     if (!user) return;
-    // Extract file extension from file name
     const parts = file.fileName.split('.');
     const ext = parts[parts.length - 1].toLowerCase();
     const cost = pricing.Basic[ext] || pricing.Basic['*'];
 
-    // Get current user tokens from Firestore
     const userDocRef = doc(db, 'users', user.uid);
     const userDocSnap = await getDoc(userDocRef);
     let currentTokens = 500;
@@ -100,17 +121,14 @@ export function Community() {
       alert('Insufficient tokens to unlock this file.');
       return;
     }
-    // Deduct tokens and update Firestore
     const newTokens = currentTokens - cost;
     await updateDoc(userDocRef, { tokens: newTokens });
-
-    // Mark the file as unlocked by adding an entry in "unlockedFiles"
     await addDoc(collection(db, 'unlockedFiles'), {
       userId: user.uid,
       fileId: file.id,
       unlockedAt: new Date()
     });
-    // Refresh unlocked file list
+    // Refresh unlocked file IDs
     const q = query(collection(db, 'unlockedFiles'), where('userId', '==', user.uid));
     const querySnapshot = await getDocs(q);
     const ids: string[] = [];
@@ -118,10 +136,11 @@ export function Community() {
       ids.push(docSnap.data().fileId);
     });
     setUnlockedFileIds(ids);
+    setTokens(newTokens);
     alert('File unlocked successfully!');
   };
 
-  // Split files into sections
+  // Split files into three sections
   const yourSharedFiles = communityFiles.filter(file => file.userId === user?.uid);
   const communityUploadedFiles = communityFiles.filter(file => file.userId !== user?.uid);
   const unlockedFiles = communityFiles.filter(file => unlockedFileIds.includes(file.id));
@@ -140,27 +159,36 @@ export function Community() {
       <Sidebar
         isCollapsed={isSidebarCollapsed}
         onToggle={() => {
-          setIsSidebarCollapsed((prev) => {
+          setIsSidebarCollapsed(prev => {
             localStorage.setItem('isSidebarCollapsed', JSON.stringify(!prev));
             return !prev;
           });
         }}
-        userName={user.displayName || 'User'}
+        userName={userName}
       />
-      <main className={`flex-1 overflow-hidden transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'}`}>
-        <div className="p-4 overflow-y-auto h-full">
-          <h1 className="text-3xl font-bold text-white mb-4">Community</h1>
+      <main className={`flex-1 overflow-hidden transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} p-8`}>
+        <div className="overflow-y-auto h-full">
+          {/* Header with page title and token count */}
+          <div className="flex items-center justify-between mb-6">
+            <h1 className="text-3xl font-bold text-white">Community</h1>
+            <div className="text-lg text-gray-300">Tokens: {tokens}</div>
+          </div>
+          {/* File Upload Section */}
           <div className="mb-6">
-            <input type="file" onChange={handleFileChange} className="mb-2" />
+            <label className="block text-gray-300 mb-2">Choose File</label>
+            <input
+              type="file"
+              onChange={handleFileChange}
+              className="block w-full text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-white file:bg-gradient-to-r file:from-indigo-500 file:to-purple-500 hover:file:cursor-pointer"
+            />
             <button
               onClick={handleUpload}
               disabled={!selectedFile || uploading}
-              className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-full transition-all transform hover:scale-105"
+              className="mt-4 w-full px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-full transition-all transform hover:scale-105"
             >
               {uploading ? <Loader2 className="animate-spin w-5 h-5" /> : 'Upload File'}
             </button>
           </div>
-
           {/* Section: Community Uploaded Files */}
           <section className="mb-8">
             <h2 className="text-2xl font-semibold text-white mb-4">Community Uploaded Files</h2>
@@ -182,7 +210,6 @@ export function Community() {
                       <span className="text-sm text-gray-400">
                         {new Date(file.uploadedAt.seconds * 1000).toLocaleString()}
                       </span>
-                      {/* Only show unlock button if file is not yours and not already unlocked */}
                       {!unlockedFileIds.includes(file.id) && (
                         <button
                           onClick={() => unlockFile(file)}
@@ -197,7 +224,6 @@ export function Community() {
               </ul>
             )}
           </section>
-
           {/* Section: Your Shared Files */}
           <section className="mb-8">
             <h2 className="text-2xl font-semibold text-white mb-4">Your Shared Files</h2>
@@ -223,7 +249,6 @@ export function Community() {
               </ul>
             )}
           </section>
-
           {/* Section: Unlocked Files */}
           <section className="mb-8">
             <h2 className="text-2xl font-semibold text-white mb-4">Unlocked Files</h2>

@@ -19,7 +19,7 @@ import { auth } from '../lib/firebase';
 import { User, onAuthStateChanged } from 'firebase/auth';
 import { onCollectionSnapshot, hfApiKey } from '../lib/dashboard-firebase';
 import { getCurrentUser } from '../lib/settings-firebase';
-import { uploadAttachment } from '../lib/ai-chat-firebase.js';
+import { uploadAttachment } from '../lib/ai-chat-firebase';
 // Import the pipeline function from the Transformers.js library
 import { pipeline } from '@xenova/transformers';
 

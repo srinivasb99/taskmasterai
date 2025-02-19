@@ -18,6 +18,7 @@ import Contact from './components/Contact';
 import AIChat from './components/AI-Chat';
 import Notes from './components/Notes';
 import Calendar from './components/Calendar';
+import Community from './components/Community';
 import SchoolPage from './components/SchoolPage';
 import './index.css';
 
@@ -151,6 +152,7 @@ createRoot(document.getElementById('root')!).render(
             <Route path="/calendar" element={<PageTitle title="Calendar"><Calendar /></PageTitle>} />
             <Route path="/notes" element={<PageTitle title="Notes"><Notes /></PageTitle>} />
             <Route path="/school" element={<PageTitle title="School"><SchoolPage /></PageTitle>} />
+            <Route path="/community" element={<PageTitle title="Community"><Community /></PageTitle>} />
             <Route path="/" element={<RootTitle><App /></RootTitle>} />
             {/* Catch-all route for 404 */}
             <Route path="*" element={<PageTitle title="404 Not Found"><NotFound /></PageTitle>} />

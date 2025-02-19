@@ -4,79 +4,30 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Send,
-  Timer as TimerIcon,
   Bot,
   AlertTriangle,
   Paperclip,
 } from 'lucide-react';
-import { Sidebar } from './Sidebar';
-import { Timer } from './Timer';
-import { FlashcardsQuestions } from './FlashcardsQuestions';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import remarkGfm from 'remark-gfm';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
+
+// Firebase Auth imports (if needed for user login)
 import { User, onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../lib/firebase';
-import { onCollectionSnapshot } from '../lib/dashboard-firebase';
 import { getCurrentUser } from '../lib/settings-firebase';
 
-// Helper to convert File -> Base64 string
-async function readFileAsBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (reader.result) {
-        // result is something like "data:image/png;base64,iVBORw0KGgoAAAANS..."
-        // We can keep the entire data URL or just the Base64 portion
-        // For now let's keep the entire data URL
-        const base64Url = reader.result as string;
-        resolve(base64Url);
-      } else {
-        reject(new Error("Could not read file as Base64"));
-      }
-    };
-    reader.onerror = (error) => reject(error);
-    reader.readAsDataURL(file);
-  });
-}
+// Firestore snapshot helper (if you want tasks, goals, etc.)
+import { onCollectionSnapshot } from '../lib/dashboard-firebase';
 
-// Gemini API helper
-async function generateContentWithGemini(prompt: string): Promise<string> {
-  // Replace with your actual API key
-  const apiKey = "AIzaSyBdywFIyQefLbsVOnLS0BIy9tffDz_f8LA";
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+// Components
+import { Sidebar } from './Sidebar';
+import { Timer } from './Timer';
+import { FlashcardsQuestions } from './FlashcardsQuestions';
 
-  const body = {
-    contents: [
-      {
-        parts: [{ text: prompt }],
-      },
-    ],
-  };
-
-  console.log("Sending prompt to Gemini:", prompt);
-
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Gemini API request failed: ${response.statusText}`);
-  }
-
-  const data = await response.json();
-  console.log("Gemini API raw response:", data);
-
-  // Adjust property access if Gemini's response differs
-  const generatedText = data?.candidates?.[0]?.output?.parts?.[0]?.text;
-  return (generatedText || "").trim();
-}
-
-// Timer & Chat message types
+// ---------- TYPES ----------
 interface TimerMessage {
   type: 'timer';
   duration: number;
@@ -116,42 +67,101 @@ interface ChatMessage {
   question?: QuestionMessage;
 }
 
+// ---------- GEMINI API HELPER ----------
+// This function calls the Gemini API to generate content.
+async function generateContentWithGemini(prompt: string): Promise<string> {
+  const apiKey = "AIzaSyBdywFIyQefLbsVOnLS0BIy9tffDz_f8LA";
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+
+  const body = {
+    contents: [
+      {
+        parts: [{ text: prompt }],
+      },
+    ],
+  };
+
+  console.log("Sending prompt to Gemini:", prompt);
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    throw new Error(`Gemini API request failed: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  console.log("Gemini API raw response:", data);
+
+  // Adjust property access if Gemini's response format is different
+  const generatedText = data?.candidates?.[0]?.output?.parts?.[0]?.text;
+  return (generatedText || "").trim();
+}
+
+// ---------- FILE HELPER ----------
+// Reads a File (image/PDF) as a Base64 data URL
+async function readFileAsBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (reader.result) {
+        resolve(reader.result as string);
+      } else {
+        reject(new Error("Could not read file as Base64"));
+      }
+    };
+    reader.onerror = (error) => reject(error);
+    reader.readAsDataURL(file);
+  });
+}
+
+// ---------- MAIN COMPONENT ----------
 export function AIChat() {
   const navigate = useNavigate();
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // ---------- AUTH & USER STATE ----------
   const [user, setUser] = useState<User | null>(null);
+  const [userName, setUserName] = useState<string>("Loading...");
   const [loading, setLoading] = useState(true);
-  const [userName, setUserName] = useState<string>('Loading...');
-  const [chatMessage, setChatMessage] = useState('');
+
+  // ---------- CHAT & UI STATE ----------
+  const [chatMessage, setChatMessage] = useState("");
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([
     {
-      role: 'assistant',
-      content: "👋 Hi I'm TaskMaster, How can I help you today? Need help with your items? Simply ask me!",
+      role: "assistant",
+      content:
+        "👋 Hi I'm TaskMaster, How can I help you today? Need help with your items? Simply ask me!",
     },
   ]);
   const [isChatLoading, setIsChatLoading] = useState(false);
-  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // For tasks/goals/projects/plans from Firestore
   const [tasks, setTasks] = useState<Array<{ id: string; data: any }>>([]);
   const [goals, setGoals] = useState<Array<{ id: string; data: any }>>([]);
   const [projects, setProjects] = useState<Array<{ id: string; data: any }>>([]);
   const [plans, setPlans] = useState<Array<{ id: string; data: any }>>([]);
-  // For direct file attachments to Gemini
+
+  // ---------- ATTACHMENT ----------
   const [attachment, setAttachment] = useState<File | null>(null);
 
-  // Collapsed sidebar from localStorage
+  // ---------- SIDEBAR COLLAPSE ----------
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
-    const stored = localStorage.getItem('isSidebarCollapsed');
+    const stored = localStorage.getItem("isSidebarCollapsed");
     return stored ? JSON.parse(stored) : false;
   });
   useEffect(() => {
-    localStorage.setItem('isSidebarCollapsed', JSON.stringify(isSidebarCollapsed));
+    localStorage.setItem("isSidebarCollapsed", JSON.stringify(isSidebarCollapsed));
   }, [isSidebarCollapsed]);
 
-  // Listen for Auth
+  // ---------- FIREBASE AUTH ----------
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
       if (firebaseUser) {
-        setUserName(firebaseUser.displayName || 'User');
+        setUserName(firebaseUser.displayName || "User");
       }
       setLoading(false);
     });
@@ -162,20 +172,29 @@ export function AIChat() {
     const firebaseUser = getCurrentUser();
     if (firebaseUser) {
       setUser(firebaseUser);
-      setUserName(firebaseUser.displayName || 'User');
+      setUserName(firebaseUser.displayName || "User");
     } else {
-      navigate('/login');
+      navigate("/login");
     }
     setLoading(false);
   }, [navigate]);
 
-  // Firestore snapshots
+  // ---------- FIRESTORE SNAPSHOTS (OPTIONAL) ----------
   useEffect(() => {
     if (!user) return;
-    const unsubTasks = onCollectionSnapshot('tasks', user.uid, (items) => setTasks(items));
-    const unsubGoals = onCollectionSnapshot('goals', user.uid, (items) => setGoals(items));
-    const unsubProjects = onCollectionSnapshot('projects', user.uid, (items) => setProjects(items));
-    const unsubPlans = onCollectionSnapshot('plans', user.uid, (items) => setPlans(items));
+    const unsubTasks = onCollectionSnapshot("tasks", user.uid, (items) =>
+      setTasks(items)
+    );
+    const unsubGoals = onCollectionSnapshot("goals", user.uid, (items) =>
+      setGoals(items)
+    );
+    const unsubProjects = onCollectionSnapshot("projects", user.uid, (items) =>
+      setProjects(items)
+    );
+    const unsubPlans = onCollectionSnapshot("plans", user.uid, (items) =>
+      setPlans(items)
+    );
+
     return () => {
       unsubTasks();
       unsubGoals();
@@ -184,95 +203,125 @@ export function AIChat() {
     };
   }, [user]);
 
+  // ---------- SIDEBAR TOGGLE ----------
   const handleToggleSidebar = () => {
     setIsSidebarCollapsed((prev) => !prev);
   };
 
-  // Timer completion
+  // ---------- TIMER COMPLETION ----------
   const handleTimerComplete = (timerId: string) => {
     setChatHistory((prev) => [
       ...prev,
       {
-        role: 'assistant',
+        role: "assistant",
         content: "⏰ Time's up! Your timer has finished.",
       },
     ]);
   };
 
-  const parseTimerRequest = (message: string): number | null => {
+  // ---------- TIMER DETECTION ----------
+  function parseTimerRequest(message: string): number | null {
     const timeRegex = /(\d+)\s*(minutes?|mins?|hours?|hrs?|seconds?|secs?)/i;
     const match = message.match(timeRegex);
     if (!match) return null;
+
     const amount = parseInt(match[1]);
     const unit = match[2].toLowerCase();
-    if (unit.startsWith('hour') || unit.startsWith('hr')) return amount * 3600;
-    if (unit.startsWith('min')) return amount * 60;
-    if (unit.startsWith('sec')) return amount;
-    return null;
-  };
 
-  // Scroll to bottom on new messages
+    if (unit.startsWith("hour") || unit.startsWith("hr")) {
+      return amount * 3600;
+    } else if (unit.startsWith("min")) {
+      return amount * 60;
+    } else if (unit.startsWith("sec")) {
+      return amount;
+    }
+    return null;
+  }
+
+  // ---------- SCROLL TO BOTTOM ----------
   useEffect(() => {
     if (chatEndRef.current) {
-      chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+      chatEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [chatHistory]);
 
-  // Build prompt from user items
-  const formatItemsForChat = () => {
+  // ---------- BUILD PROMPT FROM USER ITEMS ----------
+  function formatItemsForChat(): string {
     const lines: string[] = [];
     lines.push(`${userName}'s items:\n`);
     tasks.forEach((t) => {
       const due = t.data.dueDate?.toDate?.();
-      lines.push(`Task: ${t.data.task || 'Untitled'}${due ? ` (Due: ${due.toLocaleDateString()})` : ''}`);
+      lines.push(
+        `Task: ${t.data.task || "Untitled"}${
+          due ? ` (Due: ${due.toLocaleDateString()})` : ""
+        }`
+      );
     });
     goals.forEach((g) => {
       const due = g.data.dueDate?.toDate?.();
-      lines.push(`Goal: ${g.data.goal || 'Untitled'}${due ? ` (Due: ${due.toLocaleDateString()})` : ''}`);
+      lines.push(
+        `Goal: ${g.data.goal || "Untitled"}${
+          due ? ` (Due: ${due.toLocaleDateString()})` : ""
+        }`
+      );
     });
     projects.forEach((p) => {
       const due = p.data.dueDate?.toDate?.();
-      lines.push(`Project: ${p.data.project || 'Untitled'}${due ? ` (Due: ${due.toLocaleDateString()})` : ''}`);
+      lines.push(
+        `Project: ${p.data.project || "Untitled"}${
+          due ? ` (Due: ${due.toLocaleDateString()})` : ""
+        }`
+      );
     });
     plans.forEach((p) => {
       const due = p.data.dueDate?.toDate?.();
-      lines.push(`Plan: ${p.data.plan || 'Untitled'}${due ? ` (Due: ${due.toLocaleDateString()})` : ''}`);
+      lines.push(
+        `Plan: ${p.data.plan || "Untitled"}${
+          due ? ` (Due: ${due.toLocaleDateString()})` : ""
+        }`
+      );
     });
-    return lines.join('\n');
-  };
+    return lines.join("\n");
+  }
 
-  // Main chat submission
-  const handleChatSubmit = async (e: React.FormEvent) => {
+  // ---------- MAIN SUBMIT HANDLER ----------
+  async function handleChatSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!chatMessage.trim() && !attachment) return;
 
     setIsChatLoading(true);
 
-    // If we have an attachment, read it as Base64 and pass it directly to Gemini
+    // ---------- ATTACHMENT (IMAGE/PDF) ----------
     if (attachment) {
-      const combinedUserMessage = chatMessage.trim() || 'Describe this image in one sentence.';
+      // Let user provide optional text, or default prompt
+      const combinedUserMessage =
+        chatMessage.trim() || "Describe this file in one sentence.";
       const userMsg: ChatMessage = {
-        role: 'user',
+        role: "user",
         content: `${combinedUserMessage}\n[Attachment: ${attachment.name}]`,
       };
       setChatHistory((prev) => [...prev, userMsg]);
-      setChatMessage('');
+      setChatMessage("");
 
       try {
-        // Convert the file to Base64
+        // Convert file to base64
         const base64DataUrl = await readFileAsBase64(attachment);
+        const prompt = `User: ${combinedUserMessage}\nFile Data: ${base64DataUrl}\nAssistant:`;
 
-        // We embed the entire data URL in the prompt
-        // e.g., "data:image/png;base64,iVBORw0KGgoAAAANS..."
-        const prompt = `User: ${combinedUserMessage}\nImage Data: ${base64DataUrl}\nAssistant:`;
         const assistantReply = await generateContentWithGemini(prompt);
-
-        setChatHistory((prev) => [...prev, { role: 'assistant', content: assistantReply }]);
+        setChatHistory((prev) => [
+          ...prev,
+          { role: "assistant", content: assistantReply },
+        ]);
       } catch (error) {
         console.error("Gemini API error (attachment):", error);
         setChatHistory((prev) => [
           ...prev,
-          { role: 'assistant', content: 'Sorry, I had an issue processing your attachment. Please try again later.' },
+          {
+            role: "assistant",
+            content:
+              "Sorry, I had an issue processing your attachment. Please try again later.",
+          },
         ]);
       } finally {
         setAttachment(null);
@@ -281,35 +330,48 @@ export function AIChat() {
       return;
     }
 
-    // For text-only messages
+    // ---------- TEXT-ONLY MESSAGE ----------
     const timerDuration = parseTimerRequest(chatMessage);
-    const userMsg: ChatMessage = { role: 'user', content: chatMessage };
+    const userMsg: ChatMessage = { role: "user", content: chatMessage };
     setChatHistory((prev) => [...prev, userMsg]);
-    setChatMessage('');
+    setChatMessage("");
 
+    // If user sets a timer
     if (timerDuration) {
       const timerId = Math.random().toString(36).substr(2, 9);
       setChatHistory((prev) => [
         ...prev,
         {
-          role: 'assistant',
+          role: "assistant",
           content: `Starting a timer for ${timerDuration} seconds.`,
-          timer: { type: 'timer', duration: timerDuration, id: timerId },
+          timer: { type: "timer", duration: timerDuration, id: timerId },
         },
       ]);
       setIsChatLoading(false);
       return;
     }
 
+    // Build conversation prompt
     try {
       const conversation = chatHistory
-        .map((m) => `${m.role === 'user' ? userName : 'Assistant'}: ${m.content}`)
-        .join('\n');
+        .map(
+          (m) => `${m.role === "user" ? userName : "Assistant"}: ${m.content}`
+        )
+        .join("\n");
       const itemsText = formatItemsForChat();
       const now = new Date();
       const currentDateTime = {
-        date: now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
-        time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }),
+        date: now.toLocaleDateString("en-US", {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        }),
+        time: now.toLocaleTimeString("en-US", {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true,
+        }),
       };
 
       const prompt = `
@@ -330,18 +392,25 @@ Assistant:
       `;
 
       const assistantReply = await generateContentWithGemini(prompt);
-      setChatHistory((prev) => [...prev, { role: 'assistant', content: assistantReply }]);
+      setChatHistory((prev) => [
+        ...prev,
+        { role: "assistant", content: assistantReply },
+      ]);
     } catch (err) {
       console.error("Gemini API error (text-only):", err);
       setChatHistory((prev) => [
         ...prev,
-        { role: 'assistant', content: 'Sorry, I had an issue responding. Please try again later.' },
+        {
+          role: "assistant",
+          content: "Sorry, I had an issue responding. Please try again later.",
+        },
       ]);
     } finally {
       setIsChatLoading(false);
     }
-  };
+  }
 
+  // ---------- RENDER ----------
   return (
     <div className="flex h-screen bg-gray-900 text-gray-200">
       <Sidebar
@@ -351,162 +420,168 @@ Assistant:
       />
       <main
         className={`flex-1 overflow-hidden transition-all duration-300 ${
-          isSidebarCollapsed ? 'ml-16' : 'ml-64'
+          isSidebarCollapsed ? "ml-16" : "ml-64"
         }`}
       >
-        <div className="h-full flex flex-col">
-          {/* Header */}
-          <div className="p-4 border-b border-gray-800">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Bot className="w-6 h-6 text-blue-400" />
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h1 className="text-xl font-semibold">AI Assistant</h1>
-                    <span className="px-2 py-0.5 text-xs font-medium bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-full">
-                      BETA
-                    </span>
-                  </div>
-                  <p className="text-sm text-gray-400">Chat with TaskMaster</p>
+        {/* Header */}
+        <div className="p-4 border-b border-gray-800">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Bot className="w-6 h-6 text-blue-400" />
+              <div>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-xl font-semibold">AI Assistant</h1>
+                  <span className="px-2 py-0.5 text-xs font-medium bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-full">
+                    BETA
+                  </span>
                 </div>
+                <p className="text-sm text-gray-400">Chat with TaskMaster</p>
               </div>
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2 text-xs">
-                  <AlertTriangle className="w-4 h-4 text-yellow-400" />
-                  <span className="text-gray-400">Chat history is not saved</span>
-                </div>
-                <div className="flex items-center gap-2 text-xs">
-                  <AlertTriangle className="w-4 h-4 text-yellow-400" />
-                  <span className="text-gray-400">TaskMaster can make mistakes. Verify details.</span>
-                </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 text-xs">
+                <AlertTriangle className="w-4 h-4 text-yellow-400" />
+                <span className="text-gray-400">Chat history is not saved</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs">
+                <AlertTriangle className="w-4 h-4 text-yellow-400" />
+                <span className="text-gray-400">
+                  TaskMaster can make mistakes. Verify details.
+                </span>
               </div>
             </div>
           </div>
+        </div>
 
-          {/* Chat Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={chatEndRef}>
-            {chatHistory.map((message, index) => (
+        {/* Chat Messages */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {chatHistory.map((message, index) => (
+            <div
+              key={index}
+              className={`flex ${
+                message.role === "user" ? "justify-end" : "justify-start"
+              }`}
+            >
               <div
-                key={index}
-                className={`flex ${
-                  message.role === 'user' ? 'justify-end' : 'justify-start'
+                className={`max-w-[80%] rounded-lg px-4 py-2 ${
+                  message.role === "user"
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-700 text-gray-200"
                 }`}
               >
-                <div
-                  className={`max-w-[80%] rounded-lg px-4 py-2 ${
-                    message.role === 'user'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-700 text-gray-200'
-                  }`}
+                <ReactMarkdown
+                  remarkPlugins={[remarkMath, remarkGfm]}
+                  rehypePlugins={[rehypeKatex]}
+                  components={{
+                    p: ({ children }) => <p className="mb-2">{children}</p>,
+                    ul: ({ children }) => (
+                      <ul className="list-disc ml-4 mb-2">{children}</ul>
+                    ),
+                    ol: ({ children }) => (
+                      <ol className="list-decimal ml-4 mb-2">{children}</ol>
+                    ),
+                    li: ({ children }) => <li className="mb-1">{children}</li>,
+                    code: ({ inline, children }) =>
+                      inline ? (
+                        <code className="bg-gray-800 px-1 rounded">
+                          {children}
+                        </code>
+                      ) : (
+                        <pre className="bg-gray-800 p-2 rounded-lg overflow-x-auto">
+                          <code>{children}</code>
+                        </pre>
+                      ),
+                  }}
                 >
-                  <ReactMarkdown
-                    remarkPlugins={[remarkMath, remarkGfm]}
-                    rehypePlugins={[rehypeKatex]}
-                    components={{
-                      p: ({ children }) => <p className="mb-2">{children}</p>,
-                      ul: ({ children }) => (
-                        <ul className="list-disc ml-4 mb-2">{children}</ul>
-                      ),
-                      ol: ({ children }) => (
-                        <ol className="list-decimal ml-4 mb-2">{children}</ol>
-                      ),
-                      li: ({ children }) => <li className="mb-1">{children}</li>,
-                      code: ({ inline, children }) =>
-                        inline ? (
-                          <code className="bg-gray-800 px-1 rounded">
-                            {children}
-                          </code>
-                        ) : (
-                          <pre className="bg-gray-800 p-2 rounded-lg overflow-x-auto">
-                            <code>{children}</code>
-                          </pre>
-                        ),
-                    }}
-                  >
-                    {message.content}
-                  </ReactMarkdown>
-                  {message.timer && (
-                    <div className="mt-2">
-                      <div className="flex items-center space-x-2 bg-gray-900 rounded-lg px-4 py-2">
-                        <TimerIcon className="w-5 h-5 text-blue-400" />
-                        <Timer
-                          key={message.timer.id}
-                          initialDuration={message.timer.duration}
-                          onComplete={() => handleTimerComplete(message.timer!.id)}
-                        />
-                      </div>
-                    </div>
-                  )}
-                  {message.flashcard && (
-                    <div className="mt-2">
-                      <FlashcardsQuestions
-                        type="flashcard"
-                        data={message.flashcard.data}
-                        onComplete={() => {}}
-                      />
-                    </div>
-                  )}
-                  {message.question && (
-                    <div className="mt-2">
-                      <FlashcardsQuestions
-                        type="question"
-                        data={message.question.data}
-                        onComplete={() => {}}
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-            {isChatLoading && (
-              <div className="flex justify-start">
-                <div className="bg-gray-700 text-gray-200 rounded-lg px-4 py-2 max-w-[80%]">
-                  <div className="flex space-x-2">
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100"></div>
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200"></div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+                  {message.content}
+                </ReactMarkdown>
 
-          {/* Chat Input */}
-          <form onSubmit={handleChatSubmit} className="p-4 border-t border-gray-800">
-            <div className="flex items-center gap-2">
-              {/* File attachment button */}
-              <label htmlFor="attachmentInput" className="cursor-pointer">
-                <Paperclip className="w-6 h-6 text-gray-200" />
-              </label>
-              <input
-                id="attachmentInput"
-                type="file"
-                onChange={(e) => setAttachment(e.target.files?.[0] || null)}
-                accept="image/*"
-                className="hidden"
-              />
-              <input
-                type="text"
-                value={chatMessage}
-                onChange={(e) => setChatMessage(e.target.value)}
-                placeholder="Ask TaskMaster something..."
-                className="flex-1 bg-gray-700 text-gray-200 placeholder-gray-400 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <button
-                type="submit"
-                disabled={isChatLoading}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Send className="w-5 h-5" />
-              </button>
-            </div>
-            {attachment && (
-              <div className="mt-2 text-sm text-gray-400">
-                Attached: {attachment.name}
+                {/* Timer, Flashcards, or Quiz */}
+                {message.timer && (
+                  <div className="mt-2">
+                    <div className="flex items-center space-x-2 bg-gray-900 rounded-lg px-4 py-2">
+                      <Timer
+                        key={message.timer.id}
+                        initialDuration={message.timer.duration}
+                        onComplete={() => handleTimerComplete(message.timer!.id)}
+                      />
+                    </div>
+                  </div>
+                )}
+                {message.flashcard && (
+                  <div className="mt-2">
+                    <FlashcardsQuestions
+                      type="flashcard"
+                      data={message.flashcard.data}
+                      onComplete={() => {}}
+                    />
+                  </div>
+                )}
+                {message.question && (
+                  <div className="mt-2">
+                    <FlashcardsQuestions
+                      type="question"
+                      data={message.question.data}
+                      onComplete={() => {}}
+                    />
+                  </div>
+                )}
               </div>
-            )}
-          </form>
+            </div>
+          ))}
+
+          {/* Loading Indicator */}
+          {isChatLoading && (
+            <div className="flex justify-start">
+              <div className="bg-gray-700 text-gray-200 rounded-lg px-4 py-2 max-w-[80%]">
+                <div className="flex space-x-2">
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100"></div>
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200"></div>
+                </div>
+              </div>
+            </div>
+          )}
+          {/* Scroll anchor */}
+          <div ref={chatEndRef} />
         </div>
+
+        {/* Chat Input */}
+        <form onSubmit={handleChatSubmit} className="p-4 border-t border-gray-800">
+          <div className="flex items-center gap-2">
+            {/* File Attachment */}
+            <label htmlFor="attachmentInput" className="cursor-pointer">
+              <Paperclip className="w-6 h-6 text-gray-200" />
+            </label>
+            <input
+              id="attachmentInput"
+              type="file"
+              onChange={(e) => setAttachment(e.target.files?.[0] || null)}
+              accept="image/*,application/pdf"
+              className="hidden"
+            />
+
+            <input
+              type="text"
+              value={chatMessage}
+              onChange={(e) => setChatMessage(e.target.value)}
+              placeholder="Ask TaskMaster something..."
+              className="flex-1 bg-gray-700 text-gray-200 placeholder-gray-400 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <button
+              type="submit"
+              disabled={isChatLoading}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Send className="w-5 h-5" />
+            </button>
+          </div>
+          {attachment && (
+            <div className="mt-2 text-sm text-gray-400">
+              Attached: {attachment.name}
+            </div>
+          )}
+        </form>
       </main>
     </div>
   );

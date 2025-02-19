@@ -184,52 +184,34 @@ export function AIChat() {
     return lines.join('\n');
   };
 
-  const handleChatSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!chatMessage.trim() && !attachment) return;
+const handleChatSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  if (!chatMessage.trim() && !attachment) return;
 
-    // Define our model options
-    const modelOptions = {
-      model: "meta-llama/Llama-3.2-90B-Vision-Instruct",
-      trustRemoteCode: true,
-    };
+  const modelOptions = {
+    model: "Xenova/gpt2", // Use a known‑supported, smaller model for testing
+    trustRemoteCode: true,
+  };
 
-    // If an attachment is provided, handle it by uploading the image and appending its URL to the prompt.
-    if (attachment) {
-      const combinedUserMessage = chatMessage.trim()
-        ? chatMessage.trim()
-        : 'Describe this image in one sentence.';
-      // Display the user's message (with a note about the attachment)
-      const userMsg: ChatMessage = {
-        role: 'user',
-        content: `${combinedUserMessage}\n[Attachment: ${attachment.name}]`,
-      };
-      setChatHistory((prev) => [...prev, userMsg]);
-      setChatMessage('');
-      setIsChatLoading(true);
-      try {
-        // Upload the image to Firebase Storage and obtain its public URL.
-        const publicUrl = await uploadAttachment(attachment);
-        // Build a prompt that includes the image URL.
-        const prompt = `User: ${combinedUserMessage}\nImage URL: ${publicUrl}\nAssistant:`;
-        // Use the text-generation pipeline for multi-modal inference.
-        const pipe = await pipeline("text-generation", modelOptions);
-        const result = await pipe(prompt, { max_new_tokens: 150 });
-        const assistantReply = (result && result[0]?.generated_text) ||
-          "I'm sorry, I couldn't generate a response.";
-        setChatHistory((prev) => [...prev, { role: 'assistant', content: assistantReply }]);
-      } catch (err) {
-        console.error('Vision chat error:', err);
-        setChatHistory((prev) => [
-          ...prev,
-          { role: 'assistant', content: 'Sorry, I had an issue processing your attachment. Please try again in a moment.' },
-        ]);
-      } finally {
-        setIsChatLoading(false);
-        setAttachment(null);
-      }
-      return;
-    }
+  // For text-only messages
+  const userMsg = { role: 'user', content: chatMessage };
+  setChatHistory(prev => [...prev, userMsg]);
+  setChatMessage('');
+  
+  setIsChatLoading(true);
+  try {
+    const pipe = await pipeline("text-generation", modelOptions);
+    const result = await pipe(chatMessage, { max_new_tokens: 150 });
+    const assistantReply = (result && result[0]?.generated_text) || "I'm sorry, I couldn't generate a response.";
+    setChatHistory(prev => [...prev, { role: 'assistant', content: assistantReply }]);
+  } catch (err) {
+    console.error('Chat error:', err);
+    setChatHistory(prev => [...prev, { role: 'assistant', content: 'Sorry, I had an issue responding. Please try again in a moment.' }]);
+  } finally {
+    setIsChatLoading(false);
+  }
+};
+
 
     // For text-only messages, check for timer requests.
     const timerDuration = parseTimerRequest(chatMessage);

@@ -25,7 +25,7 @@ import { uploadAttachment } from '../lib/ai-chat-firebase.js';
 // Import the pipeline function from Transformers.js (Xenova)
 import { pipeline } from '@xenova/transformers';
 
-// Message and related type definitions
+// Define TypeScript types for our messages
 interface TimerMessage {
   type: 'timer';
   duration: number;
@@ -74,7 +74,8 @@ export function AIChat() {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([
     {
       role: 'assistant',
-      content: "👋 Hi I'm TaskMaster, How can I help you today? Need help with your items? Simply ask me!",
+      content:
+        "👋 Hi I'm TaskMaster, How can I help you today? Need help with your items? Simply ask me!",
     },
   ]);
   const [isChatLoading, setIsChatLoading] = useState(false);
@@ -99,9 +100,7 @@ export function AIChat() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
-      if (firebaseUser) {
-        setUserName(firebaseUser.displayName || 'User');
-      }
+      if (firebaseUser) setUserName(firebaseUser.displayName || 'User');
       setLoading(false);
     });
     return () => unsubscribe();
@@ -137,7 +136,7 @@ export function AIChat() {
     setIsSidebarCollapsed((prev) => !prev);
   };
 
-  // Handle timer completion
+  // Timer handling
   const handleTimerComplete = (timerId: string) => {
     setChatHistory((prev) => [
       ...prev,
@@ -145,7 +144,6 @@ export function AIChat() {
     ]);
   };
 
-  // Detect timer requests in the message text
   const parseTimerRequest = (message: string): number | null => {
     const timeRegex = /(\d+)\s*(minutes?|mins?|hours?|hrs?|seconds?|secs?)/i;
     const match = message.match(timeRegex);
@@ -158,14 +156,12 @@ export function AIChat() {
     return null;
   };
 
-  // Scroll to bottom on chat update
   useEffect(() => {
     if (chatEndRef.current) {
       chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [chatHistory]);
 
-  // Build a text prompt from the user's items (tasks, goals, etc.)
   const formatItemsForChat = () => {
     const lines: string[] = [];
     lines.push(`${userName}'s items:\n`);
@@ -188,23 +184,22 @@ export function AIChat() {
     return lines.join('\n');
   };
 
-  // Main handler for chat submission
   const handleChatSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatMessage.trim() && !attachment) return;
 
-    // Define model options for our pipeline
+    // Define our model options
     const modelOptions = {
       model: "meta-llama/Llama-3.2-90B-Vision-Instruct",
       trustRemoteCode: true,
     };
 
-    // If there's an attachment, handle it as an image-text-to-text task.
+    // If an attachment is provided, handle it by uploading the image and appending its URL to the prompt.
     if (attachment) {
       const combinedUserMessage = chatMessage.trim()
         ? chatMessage.trim()
         : 'Describe this image in one sentence.';
-      // Append a note about the attachment for display purposes.
+      // Display the user's message (with a note about the attachment)
       const userMsg: ChatMessage = {
         role: 'user',
         content: `${combinedUserMessage}\n[Attachment: ${attachment.name}]`,
@@ -213,16 +208,14 @@ export function AIChat() {
       setChatMessage('');
       setIsChatLoading(true);
       try {
-        // Upload the image to Firebase and get its public URL.
+        // Upload the image to Firebase Storage and obtain its public URL.
         const publicUrl = await uploadAttachment(attachment);
-        // Build a prompt that includes the user's text and the image URL.
+        // Build a prompt that includes the image URL.
         const prompt = `User: ${combinedUserMessage}\nImage URL: ${publicUrl}\nAssistant:`;
-        // Load the pipeline for image-text-to-text.
-        const pipe = await pipeline("image-text-to-text", modelOptions);
-        // Get the model's output.
+        // Use the text-generation pipeline for multi-modal inference.
+        const pipe = await pipeline("text-generation", modelOptions);
         const result = await pipe(prompt, { max_new_tokens: 150 });
-        const assistantReply =
-          (result && result[0]?.generated_text) ||
+        const assistantReply = (result && result[0]?.generated_text) ||
           "I'm sorry, I couldn't generate a response.";
         setChatHistory((prev) => [...prev, { role: 'assistant', content: assistantReply }]);
       } catch (err) {
@@ -238,7 +231,7 @@ export function AIChat() {
       return;
     }
 
-    // For text-only messages, first check for timer requests.
+    // For text-only messages, check for timer requests.
     const timerDuration = parseTimerRequest(chatMessage);
     const userMsg: ChatMessage = { role: 'user', content: chatMessage };
     setChatHistory((prev) => [...prev, userMsg]);
@@ -256,7 +249,7 @@ export function AIChat() {
       return;
     }
 
-    // Build a conversation prompt that includes context and past conversation.
+    // Build a conversation prompt for text-only messages.
     const conversation = chatHistory
       .map((m) => `${m.role === 'user' ? userName : 'Assistant'}: ${m.content}`)
       .join('\n');
@@ -284,11 +277,10 @@ Assistant:
     `;
     setIsChatLoading(true);
     try {
-      // Load the same pipeline for text generation using image-text-to-text.
-      const pipe = await pipeline("image-text-to-text", modelOptions);
+      // Use the text-generation pipeline for the conversation prompt.
+      const pipe = await pipeline("text-generation", modelOptions);
       const result = await pipe(prompt, { max_new_tokens: 150 });
-      const assistantReply =
-        (result && result[0]?.generated_text) ||
+      const assistantReply = (result && result[0]?.generated_text) ||
         "I'm sorry, I couldn't generate a response.";
       setChatHistory((prev) => [...prev, { role: 'assistant', content: assistantReply }]);
     } catch (err) {
@@ -315,7 +307,9 @@ Assistant:
                 <div>
                   <div className="flex items-center gap-2">
                     <h1 className="text-xl font-semibold text-white">AI Assistant</h1>
-                    <span className="px-2 py-0.5 text-xs font-medium bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-full">BETA</span>
+                    <span className="px-2 py-0.5 text-xs font-medium bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-full">
+                      BETA
+                    </span>
                   </div>
                   <p className="text-sm text-gray-400">Chat with TaskMaster</p>
                 </div>

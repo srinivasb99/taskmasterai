@@ -21,45 +21,80 @@ import Calendar from './components/Calendar';
 import SchoolPage from './components/SchoolPage';
 import './index.css';
 
-// NotFound component with advanced animations
+// Advanced NotFound component with multiple animated layers and matching styling
 const NotFound = () => (
-  <div className="relative flex flex-col items-center justify-center h-screen overflow-hidden bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white">
+  <div className="relative flex flex-col items-center justify-center h-screen overflow-hidden bg-gray-900 text-white font-poppins">
+    {/* Animated Background Elements */}
+    <motion.div
+      className="absolute bg-indigo-500 rounded-full opacity-30"
+      style={{ width: 300, height: 300, top: '-150px', left: '-150px' }}
+      animate={{ x: [0, 50, 0], y: [0, 50, 0] }}
+      transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+    />
+    <motion.div
+      className="absolute bg-purple-500 rounded-full opacity-30"
+      style={{ width: 250, height: 250, bottom: '-100px', right: '-100px' }}
+      animate={{ x: [0, -50, 0], y: [0, -50, 0] }}
+      transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+    />
+    <motion.div
+      className="absolute bg-indigo-500 rounded-full opacity-20"
+      style={{ width: 150, height: 150, bottom: '50%', left: '-75px' }}
+      animate={{ rotate: [0, 360] }}
+      transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+    />
+    <motion.div
+      className="absolute bg-purple-500 rounded-full opacity-20"
+      style={{ width: 100, height: 100, top: '20%', right: '-50px' }}
+      animate={{ x: [0, -30, 0], y: [0, 30, 0] }}
+      transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+    />
+    <motion.div
+      className="absolute bg-indigo-500 rounded-full opacity-20"
+      style={{ width: 120, height: 120, bottom: '30%', left: '-60px' }}
+      animate={{ x: [0, 30, 0], y: [0, -30, 0] }}
+      transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
+    />
+    
+    {/* 404 Heading with entrance and continuous subtle oscillation */}
     <motion.h1
       className="text-9xl font-extrabold"
-      initial={{ scale: 0, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
-      transition={{ type: "spring", stiffness: 260, damping: 20 }}
+      initial={{ y: -100, scale: 0.5, opacity: 0 }}
+      animate={{ y: 0, scale: 1, opacity: 1 }}
+      transition={{ type: "spring", stiffness: 200, damping: 15 }}
     >
-      404
+      <motion.span
+        animate={{ rotate: [-2, 2, -2] }}
+        transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
+      >
+        404
+      </motion.span>
     </motion.h1>
+    
+    {/* Descriptive text with entrance animation */}
     <motion.p
-      className="mt-4 text-2xl"
-      initial={{ opacity: 0, y: 50 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.3, duration: 0.8 }}
+      className="mt-4 text-2xl text-gray-300"
+      initial={{ x: -100, opacity: 0 }}
+      animate={{ x: 0, opacity: 1 }}
+      transition={{ delay: 0.5, duration: 1.5, ease: "easeOut" }}
     >
       Oops! The page you're looking for doesn't exist.
     </motion.p>
+    
+    {/* Button styled to match your main page */}
     <motion.div
       className="mt-8"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ delay: 0.8, duration: 1 }}
+      initial={{ scale: 0 }}
+      animate={{ scale: 1 }}
+      transition={{ delay: 1, type: "spring", stiffness: 260, damping: 20 }}
     >
       <Link 
         to="/dashboard" 
-        className="px-6 py-3 bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+        className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-full transition-all transform hover:scale-105"
       >
         Go to Dashboard
       </Link>
     </motion.div>
-    {/* Optional animated background element */}
-    <motion.div 
-      className="absolute -z-10 w-96 h-96 bg-white opacity-10 rounded-full"
-      initial={{ scale: 0 }}
-      animate={{ scale: 1.2 }}
-      transition={{ delay: 0.5, duration: 2, repeat: Infinity, repeatType: 'mirror' }}
-    />
   </div>
 );
 
@@ -112,3 +147,5 @@ createRoot(document.getElementById('root')!).render(
     </HelmetProvider>
   </StrictMode>
 );
+
+export {};

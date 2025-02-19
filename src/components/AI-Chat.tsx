@@ -22,10 +22,34 @@ import { User, onAuthStateChanged } from 'firebase/auth';
 import { onCollectionSnapshot } from '../lib/dashboard-firebase';
 import { getCurrentUser } from '../lib/settings-firebase';
 import { uploadAttachment } from '../lib/ai-chat-firebase.js';
-// Import the pipeline function from Transformers.js (Xenova)
-import { pipeline } from '@xenova/transformers';
 
-// Define TypeScript types for our messages
+// --- Helper function to call Gemini API ---
+async function generateContentWithGemini(prompt: string): Promise<string> {
+  const apiKey = "AIzaSyBdywFIyQefLbsVOnLS0BIy9tffDz_f8LA";
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+  const body = {
+    contents: [
+      {
+        parts: [{ text: prompt }],
+      },
+    ],
+  };
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    throw new Error(`Gemini API request failed: ${response.statusText}`);
+  }
+  const data = await response.json();
+  // Adjust the following according to the actual API response format.
+  const generatedText = data?.candidates?.[0]?.output?.parts?.[0]?.text;
+  return generatedText || "";
+}
+
+// --- TypeScript types ---
 interface TimerMessage {
   type: 'timer';
   duration: number;
@@ -74,8 +98,7 @@ export function AIChat() {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([
     {
       role: 'assistant',
-      content:
-        "👋 Hi I'm TaskMaster, How can I help you today? Need help with your items? Simply ask me!",
+      content: "👋 Hi I'm TaskMaster, How can I help you today? Need help with your items? Simply ask me!",
     },
   ]);
   const [isChatLoading, setIsChatLoading] = useState(false);
@@ -84,10 +107,10 @@ export function AIChat() {
   const [goals, setGoals] = useState<Array<{ id: string; data: any }>>([]);
   const [projects, setProjects] = useState<Array<{ id: string; data: any }>>([]);
   const [plans, setPlans] = useState<Array<{ id: string; data: any }>>([]);
-  // State for file attachments
+  // For file attachments (images, PDFs, etc.)
   const [attachment, setAttachment] = useState<File | null>(null);
 
-  // Sidebar collapse state loaded from localStorage
+  // Sidebar collapse state (persisted in localStorage)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     const stored = localStorage.getItem('isSidebarCollapsed');
     return stored ? JSON.parse(stored) : false;
@@ -96,7 +119,7 @@ export function AIChat() {
     localStorage.setItem('isSidebarCollapsed', JSON.stringify(isSidebarCollapsed));
   }, [isSidebarCollapsed]);
 
-  // Listen for Firebase Auth changes
+  // Firebase Auth listener
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
@@ -117,7 +140,7 @@ export function AIChat() {
     setLoading(false);
   }, [navigate]);
 
-  // Listen for Firestore collection snapshots
+  // Firestore collection snapshots
   useEffect(() => {
     if (!user) return;
     const unsubTasks = onCollectionSnapshot('tasks', user.uid, (items) => setTasks(items));
@@ -184,34 +207,38 @@ export function AIChat() {
     return lines.join('\n');
   };
 
-const handleChatSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  if (!chatMessage.trim() && !attachment) return;
+  const handleChatSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatMessage.trim() && !attachment) return;
 
-  const modelOptions = {
-    model: "Xenova/gpt2", // Use a known‑supported, smaller model for testing
-    trustRemoteCode: true,
-  };
-
-  // For text-only messages
-  const userMsg = { role: 'user', content: chatMessage };
-  setChatHistory(prev => [...prev, userMsg]);
-  setChatMessage('');
-  
-  setIsChatLoading(true);
-  try {
-    const pipe = await pipeline("text-generation", modelOptions);
-    const result = await pipe(chatMessage, { max_new_tokens: 150 });
-    const assistantReply = (result && result[0]?.generated_text) || "I'm sorry, I couldn't generate a response.";
-    setChatHistory(prev => [...prev, { role: 'assistant', content: assistantReply }]);
-  } catch (err) {
-    console.error('Chat error:', err);
-    setChatHistory(prev => [...prev, { role: 'assistant', content: 'Sorry, I had an issue responding. Please try again in a moment.' }]);
-  } finally {
-    setIsChatLoading(false);
-  }
-};
-
+    // If there's an attachment, upload it and append its URL to the prompt.
+    if (attachment) {
+      const combinedUserMessage = chatMessage.trim() || 'Describe this image in one sentence.';
+      const userMsg: ChatMessage = {
+        role: 'user',
+        content: `${combinedUserMessage}\n[Attachment: ${attachment.name}]`,
+      };
+      setChatHistory((prev) => [...prev, userMsg]);
+      setChatMessage('');
+      setIsChatLoading(true);
+      try {
+        const publicUrl = await uploadAttachment(attachment);
+        // Build a prompt that includes the image URL as text.
+        const prompt = `User: ${combinedUserMessage}\nImage URL: ${publicUrl}\nAssistant:`;
+        const assistantReply = await generateContentWithGemini(prompt);
+        setChatHistory((prev) => [...prev, { role: 'assistant', content: assistantReply }]);
+      } catch (err) {
+        console.error('Gemini API error (attachment):', err);
+        setChatHistory((prev) => [
+          ...prev,
+          { role: 'assistant', content: 'Sorry, I had an issue processing your attachment. Please try again later.' },
+        ]);
+      } finally {
+        setIsChatLoading(false);
+        setAttachment(null);
+      }
+      return;
+    }
 
     // For text-only messages, check for timer requests.
     const timerDuration = parseTimerRequest(chatMessage);
@@ -231,7 +258,7 @@ const handleChatSubmit = async (e: React.FormEvent) => {
       return;
     }
 
-    // Build a conversation prompt for text-only messages.
+    // Build a conversation prompt from context, items, and chat history.
     const conversation = chatHistory
       .map((m) => `${m.role === 'user' ? userName : 'Assistant'}: ${m.content}`)
       .join('\n');
@@ -259,17 +286,13 @@ Assistant:
     `;
     setIsChatLoading(true);
     try {
-      // Use the text-generation pipeline for the conversation prompt.
-      const pipe = await pipeline("text-generation", modelOptions);
-      const result = await pipe(prompt, { max_new_tokens: 150 });
-      const assistantReply = (result && result[0]?.generated_text) ||
-        "I'm sorry, I couldn't generate a response.";
+      const assistantReply = await generateContentWithGemini(prompt);
       setChatHistory((prev) => [...prev, { role: 'assistant', content: assistantReply }]);
     } catch (err) {
-      console.error('Chat error:', err);
+      console.error('Gemini API error (text-only):', err);
       setChatHistory((prev) => [
         ...prev,
-        { role: 'assistant', content: 'Sorry, I had an issue responding. Please try again in a moment.' },
+        { role: 'assistant', content: 'Sorry, I had an issue responding. Please try again later.' },
       ]);
     } finally {
       setIsChatLoading(false);

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
-import { Loader2, Globe2, Search, Coins } from 'lucide-react';
+import { Loader2, Globe2, Search, Coins, CircleUserRound } from 'lucide-react';
 import { getCurrentUser } from '../lib/settings-firebase';
 import { uploadCommunityFile, getCommunityFiles } from '../lib/community-firebase';
 import { pricing, db } from '../lib/firebase';
@@ -13,7 +13,8 @@ import {
   collection,
   query,
   where,
-  getDocs
+  getDocs,
+  documentId
 } from 'firebase/firestore';
 
 export function Community() {
@@ -30,6 +31,9 @@ export function Community() {
   const [communityFiles, setCommunityFiles] = useState<any[]>([]);
   const [unlockedFileIds, setUnlockedFileIds] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
+
+  // For showing each uploader's name & photo
+  const [userProfiles, setUserProfiles] = useState<{ [key: string]: any }>({});
 
   // UI States
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
@@ -58,13 +62,31 @@ export function Community() {
     setLoading(false);
   }, [navigate]);
 
-  // 2. Fetch all community files
+  // 2. Fetch all community files & user profiles
   useEffect(() => {
-    async function fetchFiles() {
+    async function fetchFilesAndProfiles() {
+      // Get community files
       const files = await getCommunityFiles();
       setCommunityFiles(files);
+
+      // Gather unique user IDs from those files
+      const uniqueUserIds = [...new Set(files.map((f) => f.userId))];
+
+      if (uniqueUserIds.length > 0) {
+        // Fetch the user documents for these IDs
+        const userDocs = await getDocs(
+          query(collection(db, 'users'), where(documentId(), 'in', uniqueUserIds))
+        );
+        const tempUserMap: { [key: string]: any } = {};
+
+        userDocs.forEach((docSnap) => {
+          tempUserMap[docSnap.id] = docSnap.data();
+        });
+
+        setUserProfiles(tempUserMap);
+      }
     }
-    fetchFiles();
+    fetchFilesAndProfiles();
   }, []);
 
   // 3. Fetch unlocked file IDs for the current user
@@ -100,6 +122,19 @@ export function Community() {
         // Refresh community files
         const files = await getCommunityFiles();
         setCommunityFiles(files);
+
+        // Refresh user profiles
+        const uniqueUserIds = [...new Set(files.map((f) => f.userId))];
+        if (uniqueUserIds.length > 0) {
+          const userDocs = await getDocs(
+            query(collection(db, 'users'), where(documentId(), 'in', uniqueUserIds))
+          );
+          const tempUserMap: { [key: string]: any } = {};
+          userDocs.forEach((docSnap) => {
+            tempUserMap[docSnap.id] = docSnap.data();
+          });
+          setUserProfiles(tempUserMap);
+        }
 
         // Refresh unlocked files
         const q = query(collection(db, 'unlockedFiles'), where('userId', '==', user.uid));
@@ -254,39 +289,67 @@ export function Community() {
               <p className="text-gray-400">No community files available.</p>
             ) : (
               <ul className="space-y-4">
-                {filteredCommunityUploadedFiles.map((file) => (
-                  <li
-                    key={file.id}
-                    className="p-4 bg-gray-800 rounded-lg border border-gray-700 hover:bg-gray-700 transition-colors"
-                  >
-                    <div className="flex items-center justify-between">
-                      <a
-                        href={file.downloadURL}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-indigo-400 hover:underline font-medium"
-                      >
-                        {file.fileName}
-                      </a>
-                      {!unlockedFileIds.includes(file.id) && (
-                        <button
-                          onClick={() => unlockFile(file)}
-                          className="px-3 py-1 bg-gradient-to-r from-indigo-500 to-purple-500 text-white
-                                     rounded-full text-sm transition-all transform hover:scale-105"
-                        >
-                          Unlock (
-                          {pricing.Basic[
-                            file.fileName.split('.').pop()?.toLowerCase() || '*'
-                          ] || pricing.Basic['*']}
-                          )
-                        </button>
-                      )}
-                    </div>
-                    <span className="mt-2 block text-sm text-gray-400">
-                      {new Date(file.uploadedAt.seconds * 1000).toLocaleString()}
-                    </span>
-                  </li>
-                ))}
+                {filteredCommunityUploadedFiles.map((file) => {
+                  const ext = (file.fileName.split('.').pop() || 'unknown').toUpperCase();
+                  const uploaderProfile = userProfiles[file.userId];
+                  return (
+                    <li
+                      key={file.id}
+                      className="p-4 bg-gray-800 rounded-lg border border-gray-700 hover:bg-gray-700 transition-colors"
+                    >
+                      {/* Uploader Info (profile pic + name) */}
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-700 flex items-center justify-center">
+                          {uploaderProfile?.photoURL ? (
+                            <img
+                              src={uploaderProfile.photoURL}
+                              alt="Uploader"
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <CircleUserRound className="w-4 h-4 text-gray-400" />
+                          )}
+                        </div>
+                        <span className="text-sm text-gray-300 font-medium">
+                          {uploaderProfile?.displayName || 'Unknown'}
+                        </span>
+                      </div>
+
+                      {/* File Info (name + extension + unlock button) */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <a
+                            href={file.downloadURL}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-indigo-400 hover:underline font-medium"
+                          >
+                            {file.fileName}
+                          </a>
+                          <span className="bg-gray-700 text-gray-300 px-2 py-1 rounded-full text-xs font-medium">
+                            {ext}
+                          </span>
+                        </div>
+                        {/* Unlock Button */}
+                        {!unlockedFileIds.includes(file.id) && (
+                          <button
+                            onClick={() => unlockFile(file)}
+                            className="px-3 py-1 bg-gradient-to-r from-indigo-500 to-purple-500 text-white
+                                       rounded-full text-sm transition-all transform hover:scale-105"
+                          >
+                            Unlock (
+                            {pricing.Basic[file.fileName.split('.').pop()?.toLowerCase() || '*'] ||
+                              pricing.Basic['*']}
+                            )
+                          </button>
+                        )}
+                      </div>
+                      <span className="mt-2 block text-sm text-gray-400">
+                        {new Date(file.uploadedAt.seconds * 1000).toLocaleString()}
+                      </span>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </section>

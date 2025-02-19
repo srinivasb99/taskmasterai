@@ -23,7 +23,7 @@ import { onCollectionSnapshot } from '../lib/dashboard-firebase';
 import { getCurrentUser } from '../lib/settings-firebase';
 import { uploadAttachment } from '../lib/ai-chat-firebase.js';
 
-// --- Helper function to call Gemini API ---
+// Gemini API helper function
 async function generateContentWithGemini(prompt: string): Promise<string> {
   const apiKey = "AIzaSyBdywFIyQefLbsVOnLS0BIy9tffDz_f8LA";
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
@@ -35,21 +35,27 @@ async function generateContentWithGemini(prompt: string): Promise<string> {
     ],
   };
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!response.ok) {
-    throw new Error(`Gemini API request failed: ${response.statusText}`);
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!response.ok) {
+      throw new Error(`Gemini API request failed: ${response.statusText}`);
+    }
+    const data = await response.json();
+    console.log("Gemini API raw response:", data);
+    // Adjust the following property access as needed if Gemini's response format is different.
+    const generatedText = data?.candidates?.[0]?.output?.parts?.[0]?.text;
+    return generatedText || "";
+  } catch (error) {
+    console.error("Error in Gemini API call:", error);
+    throw error;
   }
-  const data = await response.json();
-  // Adjust the following according to the actual API response format.
-  const generatedText = data?.candidates?.[0]?.output?.parts?.[0]?.text;
-  return generatedText || "";
 }
 
-// --- TypeScript types ---
+// Message type definitions
 interface TimerMessage {
   type: 'timer';
   duration: number;
@@ -98,7 +104,8 @@ export function AIChat() {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([
     {
       role: 'assistant',
-      content: "👋 Hi I'm TaskMaster, How can I help you today? Need help with your items? Simply ask me!",
+      content:
+        "👋 Hi I'm TaskMaster, How can I help you today? Need help with your items? Simply ask me!",
     },
   ]);
   const [isChatLoading, setIsChatLoading] = useState(false);
@@ -107,7 +114,7 @@ export function AIChat() {
   const [goals, setGoals] = useState<Array<{ id: string; data: any }>>([]);
   const [projects, setProjects] = useState<Array<{ id: string; data: any }>>([]);
   const [plans, setPlans] = useState<Array<{ id: string; data: any }>>([]);
-  // For file attachments (images, PDFs, etc.)
+  // For attachments (images, PDFs, etc.)
   const [attachment, setAttachment] = useState<File | null>(null);
 
   // Sidebar collapse state (persisted in localStorage)
@@ -140,7 +147,7 @@ export function AIChat() {
     setLoading(false);
   }, [navigate]);
 
-  // Firestore collection snapshots
+  // Listen for Firestore collection snapshots
   useEffect(() => {
     if (!user) return;
     const unsubTasks = onCollectionSnapshot('tasks', user.uid, (items) => setTasks(items));
@@ -159,7 +166,7 @@ export function AIChat() {
     setIsSidebarCollapsed((prev) => !prev);
   };
 
-  // Timer handling
+  // Timer handling function
   const handleTimerComplete = (timerId: string) => {
     setChatHistory((prev) => [
       ...prev,
@@ -167,6 +174,7 @@ export function AIChat() {
     ]);
   };
 
+  // Check for timer requests in the message text
   const parseTimerRequest = (message: string): number | null => {
     const timeRegex = /(\d+)\s*(minutes?|mins?|hours?|hrs?|seconds?|secs?)/i;
     const match = message.match(timeRegex);
@@ -179,12 +187,14 @@ export function AIChat() {
     return null;
   };
 
+  // Auto-scroll to bottom on chat update
   useEffect(() => {
     if (chatEndRef.current) {
       chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [chatHistory]);
 
+  // Build a prompt from user's items
   const formatItemsForChat = () => {
     const lines: string[] = [];
     lines.push(`${userName}'s items:\n`);
@@ -207,11 +217,12 @@ export function AIChat() {
     return lines.join('\n');
   };
 
+  // Main chat submission handler
   const handleChatSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatMessage.trim() && !attachment) return;
 
-    // If there's an attachment, upload it and append its URL to the prompt.
+    // If an attachment is provided, handle it first.
     if (attachment) {
       const combinedUserMessage = chatMessage.trim() || 'Describe this image in one sentence.';
       const userMsg: ChatMessage = {
@@ -223,12 +234,13 @@ export function AIChat() {
       setIsChatLoading(true);
       try {
         const publicUrl = await uploadAttachment(attachment);
-        // Build a prompt that includes the image URL as text.
+        // Build a prompt that includes the image URL.
         const prompt = `User: ${combinedUserMessage}\nImage URL: ${publicUrl}\nAssistant:`;
         const assistantReply = await generateContentWithGemini(prompt);
+        console.log("Assistant reply from Gemini (with attachment):", assistantReply);
         setChatHistory((prev) => [...prev, { role: 'assistant', content: assistantReply }]);
       } catch (err) {
-        console.error('Gemini API error (attachment):', err);
+        console.error("Gemini API error (attachment):", err);
         setChatHistory((prev) => [
           ...prev,
           { role: 'assistant', content: 'Sorry, I had an issue processing your attachment. Please try again later.' },
@@ -258,7 +270,7 @@ export function AIChat() {
       return;
     }
 
-    // Build a conversation prompt from context, items, and chat history.
+    // Build a conversation prompt including context.
     const conversation = chatHistory
       .map((m) => `${m.role === 'user' ? userName : 'Assistant'}: ${m.content}`)
       .join('\n');
@@ -287,9 +299,10 @@ Assistant:
     setIsChatLoading(true);
     try {
       const assistantReply = await generateContentWithGemini(prompt);
+      console.log("Assistant reply from Gemini (text-only):", assistantReply);
       setChatHistory((prev) => [...prev, { role: 'assistant', content: assistantReply }]);
     } catch (err) {
-      console.error('Gemini API error (text-only):', err);
+      console.error("Gemini API error (text-only):", err);
       setChatHistory((prev) => [
         ...prev,
         { role: 'assistant', content: 'Sorry, I had an issue responding. Please try again later.' },
@@ -303,9 +316,7 @@ Assistant:
     <div className="flex h-screen bg-gray-900 text-gray-200">
       <Sidebar isCollapsed={isSidebarCollapsed} onToggle={handleToggleSidebar} userName={userName} />
       
-      <main className={`flex-1 overflow-hidden transition-all duration-300 ${
-        isSidebarCollapsed ? 'ml-16' : 'ml-64'
-      }`}>
+      <main className={`flex-1 overflow-hidden transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'}`}>
         <div className="h-full flex flex-col">
           {/* Header */}
           <div className="p-4 border-b border-gray-800">
@@ -338,17 +349,8 @@ Assistant:
           {/* Chat Messages */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={chatEndRef}>
             {chatHistory.map((message, index) => (
-              <div
-                key={index}
-                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                <div
-                  className={`max-w-[80%] rounded-lg px-4 py-2 ${
-                    message.role === 'user'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-700 text-gray-200'
-                  }`}
-                >
+              <div key={index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[80%] rounded-lg px-4 py-2 ${message.role === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-200'}`}>
                   <ReactMarkdown
                     remarkPlugins={[remarkMath, remarkGfm]}
                     rehypePlugins={[rehypeKatex]}
@@ -383,20 +385,12 @@ Assistant:
                   )}
                   {message.flashcard && (
                     <div className="mt-2">
-                      <FlashcardsQuestions
-                        type="flashcard"
-                        data={message.flashcard.data}
-                        onComplete={() => {}}
-                      />
+                      <FlashcardsQuestions type="flashcard" data={message.flashcard.data} onComplete={() => {}} />
                     </div>
                   )}
                   {message.question && (
                     <div className="mt-2">
-                      <FlashcardsQuestions
-                        type="question"
-                        data={message.question.data}
-                        onComplete={() => {}}
-                      />
+                      <FlashcardsQuestions type="question" data={message.question.data} onComplete={() => {}} />
                     </div>
                   )}
                 </div>
@@ -418,14 +412,14 @@ Assistant:
           {/* Chat Input */}
           <form onSubmit={handleChatSubmit} className="p-4 border-t border-gray-800">
             <div className="flex items-center gap-2">
-              {/* Attachment button (optional) */}
               <label htmlFor="attachmentInput" className="cursor-pointer">
                 <Paperclip className="w-6 h-6 text-gray-200" />
               </label>
               <input
                 id="attachmentInput"
                 type="file"
-                // accept="image/*,application/pdf"  // Uncomment if you plan to handle attachments
+                onChange={(e) => setAttachment(e.target.files?.[0] || null)}
+                accept="image/*,application/pdf"
                 className="hidden"
               />
               <input

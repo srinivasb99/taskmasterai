@@ -1,3 +1,5 @@
+// src/components/AIChat.tsx
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -17,10 +19,10 @@ import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
 import { auth } from '../lib/firebase';
 import { User, onAuthStateChanged } from 'firebase/auth';
-import { onCollectionSnapshot, hfApiKey } from '../lib/dashboard-firebase';
+import { onCollectionSnapshot } from '../lib/dashboard-firebase';
 import { getCurrentUser } from '../lib/settings-firebase';
-import { uploadAttachment } from '../lib/ai-chat-firebase';
-// Import the pipeline function from the Transformers.js library
+import { uploadAttachment } from '../lib/ai-chat-firebase.js';
+// Import the pipeline function from Transformers.js (Xenova)
 import { pipeline } from '@xenova/transformers';
 
 // Types for messages
@@ -81,26 +83,23 @@ export function AIChat() {
   const [goals, setGoals] = useState<Array<{ id: string; data: any }>>([]);
   const [projects, setProjects] = useState<Array<{ id: string; data: any }>>([]);
   const [plans, setPlans] = useState<Array<{ id: string; data: any }>>([]);
-  // State for attachments (images, PDFs, etc.)
+  // Attachment state
   const [attachment, setAttachment] = useState<File | null>(null);
 
-  // Initialize sidebar state from localStorage
+  // Sidebar state from localStorage
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     const stored = localStorage.getItem('isSidebarCollapsed');
     return stored ? JSON.parse(stored) : false;
   });
-
   useEffect(() => {
     localStorage.setItem('isSidebarCollapsed', JSON.stringify(isSidebarCollapsed));
   }, [isSidebarCollapsed]);
 
-  // Auth state listener
+  // Auth listener
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
-      if (firebaseUser) {
-        setUserName(firebaseUser.displayName || 'User');
-      }
+      if (firebaseUser) setUserName(firebaseUser.displayName || 'User');
       setLoading(false);
     });
     return () => unsubscribe();
@@ -117,15 +116,13 @@ export function AIChat() {
     setLoading(false);
   }, [navigate]);
 
-  // Collection snapshots from Firestore
+  // Firestore collection snapshots
   useEffect(() => {
     if (!user) return;
-
     const unsubTasks = onCollectionSnapshot('tasks', user.uid, (items) => setTasks(items));
     const unsubGoals = onCollectionSnapshot('goals', user.uid, (items) => setGoals(items));
     const unsubProjects = onCollectionSnapshot('projects', user.uid, (items) => setProjects(items));
     const unsubPlans = onCollectionSnapshot('plans', user.uid, (items) => setPlans(items));
-
     return () => {
       unsubTasks();
       unsubGoals();
@@ -138,7 +135,7 @@ export function AIChat() {
     setIsSidebarCollapsed((prev) => !prev);
   };
 
-  // Timer handling function
+  // Timer function
   const handleTimerComplete = (timerId: string) => {
     setChatHistory((prev) => [
       ...prev,
@@ -161,14 +158,11 @@ export function AIChat() {
     return null;
   };
 
-  // Scroll to bottom when chat history updates
   useEffect(() => {
-    if (chatEndRef.current) {
+    if (chatEndRef.current)
       chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
   }, [chatHistory]);
 
-  // Format user's items for context (from tasks, goals, etc.)
   const formatItemsForChat = () => {
     const lines: string[] = [];
     lines.push(`${userName}'s items:\n`);
@@ -195,7 +189,7 @@ export function AIChat() {
     e.preventDefault();
     if (!chatMessage.trim() && !attachment) return;
 
-    // If there is an attachment, handle it using the image-to-text pipeline.
+    // If an attachment is provided, use image-to-text pipeline.
     if (attachment) {
       const combinedUserMessage = chatMessage.trim()
         ? chatMessage.trim()
@@ -208,14 +202,17 @@ export function AIChat() {
       setChatMessage('');
       setIsChatLoading(true);
       try {
-        // Upload the attachment to Firebase and get its public URL.
+        // Upload attachment to Firebase Storage.
         const publicUrl = await uploadAttachment(attachment);
-        // Load the image-to-text pipeline (for image captioning)
-        const imageToText = await pipeline("image-to-text", { model: "nlpconnect/vit-gpt2-image-captioning" });
+        // Use the image-to-text pipeline for captioning.
+        const imageToText = await pipeline("image-to-text", {
+          model: "nlpconnect/vit-gpt2-image-captioning"
+        });
         const result = await imageToText(publicUrl);
-        const assistantReply = result && result[0]?.generated_text
-          ? result[0].generated_text
-          : "I'm sorry, I couldn't generate a caption for that image.";
+        const assistantReply =
+          result && result[0]?.generated_text
+            ? result[0].generated_text
+            : "I'm sorry, I couldn't generate a caption for that image.";
         setChatHistory((prev) => [...prev, { role: 'assistant', content: assistantReply }]);
       } catch (err) {
         console.error('Vision chat error:', err);
@@ -223,7 +220,8 @@ export function AIChat() {
           ...prev,
           {
             role: 'assistant',
-            content: 'Sorry, I had an issue processing your attachment. Please try again in a moment.',
+            content:
+              'Sorry, I had an issue processing your attachment. Please try again in a moment.',
           },
         ]);
       } finally {
@@ -233,12 +231,11 @@ export function AIChat() {
       return;
     }
 
-    // Regular text chat processing using text-generation pipeline.
+    // For text-only messages, use text-generation pipeline.
     const timerDuration = parseTimerRequest(chatMessage);
     const userMsg: ChatMessage = { role: 'user', content: chatMessage };
     setChatHistory((prev) => [...prev, userMsg]);
     setChatMessage('');
-    // If the message is a timer request, handle it immediately.
     if (timerDuration) {
       const timerId = Math.random().toString(36).substr(2, 9);
       setChatHistory((prev) => [
@@ -252,15 +249,19 @@ export function AIChat() {
       return;
     }
 
-    // Build the conversation prompt with context.
+    // Build conversation prompt for text generation.
     const conversation = chatHistory
       .map((m) => `${m.role === 'user' ? userName : 'Assistant'}: ${m.content}`)
       .join('\n');
     const itemsText = formatItemsForChat();
     const now = new Date();
     const currentDateTime = {
-      date: now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
-      time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }),
+      date: now.toLocaleDateString('en-US', {
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+      }),
+      time: now.toLocaleTimeString('en-US', {
+        hour: '2-digit', minute: '2-digit', hour12: true
+      }),
     };
     const prompt = `
 [CONTEXT]
@@ -280,12 +281,15 @@ Please provide a direct, friendly response.
     `;
     setIsChatLoading(true);
     try {
-      // Load the text-generation pipeline (using a smaller model like GPT-2)
-      const textGen = await pipeline("text-generation", { model: "gpt2" });
+      // Use the text-generation pipeline with Xenova's GPT-2 model.
+      const textGen = await pipeline("text-generation", {
+        model: "Xenova/gpt2"
+      });
       const generated = await textGen(prompt, { max_new_tokens: 150 });
-      const assistantReply = generated && generated[0]?.generated_text
-        ? generated[0].generated_text
-        : "I'm sorry, I couldn't generate a response.";
+      const assistantReply =
+        generated && generated[0]?.generated_text
+          ? generated[0].generated_text
+          : "I'm sorry, I couldn't generate a response.";
       setChatHistory((prev) => [...prev, { role: 'assistant', content: assistantReply }]);
     } catch (err) {
       console.error('Chat error:', err);

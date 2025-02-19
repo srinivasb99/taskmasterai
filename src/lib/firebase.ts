@@ -20,3 +20,46 @@ export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
+
+// File Type Pricing
+export const pricing = {
+  'Basic': {
+      'pdf': 50,
+      'png': 40,
+      'jpg': 40,
+      'jpeg': 40,
+      'mp3': 60,
+      'wav': 60,
+      'mp4': 100,
+      'mov': 100,
+      'docx': 50,
+      'zip': 80,
+      '*': 70
+  },
+  'Pro': {
+      'pdf': 30,
+      'png': 25,
+      'jpg': 25,
+      'jpeg': 25,
+      'mp3': 40,
+      'wav': 40,
+      'mp4': 75,
+      'mov': 75,
+      'docx': 30,
+      'zip': 60,
+      '*': 50
+  },
+  'Premium': {
+      'pdf': 20,
+      'png': 15,
+      'jpg': 15,
+      'jpeg': 15,
+      'mp3': 25,
+      'wav': 25,
+      'mp4': 50,
+      'mov': 50,
+      'docx': 20,
+      'zip': 40,
+      '*': 30
+  }
+};

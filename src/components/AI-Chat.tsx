@@ -25,7 +25,7 @@ import { uploadAttachment } from '../lib/ai-chat-firebase.js';
 // Import the pipeline function from Transformers.js (Xenova)
 import { pipeline } from '@xenova/transformers';
 
-// Types for messages
+// Message and related type definitions
 interface TimerMessage {
   type: 'timer';
   duration: number;
@@ -83,10 +83,10 @@ export function AIChat() {
   const [goals, setGoals] = useState<Array<{ id: string; data: any }>>([]);
   const [projects, setProjects] = useState<Array<{ id: string; data: any }>>([]);
   const [plans, setPlans] = useState<Array<{ id: string; data: any }>>([]);
-  // Attachment state
+  // State for file attachments
   const [attachment, setAttachment] = useState<File | null>(null);
 
-  // Sidebar state from localStorage
+  // Sidebar collapse state loaded from localStorage
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     const stored = localStorage.getItem('isSidebarCollapsed');
     return stored ? JSON.parse(stored) : false;
@@ -95,11 +95,13 @@ export function AIChat() {
     localStorage.setItem('isSidebarCollapsed', JSON.stringify(isSidebarCollapsed));
   }, [isSidebarCollapsed]);
 
-  // Auth listener
+  // Listen for Firebase Auth changes
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
-      if (firebaseUser) setUserName(firebaseUser.displayName || 'User');
+      if (firebaseUser) {
+        setUserName(firebaseUser.displayName || 'User');
+      }
       setLoading(false);
     });
     return () => unsubscribe();
@@ -116,7 +118,7 @@ export function AIChat() {
     setLoading(false);
   }, [navigate]);
 
-  // Firestore collection snapshots
+  // Listen for Firestore collection snapshots
   useEffect(() => {
     if (!user) return;
     const unsubTasks = onCollectionSnapshot('tasks', user.uid, (items) => setTasks(items));
@@ -135,17 +137,15 @@ export function AIChat() {
     setIsSidebarCollapsed((prev) => !prev);
   };
 
-  // Timer function
+  // Handle timer completion
   const handleTimerComplete = (timerId: string) => {
     setChatHistory((prev) => [
       ...prev,
-      {
-        role: 'assistant',
-        content: "⏰ Time's up! Your timer has finished.",
-      },
+      { role: 'assistant', content: "⏰ Time's up! Your timer has finished." },
     ]);
   };
 
+  // Detect timer requests in the message text
   const parseTimerRequest = (message: string): number | null => {
     const timeRegex = /(\d+)\s*(minutes?|mins?|hours?|hrs?|seconds?|secs?)/i;
     const match = message.match(timeRegex);
@@ -158,11 +158,14 @@ export function AIChat() {
     return null;
   };
 
+  // Scroll to bottom on chat update
   useEffect(() => {
-    if (chatEndRef.current)
+    if (chatEndRef.current) {
       chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [chatHistory]);
 
+  // Build a text prompt from the user's items (tasks, goals, etc.)
   const formatItemsForChat = () => {
     const lines: string[] = [];
     lines.push(`${userName}'s items:\n`);
@@ -185,15 +188,23 @@ export function AIChat() {
     return lines.join('\n');
   };
 
+  // Main handler for chat submission
   const handleChatSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatMessage.trim() && !attachment) return;
 
-    // If an attachment is provided, use image-to-text pipeline.
+    // Define model options for our pipeline
+    const modelOptions = {
+      model: "meta-llama/Llama-3.2-90B-Vision-Instruct",
+      trustRemoteCode: true,
+    };
+
+    // If there's an attachment, handle it as an image-text-to-text task.
     if (attachment) {
       const combinedUserMessage = chatMessage.trim()
         ? chatMessage.trim()
         : 'Describe this image in one sentence.';
+      // Append a note about the attachment for display purposes.
       const userMsg: ChatMessage = {
         role: 'user',
         content: `${combinedUserMessage}\n[Attachment: ${attachment.name}]`,
@@ -202,27 +213,23 @@ export function AIChat() {
       setChatMessage('');
       setIsChatLoading(true);
       try {
-        // Upload attachment to Firebase Storage.
+        // Upload the image to Firebase and get its public URL.
         const publicUrl = await uploadAttachment(attachment);
-        // Use the image-to-text pipeline for captioning.
-        const imageToText = await pipeline("image-to-text", {
-          model: "nlpconnect/vit-gpt2-image-captioning"
-        });
-        const result = await imageToText(publicUrl);
+        // Build a prompt that includes the user's text and the image URL.
+        const prompt = `User: ${combinedUserMessage}\nImage URL: ${publicUrl}\nAssistant:`;
+        // Load the pipeline for image-text-to-text.
+        const pipe = await pipeline("image-text-to-text", modelOptions);
+        // Get the model's output.
+        const result = await pipe(prompt, { max_new_tokens: 150 });
         const assistantReply =
-          result && result[0]?.generated_text
-            ? result[0].generated_text
-            : "I'm sorry, I couldn't generate a caption for that image.";
+          (result && result[0]?.generated_text) ||
+          "I'm sorry, I couldn't generate a response.";
         setChatHistory((prev) => [...prev, { role: 'assistant', content: assistantReply }]);
       } catch (err) {
         console.error('Vision chat error:', err);
         setChatHistory((prev) => [
           ...prev,
-          {
-            role: 'assistant',
-            content:
-              'Sorry, I had an issue processing your attachment. Please try again in a moment.',
-          },
+          { role: 'assistant', content: 'Sorry, I had an issue processing your attachment. Please try again in a moment.' },
         ]);
       } finally {
         setIsChatLoading(false);
@@ -231,7 +238,7 @@ export function AIChat() {
       return;
     }
 
-    // For text-only messages, use text-generation pipeline.
+    // For text-only messages, first check for timer requests.
     const timerDuration = parseTimerRequest(chatMessage);
     const userMsg: ChatMessage = { role: 'user', content: chatMessage };
     setChatHistory((prev) => [...prev, userMsg]);
@@ -249,19 +256,15 @@ export function AIChat() {
       return;
     }
 
-    // Build conversation prompt for text generation.
+    // Build a conversation prompt that includes context and past conversation.
     const conversation = chatHistory
       .map((m) => `${m.role === 'user' ? userName : 'Assistant'}: ${m.content}`)
       .join('\n');
     const itemsText = formatItemsForChat();
     const now = new Date();
     const currentDateTime = {
-      date: now.toLocaleDateString('en-US', {
-        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-      }),
-      time: now.toLocaleTimeString('en-US', {
-        hour: '2-digit', minute: '2-digit', hour12: true
-      }),
+      date: now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
+      time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }),
     };
     const prompt = `
 [CONTEXT]
@@ -277,19 +280,16 @@ ${conversation}
 [NEW USER MESSAGE]
 ${userName}: ${userMsg.content}
 
-Please provide a direct, friendly response.
+Assistant:
     `;
     setIsChatLoading(true);
     try {
-      // Use the text-generation pipeline with Xenova's GPT-2 model.
-      const textGen = await pipeline("text-generation", {
-        model: "Xenova/gpt2"
-      });
-      const generated = await textGen(prompt, { max_new_tokens: 150 });
+      // Load the same pipeline for text generation using image-text-to-text.
+      const pipe = await pipeline("image-text-to-text", modelOptions);
+      const result = await pipe(prompt, { max_new_tokens: 150 });
       const assistantReply =
-        generated && generated[0]?.generated_text
-          ? generated[0].generated_text
-          : "I'm sorry, I couldn't generate a response.";
+        (result && result[0]?.generated_text) ||
+        "I'm sorry, I couldn't generate a response.";
       setChatHistory((prev) => [...prev, { role: 'assistant', content: assistantReply }]);
     } catch (err) {
       console.error('Chat error:', err);

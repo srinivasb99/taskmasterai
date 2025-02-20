@@ -230,7 +230,7 @@ Generate 10 questions in this exact format.`;
 export async function regenerateStudyQuestions(noteId: string, content: string, huggingFaceApiKey: string) {
   try {
     const questionsPrompt = `
-Based on the following content, generate 3 multiple-choice questions:
+Based on the following content, generate 10 multiple-choice questions:
 
 ${content}
 
@@ -243,7 +243,7 @@ D) (Fourth option)
 Correct: (Letter of correct answer)
 Explanation: (Why this is the correct answer)
 
-Generate 3 questions in this exact format.`;
+Generate 10 questions in this exact format.`;
 
     const questionsResponse = await fetch(
       'https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct',

@@ -92,8 +92,8 @@ export async function processTextToAINote(text: string, userId: string, huggingF
     // Generate summary and key points using Hugging Face API
     const summaryPrompt = `
 Analyze the following text and generate:
-1. A clear, concise summary (2-4 sentences)
-2. 5 key points that capture the most important information
+1. A clear, concise summary (4-6 sentences)
+2. 10 key points that capture the most important information
 
 Text to analyze:
 ${text}
@@ -101,14 +101,19 @@ ${text}
 Format your response exactly as follows:
 
 Summary:
-[Provide a 2-4 sentence summary]
+[Provide a 4-6 sentence summary]
 
 Key Points:
 1. [First key point]
 2. [Second key point]
 3. [Third key point]
 4. [Fourth key point]
-5. [Fifth key point]`;
+5. [Fifth key point]
+6. [Sixth key point]
+7. [Seventh key point]
+8. [Eighth key point]
+9. [Ninth key point]
+10. [Tenth key point]`;
 
     const summaryResponse = await fetch(
       'https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct',
@@ -147,7 +152,7 @@ Key Points:
 
     // Generate study questions
     const questionsPrompt = `
-Based on the following key points, generate 3 multiple-choice questions:
+Based on the following key points, generate 10 multiple-choice questions:
 
 ${keyPoints.join('\n')}
 
@@ -160,10 +165,10 @@ D) (Fourth option)
 Correct: (Letter of correct answer)
 Explanation: (Why this is the correct answer)
 
-Generate 3 questions in this exact format.`;
+Generate 10 questions in this exact format.`;
 
     const questionsResponse = await fetch(
-      'https://api-inference.huggingface.co/models/meta-llama/Llama-3.2-11B-Vision-Instruct',
+      'https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct',
       {
         method: 'POST',
         headers: {

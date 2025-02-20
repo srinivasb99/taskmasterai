@@ -377,7 +377,7 @@ export function Community() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Community Uploaded Files (excludes your own files) */}
-            <section className="bg-gray-800/60 rounded-xl p-4 border border-gray-700 h-[700px] overflow-y-auto">
+            <section className="bg-gray-800/60 rounded-xl p-4 border border-gray-700 h-[650px] overflow-y-auto">
               <h2 className="text-2xl font-semibold text-white mb-4">Community Uploaded Files</h2>
               {filteredCommunityUploadedFiles.length === 0 ? (
                 <p className="text-gray-400">No community files available.</p>
@@ -432,7 +432,7 @@ export function Community() {
             </section>
 
             {/* Your Shared Files */}
-            <section className="bg-gray-800/60 rounded-xl p-4 border border-gray-700 h-[700px] overflow-y-auto">
+            <section className="bg-gray-800/60 rounded-xl p-4 border border-gray-700 h-[650px] overflow-y-auto">
               <h2 className="text-2xl font-semibold text-white mb-4">Your Shared Files</h2>
               {yourSharedFiles.length === 0 ? (
                 <p className="text-gray-400">You haven't shared any files yet.</p>
@@ -492,7 +492,7 @@ export function Community() {
             </section>
 
             {/* Unlocked Files */}
-            <section className="bg-gray-800/60 rounded-xl p-4 border border-gray-700 h-[700px] overflow-y-auto">
+            <section className="bg-gray-800/60 rounded-xl p-4 border border-gray-700 h-[650px] overflow-y-auto">
               <h2 className="text-2xl font-semibold text-white mb-4">Unlocked Files</h2>
               {unlockedFiles.length === 0 ? (
                 <p className="text-gray-400">You haven't unlocked any files yet.</p>

@@ -58,8 +58,6 @@ export function Community() {
     if (firebaseUser) {
       setUser(firebaseUser);
       setUserName(firebaseUser.displayName || 'User');
-
-      // Fetch user tokens from Firestore
       const userDocRef = doc(db, 'users', firebaseUser.uid);
       getDoc(userDocRef).then((docSnap) => {
         if (docSnap.exists()) {
@@ -77,8 +75,6 @@ export function Community() {
     async function fetchFilesAndProfiles() {
       const files = await getCommunityFiles();
       setCommunityFiles(files);
-
-      // Gather unique user IDs from those files
       const uniqueUserIds = [...new Set(files.map((f) => f.userId))];
       if (uniqueUserIds.length > 0) {
         const userDocs = await getDocs(
@@ -115,7 +111,7 @@ export function Community() {
     fileInputRef.current?.click();
   };
 
-  // Once user picks a file, automatically upload
+  // Auto-upload when a file is selected
   const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
     if (!user) return;
     if (e.target.files && e.target.files[0]) {
@@ -123,8 +119,6 @@ export function Community() {
       setUploading(true);
       try {
         await uploadCommunityFile(user.uid, file);
-
-        // Refresh community files & user profiles
         const files = await getCommunityFiles();
         setCommunityFiles(files);
         const uniqueUserIds = [...new Set(files.map((f) => f.userId))];
@@ -138,7 +132,6 @@ export function Community() {
           });
           setUserProfiles(tempUserMap);
         }
-        // Refresh unlocked files
         const q = query(collection(db, 'unlockedFiles'), where('userId', '==', user.uid));
         const querySnapshot = await getDocs(q);
         const ids: string[] = [];
@@ -157,15 +150,11 @@ export function Community() {
   const removeFile = async (file: any) => {
     if (!user) return;
     try {
-      // Delete from Firestore
       await deleteDoc(doc(db, 'communityFiles', file.id));
-      // Delete from Storage using uniqueFileName (assumed to be stored with file)
       const fileRef = storageRef(storage, `community/${file.userId}/${file.uniqueFileName}`);
       await deleteObject(fileRef);
-      // Refresh community files
       const files = await getCommunityFiles();
       setCommunityFiles(files);
-      alert('File removed successfully!');
     } catch (error) {
       console.error('Error removing file', error);
     }
@@ -179,7 +168,6 @@ export function Community() {
       setCommunityFiles(files);
       setEditingFileId(null);
       setEditingFileName('');
-      alert('File name updated successfully!');
     } catch (error) {
       console.error('Error updating file name', error);
     }
@@ -191,7 +179,6 @@ export function Community() {
     const parts = file.fileName.split('.');
     const ext = parts[parts.length - 1].toLowerCase();
     const cost = pricing.Basic[ext] || pricing.Basic['*'];
-
     const userDocRef = doc(db, 'users', user.uid);
     const userDocSnap = await getDoc(userDocRef);
     let currentTokens = 500;
@@ -199,13 +186,9 @@ export function Community() {
       const data = userDocSnap.data();
       currentTokens = data.tokens || 500;
     }
-
     if (currentTokens < cost) {
-      alert('Insufficient tokens to unlock this file.');
       return;
     }
-
-    // Deduct cost & record the unlock
     const newTokens = currentTokens - cost;
     await updateDoc(userDocRef, { tokens: newTokens });
     await addDoc(collection(db, 'unlockedFiles'), {
@@ -214,8 +197,6 @@ export function Community() {
       unlockedAt: new Date()
     });
     setTokens(newTokens);
-
-    // Refresh unlocked files
     const q = query(collection(db, 'unlockedFiles'), where('userId', '==', user.uid));
     const querySnapshot = await getDocs(q);
     const ids: string[] = [];
@@ -223,8 +204,6 @@ export function Community() {
       ids.push(docSnap.data().fileId);
     });
     setUnlockedFileIds(ids);
-
-    alert('File unlocked successfully!');
   };
 
   // Split files into sections
@@ -233,7 +212,7 @@ export function Community() {
   const unlockedFiles = communityFiles.filter((file) => unlockedFileIds.includes(file.id));
 
   // Filter community files by search term and file type
-  const filteredCommunityUploadedFiles = communityUploadedFiles.filter((file) => {
+  const filteredCommunityUploadedFiles = communityFiles.filter((file) => {
     const baseName = getDisplayName(file.fileName).toLowerCase();
     const ext = file.fileName.split('.').pop()?.toLowerCase() || '';
     const searchMatch = baseName.includes(searchTerm.toLowerCase());
@@ -265,11 +244,7 @@ export function Community() {
       />
 
       {/* Main Content */}
-      <main
-        className={`flex-1 overflow-hidden transition-all duration-300 ${
-          isSidebarCollapsed ? 'ml-16' : 'ml-64'
-        } p-8`}
-      >
+      <main className={`flex-1 overflow-hidden transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} p-8`}>
         <div className="overflow-y-auto h-full">
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
@@ -290,11 +265,7 @@ export function Community() {
               disabled={uploading}
               className="w-full px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-full transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {uploading ? (
-                <Loader2 className="animate-spin w-5 h-5 mx-auto" />
-              ) : (
-                'Choose & Upload File'
-              )}
+              {uploading ? <Loader2 className="animate-spin w-5 h-5 mx-auto" /> : 'Choose & Upload File'}
             </button>
             <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange} />
           </div>
@@ -344,20 +315,14 @@ export function Community() {
                   {filteredCommunityUploadedFiles.map((file) => {
                     const ext = (file.fileName.split('.').pop() || 'unknown').toUpperCase();
                     const uploaderProfile = userProfiles[file.userId];
+                    const cost = pricing.Basic[file.fileName.split('.').pop()?.toLowerCase() || '*'] || pricing.Basic['*'];
                     return (
-                      <li
-                        key={file.id}
-                        className="p-4 bg-gray-800 rounded-lg border border-gray-700 hover:bg-gray-700 transition-colors"
-                      >
+                      <li key={file.id} className="p-4 bg-gray-800 rounded-lg border border-gray-700 hover:bg-gray-700 transition-colors">
                         {/* Uploader Info */}
                         <div className="flex items-center gap-3 mb-2">
                           <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-700 flex items-center justify-center">
                             {uploaderProfile?.photoURL ? (
-                              <img
-                                src={uploaderProfile.photoURL}
-                                alt={uploaderProfile.displayName}
-                                className="w-full h-full object-cover"
-                              />
+                              <img src={uploaderProfile.photoURL} alt={uploaderProfile.displayName} className="w-full h-full object-cover" />
                             ) : (
                               <CircleUserRound className="w-4 h-4 text-gray-400" />
                             )}
@@ -369,21 +334,19 @@ export function Community() {
                         {/* File Info */}
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
-                            <span className="text-indigo-400 font-medium">
-                              {getDisplayName(file.fileName)}
-                            </span>
-                            <span className="bg-gray-700 text-gray-300 px-2 py-1 rounded-full text-xs font-medium">
-                              {ext}
-                            </span>
+                            <span className="text-indigo-400 font-medium">{getDisplayName(file.fileName)}</span>
+                            <span className="bg-gray-700 text-gray-300 px-2 py-1 rounded-full text-xs font-medium">{ext}</span>
                           </div>
                           {!unlockedFileIds.includes(file.id) && (
                             <button
                               onClick={() => unlockFile(file)}
-                              className="px-3 py-1 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-full text-sm transition-all transform hover:scale-105"
+                              className="px-3 py-1 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-full text-sm transition-all transform hover:scale-105 flex flex-col items-center"
                             >
-                              Unlock (
-                              {pricing.Basic[file.fileName.split('.').pop()?.toLowerCase() || '*'] ||
-                                pricing.Basic['*']} tokens)
+                              <span>Unlock</span>
+                              <div className="flex items-center text-xs">
+                                <Coins className="w-4 h-4 text-yellow-400 mr-1" />
+                                <span>{cost}</span>
+                              </div>
                             </button>
                           )}
                         </div>
@@ -405,14 +368,9 @@ export function Community() {
               ) : (
                 <ul className="space-y-4">
                   {yourSharedFiles.map((file) => (
-                    <li
-                      key={file.id}
-                      className="p-4 bg-gray-800 rounded-lg border border-gray-700 hover:bg-gray-700 transition-colors"
-                    >
+                    <li key={file.id} className="p-4 bg-gray-800 rounded-lg border border-gray-700 hover:bg-gray-700 transition-colors">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-indigo-300 font-medium">
-                          {getDisplayName(file.fileName)}
-                        </span>
+                        <span className="text-indigo-300 font-medium">{getDisplayName(file.fileName)}</span>
                         <span className="bg-gray-600 text-gray-300 px-2 py-1 rounded-full text-xs font-medium">
                           {file.fileName.split('.').pop()?.toUpperCase() || 'Unknown'}
                         </span>
@@ -426,16 +384,10 @@ export function Community() {
                               onChange={(e) => setEditingFileName(e.target.value)}
                               className="bg-gray-600 text-gray-200 rounded px-2 py-1 text-sm focus:outline-none"
                             />
-                            <button
-                              onClick={() => updateFileName(file.id, editingFileName)}
-                              className="px-2 py-1 bg-green-500 text-white rounded text-xs"
-                            >
+                            <button onClick={() => updateFileName(file.id, editingFileName)} className="px-2 py-1 bg-green-500 text-white rounded text-xs">
                               Save
                             </button>
-                            <button
-                              onClick={() => setEditingFileId(null)}
-                              className="px-2 py-1 bg-red-500 text-white rounded text-xs"
-                            >
+                            <button onClick={() => setEditingFileId(null)} className="px-2 py-1 bg-red-500 text-white rounded text-xs">
                               Cancel
                             </button>
                           </>
@@ -450,10 +402,7 @@ export function Community() {
                             >
                               Edit
                             </button>
-                            <button
-                              onClick={() => removeFile(file)}
-                              className="px-2 py-1 bg-red-500 text-white rounded text-xs"
-                            >
+                            <button onClick={() => removeFile(file)} className="px-2 py-1 bg-red-500 text-white rounded text-xs">
                               Delete
                             </button>
                           </>
@@ -478,14 +427,16 @@ export function Community() {
                   {unlockedFiles.map((file) => {
                     const ext = (file.fileName.split('.').pop() || 'unknown').toUpperCase();
                     return (
-                      <li
-                        key={file.id}
-                        className="p-4 bg-gray-800 rounded-lg border border-gray-700 hover:bg-gray-700 transition-colors"
-                      >
+                      <li key={file.id} className="p-4 bg-gray-800 rounded-lg border border-gray-700 hover:bg-gray-700 transition-colors">
                         <div className="flex items-center justify-between mb-2">
-                          <span className="text-indigo-300 font-medium">
+                          <a
+                            href={file.downloadURL}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-indigo-300 hover:underline font-medium"
+                          >
                             {getDisplayName(file.fileName)}
-                          </span>
+                          </a>
                           <span className="bg-gray-600 text-gray-300 px-2 py-1 rounded-full text-xs font-medium">
                             {ext}
                           </span>

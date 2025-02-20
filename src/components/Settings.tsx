@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   User, 
@@ -177,8 +177,10 @@ export function Settings() {
         throw new AuthError('New passwords do not match');
       }
 
+      // Update both "name" and "displayName" when updating the user's name
       const updateData = {
         name: formData.name !== userData.name ? formData.name : undefined,
+        displayName: formData.name !== userData.name ? formData.name : undefined,
         email: formData.email !== userData.email ? formData.email : undefined,
         currentPassword: formData.currentPassword || undefined,
         newPassword: formData.newPassword || undefined,
@@ -194,11 +196,12 @@ export function Settings() {
           confirmPassword: '',
         }));
         
-        // Update local user data
+        // Update local user data (both fields)
         setUserData(prev => ({
           ...prev,
           name: formData.name,
-          email: formData.email
+          email: formData.email,
+          displayName: formData.name,
         }));
       }
     } catch (err) {
@@ -238,7 +241,6 @@ export function Settings() {
       setIsLoading(false);
     }
   };
-
 
   return (
     <div className="flex h-screen bg-gray-900">
@@ -560,6 +562,6 @@ export function Settings() {
       </main>
     </div>
   );
-};
+}
 
 export default Settings;

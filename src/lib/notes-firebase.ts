@@ -150,7 +150,7 @@ Key Points:
       .filter(line => line.trim().match(/^\d+\./))
       .map(point => point.replace(/^\d+\.\s*/, '').trim());
 
-    // Generate study questions
+    // Generate study questions based on key points
     const questionsPrompt = `
 Based on the following key points, generate 10 multiple-choice questions:
 
@@ -194,9 +194,9 @@ Generate 10 questions in this exact format.`;
     const questionsResult = await questionsResponse.json();
     const questionsText = questionsResult[0].generated_text;
 
-    // Parse questions
+    // Parse questions and ensure exactly 10 are returned
     const questionBlocks = questionsText.split(/Question: /).filter(Boolean);
-    const questions = questionBlocks.map(block => {
+    const parsedQuestions = questionBlocks.map(block => {
       const lines = block.split('\n').filter(Boolean);
       const question = lines[0].trim();
       const options = lines.slice(1, 5).map(opt => opt.replace(/^[A-D]\)\s*/, '').trim());
@@ -209,13 +209,13 @@ Generate 10 questions in this exact format.`;
         correctAnswer: ['A', 'B', 'C', 'D'].indexOf(correctAnswer || 'A'),
         explanation
       };
-    });
+    }).slice(0, 10); // Ensure exactly 10 questions
 
     return {
       title: 'AI-Generated Note',
       content: summary,
       keyPoints,
-      questions,
+      questions: parsedQuestions,
       type: 'text' as const,
       isPublic: false,
       tags: []
@@ -226,7 +226,6 @@ Generate 10 questions in this exact format.`;
   }
 }
 
-// Add this function to regenerate study questions
 export async function regenerateStudyQuestions(noteId: string, content: string, huggingFaceApiKey: string) {
   try {
     const questionsPrompt = `
@@ -272,9 +271,9 @@ Generate 10 questions in this exact format.`;
     const questionsResult = await questionsResponse.json();
     const questionsText = questionsResult[0].generated_text;
 
-    // Parse questions
+    // Parse questions and ensure exactly 10 are returned
     const questionBlocks = questionsText.split(/Question: /).filter(Boolean);
-    const questions = questionBlocks.map(block => {
+    const parsedQuestions = questionBlocks.map(block => {
       const lines = block.split('\n').filter(Boolean);
       const question = lines[0].trim();
       const options = lines.slice(1, 5).map(opt => opt.replace(/^[A-D]\)\s*/, '').trim());
@@ -287,16 +286,15 @@ Generate 10 questions in this exact format.`;
         correctAnswer: ['A', 'B', 'C', 'D'].indexOf(correctAnswer || 'A'),
         explanation
       };
-    });
+    }).slice(0, 10); // Ensure exactly 10 questions
 
-    // Update the note with new questions
     const noteRef = doc(db, 'notes', noteId);
     await updateDoc(noteRef, {
-      questions,
+      questions: parsedQuestions,
       updatedAt: Timestamp.now()
     });
 
-    return questions;
+    return parsedQuestions;
   } catch (error) {
     console.error('Error regenerating questions:', error);
     throw error;

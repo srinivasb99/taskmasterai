@@ -4,7 +4,7 @@ import { Sidebar } from './Sidebar';
 import { motion } from 'framer-motion';
 import { Loader2, Globe2, Search, Coins, CircleUserRound } from 'lucide-react';
 import { getCurrentUser } from '../lib/settings-firebase';
-import { uploadCommunityFile, getCommunityFiles } from '../lib/community-firebase';
+import { uploadCommunityFile } from '../lib/community-firebase';
 import { pricing, db, storage } from '../lib/firebase';
 import {
   doc,
@@ -15,7 +15,7 @@ import {
   collection,
   query,
   where,
-  getDocs,
+  onSnapshot,
   documentId
 } from 'firebase/firestore';
 import { ref as storageRef, deleteObject } from 'firebase/storage';
@@ -40,25 +40,22 @@ export function Community() {
   const [tokens, setTokens] = useState<number>(500);
   const [loading, setLoading] = useState(true);
 
-  // File & Community Data
+  // Real-time data
   const [communityFiles, setCommunityFiles] = useState<any[]>([]);
   const [unlockedFileIds, setUnlockedFileIds] = useState<string[]>([]);
+
+  // UI states
   const [uploading, setUploading] = useState(false);
-
-  // For showing uploader info
   const [userProfiles, setUserProfiles] = useState<{ [key: string]: any }>({});
-
-  // For editing file names in "Your Shared Files"
   const [editingFileId, setEditingFileId] = useState<string | null>(null);
   const [editingFileName, setEditingFileName] = useState<string>('');
 
-  // Abuse Prevention: bonus cycle and warnings
+  // Abuse Prevention
   const [uploadBonusCount, setUploadBonusCount] = useState<number>(0);
   const [abuseWarningCount, setAbuseWarningCount] = useState<number>(0);
   const [warning, setWarning] = useState<string>('');
   const [showWarning, setShowWarning] = useState<boolean>(false);
 
-  // UI States
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     const stored = localStorage.getItem('isSidebarCollapsed');
     return stored ? JSON.parse(stored) : false;
@@ -66,7 +63,7 @@ export function Community() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('All');
 
-  // 1. Check Auth and load user document fields for abuse prevention
+  // 1. Check Auth & Load user doc fields for abuse prevention
   useEffect(() => {
     const firebaseUser = getCurrentUser();
     if (firebaseUser) {
@@ -87,12 +84,37 @@ export function Community() {
     setLoading(false);
   }, [navigate]);
 
-  // 2. Fetch all community files & user profiles
+  // 2. Real-time listener for "communityFiles" collection
   useEffect(() => {
-    async function fetchFilesAndProfiles() {
-      const files = await getCommunityFiles();
+    const unsubCommunity = onSnapshot(collection(db, 'communityFiles'), (snapshot) => {
+      const files: any[] = [];
+      snapshot.forEach((docSnap) => {
+        files.push({ id: docSnap.id, ...docSnap.data() });
+      });
       setCommunityFiles(files);
-      const uniqueUserIds = [...new Set(files.map((f) => f.userId))];
+    });
+    return () => unsubCommunity();
+  }, []);
+
+  // 3. Real-time listener for "unlockedFiles" (for the current user)
+  useEffect(() => {
+    if (!user) return;
+    const q = query(collection(db, 'unlockedFiles'), where('userId', '==', user.uid));
+    const unsubUnlocked = onSnapshot(q, (snapshot) => {
+      const ids: string[] = [];
+      snapshot.forEach((docSnap) => {
+        ids.push(docSnap.data().fileId);
+      });
+      setUnlockedFileIds(ids);
+    });
+    return () => unsubUnlocked();
+  }, [user]);
+
+  // 4. Real-time fetch user profiles for each file's uploader
+  //    We do this whenever "communityFiles" changes
+  useEffect(() => {
+    async function fetchUserProfiles() {
+      const uniqueUserIds = [...new Set(communityFiles.map((f) => f.userId))];
       if (uniqueUserIds.length > 0) {
         const userDocs = await getDocs(
           query(collection(db, 'users'), where(documentId(), 'in', uniqueUserIds))
@@ -104,53 +126,38 @@ export function Community() {
         setUserProfiles(tempUserMap);
       }
     }
-    fetchFilesAndProfiles();
-  }, []);
+    fetchUserProfiles();
+  }, [communityFiles]);
 
-  // 3. Fetch unlocked file IDs for the current user
-  useEffect(() => {
-    async function fetchUnlockedFiles() {
-      if (user) {
-        const q = query(collection(db, 'unlockedFiles'), where('userId', '==', user.uid));
-        const querySnapshot = await getDocs(q);
-        const ids: string[] = [];
-        querySnapshot.forEach((docSnap) => {
-          ids.push(docSnap.data().fileId);
-        });
-        setUnlockedFileIds(ids);
-      }
-    }
-    fetchUnlockedFiles();
-  }, [user, uploading]);
-
-  // 4. Abuse Prevention: Monitor user's own file uploads (skip for DEV users)
+  // 5. Abuse Prevention: Monitor user's own file uploads (skip for DEV users)
   useEffect(() => {
     if (user && !DEV_EMAILS.includes(user.email)) {
       const userFiles = communityFiles.filter((file) => file.userId === user.uid);
       const newBonusGroup = Math.floor(userFiles.length / 5);
       const userDocRef = doc(db, 'users', user.uid);
+
       if (newBonusGroup > uploadBonusCount) {
-        // New bonus group achieved: update stored bonus count.
+        // New bonus group achieved
         setUploadBonusCount(newBonusGroup);
         updateDoc(userDocRef, { uploadBonusCount: newBonusGroup });
       } else if (newBonusGroup < uploadBonusCount) {
-        // User deleted some files; if they later re-upload to regain the same bonus,
-        // increment abuse warning count.
+        // Possibly user is deleting & re-uploading
         const newWarning = abuseWarningCount + 1;
         setAbuseWarningCount(newWarning);
         updateDoc(userDocRef, { abuseWarningCount: newWarning });
-        setWarning(`Warning ${newWarning} of 3: Abusive upload behavior detected. Please refrain from deleting and re-uploading files to gain extra tokens.`);
+        setWarning(
+          `Warning ${newWarning} of 3: Abusive upload behavior detected. ` +
+          `Please refrain from deleting and re-uploading files to gain extra tokens.`
+        );
         setShowWarning(true);
         setTimeout(() => setShowWarning(false), 5000);
+
         if (newWarning >= 3) {
           navigate('/delete-account');
         }
       }
     }
   }, [communityFiles, user, uploadBonusCount, abuseWarningCount, navigate]);
-
-  // Prevent duplicate uploads (by filename) for the current user.
-  const userFiles = communityFiles.filter((file) => file.userId === user?.uid);
 
   // Single button for selecting & uploading a file
   const handleSelectFile = () => {
@@ -162,34 +169,17 @@ export function Community() {
     if (!user) return;
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      // Check for duplicate file name in user's uploads
+
+      // Check for duplicate file name among current user's files
+      const userFiles = communityFiles.filter((f) => f.userId === user.uid);
       if (userFiles.some((f) => f.fileName === file.name)) {
         console.error('File already uploaded');
         return;
       }
+
       setUploading(true);
       try {
         await uploadCommunityFile(user.uid, file);
-        const files = await getCommunityFiles();
-        setCommunityFiles(files);
-        const uniqueUserIds = [...new Set(files.map((f) => f.userId))];
-        if (uniqueUserIds.length > 0) {
-          const userDocs = await getDocs(
-            query(collection(db, 'users'), where(documentId(), 'in', uniqueUserIds))
-          );
-          const tempUserMap: { [key: string]: any } = {};
-          userDocs.forEach((docSnap) => {
-            tempUserMap[docSnap.id] = docSnap.data();
-          });
-          setUserProfiles(tempUserMap);
-        }
-        const q = query(collection(db, 'unlockedFiles'), where('userId', '==', user.uid));
-        const querySnapshot = await getDocs(q);
-        const ids: string[] = [];
-        querySnapshot.forEach((docSnap) => {
-          ids.push(docSnap.data().fileId);
-        });
-        setUnlockedFileIds(ids);
       } catch (error) {
         console.error('Error uploading file', error);
       }
@@ -200,25 +190,32 @@ export function Community() {
   // Remove a shared file (only allowed for DEV users)
   const removeFile = async (file: any) => {
     if (!user) return;
-    // Only DEV emails can remove files
-    if (!DEV_EMAILS.includes(user.email)) return;
+    if (!DEV_EMAILS.includes(user.email)) return; // only devs can delete
+
     try {
       await deleteDoc(doc(db, 'communityFiles', file.id));
       const fileRef = storageRef(storage, `community/${file.userId}/${file.uniqueFileName}`);
       await deleteObject(fileRef);
-      const files = await getCommunityFiles();
-      setCommunityFiles(files);
     } catch (error) {
       console.error('Error removing file', error);
     }
   };
 
-  // Update file name for a shared file
+  /**
+   * Update file name for a shared file, preserving the original extension
+   */
   const updateFileName = async (fileId: string, newName: string) => {
     try {
-      await updateDoc(doc(db, 'communityFiles', fileId), { fileName: newName });
-      const files = await getCommunityFiles();
-      setCommunityFiles(files);
+      // Find the old file in state
+      const oldFile = communityFiles.find((f) => f.id === fileId);
+      if (!oldFile) return;
+
+      // Extract old extension
+      const oldExtension = oldFile.fileName.split('.').pop()?.toLowerCase() || '';
+      // Build final new name by re-appending the original extension
+      const finalName = `${newName}.${oldExtension}`;
+
+      await updateDoc(doc(db, 'communityFiles', fileId), { fileName: finalName });
       setEditingFileId(null);
       setEditingFileName('');
     } catch (error) {
@@ -232,6 +229,7 @@ export function Community() {
     const parts = file.fileName.split('.');
     const ext = parts[parts.length - 1].toLowerCase();
     const cost = pricing.Basic[ext] || pricing.Basic['*'];
+
     const userDocRef = doc(db, 'users', user.uid);
     const userDocSnap = await getDoc(userDocRef);
     let currentTokens = 500;
@@ -239,9 +237,11 @@ export function Community() {
       const data = userDocSnap.data();
       currentTokens = data.tokens || 500;
     }
+
     if (currentTokens < cost) {
       return;
     }
+
     const newTokens = currentTokens - cost;
     await updateDoc(userDocRef, { tokens: newTokens });
     await addDoc(collection(db, 'unlockedFiles'), {
@@ -250,29 +250,7 @@ export function Community() {
       unlockedAt: new Date()
     });
     setTokens(newTokens);
-    const q = query(collection(db, 'unlockedFiles'), where('userId', '==', user.uid));
-    const querySnapshot = await getDocs(q);
-    const ids: string[] = [];
-    querySnapshot.forEach((docSnap) => {
-      ids.push(docSnap.data().fileId);
-    });
-    setUnlockedFileIds(ids);
   };
-
-  // Split files into sections
-  const yourSharedFiles = communityFiles.filter((file) => file.userId === user?.uid);
-  const communityUploadedFiles = communityFiles.filter((file) => file.userId !== user?.uid);
-  const unlockedFiles = communityFiles.filter((file) => unlockedFileIds.includes(file.id));
-
-  // Filter community files by search term and file type (exclude user's own files)
-  const filteredCommunityUploadedFiles = communityFiles.filter((file) => {
-    if (file.userId === user?.uid) return false;
-    const baseName = getDisplayName(file.fileName).toLowerCase();
-    const ext = file.fileName.split('.').pop()?.toLowerCase() || '';
-    const searchMatch = baseName.includes(searchTerm.toLowerCase());
-    const typeMatch = filterType === 'All' ? true : ext === filterType.toLowerCase();
-    return searchMatch && typeMatch;
-  });
 
   if (loading) {
     return (
@@ -282,6 +260,20 @@ export function Community() {
     );
   }
   if (!user) return null;
+
+  // Split files into sections
+  const yourSharedFiles = communityFiles.filter((file) => file.userId === user.uid);
+  const unlockedFiles = communityFiles.filter((file) => unlockedFileIds.includes(file.id));
+
+  // Filter community files by search term and file type (exclude user's own)
+  const filteredCommunityUploadedFiles = communityFiles.filter((file) => {
+    if (file.userId === user.uid) return false; // exclude your own
+    const baseName = getDisplayName(file.fileName).toLowerCase();
+    const ext = file.fileName.split('.').pop()?.toLowerCase() || '';
+    const searchMatch = baseName.includes(searchTerm.toLowerCase());
+    const typeMatch = filterType === 'All' ? true : ext === filterType.toLowerCase();
+    return searchMatch && typeMatch;
+  });
 
   return (
     <div className="flex h-screen bg-gray-900">
@@ -307,7 +299,11 @@ export function Community() {
       )}
 
       {/* Main Content */}
-      <main className={`flex-1 overflow-hidden transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} p-8`}>
+      <main
+        className={`flex-1 overflow-hidden transition-all duration-300 ${
+          isSidebarCollapsed ? 'ml-16' : 'ml-64'
+        } p-8`}
+      >
         <div className="overflow-y-auto h-full">
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
@@ -321,7 +317,7 @@ export function Community() {
                 key={tokens}
                 initial={{ scale: 0.8, opacity: 0.5 }}
                 animate={{ scale: 1, opacity: 1 }}
-                transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 20 }}
                 className="text-lg"
               >
                 {tokens}
@@ -336,9 +332,18 @@ export function Community() {
               disabled={uploading}
               className="w-full px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-full transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {uploading ? <Loader2 className="animate-spin w-5 h-5 mx-auto" /> : 'Choose & Upload File'}
+              {uploading ? (
+                <Loader2 className="animate-spin w-5 h-5 mx-auto" />
+              ) : (
+                'Choose & Upload File'
+              )}
             </button>
-            <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange} />
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              onChange={handleFileChange}
+            />
           </div>
 
           {/* Search Bar with File Type Filter */}
@@ -376,9 +381,11 @@ export function Community() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Community Uploaded Files (excludes your own files) */}
+            {/* Community Uploaded Files (excludes your own) */}
             <section className="bg-gray-800/60 rounded-xl p-4 border border-gray-700 h-[650px] overflow-y-auto">
-              <h2 className="text-2xl font-semibold text-white mb-4">Community Uploaded Files</h2>
+              <h2 className="text-2xl font-semibold text-white mb-4">
+                Community Uploaded Files
+              </h2>
               {filteredCommunityUploadedFiles.length === 0 ? (
                 <p className="text-gray-400">No community files available.</p>
               ) : (
@@ -386,14 +393,25 @@ export function Community() {
                   {filteredCommunityUploadedFiles.map((file) => {
                     const ext = (file.fileName.split('.').pop() || 'unknown').toUpperCase();
                     const uploaderProfile = userProfiles[file.userId];
-                    const cost = pricing.Basic[file.fileName.split('.').pop()?.toLowerCase() || '*'] || pricing.Basic['*'];
+                    const cost =
+                      pricing.Basic[
+                        file.fileName.split('.').pop()?.toLowerCase() || '*'
+                      ] || pricing.Basic['*'];
+
                     return (
-                      <li key={file.id} className="p-4 bg-gray-800 rounded-lg border border-gray-700 hover:bg-gray-700 transition-colors">
+                      <li
+                        key={file.id}
+                        className="p-4 bg-gray-800 rounded-lg border border-gray-700 hover:bg-gray-700 transition-colors"
+                      >
                         {/* Uploader Info */}
                         <div className="flex items-center gap-3 mb-2">
                           <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-700 flex items-center justify-center">
                             {uploaderProfile?.photoURL ? (
-                              <img src={uploaderProfile.photoURL} alt={uploaderProfile.displayName} className="w-full h-full object-cover" />
+                              <img
+                                src={uploaderProfile.photoURL}
+                                alt={uploaderProfile.displayName}
+                                className="w-full h-full object-cover"
+                              />
                             ) : (
                               <CircleUserRound className="w-4 h-4 text-gray-400" />
                             )}
@@ -402,11 +420,16 @@ export function Community() {
                             {uploaderProfile?.displayName || 'Unknown'}
                           </span>
                         </div>
+
                         {/* File Info */}
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
-                            <span className="text-indigo-400 font-medium">{getDisplayName(file.fileName)}</span>
-                            <span className="bg-gray-700 text-gray-300 px-2 py-1 rounded-full text-xs font-medium">{ext}</span>
+                            <span className="text-indigo-400 font-medium">
+                              {getDisplayName(file.fileName)}
+                            </span>
+                            <span className="bg-gray-700 text-gray-300 px-2 py-1 rounded-full text-xs font-medium">
+                              {ext}
+                            </span>
                           </div>
                           {!unlockedFileIds.includes(file.id) && (
                             <button
@@ -433,67 +456,90 @@ export function Community() {
 
             {/* Your Shared Files */}
             <section className="bg-gray-800/60 rounded-xl p-4 border border-gray-700 h-[650px] overflow-y-auto">
-              <h2 className="text-2xl font-semibold text-white mb-4">Your Shared Files</h2>
+              <h2 className="text-2xl font-semibold text-white mb-4">
+                Your Shared Files
+              </h2>
               {yourSharedFiles.length === 0 ? (
                 <p className="text-gray-400">You haven't shared any files yet.</p>
               ) : (
                 <ul className="space-y-4">
-                  {yourSharedFiles.map((file) => (
-                    <li key={file.id} className="p-4 bg-gray-800 rounded-lg border border-gray-700 hover:bg-gray-700 transition-colors">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-indigo-300 font-medium">{getDisplayName(file.fileName)}</span>
-                        <span className="bg-gray-600 text-gray-300 px-2 py-1 rounded-full text-xs font-medium">
-                          {file.fileName.split('.').pop()?.toUpperCase() || 'Unknown'}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {editingFileId === file.id ? (
-                          <>
-                            <input
-                              type="text"
-                              value={editingFileName}
-                              onChange={(e) => setEditingFileName(e.target.value)}
-                              className="bg-gray-600 text-gray-200 rounded px-2 py-1 text-sm focus:outline-none"
-                            />
-                            <button onClick={() => updateFileName(file.id, editingFileName)} className="px-2 py-1 bg-green-500 text-white rounded text-xs">
-                              Save
-                            </button>
-                            <button onClick={() => setEditingFileId(null)} className="px-2 py-1 bg-red-500 text-white rounded text-xs">
-                              Cancel
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            <button
-                              onClick={() => {
-                                setEditingFileId(file.id);
-                                setEditingFileName(getDisplayName(file.fileName));
-                              }}
-                              className="px-2 py-1 bg-indigo-500 text-white rounded text-xs"
-                            >
-                              Edit
-                            </button>
-                            {/* Only DEV users can delete their files */}
-                            {DEV_EMAILS.includes(user.email) && (
-                              <button onClick={() => removeFile(file)} className="px-2 py-1 bg-red-500 text-white rounded text-xs">
-                                Delete
+                  {yourSharedFiles.map((file) => {
+                    const oldExt = file.fileName.split('.').pop()?.toUpperCase() || 'UNKNOWN';
+                    return (
+                      <li
+                        key={file.id}
+                        className="p-4 bg-gray-800 rounded-lg border border-gray-700 hover:bg-gray-700 transition-colors"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-indigo-300 font-medium">
+                            {getDisplayName(file.fileName)}
+                          </span>
+                          <span className="bg-gray-600 text-gray-300 px-2 py-1 rounded-full text-xs font-medium">
+                            {oldExt}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {editingFileId === file.id ? (
+                            <>
+                              <input
+                                type="text"
+                                value={editingFileName}
+                                onChange={(e) => setEditingFileName(e.target.value)}
+                                className="bg-gray-600 text-gray-200 rounded px-2 py-1 text-sm focus:outline-none"
+                              />
+                              <button
+                                onClick={() => updateFileName(file.id, editingFileName)}
+                                className="px-2 py-1 bg-green-500 text-white rounded text-xs"
+                              >
+                                Save
                               </button>
-                            )}
-                          </>
-                        )}
-                      </div>
-                      <span className="block text-sm text-gray-400 mt-1">
-                        {new Date(file.uploadedAt.seconds * 1000).toLocaleString()}
-                      </span>
-                    </li>
-                  ))}
+                              <button
+                                onClick={() => setEditingFileId(null)}
+                                className="px-2 py-1 bg-red-500 text-white rounded text-xs"
+                              >
+                                Cancel
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => {
+                                  setEditingFileId(file.id);
+                                  // Strip extension from old name
+                                  const baseName = getDisplayName(file.fileName);
+                                  setEditingFileName(baseName);
+                                }}
+                                className="px-2 py-1 bg-indigo-500 text-white rounded text-xs"
+                              >
+                                Edit
+                              </button>
+                              {/* Only DEV users can delete their files */}
+                              {DEV_EMAILS.includes(user.email) && (
+                                <button
+                                  onClick={() => removeFile(file)}
+                                  className="px-2 py-1 bg-red-500 text-white rounded text-xs"
+                                >
+                                  Delete
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                        <span className="block text-sm text-gray-400 mt-1">
+                          {new Date(file.uploadedAt.seconds * 1000).toLocaleString()}
+                        </span>
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </section>
 
             {/* Unlocked Files */}
             <section className="bg-gray-800/60 rounded-xl p-4 border border-gray-700 h-[650px] overflow-y-auto">
-              <h2 className="text-2xl font-semibold text-white mb-4">Unlocked Files</h2>
+              <h2 className="text-2xl font-semibold text-white mb-4">
+                Unlocked Files
+              </h2>
               {unlockedFiles.length === 0 ? (
                 <p className="text-gray-400">You haven't unlocked any files yet.</p>
               ) : (
@@ -501,7 +547,10 @@ export function Community() {
                   {unlockedFiles.map((file) => {
                     const ext = (file.fileName.split('.').pop() || 'unknown').toUpperCase();
                     return (
-                      <li key={file.id} className="p-4 bg-gray-800 rounded-lg border border-gray-700 hover:bg-gray-700 transition-colors">
+                      <li
+                        key={file.id}
+                        className="p-4 bg-gray-800 rounded-lg border border-gray-700 hover:bg-gray-700 transition-colors"
+                      >
                         <div className="flex items-center justify-between mb-2">
                           <a
                             href={file.downloadURL}

@@ -211,8 +211,9 @@ export function Community() {
   const communityUploadedFiles = communityFiles.filter((file) => file.userId !== user?.uid);
   const unlockedFiles = communityFiles.filter((file) => unlockedFileIds.includes(file.id));
 
-  // Filter community files by search term and file type
+  // Filter community files by search term and file type (exclude your own files)
   const filteredCommunityUploadedFiles = communityFiles.filter((file) => {
+    if (file.userId === user?.uid) return false;
     const baseName = getDisplayName(file.fileName).toLowerCase();
     const ext = file.fileName.split('.').pop()?.toLowerCase() || '';
     const searchMatch = baseName.includes(searchTerm.toLowerCase());

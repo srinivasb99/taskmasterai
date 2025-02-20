@@ -16,6 +16,7 @@ import {
   query,
   where,
   onSnapshot,
+  getDocs,
   documentId
 } from 'firebase/firestore';
 import { ref as storageRef, deleteObject } from 'firebase/storage';
@@ -147,7 +148,7 @@ export function Community() {
         updateDoc(userDocRef, { abuseWarningCount: newWarning });
         setWarning(
           `Warning ${newWarning} of 3: Abusive upload behavior detected. ` +
-          `Please refrain from deleting and re-uploading files to gain extra tokens.`
+            `Please refrain from deleting and re-uploading files to gain extra tokens.`
         );
         setShowWarning(true);
         setTimeout(() => setShowWarning(false), 5000);
@@ -332,11 +333,7 @@ export function Community() {
               disabled={uploading}
               className="w-full px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-full transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {uploading ? (
-                <Loader2 className="animate-spin w-5 h-5 mx-auto" />
-              ) : (
-                'Choose & Upload File'
-              )}
+              {uploading ? <Loader2 className="animate-spin w-5 h-5 mx-auto" /> : 'Choose & Upload File'}
             </button>
             <input
               ref={fileInputRef}
@@ -383,20 +380,15 @@ export function Community() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Community Uploaded Files (excludes your own) */}
             <section className="bg-gray-800/60 rounded-xl p-4 border border-gray-700 h-[650px] overflow-y-auto">
-              <h2 className="text-2xl font-semibold text-white mb-4">
-                Community Uploaded Files
-              </h2>
+              <h2 className="text-2xl font-semibold text-white mb-4">Community Uploaded Files</h2>
               {filteredCommunityUploadedFiles.length === 0 ? (
                 <p className="text-gray-400">No community files available.</p>
               ) : (
                 <ul className="space-y-4">
                   {filteredCommunityUploadedFiles.map((file) => {
                     const ext = (file.fileName.split('.').pop() || 'unknown').toUpperCase();
-                    const uploaderProfile = userProfiles[file.userId];
-                    const cost =
-                      pricing.Basic[
-                        file.fileName.split('.').pop()?.toLowerCase() || '*'
-                      ] || pricing.Basic['*'];
+                    const uploaderProfile = userProfiles[file.userId]; // <--- retrieve from userProfiles
+                    const cost = pricing.Basic[file.fileName.split('.').pop()?.toLowerCase() || '*'] || pricing.Basic['*'];
 
                     return (
                       <li
@@ -420,7 +412,6 @@ export function Community() {
                             {uploaderProfile?.displayName || 'Unknown'}
                           </span>
                         </div>
-
                         {/* File Info */}
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
@@ -456,9 +447,7 @@ export function Community() {
 
             {/* Your Shared Files */}
             <section className="bg-gray-800/60 rounded-xl p-4 border border-gray-700 h-[650px] overflow-y-auto">
-              <h2 className="text-2xl font-semibold text-white mb-4">
-                Your Shared Files
-              </h2>
+              <h2 className="text-2xl font-semibold text-white mb-4">Your Shared Files</h2>
               {yourSharedFiles.length === 0 ? (
                 <p className="text-gray-400">You haven't shared any files yet.</p>
               ) : (
@@ -537,9 +526,7 @@ export function Community() {
 
             {/* Unlocked Files */}
             <section className="bg-gray-800/60 rounded-xl p-4 border border-gray-700 h-[650px] overflow-y-auto">
-              <h2 className="text-2xl font-semibold text-white mb-4">
-                Unlocked Files
-              </h2>
+              <h2 className="text-2xl font-semibold text-white mb-4">Unlocked Files</h2>
               {unlockedFiles.length === 0 ? (
                 <p className="text-gray-400">You haven't unlocked any files yet.</p>
               ) : (

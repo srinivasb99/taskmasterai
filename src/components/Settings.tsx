@@ -27,12 +27,15 @@ import {
 
 export function Settings() {
   const navigate = useNavigate();
+  const [user, setUser] = useState<any>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Store user profile data from Firestore
   const [userData, setUserData] = useState({
     name: '',
     email: '',
@@ -54,24 +57,23 @@ export function Settings() {
     confirmPassword: '',
   });
 
-  // Load user data
+  // Load user data and set the current user state
   useEffect(() => {
     const loadUserData = async () => {
-      const user = getCurrentUser();
-      if (!user) {
+      const currentUser = getCurrentUser();
+      if (!currentUser) {
         navigate('/login');
         return;
       }
-
+      setUser(currentUser);
       try {
-        const firestoreData = await getUserData(user.uid);
+        const firestoreData = await getUserData(currentUser.uid);
         const loadedUserData = {
-          name: user.displayName || '',
-          email: user.email || '',
-          photoURL: user.photoURL || '',
+          name: currentUser.displayName || '',
+          email: currentUser.email || '',
+          photoURL: currentUser.photoURL || '',
           ...firestoreData
         };
-
         setUserData(loadedUserData);
         setFormData(prev => ({
           ...prev,
@@ -131,9 +133,9 @@ export function Settings() {
 
     try {
       await updateUserProfile({ photoFile: file });
-      const user = getCurrentUser();
-      if (user?.photoURL) {
-        setUserData(prev => ({ ...prev, photoURL: user.photoURL }));
+      const currentUser = getCurrentUser();
+      if (currentUser?.photoURL) {
+        setUserData(prev => ({ ...prev, photoURL: currentUser.photoURL }));
       }
     } catch (err) {
       setError(err instanceof AuthError ? err.message : 'Failed to upload profile picture');
@@ -151,7 +153,6 @@ export function Settings() {
     setError(null);
 
     try {
-      const user = getCurrentUser();
       if (user) {
         await deleteProfilePicture(user.uid);
         setUserData(prev => ({ ...prev, photoURL: '' }));
@@ -163,12 +164,8 @@ export function Settings() {
     }
   };
 
-  // Determine if user is signed in with Google
-  const userObj = getCurrentUser();
-  const isGoogleUser =
-    userObj &&
-    userObj.providerData &&
-    userObj.providerData.some((provider: any) => provider.providerId === 'google.com');
+  // Determine if user signed in via Google
+  const isGoogleUser = user?.providerData?.some((p: any) => p.providerId === 'google.com');
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -184,7 +181,7 @@ export function Settings() {
         throw new AuthError('New passwords do not match');
       }
 
-      // Build update data; skip password fields for Google users
+      // Update both "name" and "displayName" when updating the user's name
       const updateData = {
         name: formData.name !== userData.name ? formData.name : undefined,
         displayName: formData.name !== userData.name ? formData.name : undefined,
@@ -204,8 +201,8 @@ export function Settings() {
           newPassword: '',
           confirmPassword: '',
         }));
-        
-        // Update local user data (both name and displayName)
+
+        // Update local user data (both fields)
         setUserData(prev => ({
           ...prev,
           name: formData.name,
@@ -241,7 +238,6 @@ export function Settings() {
       if (!isGoogleUser && !formData.currentPassword) {
         throw new AuthError('Current password is required to delete account');
       }
-      // For Google users, skip password re-authentication here (or use a reauth popup)
       await deleteUserAccount(isGoogleUser ? undefined : formData.currentPassword);
       navigate('/login');
     } catch (err) {
@@ -523,7 +519,7 @@ export function Settings() {
                       Are you sure you want to delete your account? This action cannot be undone.
                     </p>
                     <div>
-                      {/* For non-Google users, require password; Google users don't */}
+                      {/* For non-Google users, require password; Google users skip */}
                       {!user.providerData?.some((p: any) => p.providerId === 'google.com') && (
                         <input
                           type="password"

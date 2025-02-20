@@ -20,6 +20,13 @@ import {
 } from 'firebase/firestore';
 import { ref as storageRef, deleteObject } from 'firebase/storage';
 
+// List of developer emails (never get banned or restricted)
+const DEV_EMAILS = [
+  'bajinsrinivasr@lexington1.net',
+  'srinibaj10@gmail.com',
+  'fugegate@gmail.com'
+];
+
 // Helper: Remove file extension from file name
 const getDisplayName = (fileName: string) => fileName.replace(/\.[^/.]+$/, '');
 
@@ -48,6 +55,8 @@ export function Community() {
   // Abuse Prevention: bonus cycle and warnings
   const [uploadBonusCount, setUploadBonusCount] = useState<number>(0);
   const [abuseWarningCount, setAbuseWarningCount] = useState<number>(0);
+  const [warning, setWarning] = useState<string>('');
+  const [showWarning, setShowWarning] = useState<boolean>(false);
 
   // UI States
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
@@ -114,9 +123,9 @@ export function Community() {
     fetchUnlockedFiles();
   }, [user, uploading]);
 
-  // 4. Abuse Prevention: Monitor user's own file uploads
+  // 4. Abuse Prevention: Monitor user's own file uploads (skip for DEV users)
   useEffect(() => {
-    if (user) {
+    if (user && !DEV_EMAILS.includes(user.email)) {
       const userFiles = communityFiles.filter((file) => file.userId === user.uid);
       const newBonusGroup = Math.floor(userFiles.length / 5);
       const userDocRef = doc(db, 'users', user.uid);
@@ -125,13 +134,15 @@ export function Community() {
         setUploadBonusCount(newBonusGroup);
         updateDoc(userDocRef, { uploadBonusCount: newBonusGroup });
       } else if (newBonusGroup < uploadBonusCount) {
-        // This indicates that the user has deleted files. If they re-upload and try to regain bonus for the same group,
-        // consider it abuse.
+        // User deleted some files; if they later re-upload to regain the same bonus,
+        // increment abuse warning count.
         const newWarning = abuseWarningCount + 1;
         setAbuseWarningCount(newWarning);
         updateDoc(userDocRef, { abuseWarningCount: newWarning });
-        if (newWarning >= 2) {
-          // Redirect the user for account deletion if abuse is repeated.
+        setWarning(`Warning ${newWarning} of 3: Abusive upload behavior detected. Please refrain from deleting and re-uploading files to gain extra tokens.`);
+        setShowWarning(true);
+        setTimeout(() => setShowWarning(false), 5000);
+        if (newWarning >= 3) {
           navigate('/delete-account');
         }
       }
@@ -186,9 +197,11 @@ export function Community() {
     }
   };
 
-  // Remove a shared file (only for files owned by the user)
+  // Remove a shared file (only allowed for DEV users)
   const removeFile = async (file: any) => {
     if (!user) return;
+    // Only DEV emails can remove files
+    if (!DEV_EMAILS.includes(user.email)) return;
     try {
       await deleteDoc(doc(db, 'communityFiles', file.id));
       const fileRef = storageRef(storage, `community/${file.userId}/${file.uniqueFileName}`);
@@ -283,6 +296,15 @@ export function Community() {
         }}
         userName={userName}
       />
+
+      {/* Warning Popup */}
+      {showWarning && (
+        <div className="fixed inset-0 flex items-center justify-center z-50">
+          <div className="bg-white text-black p-4 rounded shadow-lg">
+            <p className="font-semibold">{warning}</p>
+          </div>
+        </div>
+      )}
 
       {/* Main Content */}
       <main className={`flex-1 overflow-hidden transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} p-8`}>
@@ -451,9 +473,12 @@ export function Community() {
                             >
                               Edit
                             </button>
-                            <button onClick={() => removeFile(file)} className="px-2 py-1 bg-red-500 text-white rounded text-xs">
-                              Delete
-                            </button>
+                            {/* Only DEV users can delete their files */}
+                            {DEV_EMAILS.includes(user.email) && (
+                              <button onClick={() => removeFile(file)} className="px-2 py-1 bg-red-500 text-white rounded text-xs">
+                                Delete
+                              </button>
+                            )}
                           </>
                         )}
                       </div>

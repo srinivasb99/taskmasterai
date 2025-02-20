@@ -45,6 +45,10 @@ export function Community() {
   const [editingFileId, setEditingFileId] = useState<string | null>(null);
   const [editingFileName, setEditingFileName] = useState<string>('');
 
+  // Abuse Prevention: bonus cycle and warnings
+  const [uploadBonusCount, setUploadBonusCount] = useState<number>(0);
+  const [abuseWarningCount, setAbuseWarningCount] = useState<number>(0);
+
   // UI States
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     const stored = localStorage.getItem('isSidebarCollapsed');
@@ -53,7 +57,7 @@ export function Community() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('All');
 
-  // 1. Check Auth
+  // 1. Check Auth and load user document fields for abuse prevention
   useEffect(() => {
     const firebaseUser = getCurrentUser();
     if (firebaseUser) {
@@ -62,7 +66,10 @@ export function Community() {
       const userDocRef = doc(db, 'users', firebaseUser.uid);
       getDoc(userDocRef).then((docSnap) => {
         if (docSnap.exists()) {
-          setTokens(docSnap.data().tokens || 500);
+          const data = docSnap.data();
+          setTokens(data.tokens || 500);
+          setUploadBonusCount(data.uploadBonusCount || 0);
+          setAbuseWarningCount(data.abuseWarningCount || 0);
         }
       });
     } else {
@@ -107,6 +114,33 @@ export function Community() {
     fetchUnlockedFiles();
   }, [user, uploading]);
 
+  // 4. Abuse Prevention: Monitor user's own file uploads
+  useEffect(() => {
+    if (user) {
+      const userFiles = communityFiles.filter((file) => file.userId === user.uid);
+      const newBonusGroup = Math.floor(userFiles.length / 5);
+      const userDocRef = doc(db, 'users', user.uid);
+      if (newBonusGroup > uploadBonusCount) {
+        // New bonus group achieved: update stored bonus count.
+        setUploadBonusCount(newBonusGroup);
+        updateDoc(userDocRef, { uploadBonusCount: newBonusGroup });
+      } else if (newBonusGroup < uploadBonusCount) {
+        // This indicates that the user has deleted files. If they re-upload and try to regain bonus for the same group,
+        // consider it abuse.
+        const newWarning = abuseWarningCount + 1;
+        setAbuseWarningCount(newWarning);
+        updateDoc(userDocRef, { abuseWarningCount: newWarning });
+        if (newWarning >= 2) {
+          // Redirect the user for account deletion if abuse is repeated.
+          navigate('/delete-account');
+        }
+      }
+    }
+  }, [communityFiles, user, uploadBonusCount, abuseWarningCount, navigate]);
+
+  // Prevent duplicate uploads (by filename) for the current user.
+  const userFiles = communityFiles.filter((file) => file.userId === user?.uid);
+
   // Single button for selecting & uploading a file
   const handleSelectFile = () => {
     fileInputRef.current?.click();
@@ -117,6 +151,11 @@ export function Community() {
     if (!user) return;
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
+      // Check for duplicate file name in user's uploads
+      if (userFiles.some((f) => f.fileName === file.name)) {
+        console.error('File already uploaded');
+        return;
+      }
       setUploading(true);
       try {
         await uploadCommunityFile(user.uid, file);
@@ -212,7 +251,7 @@ export function Community() {
   const communityUploadedFiles = communityFiles.filter((file) => file.userId !== user?.uid);
   const unlockedFiles = communityFiles.filter((file) => unlockedFileIds.includes(file.id));
 
-  // Filter community files by search term and file type (exclude your own files)
+  // Filter community files by search term and file type (exclude user's own files)
   const filteredCommunityUploadedFiles = communityFiles.filter((file) => {
     if (file.userId === user?.uid) return false;
     const baseName = getDisplayName(file.fileName).toLowerCase();
@@ -248,26 +287,25 @@ export function Community() {
       {/* Main Content */}
       <main className={`flex-1 overflow-hidden transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} p-8`}>
         <div className="overflow-y-auto h-full">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-2">
-          <Globe2 className="w-6 h-6 text-blue-400" />
-          <h1 className="text-3xl font-bold text-white">Community</h1>
-        </div>
-        <div className="flex items-center gap-2 text-gray-300">
-          <Coins className="w-5 h-5 text-yellow-400" />
-          <motion.span
-            key={tokens}
-            initial={{ scale: 0.8, opacity: 0.5 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ type: "spring", stiffness: 300, damping: 20 }}
-            className="text-lg"
-          >
-            {tokens}
-          </motion.span>
-        </div>
-      </div>
-
+          {/* Header */}
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2">
+              <Globe2 className="w-6 h-6 text-blue-400" />
+              <h1 className="text-3xl font-bold text-white">Community</h1>
+            </div>
+            <div className="flex items-center gap-2 text-gray-300">
+              <Coins className="w-5 h-5 text-yellow-400" />
+              <motion.span
+                key={tokens}
+                initial={{ scale: 0.8, opacity: 0.5 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                className="text-lg"
+              >
+                {tokens}
+              </motion.span>
+            </div>
+          </div>
 
           {/* Single Button for Selecting & Uploading File */}
           <div className="mb-6">
@@ -316,7 +354,7 @@ export function Community() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Community Uploaded Files */}
+            {/* Community Uploaded Files (excludes your own files) */}
             <section className="bg-gray-800/60 rounded-xl p-4 border border-gray-700 h-96 overflow-y-auto">
               <h2 className="text-2xl font-semibold text-white mb-4">Community Uploaded Files</h2>
               {filteredCommunityUploadedFiles.length === 0 ? (
@@ -353,7 +391,7 @@ export function Community() {
                               onClick={() => unlockFile(file)}
                               className="px-3 py-1 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-full text-sm transition-all transform hover:scale-105 flex flex-col items-center"
                             >
-                              <span></span>
+                              <span>Unlock</span>
                               <div className="flex items-center text-xs">
                                 <Coins className="w-4 h-4 text-yellow-400 mr-1" />
                                 <span>{cost}</span>

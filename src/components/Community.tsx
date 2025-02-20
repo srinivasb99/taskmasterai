@@ -342,7 +342,7 @@ export function Community() {
                               onClick={() => unlockFile(file)}
                               className="px-3 py-1 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-full text-sm transition-all transform hover:scale-105 flex flex-col items-center"
                             >
-                              <span>Unlock</span>
+                              <span></span>
                               <div className="flex items-center text-xs">
                                 <Coins className="w-4 h-4 text-yellow-400 mr-1" />
                                 <span>{cost}</span>

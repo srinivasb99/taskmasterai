@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
+import { motion } from 'framer-motion';
 import { Loader2, Globe2, Search, Coins, CircleUserRound } from 'lucide-react';
 import { getCurrentUser } from '../lib/settings-firebase';
 import { uploadCommunityFile, getCommunityFiles } from '../lib/community-firebase';
@@ -247,17 +248,26 @@ export function Community() {
       {/* Main Content */}
       <main className={`flex-1 overflow-hidden transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} p-8`}>
         <div className="overflow-y-auto h-full">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-2">
-              <Globe2 className="w-6 h-6 text-blue-400" />
-              <h1 className="text-3xl font-bold text-white">Community</h1>
-            </div>
-            <div className="flex items-center gap-2 text-gray-300">
-              <Coins className="w-5 h-5 text-yellow-400" />
-              <span className="text-lg">{tokens}</span>
-            </div>
-          </div>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-2">
+          <Globe2 className="w-6 h-6 text-blue-400" />
+          <h1 className="text-3xl font-bold text-white">Community</h1>
+        </div>
+        <div className="flex items-center gap-2 text-gray-300">
+          <Coins className="w-5 h-5 text-yellow-400" />
+          <motion.span
+            key={tokens}
+            initial={{ scale: 0.8, opacity: 0.5 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: "spring", stiffness: 300, damping: 20 }}
+            className="text-lg"
+          >
+            {tokens}
+          </motion.span>
+        </div>
+      </div>
+
 
           {/* Single Button for Selecting & Uploading File */}
           <div className="mb-6">

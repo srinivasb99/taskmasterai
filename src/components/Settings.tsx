@@ -65,18 +65,18 @@ export function Settings() {
 
       try {
         const firestoreData = await getUserData(user.uid);
-        const userData = {
+        const loadedUserData = {
           name: user.displayName || '',
           email: user.email || '',
           photoURL: user.photoURL || '',
           ...firestoreData
         };
 
-        setUserData(userData);
+        setUserData(loadedUserData);
         setFormData(prev => ({
           ...prev,
-          name: userData.name,
-          email: userData.email
+          name: loadedUserData.name,
+          email: loadedUserData.email
         }));
       } catch (error) {
         console.error('Error loading user data:', error);
@@ -163,6 +163,13 @@ export function Settings() {
     }
   };
 
+  // Determine if user is signed in with Google
+  const userObj = getCurrentUser();
+  const isGoogleUser =
+    userObj &&
+    userObj.providerData &&
+    userObj.providerData.some((provider: any) => provider.providerId === 'google.com');
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -173,17 +180,19 @@ export function Settings() {
         throw new AuthError('You must be logged in to update your profile');
       }
 
-      if (formData.newPassword && formData.newPassword !== formData.confirmPassword) {
+      if (!isGoogleUser && formData.newPassword && formData.newPassword !== formData.confirmPassword) {
         throw new AuthError('New passwords do not match');
       }
 
-      // Update both "name" and "displayName" when updating the user's name
+      // Build update data; skip password fields for Google users
       const updateData = {
         name: formData.name !== userData.name ? formData.name : undefined,
         displayName: formData.name !== userData.name ? formData.name : undefined,
         email: formData.email !== userData.email ? formData.email : undefined,
-        currentPassword: formData.currentPassword || undefined,
-        newPassword: formData.newPassword || undefined,
+        ...( !isGoogleUser && {
+          currentPassword: formData.currentPassword || undefined,
+          newPassword: formData.newPassword || undefined,
+        })
       };
 
       if (Object.values(updateData).some(value => value !== undefined)) {
@@ -196,7 +205,7 @@ export function Settings() {
           confirmPassword: '',
         }));
         
-        // Update local user data (both fields)
+        // Update local user data (both name and displayName)
         setUserData(prev => ({
           ...prev,
           name: formData.name,
@@ -229,10 +238,11 @@ export function Settings() {
         throw new AuthError('You must be logged in to delete your account');
       }
 
-      if (!formData.currentPassword) {
+      if (!isGoogleUser && !formData.currentPassword) {
         throw new AuthError('Current password is required to delete account');
       }
-      await deleteUserAccount(formData.currentPassword);
+      // For Google users, skip password re-authentication here (or use a reauth popup)
+      await deleteUserAccount(isGoogleUser ? undefined : formData.currentPassword);
       navigate('/login');
     } catch (err) {
       setError(err instanceof AuthError ? err.message : 'Failed to delete account');
@@ -250,9 +260,7 @@ export function Settings() {
         userName={userData.name}
       />
       
-      <main className={`flex-1 overflow-y-auto transition-all duration-300 ${
-        isSidebarCollapsed ? 'ml-16' : 'ml-64'
-      }`}>
+      <main className={`flex-1 overflow-y-auto transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'}`}>
         <div className="container mx-auto px-6 py-8">
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-white flex items-center gap-3">
@@ -269,14 +277,9 @@ export function Settings() {
             <h2 className="text-xl font-semibold text-white mb-4">Profile Picture</h2>
             <div className="flex items-center gap-6">
               <div className="relative group">
-                <div className={`w-24 h-24 rounded-full overflow-hidden bg-gray-700 flex items-center justify-center
-                  ${isUploading ? 'opacity-50' : ''}`}>
+                <div className={`w-24 h-24 rounded-full overflow-hidden bg-gray-700 flex items-center justify-center ${isUploading ? 'opacity-50' : ''}`}>
                   {userData.photoURL ? (
-                    <img
-                      src={userData.photoURL}
-                      alt="Profile"
-                      className="w-full h-full object-cover"
-                    />
+                    <img src={userData.photoURL} alt="Profile" className="w-full h-full object-cover" />
                   ) : (
                     <User className="w-12 h-12 text-gray-400" />
                   )}
@@ -324,12 +327,10 @@ export function Settings() {
           <div className="bg-gray-800 rounded-xl p-6 mb-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold text-white flex items-center gap-2">
-                <Crown className="w-5 h-5 text-yellow-400" />
+                <className="w-5 h-5 text-yellow-400" />
                 Current Subscription
               </h2>
-              <span className="px-3 py-1 bg-blue-500 text-white rounded-full text-sm">
-                Basic
-              </span>
+              <span className="px-3 py-1 bg-blue-500 text-white rounded-full text-sm">Basic</span>
             </div>
             <div className="text-gray-300">
               <p className="mb-2">Your free plan includes:</p>
@@ -392,8 +393,8 @@ export function Settings() {
                   />
                 </div>
 
-                {/* Password Fields - Only shown when editing */}
-                {isEditing && (
+                {/* Password Fields - Only shown when editing and if not a Google user */}
+                {isEditing && !user.providerData?.some((p: any) => p.providerId === 'google.com') && (
                   <>
                     <div>
                       <label className="flex items-center text-sm font-medium text-gray-300 mb-2">
@@ -439,51 +440,51 @@ export function Settings() {
                     </div>
                   </>
                 )}
+              </div>
 
-                {/* Action Buttons */}
-                <div className="flex justify-end gap-3 mt-6">
-                  {isEditing ? (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsEditing(false);
-                          setError(null);
-                          setFormData(prev => ({
-                            ...prev,
-                            name: userData.name,
-                            email: userData.email,
-                            currentPassword: '',
-                            newPassword: '',
-                            confirmPassword: '',
-                          }));
-                        }}
-                        disabled={isLoading}
-                        className="flex items-center px-4 py-2 text-sm font-medium text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <X className="w-4 h-4 mr-2" />
-                        Cancel
-                      </button>
-                      <button
-                        type="submit"
-                        disabled={isLoading}
-                        className="flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <Save className="w-4 h-4 mr-2" />
-                        {isLoading ? 'Saving...' : 'Save Changes'}
-                      </button>
-                    </>
-                  ) : (
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-3 mt-6">
+                {isEditing ? (
+                  <>
                     <button
                       type="button"
-                      onClick={() => setIsEditing(true)}
+                      onClick={() => {
+                        setIsEditing(false);
+                        setError(null);
+                        setFormData(prev => ({
+                          ...prev,
+                          name: userData.name,
+                          email: userData.email,
+                          currentPassword: '',
+                          newPassword: '',
+                          confirmPassword: '',
+                        }));
+                      }}
+                      disabled={isLoading}
+                      className="flex items-center px-4 py-2 text-sm font-medium text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <X className="w-4 h-4 mr-2" />
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
                       disabled={isLoading}
                       className="flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      Edit Profile
+                      <Save className="w-4 h-4 mr-2" />
+                      {isLoading ? 'Saving...' : 'Save Changes'}
                     </button>
-                  )}
-                </div>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setIsEditing(true)}
+                    disabled={isLoading}
+                    className="flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Edit Profile
+                  </button>
+                )}
               </div>
             </form>
           </div>
@@ -523,15 +524,18 @@ export function Settings() {
                       Are you sure you want to delete your account? This action cannot be undone.
                     </p>
                     <div>
-                      <input
-                        type="password"
-                        name="currentPassword"
-                        value={formData.currentPassword}
-                        onChange={handleInputChange}
-                        placeholder="Enter your password to confirm"
-                        disabled={isLoading}
-                        className="w-full mb-3 bg-gray-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                      />
+                      {/* For non-Google users, require password; Google users don't */}
+                      {!user.providerData?.some((p: any) => p.providerId === 'google.com') && (
+                        <input
+                          type="password"
+                          name="currentPassword"
+                          value={formData.currentPassword}
+                          onChange={handleInputChange}
+                          placeholder="Enter your password to confirm"
+                          disabled={isLoading}
+                          className="w-full mb-3 bg-gray-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                        />
+                      )}
                     </div>
                     <div className="flex gap-3">
                       <button

@@ -57,6 +57,9 @@ export function Settings() {
     confirmPassword: '',
   });
 
+  // Determine if user signed in via Google
+  const [isGoogleUser, setIsGoogleUser] = useState<boolean>(false);
+
   // Load user data and set the current user state
   useEffect(() => {
     const loadUserData = async () => {
@@ -66,12 +69,16 @@ export function Settings() {
         return;
       }
       setUser(currentUser);
+      // Check if user is Google user
+      const googleFlag = currentUser.providerData?.some((p: any) => p.providerId === 'google.com');
+      setIsGoogleUser(googleFlag);
       try {
         const firestoreData = await getUserData(currentUser.uid);
+        // Use Firestore's "name" and "photoURL" if available; otherwise, fallback to Auth values
         const loadedUserData = {
-          name: currentUser.displayName || '',
+          name: firestoreData?.name || currentUser.displayName || '',
           email: currentUser.email || '',
-          photoURL: currentUser.photoURL || '',
+          photoURL: firestoreData?.photoURL || currentUser.photoURL || '',
           ...firestoreData
         };
         setUserData(loadedUserData);
@@ -164,9 +171,6 @@ export function Settings() {
     }
   };
 
-  // Determine if user signed in via Google
-  const isGoogleUser = user?.providerData?.some((p: any) => p.providerId === 'google.com');
-
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -177,6 +181,7 @@ export function Settings() {
         throw new AuthError('You must be logged in to update your profile');
       }
 
+      // For non-Google users, validate new password fields
       if (!isGoogleUser && formData.newPassword && formData.newPassword !== formData.confirmPassword) {
         throw new AuthError('New passwords do not match');
       }
@@ -186,6 +191,7 @@ export function Settings() {
         name: formData.name !== userData.name ? formData.name : undefined,
         displayName: formData.name !== userData.name ? formData.name : undefined,
         email: formData.email !== userData.email ? formData.email : undefined,
+        // Only include password fields if the user is not a Google user
         ...( !isGoogleUser && {
           currentPassword: formData.currentPassword || undefined,
           newPassword: formData.newPassword || undefined,
@@ -202,7 +208,7 @@ export function Settings() {
           confirmPassword: '',
         }));
 
-        // Update local user data (both fields)
+        // Update local user data (both "name" and "displayName")
         setUserData(prev => ({
           ...prev,
           name: formData.name,
@@ -234,7 +240,7 @@ export function Settings() {
       if (!getCurrentUser()) {
         throw new AuthError('You must be logged in to delete your account');
       }
-
+      // For non-Google users, require current password
       if (!isGoogleUser && !formData.currentPassword) {
         throw new AuthError('Current password is required to delete account');
       }
@@ -323,9 +329,12 @@ export function Settings() {
           <div className="bg-gray-800 rounded-xl p-6 mb-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+                <Crown className="w-5 h-5 text-yellow-400" />
                 Current Subscription
               </h2>
-              <span className="px-3 py-1 bg-blue-500 text-white rounded-full text-sm">Basic</span>
+              <span className="px-3 py-1 bg-blue-500 text-white rounded-full text-sm">
+                Basic
+              </span>
             </div>
             <div className="text-gray-300">
               <p className="mb-2">Your free plan includes:</p>
@@ -388,8 +397,8 @@ export function Settings() {
                   />
                 </div>
 
-                {/* Password Fields - Only shown when editing and if not a Google user */}
-                {isEditing && !user.providerData?.some((p: any) => p.providerId === 'google.com') && (
+                {/* Password Fields - Only shown for non-Google users */}
+                {isEditing && !isGoogleUser && (
                   <>
                     <div>
                       <label className="flex items-center text-sm font-medium text-gray-300 mb-2">
@@ -520,7 +529,7 @@ export function Settings() {
                     </p>
                     <div>
                       {/* For non-Google users, require password; Google users skip */}
-                      {!user.providerData?.some((p: any) => p.providerId === 'google.com') && (
+                      {!isGoogleUser && (
                         <input
                           type="password"
                           name="currentPassword"

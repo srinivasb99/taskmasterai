@@ -1,15 +1,34 @@
 import React from 'react';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { auth, db } from '../../lib/firebase';
-import { saveUserData } from '../../lib/firebase';
+import { doc, setDoc } from 'firebase/firestore';
 
 export function GoogleSignUp() {
+  // Directly defined saveUserData function that saves the user's info to Firestore.
+  const saveUserData = async (user: any) => {
+    try {
+      await setDoc(
+        doc(db, "users", user.uid),
+        {
+          uid: user.uid,
+          email: user.email,
+          name: user.displayName || "Anonymous",  // Save the user's name in the "name" field
+          photoURL: user.photoURL || ""
+        },
+        { merge: true }
+      );
+      console.log("User data saved successfully");
+    } catch (error) {
+      console.error("Error saving user data:", error);
+    }
+  };
+
   const handleGoogleSignUp = async () => {
     try {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
-      // Update Firestore with the user's name, displayName, and photoURL
+      // Save the user's data directly
       await saveUserData(user);
       window.location.href = '/dashboard';
     } catch (error) {

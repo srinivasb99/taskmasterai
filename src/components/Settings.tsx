@@ -69,7 +69,7 @@ export function Settings() {
         return;
       }
       setUser(currentUser);
-      // Check if user is Google user
+      // Determine if the user is a Google user
       const googleFlag = currentUser.providerData?.some((p: any) => p.providerId === 'google.com');
       setIsGoogleUser(googleFlag);
       try {
@@ -186,13 +186,13 @@ export function Settings() {
         throw new AuthError('New passwords do not match');
       }
 
-      // Update both "name" and "displayName" when updating the user's name
+      // For Google users, we skip email update and password fields.
+      // For non-Google users, include email and password updates.
       const updateData = {
         name: formData.name !== userData.name ? formData.name : undefined,
         displayName: formData.name !== userData.name ? formData.name : undefined,
-        email: formData.email !== userData.email ? formData.email : undefined,
-        // Only include password fields if the user is not a Google user
         ...( !isGoogleUser && {
+          email: formData.email !== userData.email ? formData.email : undefined,
           currentPassword: formData.currentPassword || undefined,
           newPassword: formData.newPassword || undefined,
         })
@@ -212,7 +212,7 @@ export function Settings() {
         setUserData(prev => ({
           ...prev,
           name: formData.name,
-          email: formData.email,
+          email: isGoogleUser ? userData.email : formData.email,
           displayName: formData.name,
         }));
       }
@@ -240,7 +240,7 @@ export function Settings() {
       if (!getCurrentUser()) {
         throw new AuthError('You must be logged in to delete your account');
       }
-      // For non-Google users, require current password
+      // For non-Google users, require current password; for Google users, skip it
       if (!isGoogleUser && !formData.currentPassword) {
         throw new AuthError('Current password is required to delete account');
       }
@@ -258,7 +258,10 @@ export function Settings() {
     <div className="flex h-screen bg-gray-900">
       <Sidebar 
         isCollapsed={isSidebarCollapsed} 
-        onToggle={handleToggleSidebar}
+        onToggle={() => setIsSidebarCollapsed(prev => {
+          localStorage.setItem('isSidebarCollapsed', JSON.stringify(!prev));
+          return !prev;
+        })}
         userName={userData.name}
       />
       
@@ -382,20 +385,22 @@ export function Settings() {
                 </div>
 
                 {/* Email Field */}
-                <div>
-                  <label className="flex items-center text-sm font-medium text-gray-300 mb-2">
-                    <Mail className="w-4 h-4 mr-2 text-blue-400" />
-                    Email
-                  </label>
-                  <input
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleInputChange}
-                    disabled={!isEditing || isLoading}
-                    className="w-full bg-gray-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                  />
-                </div>
+                { !isGoogleUser && (
+                  <div>
+                    <label className="flex items-center text-sm font-medium text-gray-300 mb-2">
+                      <Mail className="w-4 h-4 mr-2 text-blue-400" />
+                      Email
+                    </label>
+                    <input
+                      type="email"
+                      name="email"
+                      value={formData.email}
+                      onChange={handleInputChange}
+                      disabled={!isEditing || isLoading}
+                      className="w-full bg-gray-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    />
+                  </div>
+                )}
 
                 {/* Password Fields - Only shown for non-Google users */}
                 {isEditing && !isGoogleUser && (

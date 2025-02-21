@@ -112,7 +112,6 @@ export function Community() {
   }, [user]);
 
   // 4. Real-time fetch user profiles for each file's uploader
-  //    We do this whenever "communityFiles" changes
   useEffect(() => {
     async function fetchUserProfiles() {
       const uniqueUserIds = [...new Set(communityFiles.map((f) => f.userId))];
@@ -138,17 +137,14 @@ export function Community() {
       const userDocRef = doc(db, 'users', user.uid);
 
       if (newBonusGroup > uploadBonusCount) {
-        // New bonus group achieved
         setUploadBonusCount(newBonusGroup);
         updateDoc(userDocRef, { uploadBonusCount: newBonusGroup });
       } else if (newBonusGroup < uploadBonusCount) {
-        // Possibly user is deleting & re-uploading
         const newWarning = abuseWarningCount + 1;
         setAbuseWarningCount(newWarning);
         updateDoc(userDocRef, { abuseWarningCount: newWarning });
         setWarning(
-          `Warning ${newWarning} of 3: Abusive upload behavior detected. ` +
-            `Please refrain from deleting and re-uploading files to gain extra tokens.`
+          `Warning ${newWarning} of 3: Abusive upload behavior detected. Please refrain from deleting and re-uploading files to gain extra tokens.`
         );
         setShowWarning(true);
         setTimeout(() => setShowWarning(false), 5000);
@@ -170,7 +166,6 @@ export function Community() {
     if (!user) return;
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-
       // Check for duplicate file name among current user's files
       const userFiles = communityFiles.filter((f) => f.userId === user.uid);
       if (userFiles.some((f) => f.fileName === file.name)) {
@@ -191,8 +186,7 @@ export function Community() {
   // Remove a shared file (only allowed for DEV users)
   const removeFile = async (file: any) => {
     if (!user) return;
-    if (!DEV_EMAILS.includes(user.email)) return; // only devs can delete
-
+    if (!DEV_EMAILS.includes(user.email)) return;
     try {
       await deleteDoc(doc(db, 'communityFiles', file.id));
       const fileRef = storageRef(storage, `community/${file.userId}/${file.uniqueFileName}`);
@@ -207,13 +201,10 @@ export function Community() {
    */
   const updateFileName = async (fileId: string, newName: string) => {
     try {
-      // Find the old file in state
       const oldFile = communityFiles.find((f) => f.id === fileId);
       if (!oldFile) return;
 
-      // Extract old extension
       const oldExtension = oldFile.fileName.split('.').pop()?.toLowerCase() || '';
-      // Build final new name by re-appending the original extension
       const finalName = `${newName}.${oldExtension}`;
 
       await updateDoc(doc(db, 'communityFiles', fileId), { fileName: finalName });
@@ -268,7 +259,7 @@ export function Community() {
 
   // Filter community files by search term and file type (exclude user's own)
   const filteredCommunityUploadedFiles = communityFiles.filter((file) => {
-    if (file.userId === user.uid) return false; // exclude your own
+    if (file.userId === user.uid) return false;
     const baseName = getDisplayName(file.fileName).toLowerCase();
     const ext = file.fileName.split('.').pop()?.toLowerCase() || '';
     const searchMatch = baseName.includes(searchTerm.toLowerCase());
@@ -300,11 +291,7 @@ export function Community() {
       )}
 
       {/* Main Content */}
-      <main
-        className={`flex-1 overflow-hidden transition-all duration-300 ${
-          isSidebarCollapsed ? 'ml-16' : 'ml-64'
-        } p-8`}
-      >
+      <main className={`flex-1 overflow-hidden transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} p-8`}>
         <div className="overflow-y-auto h-full">
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
@@ -335,12 +322,7 @@ export function Community() {
             >
               {uploading ? <Loader2 className="animate-spin w-5 h-5 mx-auto" /> : 'Choose & Upload File'}
             </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              className="hidden"
-              onChange={handleFileChange}
-            />
+            <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange} />
           </div>
 
           {/* Search Bar with File Type Filter */}
@@ -387,9 +369,8 @@ export function Community() {
                 <ul className="space-y-4">
                   {filteredCommunityUploadedFiles.map((file) => {
                     const ext = (file.fileName.split('.').pop() || 'unknown').toUpperCase();
-                    const uploaderProfile = userProfiles[file.userId]; // <--- retrieve from userProfiles
+                    const uploaderProfile = userProfiles[file.userId]; // use "name" field and photoURL from here
                     const cost = pricing.Basic[file.fileName.split('.').pop()?.toLowerCase() || '*'] || pricing.Basic['*'];
-
                     return (
                       <li
                         key={file.id}
@@ -401,7 +382,7 @@ export function Community() {
                             {uploaderProfile?.photoURL ? (
                               <img
                                 src={uploaderProfile.photoURL}
-                                alt={uploaderProfile.displayName}
+                                alt={uploaderProfile.name}
                                 className="w-full h-full object-cover"
                               />
                             ) : (
@@ -409,7 +390,7 @@ export function Community() {
                             )}
                           </div>
                           <span className="text-sm text-gray-300 font-medium">
-                            {uploaderProfile?.displayName || 'Unknown'}
+                            {uploaderProfile?.name || 'Unknown'}
                           </span>
                         </div>
                         {/* File Info */}
@@ -427,7 +408,7 @@ export function Community() {
                               onClick={() => unlockFile(file)}
                               className="px-3 py-1 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-full text-sm transition-all transform hover:scale-105 flex flex-col items-center"
                             >
-                              <span></span>
+                              <span>Unlock</span>
                               <div className="flex items-center text-xs">
                                 <Coins className="w-4 h-4 text-yellow-400 mr-1" />
                                 <span>{cost}</span>
@@ -449,7 +430,10 @@ export function Community() {
             <section className="bg-gray-800/60 rounded-xl p-4 border border-gray-700 h-[650px] overflow-y-auto">
               <h2 className="text-2xl font-semibold text-white mb-4">Your Shared Files</h2>
               {yourSharedFiles.length === 0 ? (
-                <p className="text-gray-400">You haven't shared any files yet.</p>
+                <p className="text-gray-400 flex items-center gap-2">
+                  <Coins className="w-4 h-4 text-yellow-400" />
+                  You haven't shared any files yet. Upload files to earn tokens.
+                </p>
               ) : (
                 <ul className="space-y-4">
                   {yourSharedFiles.map((file) => {
@@ -494,7 +478,6 @@ export function Community() {
                               <button
                                 onClick={() => {
                                   setEditingFileId(file.id);
-                                  // Strip extension from old name
                                   const baseName = getDisplayName(file.fileName);
                                   setEditingFileName(baseName);
                                 }}
@@ -502,7 +485,6 @@ export function Community() {
                               >
                                 Edit
                               </button>
-                              {/* Only DEV users can delete their files */}
                               {DEV_EMAILS.includes(user.email) && (
                                 <button
                                   onClick={() => removeFile(file)}

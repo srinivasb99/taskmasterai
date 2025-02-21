@@ -41,7 +41,7 @@ export function Community() {
   const [tokens, setTokens] = useState<number>(500);
   const [loading, setLoading] = useState(true);
 
-  // Real-time data
+  // Real-time data from Firestore
   const [communityFiles, setCommunityFiles] = useState<any[]>([]);
   const [unlockedFileIds, setUnlockedFileIds] = useState<string[]>([]);
 
@@ -64,7 +64,7 @@ export function Community() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('All');
 
-  // 1. Check Auth & Load user doc fields for abuse prevention
+  // 1. Check Auth & load user document fields for abuse prevention
   useEffect(() => {
     const firebaseUser = getCurrentUser();
     if (firebaseUser) {
@@ -369,7 +369,8 @@ export function Community() {
                 <ul className="space-y-4">
                   {filteredCommunityUploadedFiles.map((file) => {
                     const ext = (file.fileName.split('.').pop() || 'unknown').toUpperCase();
-                    const uploaderProfile = userProfiles[file.userId]; // use "name" field and photoURL from here
+                    // Pull uploader's info from Firestore using the "name" and "photoURL" fields
+                    const uploaderProfile = userProfiles[file.userId];
                     const cost = pricing.Basic[file.fileName.split('.').pop()?.toLowerCase() || '*'] || pricing.Basic['*'];
                     return (
                       <li
@@ -408,7 +409,7 @@ export function Community() {
                               onClick={() => unlockFile(file)}
                               className="px-3 py-1 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-full text-sm transition-all transform hover:scale-105 flex flex-col items-center"
                             >
-                              <span>Unlock</span>
+                              <span></span>
                               <div className="flex items-center text-xs">
                                 <Coins className="w-4 h-4 text-yellow-400 mr-1" />
                                 <span>{cost}</span>

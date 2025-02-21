@@ -23,13 +23,15 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 
-// Function to save user data to Firestore
+// Function to save user data to Firestore (now including "name" and "photoURL")
 export const saveUserData = async (user: any) => {
   try {
     await setDoc(doc(db, "users", user.uid), {
       uid: user.uid,
       email: user.email,
-      displayName: user.displayName || "Anonymous"
+      name: user.displayName || "Anonymous",
+      displayName: user.displayName || "Anonymous",
+      photoURL: user.photoURL || ""
     });
     console.log("User data saved successfully");
   } catch (error) {
@@ -44,7 +46,7 @@ export const googleSignIn = async () => {
     const result = await signInWithPopup(auth, provider);
     const user = result.user;
     console.log("Google Sign-In successful:", user);
-    await saveUserData(user); // Save user data to Firestore after successful login
+    await saveUserData(user); // Save user data (name and photoURL) to Firestore
     return user; // Return user info to use in the calling function
   } catch (error) {
     console.error("Error with Google Sign-In:", error);
@@ -58,6 +60,8 @@ export const emailSignIn = async (email: string, password: string) => {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
     console.log("Sign-In successful:", user);
+    // Update Firestore with user data including name and photoURL (if available)
+    await saveUserData(user);
     return user; // Return user info if needed
   } catch (error) {
     console.error("Error signing in:", error);

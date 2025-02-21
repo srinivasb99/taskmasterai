@@ -1,12 +1,16 @@
 import React from 'react';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
-import { auth } from '../../lib/firebase';
+import { auth, db } from '../../lib/firebase';
+import { saveUserData } from '../../lib/firebase';
 
 export function GoogleSignUp() {
   const handleGoogleSignUp = async () => {
     try {
       const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+      // Update Firestore with the user's name, displayName, and photoURL
+      await saveUserData(user);
       window.location.href = '/dashboard';
     } catch (error) {
       console.error("Google sign up failed", error);

@@ -4,15 +4,17 @@ import { auth, db } from '../../lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 
 export function GoogleSignUp() {
-  // Directly defined saveUserData function that saves the user's info to Firestore.
+  // Inline function to save the user's info to Firestore.
   const saveUserData = async (user: any) => {
     try {
+      // Use the providerData to get the correct name
+      const name = user.providerData[0]?.displayName || "Anonymous";
       await setDoc(
         doc(db, "users", user.uid),
         {
           uid: user.uid,
           email: user.email,
-          name: user.displayName || "Anonymous",  // Save the user's name in the "name" field
+          name: name, // Save the user's name in the "name" field
           photoURL: user.photoURL || ""
         },
         { merge: true }

@@ -64,7 +64,7 @@ export function Community() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('All');
 
-  // 1. Check Auth & load user document fields for abuse prevention
+  // 1. Check Auth & load user doc fields for abuse prevention
   useEffect(() => {
     const firebaseUser = getCurrentUser();
     if (firebaseUser) {
@@ -113,20 +113,18 @@ export function Community() {
 
   // 4. Real-time fetch user profiles for each file's uploader
   useEffect(() => {
-    async function fetchUserProfiles() {
-      const uniqueUserIds = [...new Set(communityFiles.map((f) => f.userId))];
-      if (uniqueUserIds.length > 0) {
-        const userDocs = await getDocs(
-          query(collection(db, 'users'), where(documentId(), 'in', uniqueUserIds))
-        );
+    const uniqueUserIds = [...new Set(communityFiles.map((f) => f.userId))];
+    if (uniqueUserIds.length > 0) {
+      const q = query(collection(db, 'users'), where(documentId(), 'in', uniqueUserIds));
+      const unsubscribe = onSnapshot(q, (snapshot) => {
         const tempUserMap: { [key: string]: any } = {};
-        userDocs.forEach((docSnap) => {
+        snapshot.forEach((docSnap) => {
           tempUserMap[docSnap.id] = docSnap.data();
         });
         setUserProfiles(tempUserMap);
-      }
+      });
+      return () => unsubscribe();
     }
-    fetchUserProfiles();
   }, [communityFiles]);
 
   // 5. Abuse Prevention: Monitor user's own file uploads (skip for DEV users)

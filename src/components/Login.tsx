@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
-import { auth } from '../lib/firebase';
+import { auth, db } from '../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { googleSignIn, emailSignIn } from '../lib/login-firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 function Login() {
   const navigate = useNavigate();
@@ -11,18 +12,45 @@ function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
+  // On mount, listen for auth state changes and redirect if already logged in.
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setLoading(false);
       if (user) {
-        // User is signed in, redirect to dashboard
-        navigate('/dashboard');
+        // Already signed in; fetch user document to update local data
+        updateLocalUserData(user).then(() => navigate('/dashboard'));
       }
     });
-
-    // Cleanup subscription on unmount
     return () => unsubscribe();
   }, [navigate]);
+
+  // Helper: Retrieve (or create) Firestore user record and update fields
+  const updateLocalUserData = async (user: any) => {
+    try {
+      const userDocRef = doc(db, 'users', user.uid);
+      const docSnap = await getDoc(userDocRef);
+      let name = "";
+      let photoURL = "";
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        // Use the "name" field from Firestore if it exists.
+        name = data.name || "";
+        photoURL = data.photoURL || "";
+      } else {
+        // If no document exists, use a default value and create the doc.
+        name = "";
+        photoURL = user.photoURL || "";
+        await setDoc(userDocRef, {
+          uid: user.uid,
+          email: user.email,
+          name,
+          photoURL
+        });
+      }
+    } catch (error) {
+      console.error("Error updating local user data:", error);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,6 +58,7 @@ function Login() {
       setLoading(true);
       const user = await emailSignIn(email, password);
       if (user) {
+        await updateLocalUserData(user);
         navigate('/dashboard');
       }
     } catch (error) {
@@ -45,6 +74,7 @@ function Login() {
       setLoading(true);
       const user = await googleSignIn();
       if (user) {
+        await updateLocalUserData(user);
         navigate('/dashboard');
       }
     } catch (error) {
@@ -68,18 +98,16 @@ function Login() {
       <main className="flex items-center justify-center min-h-screen">
         <div className="w-full max-w-md bg-gray-800 p-8 rounded-xl">
           <h2 className="text-3xl text-center text-white mb-6">Login</h2>
-          <p className="text-center text-gray-400 mb-6">Create notes in minutes. Free forever. No credit card required.</p>
+          <p className="text-center text-gray-400 mb-6">
+            Create notes in minutes. Free forever. No credit card required.
+          </p>
 
           {/* Google Login Button */}
           <button
             onClick={handleGoogleLogin}
             className="w-full py-3 mb-4 bg-blue-500 text-white rounded-full flex items-center justify-center gap-3 hover:scale-105 transition-all"
           >
-            <svg
-              className="h-6 w-6"
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 48 48"
-            >
+            <svg className="h-6 w-6" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
               <circle cx="24" cy="24" r="24" fill="white" />
               <path
                 fill="#FFC107"
@@ -147,7 +175,9 @@ function Login() {
 
           {/* Sign Up Link */}
           <div className="text-center mt-6">
-            <p className="text-sm text-gray-400">Don't have an account? <a href="/signup" className="text-indigo-400 hover:underline">Sign Up</a></p>
+            <p className="text-sm text-gray-400">
+              Don't have an account? <a href="/signup" className="text-indigo-400 hover:underline">Sign Up</a>
+            </p>
           </div>
 
           {/* Terms of Service Link */}

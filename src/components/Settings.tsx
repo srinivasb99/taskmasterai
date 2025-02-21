@@ -186,8 +186,7 @@ export function Settings() {
         throw new AuthError('New passwords do not match');
       }
 
-      // For Google users, we skip email update and password fields.
-      // For non-Google users, include email and password updates.
+      // For Google users, skip email and password updates.
       const updateData = {
         name: formData.name !== userData.name ? formData.name : undefined,
         displayName: formData.name !== userData.name ? formData.name : undefined,
@@ -265,6 +264,31 @@ export function Settings() {
         userName={userData.name}
       />
       
+      {/* Delete Account Modal Popup */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/50">
+          <div className="bg-red-900/20 p-6 rounded-lg">
+            <p className="text-red-300 mb-4">
+              Are you sure you want to delete your account? This action cannot be undone.
+            </p>
+            <div className="flex gap-4 justify-end">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteAccount}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700"
+              >
+                {isLoading ? 'Deleting...' : 'Yes, Delete Account'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
       <main className={`flex-1 overflow-y-auto transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'}`}>
         <div className="container mx-auto px-6 py-8">
           <div className="mb-8">
@@ -332,7 +356,6 @@ export function Settings() {
           <div className="bg-gray-800 rounded-xl p-6 mb-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold text-white flex items-center gap-2">
-                <Crown className="w-5 h-5 text-yellow-400" />
                 Current Subscription
               </h2>
               <span className="px-3 py-1 bg-blue-500 text-white rounded-full text-sm">
@@ -384,23 +407,21 @@ export function Settings() {
                   />
                 </div>
 
-                {/* Email Field */}
-                { !isGoogleUser && (
-                  <div>
-                    <label className="flex items-center text-sm font-medium text-gray-300 mb-2">
-                      <Mail className="w-4 h-4 mr-2 text-blue-400" />
-                      Email
-                    </label>
-                    <input
-                      type="email"
-                      name="email"
-                      value={formData.email}
-                      onChange={handleInputChange}
-                      disabled={!isEditing || isLoading}
-                      className="w-full bg-gray-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                    />
-                  </div>
-                )}
+                {/* Email Field (always visible; editable only for non‑Google users) */}
+                <div>
+                  <label className="flex items-center text-sm font-medium text-gray-300 mb-2">
+                    <Mail className="w-4 h-4 mr-2 text-blue-400" />
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    disabled={!isEditing || isLoading || isGoogleUser}
+                    className="w-full bg-gray-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  />
+                </div>
 
                 {/* Password Fields - Only shown for non-Google users */}
                 {isEditing && !isGoogleUser && (
@@ -516,63 +537,46 @@ export function Settings() {
 
               {/* Delete Account Button */}
               <div>
-                {!showDeleteConfirm ? (
-                  <button
-                    onClick={() => setShowDeleteConfirm(true)}
-                    disabled={isLoading}
-                    className="w-full flex items-center justify-between px-4 py-3 text-left text-red-300 bg-red-900/20 rounded-lg hover:bg-red-900/30 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <span className="flex items-center">
-                      <Trash2 className="w-5 h-5 mr-3 text-red-400" />
-                      Delete Account
-                    </span>
-                  </button>
-                ) : (
-                  <div className="p-4 bg-red-900/20 rounded-lg">
-                    <p className="text-red-300 mb-3">
-                      Are you sure you want to delete your account? This action cannot be undone.
-                    </p>
-                    <div>
-                      {/* For non-Google users, require password; Google users skip */}
-                      {!isGoogleUser && (
-                        <input
-                          type="password"
-                          name="currentPassword"
-                          value={formData.currentPassword}
-                          onChange={handleInputChange}
-                          placeholder="Enter your password to confirm"
-                          disabled={isLoading}
-                          className="w-full mb-3 bg-gray-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                        />
-                      )}
-                    </div>
-                    <div className="flex gap-3">
-                      <button
-                        onClick={() => {
-                          setShowDeleteConfirm(false);
-                          setError(null);
-                          setFormData(prev => ({ ...prev, currentPassword: '' }));
-                        }}
-                        disabled={isLoading}
-                        className="px-4 py-2 text-sm font-medium text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={handleDeleteAccount}
-                        disabled={isLoading}
-                        className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {isLoading ? 'Deleting...' : 'Yes, Delete Account'}
-                      </button>
-                    </div>
-                  </div>
-                )}
+                <button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  disabled={isLoading}
+                  className="w-full flex items-center justify-between px-4 py-3 text-left text-red-300 bg-red-900/20 rounded-lg hover:bg-red-900/30 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <span className="flex items-center">
+                    <Trash2 className="w-5 h-5 mr-3 text-red-400" />
+                    Delete Account
+                  </span>
+                </button>
               </div>
             </div>
           </div>
         </div>
       </main>
+
+      {/* Delete Account Modal Popup */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/50">
+          <div className="bg-red-900/20 p-6 rounded-lg">
+            <p className="text-red-300 mb-4">
+              Are you sure you want to delete your account? This action cannot be undone.
+            </p>
+            <div className="flex gap-4 justify-end">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteAccount}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700"
+              >
+                {isLoading ? 'Deleting...' : 'Yes, Delete Account'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

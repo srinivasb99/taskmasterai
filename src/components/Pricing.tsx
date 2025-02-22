@@ -118,7 +118,7 @@ function Pricing() {
             </button>
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center space-x-8">
-              <a href="/" className="text-gray-300 hover:text-indigo-400 transition-colors">Features</a>
+              <a href="/#features" className="text-gray-300 hover:text-indigo-400 transition-colors">Features</a>
               <a href="pricing" className="text-gray-300 hover:text-indigo-400 transition-colors">Pricing</a>
               <a href="contact" className="text-gray-300 hover:text-indigo-400 transition-colors">Contact</a>
               <a 
@@ -136,7 +136,7 @@ function Pricing() {
             >
               <div className="container mx-auto px-4 py-4 flex flex-col space-y-4">
                 <a
-                  href="/"
+                  href="/#features"
                   className="text-gray-300 hover:text-indigo-400 transition-colors"
                   onClick={toggleMenu}
                 >
@@ -244,9 +244,9 @@ function Pricing() {
           {/* Premium Plan */}
           <motion.div
             variants={cardVariants}
-            className="bg-gray-800 rounded-xl p-6 w-full sm:w-1/3 border-2 border-indigo-500 transform scale-105"
+            className="bg-gray-800 rounded-xl p-6 w-full sm:w-1/3 border-2 border-indigo-500"
           >
-            <h2 className="text-2xl font-bold mb-4 flex items-center justify-center gap-2">
+            <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
               <Crown className="w-6 h-6 text-yellow-400" />
               Premium
             </h2>
@@ -287,7 +287,7 @@ function Pricing() {
             variants={cardVariants}
             className="bg-gray-800 rounded-xl p-6 w-full sm:w-1/3"
           >
-            <h2 className="text-2xl font-bold mb-4 flex items-center justify-center gap-2">
+            <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
               <Gem className="w-6 h-6 text-purple-400" />
               Pro
             </h2>

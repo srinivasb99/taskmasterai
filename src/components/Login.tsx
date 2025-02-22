@@ -10,19 +10,20 @@ import { motion } from 'framer-motion';
 function Login() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
   // Framer Motion variants for the overall container and card
   const containerVariants = {
     hidden: { opacity: 0, y: 50 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } },
-    exit: { opacity: 0, y: -50, transition: { duration: 0.5, ease: "easeIn" } },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: 'easeOut' } },
+    exit: { opacity: 0, y: -50, transition: { duration: 0.5, ease: 'easeIn' } },
   };
 
   const cardVariants = {
     hidden: { opacity: 0, scale: 0.8 },
-    visible: { opacity: 1, scale: 1, transition: { duration: 0.5, ease: "easeOut" } },
+    visible: { opacity: 1, scale: 1, transition: { duration: 0.5, ease: 'easeOut' } },
   };
 
   // On mount, listen for auth state changes and redirect if already logged in.
@@ -57,7 +58,7 @@ function Login() {
           uid: user.uid,
           email: user.email,
           name,
-          photoURL
+          photoURL,
         });
       }
     } catch (error) {
@@ -67,6 +68,7 @@ function Login() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorMessage('');
     try {
       setLoading(true);
       const user = await emailSignIn(email, password);
@@ -74,9 +76,16 @@ function Login() {
         await updateLocalUserData(user);
         navigate('/dashboard');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Login failed", error);
-      // Handle login error (show error message, etc.)
+      // Handle specific Firebase auth error codes
+      if (error.code === "auth/user-not-found") {
+        setErrorMessage("No account found. Please sign up first.");
+      } else if (error.code === "auth/wrong-password") {
+        setErrorMessage("Incorrect password. Please try again.");
+      } else {
+        setErrorMessage("Login failed. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
@@ -92,7 +101,7 @@ function Login() {
       }
     } catch (error) {
       console.error("Google login failed", error);
-      // Handle Google login error
+      // You might want to handle Google login errors differently
     } finally {
       setLoading(false);
     }
@@ -181,6 +190,18 @@ function Login() {
                 onChange={(e) => setPassword(e.target.value)}
               />
             </div>
+
+            {/* Animated Error Message */}
+            {errorMessage && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="bg-red-500 text-white p-2 rounded-lg text-center mb-4"
+              >
+                {errorMessage}
+              </motion.div>
+            )}
+
             <motion.button
               type="submit"
               whileHover={{ scale: 1.05 }}
@@ -193,19 +214,31 @@ function Login() {
 
           {/* Forgot Password Link */}
           <div className="text-center mt-4">
-            <a href="/forgot-password" className="text-sm text-indigo-400 hover:underline">Forgot password?</a>
+            <a href="/forgot-password" className="text-sm text-indigo-400 hover:underline">
+              Forgot password?
+            </a>
           </div>
 
           {/* Sign Up Link */}
           <div className="text-center mt-6">
             <p className="text-sm text-gray-400">
-              Don't have an account? <a href="/signup" className="text-indigo-400 hover:underline">Sign Up</a>
+              Don't have an account?{' '}
+              <a href="/signup" className="text-indigo-400 hover:underline">
+                Sign Up
+              </a>
             </p>
           </div>
 
           {/* Terms of Service Link */}
           <div className="text-center mt-4 text-sm text-gray-400">
-            By signing in, you agree to our <a href="/terms" className="text-indigo-400 hover:underline">Terms of Service</a> and <a href="/privacy-policy" className="text-indigo-400 hover:underline">Privacy Policy</a>.
+            By signing in, you agree to our{' '}
+            <a href="/terms" className="text-indigo-400 hover:underline">
+              Terms of Service
+            </a>{' '}
+            and{' '}
+            <a href="/privacy-policy" className="text-indigo-400 hover:underline">
+              Privacy Policy
+            </a>.
           </div>
         </motion.div>
       </main>

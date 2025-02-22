@@ -567,19 +567,33 @@ let assistantReply = (result[0]?.generated_text as string || '')
   // ---------------------
   // 7. AUTH LISTENER
   // ---------------------
-  useEffect(() => {
-    const unsubscribe = onFirebaseAuthStateChanged((firebaseUser) => {
-      setUser(firebaseUser);
-      if (firebaseUser && firebaseUser.displayName) {
+useEffect(() => {
+  const unsubscribe = onFirebaseAuthStateChanged((firebaseUser) => {
+    setUser(firebaseUser);
+    if (firebaseUser) {
+      if (firebaseUser.displayName) {
         setUserName(firebaseUser.displayName);
-      } else if (firebaseUser) {
-        setUserName("Loading...");
       } else {
-        setUserName("Loading...");
+        // If displayName is not set, fetch the "name" field from Firestore.
+        getDoc(doc(db, "users", firebaseUser.uid))
+          .then((docSnap) => {
+            if (docSnap.exists() && docSnap.data().name) {
+              setUserName(docSnap.data().name);
+            } else {
+              setUserName("User");
+            }
+          })
+          .catch((error) => {
+            console.error("Error fetching user data:", error);
+            setUserName("User");
+          });
       }
-    });
-    return () => unsubscribe();
-  }, []);
+    } else {
+      setUserName("Loading...");
+    }
+  });
+  return () => unsubscribe();
+}, []);
 
   // ---------------------
   // 8. COLLECTION SNAPSHOTS

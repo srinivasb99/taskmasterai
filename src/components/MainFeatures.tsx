@@ -1,61 +1,93 @@
 import React from 'react';
-import { Zap, FileText, LayoutDashboard, Users, MessageSquareMore, Calendar } from 'lucide-react';
+import { LayoutDashboard, NotebookPen, Users, Users2, Bot, Calendar, Focus } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 const features = [
   {
-    icon: <Zap className="w-8 h-8" />,
-    title: "Distraction Control",
-    subtitle: "Block Distractions, Boost Focus",
-    description: "Manage your focus like a pro. Block distracting websites and apps, mute notifications, and enjoy calming ambient sounds to enhance productivity."
+    icon: LayoutDashboard,
+    title: 'Dashboard',
+    description:
+      'Your command center for peak productivity. Seamlessly manage tasks, set goals, and track projects with intelligent due dates that automatically sync to your calendar. The dashboard includes customizable timers, including our signature Pomodoro timer with adjustable work/break intervals. Monitor your productivity trends, set daily/weekly targets, and celebrate your achievements with our built-in progress tracking.'
   },
   {
-    icon: <FileText className="w-8 h-8" />,
-    title: "Notes",
-    subtitle: "Create and Manage Notes Effortlessly",
-    description: "Generate notes with AI from text, videos, PDFs, or audio, or craft your own. Export notes as PDFs, share publicly or keep them private, and open in a focused tab for distraction-free reviewing."
+    icon: NotebookPen,
+    title: 'Notes',
+    description:
+      'Transform any content into structured knowledge. Our AI-powered note-taking system can generate comprehensive notes from text, videos, PDFs, or audio files. Each note comes with AI-generated study questions that adapt to your learning style. Open notes in dedicated tabs for focused study, export them as beautifully formatted PDFs, and control sharing permissions with granular access controls. Features smart tagging, instant search, and automatic organization.'
   },
   {
-    icon: <LayoutDashboard className="w-8 h-8" />,
-    title: "Dashboard",
-    subtitle: "Your Productivity Hub",
-    description: "Organize tasks, goals, plans, and projects all in one place. Sync everything with your calendar, and use custom timers, including a Pomodoro timer, to stay on track."
+    icon: Users,
+    title: 'Friends',
+    description:
+      'Elevate your collaborative experience with our advanced social features. Create individual and group chats with real-time messaging, share files with drag-and-drop simplicity, and organize conversations with smart pinning. Reply to specific messages, react with custom emojis, and use threaded discussions for organized conversations. Share notes directly, collaborate on projects, and sync schedules for seamless teamwork.'
   },
   {
-    icon: <Users className="w-8 h-8" />,
-    title: "Friends",
-    subtitle: "Collaborate and Connect",
-    description: "Chat with friends, create group conversations, and share files seamlessly. Pin messages, reply with ease, and add reactions to keep collaboration fun and efficient."
+    icon: Users2,
+    title: 'Community',
+    description:
+      'A collaborative space where knowledge meets AI. Share and discover files, notes, and resources with fellow users. Features include: AI-powered content analysis for shared files, smart file categorization, secure file sharing with granular privacy controls, real-time collaboration tools, community ratings and reviews, personalized content recommendations, and the ability to ask AI questions about any public content. Build your network, learn from others, and contribute to a growing knowledge base.'
   },
   {
-    icon: <MessageSquareMore className="w-8 h-8" />,
-    title: "AI Chat Bot",
-    subtitle: "Your Personal Assistant",
-    description: "Get instant answers, boost productivity, and tackle questions with ease. The AI Chat Bot is here to support you across various topics whenever you need it."
+    icon: Bot,
+    title: 'AI Assistant',
+    description:
+      "Your personal productivity assistant powered by advanced AI. Get instant answers to complex questions, receive suggestions for task optimization, and get help with time management. The AI learns from your work patterns to provide personalized productivity tips, helps break down large projects into manageable tasks, and can even draft responses or summarize long content for you. With access to your notes, it can answer your questions, help you organize and retrieve information, and assist with your tasks, goals, projects, plans, and events—anything you need to stay on top of your life. Available 24/7 for everything from quick queries to deep problem-solving, it's your ultimate tool for productivity and organization."
   },
   {
-    icon: <Calendar className="w-8 h-8" />,
-    title: "Calendar",
-    subtitle: "Plan Smarter, Stay Organized",
-    description: "Manage schedules effortlessly. View and edit tasks, goals, plans, and projects with due dates, all synced with your dashboard for a streamlined experience."
+    icon: Calendar,
+    title: 'Calendar',
+    description:
+      "More than just a schedule - it's your visual productivity timeline. Seamlessly integrates tasks, goals, and projects from your dashboard with smart due date tracking. Create and edit events with natural language input, set recurring tasks with flexible patterns, and get AI-powered suggestions for optimal scheduling. Includes multiple view options (day, week, month), time zone support, and smart conflict detection."
+  },
+  {
+    icon: Focus,
+    title: 'Focus Mode',
+    description:
+      'Take command of your focus with our comprehensive distraction management system. Block distracting websites and apps with customizable schedules, create focus profiles for different activities, and use our smart notification management to filter only essential alerts. Enhance your concentration with our curated collection of ambient sounds, including nature sounds, white noise, and focus-optimized music. Track your focus sessions and receive insights to improve your productivity patterns.'
   }
 ];
 
 export function MainFeatures() {
+  // Container variant for staggering feature cards
+  const containerVariants = {
+    hidden: {},
+    visible: {
+      transition: {
+        staggerChildren: 0.2
+      }
+    }
+  };
+
+  // Variant for each feature card
+  const cardVariants = {
+    hidden: { opacity: 0, y: 20, scale: 0.95 },
+    visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.5, ease: 'easeOut' } }
+  };
+
   return (
     <section className="py-20 bg-gray-800/30">
       <div className="container mx-auto px-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <motion.div
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+        >
           {features.map((feature, index) => (
-            <div key={index} className="p-6 bg-gray-900/50 backdrop-blur-sm rounded-xl hover:bg-gray-800/50 transition-all duration-300 border border-gray-800/50">
+            <motion.div
+              key={index}
+              className="p-6 bg-gray-900/50 backdrop-blur-sm rounded-xl hover:bg-gray-800/50 transition-all duration-300 border border-gray-800/50"
+              variants={cardVariants}
+              whileHover={{ scale: 1.03 }}
+            >
               <div className="text-indigo-400 mb-4">
-                {feature.icon}
+                {React.createElement(feature.icon, { className: 'w-8 h-8' })}
               </div>
               <h3 className="text-xl font-semibold text-white mb-2">{feature.title}</h3>
-              <h4 className="text-indigo-400 font-medium mb-3">{feature.subtitle}</h4>
               <p className="text-gray-400 leading-relaxed">{feature.description}</p>
-            </div>
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
       </div>
     </section>
   );

@@ -77,7 +77,7 @@ useEffect(() => {
     getDoc(userDocRef).then((docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
-        // Use ?? so that 0 is not replaced by 500
+        // Use nullish coalescing so that if tokens is 0, it remains 0.
         setTokens(data.tokens ?? 500);
         setUploadBonusCount(data.uploadBonusCount ?? 0);
         setAbuseWarningCount(data.abuseWarningCount ?? 0);

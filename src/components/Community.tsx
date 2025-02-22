@@ -68,25 +68,27 @@ export function Community() {
   const [filterType, setFilterType] = useState('All');
 
   // 1. Check Auth & load user doc fields for abuse prevention
-  useEffect(() => {
-    const firebaseUser = getCurrentUser();
-    if (firebaseUser) {
-      setUser(firebaseUser);
-      setUserName(firebaseUser.displayName || 'User');
-      const userDocRef = doc(db, 'users', firebaseUser.uid);
-      getDoc(userDocRef).then((docSnap) => {
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          setTokens(data.tokens || 500);
-          setUploadBonusCount(data.uploadBonusCount || 0);
-          setAbuseWarningCount(data.abuseWarningCount || 0);
-        }
-      });
-    } else {
-      navigate('/login');
-    }
-    setLoading(false);
-  }, [navigate]);
+useEffect(() => {
+  const firebaseUser = getCurrentUser();
+  if (firebaseUser) {
+    setUser(firebaseUser);
+    setUserName(firebaseUser.displayName || 'User');
+    const userDocRef = doc(db, 'users', firebaseUser.uid);
+    getDoc(userDocRef).then((docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        // Use ?? so that 0 is not replaced by 500
+        setTokens(data.tokens ?? 500);
+        setUploadBonusCount(data.uploadBonusCount ?? 0);
+        setAbuseWarningCount(data.abuseWarningCount ?? 0);
+      }
+    });
+  } else {
+    navigate('/login');
+  }
+  setLoading(false);
+}, [navigate]);
+
 
   // 2. Real-time listener for "communityFiles" collection
   useEffect(() => {

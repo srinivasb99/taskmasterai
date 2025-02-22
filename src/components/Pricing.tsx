@@ -86,9 +86,9 @@ function Pricing() {
 
   // Helper to render list items with a check icon; force text onto one line.
   const renderFeatureItem = (text: string) => (
-    <li className="flex items-center whitespace-nowrap">
+    <li className="flex items-center whitespace-nowrap overflow-hidden">
       <Check className="w-5 h-5 text-green-500 mr-2" />
-      <span>{text}</span>
+      <span className="truncate">{text}</span>
     </li>
   );
 
@@ -230,7 +230,7 @@ function Pricing() {
           {/* Basic Plan */}
           <motion.div
             variants={cardVariants}
-            className="bg-gray-800 rounded-xl p-6 w-full sm:w-1/3 min-h-[500px]"
+            className="bg-gray-800 rounded-xl p-6 w-full sm:w-1/2 lg:w-1/3 min-h-[500px]"
           >
             <h2 className="text-2xl font-bold mb-4">Basic</h2>
             <p className="text-3xl font-extrabold text-indigo-400 mb-1">Free</p>
@@ -256,7 +256,7 @@ function Pricing() {
           {/* Premium Plan */}
           <motion.div
             variants={cardVariants}
-            className="bg-gray-800 rounded-xl p-6 w-full sm:w-1/3 min-h-[500px] border-2 border-indigo-500"
+            className="bg-gray-800 rounded-xl p-6 w-full sm:w-1/2 lg:w-1/3 min-h-[500px] border-2 border-indigo-500"
           >
             <h2 className="text-2xl font-bold mb-2 flex items-center gap-2">
               <Crown className="w-6 h-6 text-yellow-400" />
@@ -303,7 +303,7 @@ function Pricing() {
           {/* Pro Plan */}
           <motion.div
             variants={cardVariants}
-            className="bg-gray-800 rounded-xl p-6 w-full sm:w-1/3 min-h-[500px]"
+            className="bg-gray-800 rounded-xl p-6 w-full sm:w-1/2 lg:w-1/3 min-h-[500px]"
           >
             <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
               <Gem className="w-6 h-6 text-purple-400" />

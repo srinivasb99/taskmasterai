@@ -116,6 +116,21 @@ useEffect(() => {
     return () => unsubUnlocked();
   }, [user]);
 
+  useEffect(() => {
+  if (user) {
+    const userDocRef = doc(db, 'users', user.uid);
+    const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        // Use the nullish coalescing operator to ensure 0 is preserved
+        setTokens(data.tokens ?? 500);
+      }
+    });
+    return () => unsubscribe();
+  }
+}, [user]);
+
+
   // 4. Real-time fetch user profiles for each file's uploader
   useEffect(() => {
     const uniqueUserIds = [...new Set(communityFiles.map((f) => f.userId))];
@@ -345,28 +360,34 @@ const unlockFile = async (file: any) => {
 
 
 
-      {/* Main Content */}
-      <main className={`flex-1 overflow-hidden transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} p-8`}>
-        <div className="overflow-y-auto h-full">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-2">
-              <Globe2 className="w-6 h-6 text-blue-400" />
-              <h1 className="text-3xl font-bold text-white">Community</h1>
-            </div>
-            <div className="flex items-center gap-2 text-gray-300">
-              <Coins className="w-5 h-5 text-yellow-400" />
-              <motion.span
-                key={tokens}
-                initial={{ scale: 0.8, opacity: 0.5 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                className="text-lg"
-              >
-                {Number(tokens).toLocaleString()}
-              </motion.span>
-            </div>
-          </div>
+{/* Main Content */}
+<main
+  className={`flex-1 overflow-hidden transition-all duration-300 ${
+    isSidebarCollapsed ? 'ml-16' : 'ml-64'
+  } p-8`}
+>
+  <div className="overflow-y-auto h-full">
+    {/* Header */}
+    <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center gap-2">
+        <Globe2 className="w-6 h-6 text-blue-400" />
+        <h1 className="text-3xl font-bold text-white">Community</h1>
+      </div>
+      <div className="flex items-center gap-2 text-gray-300">
+        <Coins className="w-5 h-5 text-yellow-400" />
+        <motion.span
+          key={tokens}
+          initial={{ scale: 0.8, opacity: 0.5 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+          className="text-lg"
+        >
+          {Number(tokens).toLocaleString()}
+        </motion.span>
+      </div>
+    </div>
+
+
 
           {/* Single Button for Selecting & Uploading File */}
           <div className="mb-6">

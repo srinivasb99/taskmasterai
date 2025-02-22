@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Crown, Gem } from 'lucide-react';
 import { subscribeToAuthState } from '../lib/pricing-firebase';
 import { Logo } from './Logo';
 import { createCheckoutSession } from '../lib/stripe-client';
+import { motion } from 'framer-motion';
 
 // Direct Stripe checkout URLs
 const STRIPE_PRICES = {
@@ -21,7 +22,6 @@ function Pricing() {
   const { loading } = useAuth();
   const [user, setUser] = useState<any>(null);
   const [isYearly, setIsYearly] = useState(true);
-
   const [isOpen, setIsOpen] = useState(false);
 
   const toggleMenu = () => {
@@ -40,8 +40,6 @@ function Pricing() {
       alert('Please login to subscribe');
       return;
     }
-
-    // Open Stripe checkout in new tab
     window.open(checkoutUrl, '_blank');
   };
 
@@ -59,16 +57,43 @@ function Pricing() {
   const standardBillingText = isYearly ? 'Billed yearly' : 'Billed monthly';
   const proBillingText = isYearly ? 'Billed yearly' : 'Billed monthly';
 
+  // Framer Motion Variants
+  const headerVariants = {
+    hidden: { opacity: 0, y: -50 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: 'easeOut' } }
+  };
+
+  const containerVariants = {
+    hidden: {},
+    visible: {
+      transition: { staggerChildren: 0.2 }
+    }
+  };
+
+  const cardVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: 'easeOut' } }
+  };
+
+  const buttonVariants = {
+    hover: { scale: 1.05 },
+    tap: { scale: 0.95 }
+  };
+
   return (
     <div className="flex flex-col min-h-screen bg-gray-900 font-poppins">
-      <header className="fixed w-full bg-gray-900/80 backdrop-blur-lg border-b border-gray-800 z-50">
+      {/* Animated Header */}
+      <motion.header 
+        className="fixed w-full bg-gray-900/80 backdrop-blur-lg border-b border-gray-800 z-50"
+        variants={headerVariants}
+        initial="hidden"
+        animate="visible"
+      >
         <div className="container mx-auto px-4 py-4">
           <nav className="flex items-center justify-between">
-            {/* Make the logo clickable and navigate to index.html */}
             <a href="/">
               <Logo />
             </a>
-            
             {/* Hamburger Menu Button */}
             <button
               className="md:hidden text-gray-300 hover:text-indigo-400 focus:outline-none"
@@ -91,7 +116,6 @@ function Pricing() {
                 )}
               </svg>
             </button>
-
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center space-x-8">
               <a href="/" className="text-gray-300 hover:text-indigo-400 transition-colors">Features</a>
@@ -104,7 +128,6 @@ function Pricing() {
                 {user ? "Dashboard" : "Get Started Today"}
               </a>
             </div>
-
             {/* Mobile Navigation */}
             <div
               className={`absolute top-full left-0 right-0 bg-gray-900/95 border-b border-gray-800 md:hidden transition-all duration-300 ease-in-out ${
@@ -144,110 +167,162 @@ function Pricing() {
             </div>
           </nav>
         </div>
-      </header>
+      </motion.header>
 
+      {/* Main Pricing Content */}
       <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-8 text-white">
-        <div className="text-center mb-12">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: 'easeOut' }}
+          className="text-center mb-12"
+        >
           <h1 className="text-4xl font-bold text-indigo-400 mb-2">Choose Your Perfect Plan</h1>
           <p className="text-gray-300">Select a plan that works best for you.</p>
-        </div>
+        </motion.div>
 
-        <div className="flex justify-center mb-8">
+        <motion.div
+          initial="hidden"
+          animate="visible"
+          variants={containerVariants}
+          className="flex justify-center mb-8"
+        >
           <div className="bg-gray-800 rounded-full flex">
-            <button 
+            <motion.button 
+              variants={buttonVariants}
+              whileHover="hover"
+              whileTap="tap"
               className={`px-4 py-2 rounded-full transition-colors duration-300 ${isYearly ? 'bg-indigo-500 text-white' : 'text-gray-300'}`}
               onClick={() => setIsYearly(true)}
             >
               Yearly
-            </button>
-            <button 
+            </motion.button>
+            <motion.button 
+              variants={buttonVariants}
+              whileHover="hover"
+              whileTap="tap"
               className={`px-4 py-2 rounded-full transition-colors duration-300 ${!isYearly ? 'bg-indigo-500 text-white' : 'text-gray-300'}`}
               onClick={() => setIsYearly(false)}
             >
               Monthly
-            </button>
+            </motion.button>
           </div>
-        </div>
+        </motion.div>
 
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
+        <motion.div
+          initial="hidden"
+          animate="visible"
+          variants={containerVariants}
+          className="flex flex-col sm:flex-row items-center justify-center gap-6"
+        >
           {/* Basic Plan */}
-          <div className="bg-gray-800 rounded-xl p-6 w-full sm:w-1/3">
+          <motion.div
+            variants={cardVariants}
+            className="bg-gray-800 rounded-xl p-6 w-full sm:w-1/3"
+          >
             <h2 className="text-2xl font-bold mb-4">Basic</h2>
             <p className="text-3xl font-extrabold text-indigo-400 mb-1">Free</p>
             <p className="text-sm text-gray-400 mb-4">Forever free</p>
             <ul className="mb-6 space-y-2 text-gray-300">
-              <li>2 PDF Uploads & 2 AI-Generated Text Outputs</li>
+              <li>2 PDF Uploads &amp; 2 AI-Generated Text Outputs</li>
               <li>10 AI Chat Interactions per Month</li>
-              <li>1 AI-Generated Note from Audio & YouTube Links</li>
+              <li>1 AI-Generated Note from Audio &amp; YouTube Links</li>
               <li>500 Tokens Included</li>
               <li>Add Up to 3 Friends</li>
             </ul>
-            <a 
+            <motion.a 
+              variants={buttonVariants}
+              whileHover="hover"
+              whileTap="tap"
               href={user ? "/dashboard" : "/signup"}
-              className="inline-block w-full text-center py-3 rounded-full font-semibold bg-indigo-500 text-white hover:scale-105 transition-transform"
+              className="inline-block w-full text-center py-3 rounded-full font-semibold bg-indigo-500 text-white transition-transform"
             >
               {user ? 'Access Dashboard' : 'Sign Up Free'}
-            </a>
-          </div>
+            </motion.a>
+          </motion.div>
 
           {/* Premium Plan */}
-          <div className="bg-gray-800 rounded-xl p-6 w-full sm:w-1/3 border-2 border-indigo-500 transform scale-105">
-            <h2 className="text-2xl font-bold mb-4">Premium</h2>
+          <motion.div
+            variants={cardVariants}
+            className="bg-gray-800 rounded-xl p-6 w-full sm:w-1/3 border-2 border-indigo-500 transform scale-105"
+          >
+            <h2 className="text-2xl font-bold mb-4 flex items-center justify-center gap-2">
+              <Crown className="w-6 h-6 text-yellow-400" />
+              Premium
+            </h2>
             <p className="text-3xl font-extrabold text-indigo-400 mb-1">{standardPriceText}</p>
             <p className="text-sm text-gray-400 mb-4">{standardBillingText}</p>
             <ul className="mb-6 space-y-2 text-gray-300">
-              <li>Unlimited PDF Uploads & AI-Generated Text Outputs</li>
+              <li>Unlimited PDF Uploads &amp; AI-Generated Text Outputs</li>
               <li>Unlimited AI Chat Interactions</li>
               <li>Unlimited AI-Generated Notes</li>
               <li>1,500 Tokens Included</li>
               <li>Add Unlimited Friends</li>
             </ul>
             {user ? (
-              <button 
+              <motion.button 
+                variants={buttonVariants}
+                whileHover="hover"
+                whileTap="tap"
                 onClick={() => handleSubscribe(STRIPE_PRICES.PREMIUM[isYearly ? 'yearly' : 'monthly'])}
-                className="w-full text-center py-3 rounded-full font-semibold bg-white text-indigo-600 hover:scale-105 transition-transform"
+                className="w-full text-center py-3 rounded-full font-semibold bg-white text-indigo-600 transition-transform"
               >
                 Subscribe Now
-              </button>
+              </motion.button>
             ) : (
-              <a 
+              <motion.a 
+                variants={buttonVariants}
+                whileHover="hover"
+                whileTap="tap"
                 href="/signup"
-                className="inline-block w-full text-center py-3 rounded-full font-semibold bg-white text-indigo-600 hover:scale-105 transition-transform"
+                className="inline-block w-full text-center py-3 rounded-full font-semibold bg-white text-indigo-600 transition-transform"
               >
                 Sign Up to Subscribe
-              </a>
+              </motion.a>
             )}
-          </div>
+          </motion.div>
 
           {/* Pro Plan */}
-          <div className="bg-gray-800 rounded-xl p-6 w-full sm:w-1/3">
-            <h2 className="text-2xl font-bold mb-4">Pro</h2>
+          <motion.div
+            variants={cardVariants}
+            className="bg-gray-800 rounded-xl p-6 w-full sm:w-1/3"
+          >
+            <h2 className="text-2xl font-bold mb-4 flex items-center justify-center gap-2">
+              <Gem className="w-6 h-6 text-purple-400" />
+              Pro
+            </h2>
             <p className="text-3xl font-extrabold text-indigo-400 mb-1">{proPriceText}</p>
             <p className="text-sm text-gray-400 mb-4">{proBillingText}</p>
             <ul className="mb-6 space-y-2 text-gray-300">
-              <li>5 PDF Uploads & 5 AI-Generated Text Outputs per Month</li>
+              <li>5 PDF Uploads &amp; 5 AI-Generated Text Outputs per Month</li>
               <li>200 AI Chat Interactions per Month</li>
-              <li>5 AI-Generated Notes from Audio & YouTube Links per Month</li>
+              <li>5 AI-Generated Notes from Audio &amp; YouTube Links per Month</li>
               <li>750 Tokens Included</li>
               <li>Add Up to 10 Friends</li>
             </ul>
             {user ? (
-              <button 
+              <motion.button 
+                variants={buttonVariants}
+                whileHover="hover"
+                whileTap="tap"
                 onClick={() => handleSubscribe(STRIPE_PRICES.PRO[isYearly ? 'yearly' : 'monthly'])}
-                className="w-full text-center py-3 rounded-full font-semibold bg-indigo-500 text-white hover:scale-105 transition-transform"
+                className="w-full text-center py-3 rounded-full font-semibold bg-indigo-500 text-white transition-transform"
               >
                 Subscribe Now
-              </button>
+              </motion.button>
             ) : (
-              <a 
+              <motion.a 
+                variants={buttonVariants}
+                whileHover="hover"
+                whileTap="tap"
                 href="/signup"
-                className="inline-block w-full text-center py-3 rounded-full font-semibold bg-indigo-500 text-white hover:scale-105 transition-transform"
+                className="inline-block w-full text-center py-3 rounded-full font-semibold bg-indigo-500 text-white transition-transform"
               >
                 Sign Up to Subscribe
-              </a>
+              </motion.a>
             )}
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       </main>
 
       <footer className="bg-gray-900 border-t border-gray-800">
@@ -259,7 +334,7 @@ function Pricing() {
               </a>
               <span className="text-gray-600">|</span>
               <a href="/terms" className="text-sm text-gray-400 hover:text-indigo-400">
-                Terms & Conditions
+                Terms &amp; Conditions
               </a>
             </div>
             <p className="text-sm text-gray-400 mt-4 md:mt-0">

@@ -24,6 +24,7 @@ export function SignUpForm() {
           email: user.email,
           firstName,
           lastName,
+          name: `${firstName} ${lastName}`, // Combined full name field
           createdAt: serverTimestamp()
         },
         { merge: true }

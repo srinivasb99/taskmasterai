@@ -57,6 +57,10 @@ function Pricing() {
   const standardBillingText = isYearly ? 'Billed yearly' : 'Billed monthly';
   const proBillingText = isYearly ? 'Billed yearly' : 'Billed monthly';
 
+  // Calculate savings for Premium plan when paid yearly
+  const premiumMonthlySavings = (9.99 - 7.99).toFixed(2);
+  const premiumAnnualSavings = (Number(premiumMonthlySavings) * 12).toFixed(2);
+
   // Framer Motion Variants
   const headerVariants = {
     hidden: { opacity: 0, y: -50 },
@@ -80,11 +84,11 @@ function Pricing() {
     tap: { scale: 0.95 }
   };
 
-  // Helper to render list items with a check icon
+  // Helper to render list items with a check icon; force text onto one line.
   const renderFeatureItem = (text: string) => (
-    <li className="flex items-center">
-      <Check className="w-4 h-4 text-green-500 mr-2" />
-      {text}
+    <li className="flex items-center whitespace-nowrap">
+      <Check className="w-5 h-5 text-green-500 mr-2" />
+      <span>{text}</span>
     </li>
   );
 
@@ -226,7 +230,7 @@ function Pricing() {
           {/* Basic Plan */}
           <motion.div
             variants={cardVariants}
-            className="bg-gray-800 rounded-xl p-6 w-full sm:w-1/3"
+            className="bg-gray-800 rounded-xl p-6 w-full sm:w-1/3 min-h-[500px]"
           >
             <h2 className="text-2xl font-bold mb-4">Basic</h2>
             <p className="text-3xl font-extrabold text-indigo-400 mb-1">Free</p>
@@ -252,12 +256,18 @@ function Pricing() {
           {/* Premium Plan */}
           <motion.div
             variants={cardVariants}
-            className="bg-gray-800 rounded-xl p-6 w-full sm:w-1/3 border-2 border-indigo-500"
+            className="bg-gray-800 rounded-xl p-6 w-full sm:w-1/3 min-h-[500px] border-2 border-indigo-500"
           >
-            <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
+            <h2 className="text-2xl font-bold mb-2 flex items-center gap-2">
               <Crown className="w-6 h-6 text-yellow-400" />
               Premium
             </h2>
+            {/* Savings Badge */}
+            {isYearly && (
+              <div className="mb-2 bg-yellow-500 text-black text-xs font-bold px-2 py-1 rounded-full inline-block">
+                Recommended – Save ${premiumMonthlySavings}/month (${premiumAnnualSavings}/year)
+              </div>
+            )}
             <p className="text-3xl font-extrabold text-indigo-400 mb-1">{standardPriceText}</p>
             <p className="text-sm text-gray-400 mb-4">{standardBillingText}</p>
             <ul className="mb-6 space-y-2 text-gray-300">
@@ -293,7 +303,7 @@ function Pricing() {
           {/* Pro Plan */}
           <motion.div
             variants={cardVariants}
-            className="bg-gray-800 rounded-xl p-6 w-full sm:w-1/3"
+            className="bg-gray-800 rounded-xl p-6 w-full sm:w-1/3 min-h-[500px]"
           >
             <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
               <Gem className="w-6 h-6 text-purple-400" />

@@ -7,7 +7,8 @@ export default defineConfig({
     exclude: ['lucide-react'],
   },
   build: {
-    sourcemap: true,
+    // Turn off sourcemaps in production
+    sourcemap: false,
     rollupOptions: {
       output: {
         manualChunks: {

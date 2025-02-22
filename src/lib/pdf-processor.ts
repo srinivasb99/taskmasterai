@@ -172,9 +172,9 @@ Key Points:
 
     onProgress({ progress: 80, status: 'Generating study questions...', error: null });
 
-    // Generate study questions (generate 11 so we can remove the first question)
+    // Generate study questions
     const questionsPrompt = `
-Based on the following key points, generate 11 multiple-choice questions:
+Based on the following key points, generate 10 multiple-choice questions:
 
 ${keyPoints.join('\n')}
 
@@ -187,7 +187,7 @@ D) (Fourth option)
 Correct: (Letter of correct answer)
 Explanation: (Why this is the correct answer)
 
-Generate 11 questions in this exact format.`;
+Generate 10 questions in this exact format.`;
 
     const questionsResponse = await fetch(
       'https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct',
@@ -216,26 +216,22 @@ Generate 11 questions in this exact format.`;
     const questionsResult = await questionsResponse.json();
     const questionsText = questionsResult[0].generated_text;
 
-// Parse questions
-const questionBlocks = questionsText.split(/Question: /).filter(Boolean);
-let questions = questionBlocks.map(block => {
-  const lines = block.split('\n').filter(Boolean);
-  const question = lines[0].trim();
-  const options = lines.slice(1, 5).map(opt => opt.replace(/^[A-D]\)\s*/, '').trim());
-  const correctAnswer = lines.find(l => l.startsWith('Correct:'))?.replace('Correct:', '').trim();
-  const explanation = lines.find(l => l.startsWith('Explanation:'))?.replace('Explanation:', '').trim() || '';
+    // Parse questions
+    const questionBlocks = questionsText.split(/Question: /).filter(Boolean);
+    const questions = questionBlocks.map(block => {
+      const lines = block.split('\n').filter(Boolean);
+      const question = lines[0].trim();
+      const options = lines.slice(1, 5).map(opt => opt.replace(/^[A-D]\)\s*/, '').trim());
+      const correctAnswer = lines.find(l => l.startsWith('Correct:'))?.replace('Correct:', '').trim();
+      const explanation = lines.find(l => l.startsWith('Explanation:'))?.replace('Explanation:', '').trim() || '';
 
-  return {
-    question,
-    options,
-    correctAnswer: ['A', 'B', 'C', 'D'].indexOf(correctAnswer || 'A'),
-    explanation
-  };
-});
-
-// Remove the first question
-questions = questions.slice(1);
-
+      return {
+        question,
+        options,
+        correctAnswer: ['A', 'B', 'C', 'D'].indexOf(correctAnswer || 'A'),
+        explanation
+      };
+    });
 
     onProgress({ progress: 100, status: 'Processing complete!', error: null });
 

@@ -5,7 +5,7 @@ import { HelmetProvider, Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
 import App from './App';
 import Login from './components/Login';
-import { SignUpPage } from './components/SignUp';
+import { SignUp } from './components/SignUp';
 import { AuthProvider } from './contexts/AuthContext';
 import Pricing from './components/Pricing';
 import Terms from './components/Terms';
@@ -139,7 +139,7 @@ createRoot(document.getElementById('root')!).render(
         <AuthProvider>
           <Routes>
             <Route path="/login" element={<PageTitle title="Login"><Login /></PageTitle>} />
-            <Route path="/signup" element={<PageTitle title="Sign Up"><SignUpPage /></PageTitle>} />
+            <Route path="/signup" element={<PageTitle title="Sign Up"><SignUp /></PageTitle>} />
             <Route path="/pricing" element={<PageTitle title="Pricing"><Pricing /></PageTitle>} />
             <Route path="/terms" element={<PageTitle title="Terms of Service"><Terms /></PageTitle>} />
             <Route path="/settings" element={<PageTitle title="Settings"><Settings /></PageTitle>} />

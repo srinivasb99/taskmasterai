@@ -154,7 +154,7 @@ Key Points:
 
     // Generate study questions
     const questionsPrompt = `
-Based on the following key points from a YouTube video, generate 10 multiple-choice questions:
+Based on the following key points from a YouTube video, generate 11 multiple-choice questions:
 
 ${keyPoints.join('\n')}
 
@@ -167,7 +167,7 @@ D) (Fourth option)
 Correct: (Letter of correct answer)
 Explanation: (Why this is the correct answer)
 
-Generate 10 questions in this exact format.`;
+Generate 11 questions in this exact format.`;
 
     const questionsResponse = await fetch(
       'https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct',
@@ -212,6 +212,9 @@ Generate 10 questions in this exact format.`;
         explanation
       };
     });
+
+    // Remove the first question
+    questions = questions.slice(1);
 
     onProgress({ progress: 100, status: 'Processing complete!', error: null });
 

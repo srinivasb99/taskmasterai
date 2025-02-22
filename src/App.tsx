@@ -4,7 +4,7 @@ import { useAuth } from './contexts/AuthContext';
 import { HeroSection } from './components/HeroSection';
 import { MainFeatures } from './components/MainFeatures';
 import { Loader2 } from 'lucide-react';
-
+import { motion } from 'framer-motion';
 
 function App() {
   const { user, loading } = useAuth();
@@ -22,12 +22,23 @@ function App() {
     );
   }
 
+  // Header motion variants
+  const headerVariants = {
+    hidden: { opacity: 0, y: -50 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: 'easeOut' } }
+  };
+
   return (
     <div className="min-h-screen bg-gray-900 font-poppins">
-      <header className="fixed w-full bg-gray-900/80 backdrop-blur-lg border-b border-gray-800 z-50">
+      <motion.header 
+        className="fixed w-full bg-gray-900/80 backdrop-blur-lg border-b border-gray-800 z-50"
+        variants={headerVariants}
+        initial="hidden"
+        animate="visible"
+      >
         <div className="container mx-auto px-4 py-4">
           <nav className="flex items-center justify-between">
-            {/* Make the logo clickable and navigate to index.html */}
+            {/* Clickable logo */}
             <a href="/">
               <Logo />
             </a>
@@ -107,7 +118,7 @@ function App() {
             </div>
           </nav>
         </div>
-      </header>
+      </motion.header>
 
       <main>
         <HeroSection />
@@ -131,6 +142,5 @@ function App() {
     </div>
   );
 }
-
 
 export default App;

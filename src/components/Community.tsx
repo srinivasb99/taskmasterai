@@ -286,36 +286,63 @@ export function Community() {
         userName={userName}
       />
 
-      {/* Insufficient Tokens Popup */}
-      {insufficientTokensInfo && (
-        <div className="fixed inset-0 flex items-center justify-center z-50">
-          <div className="absolute inset-0 bg-black opacity-50"></div>
-          <div className="bg-white rounded-lg p-6 z-50 max-w-sm mx-auto">
-            <h3 className="text-xl font-semibold mb-4">Insufficient Tokens</h3>
-            <p className="text-gray-700 mb-4">
-              You need {insufficientTokensInfo.missing} more tokens to unlock this file.
-            </p>
-            <p className="text-gray-700 mb-4">
-              Please upgrade your account or upload more files to earn tokens.
-            </p>
-            <div className="flex justify-end gap-4">
-              <button
-                onClick={() => setInsufficientTokensInfo(null)}
-                className="px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400 transition"
-              >
-                Close
-              </button>
-              <button
-                onClick={() => { window.location.href = '/pricing'; }}
-                className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded flex items-center gap-2 hover:scale-105 transition"
-              >
-                <Crown className="w-5 h-5" />
-                Upgrade to Premium
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+{/* Insufficient Tokens Popup */}
+{insufficientTokensInfo && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center">
+    {/* Dark backdrop */}
+    <div className="absolute inset-0 bg-black bg-opacity-50"></div>
+
+    {/* Modal container */}
+    <div className="relative bg-gray-800 rounded-lg p-6 max-w-sm w-full text-white shadow-lg">
+      {/* 'X' button in top-right corner */}
+      <button
+        onClick={() => setInsufficientTokensInfo(null)}
+        className="absolute top-3 right-3 text-gray-400 hover:text-white transition"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          className="w-5 h-5"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M6 18L18 6M6 6l12 12"
+          />
+        </svg>
+      </button>
+
+      <h3 className="text-xl font-semibold mb-4">Insufficient Tokens</h3>
+      <p className="text-gray-300 mb-4">
+        You need {insufficientTokensInfo.missing} more tokens to unlock this file.
+      </p>
+      <p className="text-gray-300 mb-6">
+        Please upgrade your account or upload more files to earn tokens.
+      </p>
+
+      {/* Upgrade to Premium button styled like in your Sidebar */}
+      <div className="flex justify-end">
+        <button
+          onClick={() => { window.location.href = '/pricing'; }}
+          className={`
+            flex items-center justify-center
+            text-white rounded-lg
+            transition-all duration-200 bg-gradient-to-r from-violet-600 to-indigo-600
+            hover:from-violet-500 hover:to-indigo-500 shadow-lg shadow-indigo-500/20
+            px-4 py-2.5
+          `}
+        >
+          <Crown className="w-5 h-5 mr-2" strokeWidth={2} />
+          <span className="text-sm font-medium whitespace-nowrap">Upgrade to Premium</span>
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
 
       {/* Main Content */}
       <main className={`flex-1 overflow-hidden transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} p-8`}>

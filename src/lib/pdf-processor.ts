@@ -216,25 +216,26 @@ Generate 11 questions in this exact format.`;
     const questionsResult = await questionsResponse.json();
     const questionsText = questionsResult[0].generated_text;
 
-    // Parse questions
-    const questionBlocks = questionsText.split(/Question: /).filter(Boolean);
-    let questions = questionBlocks.map(block => {
-      const lines = block.split('\n').filter(Boolean);
-      const question = lines[0].trim();
-      const options = lines.slice(1, 5).map(opt => opt.replace(/^[A-D]\)\s*/, '').trim());
-      const correctAnswer = lines.find(l => l.startsWith('Correct:'))?.replace('Correct:', '').trim();
-      const explanation = lines.find(l => l.startsWith('Explanation:'))?.replace('Explanation:', '').trim() || '';
+// Parse questions
+const questionBlocks = questionsText.split(/Question: /).filter(Boolean);
+let questions = questionBlocks.map(block => {
+  const lines = block.split('\n').filter(Boolean);
+  const question = lines[0].trim();
+  const options = lines.slice(1, 5).map(opt => opt.replace(/^[A-D]\)\s*/, '').trim());
+  const correctAnswer = lines.find(l => l.startsWith('Correct:'))?.replace('Correct:', '').trim();
+  const explanation = lines.find(l => l.startsWith('Explanation:'))?.replace('Explanation:', '').trim() || '';
 
-      return {
-        question,
-        options,
-        correctAnswer: ['A', 'B', 'C', 'D'].indexOf(correctAnswer || 'A'),
-        explanation
-      };
-    });
+  return {
+    question,
+    options,
+    correctAnswer: ['A', 'B', 'C', 'D'].indexOf(correctAnswer || 'A'),
+    explanation
+  };
+});
 
-    // Remove the first question (usually contains mistakes)
-    questions = questions.slice(1);
+// Remove the first question
+questions = questions.slice(1);
+
 
     onProgress({ progress: 100, status: 'Processing complete!', error: null });
 

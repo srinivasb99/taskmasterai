@@ -5,12 +5,25 @@ import { auth, db } from '../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { googleSignIn, emailSignIn } from '../lib/login-firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { motion } from 'framer-motion';
 
 function Login() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+
+  // Framer Motion variants for the overall container and card
+  const containerVariants = {
+    hidden: { opacity: 0, y: 50 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } },
+    exit: { opacity: 0, y: -50, transition: { duration: 0.5, ease: "easeIn" } },
+  };
+
+  const cardVariants = {
+    hidden: { opacity: 0, scale: 0.8 },
+    visible: { opacity: 1, scale: 1, transition: { duration: 0.5, ease: "easeOut" } },
+  };
 
   // On mount, listen for auth state changes and redirect if already logged in.
   useEffect(() => {
@@ -94,18 +107,26 @@ function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 font-poppins">
+    <motion.div 
+      className="min-h-screen bg-gray-900 font-poppins"
+      initial="hidden"
+      animate="visible"
+      exit="exit"
+      variants={containerVariants}
+    >
       <main className="flex items-center justify-center min-h-screen">
-        <div className="w-full max-w-md bg-gray-800 p-8 rounded-xl">
+        <motion.div className="w-full max-w-md bg-gray-800 p-8 rounded-xl" variants={cardVariants}>
           <h2 className="text-3xl text-center text-white mb-6">Login</h2>
           <p className="text-center text-gray-400 mb-6">
             Create notes in minutes. Free forever. No credit card required.
           </p>
 
           {/* Google Login Button */}
-          <button
+          <motion.button
             onClick={handleGoogleLogin}
-            className="w-full py-3 mb-4 bg-blue-500 text-white rounded-full flex items-center justify-center gap-3 hover:scale-105 transition-all"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="w-full py-3 mb-4 bg-blue-500 text-white rounded-full flex items-center justify-center gap-3"
           >
             <svg className="h-6 w-6" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
               <circle cx="24" cy="24" r="24" fill="white" />
@@ -127,7 +148,7 @@ function Login() {
               />
             </svg>
             Login with Google
-          </button>
+          </motion.button>
 
           {/* OR Separator */}
           <div className="flex items-center my-6">
@@ -160,12 +181,14 @@ function Login() {
                 onChange={(e) => setPassword(e.target.value)}
               />
             </div>
-            <button
+            <motion.button
               type="submit"
-              className="w-full py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-full hover:scale-105 transition-all"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="w-full py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-full"
             >
               Login
-            </button>
+            </motion.button>
           </form>
 
           {/* Forgot Password Link */}
@@ -184,9 +207,9 @@ function Login() {
           <div className="text-center mt-4 text-sm text-gray-400">
             By signing in, you agree to our <a href="/terms" className="text-indigo-400 hover:underline">Terms of Service</a> and <a href="/privacy-policy" className="text-indigo-400 hover:underline">Privacy Policy</a>.
           </div>
-        </div>
+        </motion.div>
       </main>
-    </div>
+    </motion.div>
   );
 }
 

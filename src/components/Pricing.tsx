@@ -195,12 +195,40 @@ function Pricing() {
           initial="hidden"
           animate="visible"
           variants={containerVariants}
-          className="flex flex-wrap justify-center gap-6"
+          className="flex justify-center mb-8"
+        >
+          <div className="bg-gray-800 rounded-full flex">
+            <motion.button 
+              variants={buttonVariants}
+              whileHover="hover"
+              whileTap="tap"
+              className={`px-4 py-2 rounded-full transition-colors duration-300 ${isYearly ? 'bg-indigo-500 text-white' : 'text-gray-300'}`}
+              onClick={() => setIsYearly(true)}
+            >
+              Yearly
+            </motion.button>
+            <motion.button 
+              variants={buttonVariants}
+              whileHover="hover"
+              whileTap="tap"
+              className={`px-4 py-2 rounded-full transition-colors duration-300 ${!isYearly ? 'bg-indigo-500 text-white' : 'text-gray-300'}`}
+              onClick={() => setIsYearly(false)}
+            >
+              Monthly
+            </motion.button>
+          </div>
+        </motion.div>
+
+        <motion.div
+          initial="hidden"
+          animate="visible"
+          variants={containerVariants}
+          className="flex flex-col sm:flex-row items-center justify-center gap-6"
         >
           {/* Basic Plan */}
           <motion.div
             variants={cardVariants}
-            className="bg-gray-800 rounded-xl p-6 w-[350px] min-h-[500px] flex flex-col"
+            className="bg-gray-800 rounded-xl p-6 w-full sm:w-1/3 min-h-[500px] flex flex-col"
           >
             <div>
               <h2 className="text-2xl font-bold mb-4">Basic</h2>
@@ -230,7 +258,7 @@ function Pricing() {
           {/* Premium Plan */}
           <motion.div
             variants={cardVariants}
-            className="bg-gray-800 rounded-xl p-6 w-[350px] min-h-[500px] flex flex-col border-2 border-indigo-500"
+            className="bg-gray-800 rounded-xl p-6 w-full sm:w-1/3 min-h-[500px] flex flex-col border-2 border-indigo-500"
           >
             <div>
               <h2 className="text-2xl font-bold mb-2 flex items-center gap-2">
@@ -281,7 +309,7 @@ function Pricing() {
           {/* Pro Plan */}
           <motion.div
             variants={cardVariants}
-            className="bg-gray-800 rounded-xl p-6 w-[350px] min-h-[500px] flex flex-col"
+            className="bg-gray-800 rounded-xl p-6 w-full sm:w-1/3 min-h-[500px] flex flex-col"
           >
             <div>
               <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">

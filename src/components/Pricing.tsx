@@ -236,9 +236,9 @@ function Pricing() {
             <p className="text-3xl font-extrabold text-indigo-400 mb-1">Free</p>
             <p className="text-sm text-gray-400 mb-4">Forever free</p>
             <ul className="mb-6 space-y-2 text-gray-300">
-              {renderFeatureItem("2 PDF Uploads & AI-Generated Text Outputs")}
-              {renderFeatureItem("10 AI Chat Interactions per Month")}
-              {renderFeatureItem("1 AI-Generated Note from Audio & YouTube Links")}
+              {renderFeatureItem("2 PDF and Text Notes per month")}
+              {renderFeatureItem("1 YouTube Notes per month")}
+              {renderFeatureItem("10 AI Chat Interactions per month")}
               {renderFeatureItem("500 Tokens Included")}
               {renderFeatureItem("Add Up to 3 Friends")}
             </ul>
@@ -271,10 +271,10 @@ function Pricing() {
             <p className="text-3xl font-extrabold text-indigo-400 mb-1">{standardPriceText}</p>
             <p className="text-sm text-gray-400 mb-4">{standardBillingText}</p>
             <ul className="mb-6 space-y-2 text-gray-300">
-              {renderFeatureItem("Unlimited PDF Uploads & AI-Generated Text Outputs")}
+              {renderFeatureItem("Unlimited PDF and Text Notes")}
+              {renderFeatureItem("Unlimited Youtube Notes")}
               {renderFeatureItem("Unlimited AI Chat Interactions")}
-              {renderFeatureItem("Unlimited AI-Generated Notes")}
-              {renderFeatureItem("1,500 Tokens Included")}
+              {renderFeatureItem("2,500 Tokens Included")}
               {renderFeatureItem("Add Unlimited Friends")}
             </ul>
             {user ? (
@@ -312,10 +312,10 @@ function Pricing() {
             <p className="text-3xl font-extrabold text-indigo-400 mb-1">{proPriceText}</p>
             <p className="text-sm text-gray-400 mb-4">{proBillingText}</p>
             <ul className="mb-6 space-y-2 text-gray-300">
-              {renderFeatureItem("5 PDF Uploads & AI-Generated Text Outputs per Month")}
+              {renderFeatureItem("10 PDF and Text Notes per month")}
+              {renderFeatureItem("5 YouTube Notes per month")}
               {renderFeatureItem("200 AI Chat Interactions per Month")}
-              {renderFeatureItem("5 AI-Generated Notes from Audio & YouTube Links per Month")}
-              {renderFeatureItem("750 Tokens Included")}
+              {renderFeatureItem("1,000 Tokens Included")}
               {renderFeatureItem("Add Up to 10 Friends")}
             </ul>
             {user ? (

@@ -1136,14 +1136,13 @@ setSmartOverview(formattedHtml);
   {/* Greeting Section */}
   <header className="dashboard-header transform transition-all duration-500 ease-out translate-y-0 opacity-100 pt-16 lg:pt-0">
     <h1 className="text-2xl lg:text-4xl font-bold mb-2 text-white break-words">
-      {greeting.emoji} {greeting.greeting},{' '}
-      <span className="font-bold">{userName || "Loading..."}</span>
+      <span className="inline-block mr-2">{greeting.icon}</span> {greeting.greeting}, <span className="font-bold">{userName || "Loading..."}</span>
     </h1>
     <p className="text-gray-400 italic text-base lg:text-lg">
-      "{quote.text}" -{' '}
-      <span className="text-purple-400">{quote.author}</span>
+      "{quote.text}" - <span className="text-purple-400">{quote.author}</span>
     </p>
   </header>
+
 
   {/* Calendar Card */}
   <div className="bg-gray-800 rounded-xl p-2 min-w-[100px] max-w-[550px] w-full h-[80px] transform hover:scale-[1.02] transition-all duration-300 flex-shrink-0 lg:flex-shrink">

@@ -1136,12 +1136,14 @@ setSmartOverview(formattedHtml);
   {/* Greeting Section */}
   <header className="dashboard-header transform transition-all duration-500 ease-out translate-y-0 opacity-100 pt-16 lg:pt-0">
     <h1 className="text-2xl lg:text-4xl font-bold mb-2 text-white break-words">
-      <span className="inline-block mr-2">{greeting.icon}</span> {greeting.greeting}, <span className="font-bold">{userName || "Loading..."}</span>
+      {React.cloneElement(greeting.icon, { className: "w-[1em] h-[1em] inline-block mr-2" })}
+      {greeting.greeting}, <span className="font-bold">{userName || "Loading..."}</span>
     </h1>
     <p className="text-gray-400 italic text-base lg:text-lg">
       "{quote.text}" - <span className="text-purple-400">{quote.author}</span>
     </p>
   </header>
+
 
 
   {/* Calendar Card */}

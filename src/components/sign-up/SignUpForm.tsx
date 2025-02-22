@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { auth, db } from '../../lib/firebase';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 
@@ -18,6 +18,10 @@ export function SignUpForm() {
       const result = await createUserWithEmailAndPassword(auth, email, password);
       const user = result.user;
       const fullName = `${firstName} ${lastName}`;
+      
+      // Update the Firebase user's profile to include the full name
+      await updateProfile(user, { displayName: fullName });
+
       await setDoc(
         doc(db, "users", user.uid),
         {
@@ -26,7 +30,7 @@ export function SignUpForm() {
           firstName,
           lastName,
           name: fullName,
-          displayName: fullName, // New field for display name
+          displayName: fullName, // Ensure displayName is saved
           createdAt: serverTimestamp()
         },
         { merge: true }

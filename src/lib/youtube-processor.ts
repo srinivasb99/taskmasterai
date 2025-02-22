@@ -152,7 +152,7 @@ Key Points:
 
     onProgress({ progress: 80, status: 'Generating study questions...', error: null });
 
-    // Generate study questions
+    // Generate study questions (generate 11 so we can remove the first question)
     const questionsPrompt = `
 Based on the following key points from a YouTube video, generate 11 multiple-choice questions:
 
@@ -198,7 +198,7 @@ Generate 11 questions in this exact format.`;
 
     // Parse questions
     const questionBlocks = questionsText.split(/Question: /).filter(Boolean);
-    const questions = questionBlocks.map(block => {
+    let questions = questionBlocks.map(block => {
       const lines = block.split('\n').filter(Boolean);
       const question = lines[0].trim();
       const options = lines.slice(1, 5).map(opt => opt.replace(/^[A-D]\)\s*/, '').trim());
@@ -213,7 +213,7 @@ Generate 11 questions in this exact format.`;
       };
     });
 
-    // Remove the first question
+    // Remove the first question (usually contains mistakes)
     questions = questions.slice(1);
 
     onProgress({ progress: 100, status: 'Processing complete!', error: null });

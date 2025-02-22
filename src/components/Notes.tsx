@@ -495,7 +495,7 @@ export function Notes() {
                       </span>
                     </div>
                     <p className="text-gray-400">
-                      Personal &amp; AI-Generated Notes
+                      Create new notes
                     </p>
                   </div>
                 </div>

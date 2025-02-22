@@ -247,8 +247,7 @@ export function Community() {
     setTokens(newTokens);
   };
 
-  // New state for insufficient tokens popup
-  const [insufficientTokensInfo, setInsufficientTokensInfo] = useState<{ missing: number, cost: number } | null>(null);
+
 
   if (loading) {
     return (

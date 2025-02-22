@@ -154,7 +154,7 @@ Key Points:
 
 // Generate study questions
 const questionsPrompt = `
-Based on the following key points from a YouTube video, generate 10 multiple-choice questions:
+Based on the following key points from a YouTube video, generate 11 multiple-choice questions:
 
 ${keyPoints.join('\n')}
 
@@ -167,7 +167,7 @@ D) (Fourth option)
 Correct: (Letter of correct answer)
 Explanation: (Why this is the correct answer)
 
-Generate 10 questions in this exact format.`;
+Generate 11 questions in this exact format.`;
 
 const questionsResponse = await fetch(
   'https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct',
@@ -227,12 +227,13 @@ return {
   sourceUrl: `https://www.youtube.com/watch?v=${videoId}`
 };
 
-} catch (error) {
-  console.error('YouTube processing error:', error);
-  onProgress({
-    progress: 0,
-    status: 'Error processing YouTube video',
-    error: error instanceof Error ? error.message : 'Unknown error occurred'
-  });
-  throw error;
+  } catch (error) {
+    console.error('YouTube processing error:', error);
+    onProgress({
+      progress: 0,
+      status: 'Error processing YouTube video',
+      error: error instanceof Error ? error.message : 'Unknown error occurred'
+    });
+    throw error;
+  }
 }

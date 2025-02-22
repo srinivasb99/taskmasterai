@@ -71,7 +71,7 @@ export async function awardTokensForUpload(userId: string): Promise<void> {
   const querySnapshot = await getDocs(q);
   const fileCount = querySnapshot.size;
 
-  // Calculate how many bonus groups (of 5 files) have been reached
+  // Calculate bonus groups (each group of 5 files gives 50 tokens)
   const bonusGroups = Math.floor(fileCount / 5);
 
   // Reference the user's document in Firestore
@@ -79,23 +79,28 @@ export async function awardTokensForUpload(userId: string): Promise<void> {
   const userDocSnap = await getDoc(userDocRef);
 
   let currentBonus = 0;
-  let currentTokens = 0;
+  let currentTokens: number;
 
   if (userDocSnap.exists()) {
     const data = userDocSnap.data();
-    currentBonus = data.uploadBonusCount || 0;
-    // Use nullish coalescing with a fallback of 0 (not 500) so that if tokens are 0 they stay 0
+    currentBonus = data.uploadBonusCount ?? 0;
+    // If tokens are stored as 0, we keep 0.
     currentTokens = data.tokens ?? 0;
   } else {
-    // If the user document doesn't exist, create one with default tokens of 500 and no bonus awarded yet
+    // If the user document doesn't exist, create one with a starting balance of 500 tokens.
     currentTokens = 500;
     await setDoc(userDocRef, { tokens: 500, uploadBonusCount: 0 });
   }
 
-  // Award bonus tokens if the current bonus groups exceed what has already been awarded
-  if (bonusGroups > currentBonus) {
-    const bonusToAward = (bonusGroups - currentBonus) * 50;
-    const newTokens = currentTokens + bonusToAward;
+  // Calculate the total bonus tokens that should have been awarded so far.
+  const totalBonusRequired = bonusGroups * 50;
+  // Calculate the bonus tokens that have already been given.
+  const alreadyAwardedBonus = currentBonus * 50;
+
+  // If the total required bonus is greater than what has already been awarded, award the difference.
+  if (totalBonusRequired > alreadyAwardedBonus) {
+    const additionalBonus = totalBonusRequired - alreadyAwardedBonus;
+    const newTokens = currentTokens + additionalBonus;
     await updateDoc(userDocRef, {
       tokens: newTokens,
       uploadBonusCount: bonusGroups

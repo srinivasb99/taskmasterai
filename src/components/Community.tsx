@@ -20,6 +20,8 @@ import {
   documentId
 } from 'firebase/firestore';
 import { ref as storageRef, deleteObject } from 'firebase/storage';
+import { doc, onSnapshot } from 'firebase/firestore';
+
 
 // List of developer emails (never get banned or restricted)
 const DEV_EMAILS = [
@@ -89,6 +91,17 @@ useEffect(() => {
   setLoading(false);
 }, [navigate]);
 
+useEffect(() => {
+  if (user) {
+    const userDocRef = doc(db, 'users', user.uid);
+    const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
+      if (docSnap.exists()) {
+        setTokens(docSnap.data().tokens ?? 0);
+      }
+    });
+    return () => unsubscribe();
+  }
+}, [user]);
 
   // 2. Real-time listener for "communityFiles" collection
   useEffect(() => {

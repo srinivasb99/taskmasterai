@@ -1,13 +1,13 @@
 import React from 'react';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { auth, db } from '../../lib/firebase';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 export function GoogleSignUp() {
   // Inline function to save the user's info to Firestore.
   const saveUserData = async (user: any) => {
     try {
-      // Use the providerData to get the correct name
+      // Use providerData to get the correct name
       const name = user.providerData[0]?.displayName || "Anonymous";
       await setDoc(
         doc(db, "users", user.uid),
@@ -15,7 +15,11 @@ export function GoogleSignUp() {
           uid: user.uid,
           email: user.email,
           name: name, // Save the user's name in the "name" field
-          photoURL: user.photoURL || ""
+          photoURL: user.photoURL || "",
+          // Add a createdAt field using the user's auth metadata if available, otherwise use a server timestamp
+          createdAt: user.metadata.creationTime
+            ? new Date(user.metadata.creationTime)
+            : serverTimestamp()
         },
         { merge: true }
       );
@@ -30,9 +34,9 @@ export function GoogleSignUp() {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
-      // Save the user's data directly
+      // Save the user's data including createdAt to Firestore
       await saveUserData(user);
-      window.location.href = '/dashboard';
+      window.location.href = '/splashscreen';
     } catch (error) {
       console.error("Google sign up failed", error);
     }

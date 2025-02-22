@@ -5,6 +5,7 @@ import { HelmetProvider, Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
 import App from './App';
 import Login from './components/Login';
+import { SignUpPage } from './components/SignUp';
 import { AuthProvider } from './contexts/AuthContext';
 import Pricing from './components/Pricing';
 import Terms from './components/Terms';

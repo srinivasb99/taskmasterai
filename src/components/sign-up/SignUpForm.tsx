@@ -17,6 +17,7 @@ export function SignUpForm() {
     try {
       const result = await createUserWithEmailAndPassword(auth, email, password);
       const user = result.user;
+      const fullName = `${firstName} ${lastName}`;
       await setDoc(
         doc(db, "users", user.uid),
         {
@@ -24,7 +25,8 @@ export function SignUpForm() {
           email: user.email,
           firstName,
           lastName,
-          name: `${firstName} ${lastName}`, // Combined full name field
+          name: fullName,
+          displayName: fullName, // New field for display name
           createdAt: serverTimestamp()
         },
         { merge: true }

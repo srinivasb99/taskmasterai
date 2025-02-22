@@ -23,7 +23,7 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 
-// Function to save user data to Firestore (now including "name" and "photoURL")
+// Function to save user data to Firestore (available if needed elsewhere)
 export const saveUserData = async (user: any) => {
   try {
     await setDoc(doc(db, "users", user.uid), {
@@ -39,33 +39,30 @@ export const saveUserData = async (user: any) => {
   }
 };
 
-// Google Sign-In Function
+// Google Sign-In Function (logs the user in without modifying Firestore)
 export const googleSignIn = async () => {
   const provider = new GoogleAuthProvider();
   try {
     const result = await signInWithPopup(auth, provider);
     const user = result.user;
     console.log("Google Sign-In successful:", user);
-    await saveUserData(user); // Save user data (name and photoURL) to Firestore
-    return user; // Return user info to use in the calling function
+    return user; // Simply return the user info
   } catch (error) {
     console.error("Error with Google Sign-In:", error);
-    throw error; // Re-throw the error to handle it in the calling function
+    throw error;
   }
 };
 
-// Email/Password Sign-In Function
+// Email/Password Sign-In Function (logs the user in without modifying Firestore)
 export const emailSignIn = async (email: string, password: string) => {
   try {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
     console.log("Sign-In successful:", user);
-    // Update Firestore with user data including name and photoURL (if available)
-    await saveUserData(user);
-    return user; // Return user info if needed
+    return user; // Simply return the user info
   } catch (error) {
     console.error("Error signing in:", error);
-    throw error; // Re-throw the error to handle it in the calling function
+    throw error;
   }
 };
 
@@ -73,12 +70,12 @@ export const emailSignIn = async (email: string, password: string) => {
 export const sendPasswordResetEmail = async (email: string) => {
   try {
     await firebaseSendPasswordResetEmail(auth, email, {
-      url: window.location.origin + '/login', // Redirect URL after password reset
-      handleCodeInApp: false // Set to true if you want to handle the code in your app
+      url: window.location.origin + '/login',
+      handleCodeInApp: false
     });
     console.log("Password reset email sent successfully");
   } catch (error) {
     console.error("Error sending password reset email:", error);
-    throw error; // Re-throw the error to handle it in the calling function
+    throw error;
   }
 };

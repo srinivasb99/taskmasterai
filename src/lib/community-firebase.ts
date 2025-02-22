@@ -79,15 +79,16 @@ export async function awardTokensForUpload(userId: string): Promise<void> {
   const userDocSnap = await getDoc(userDocRef);
 
   let currentBonus = 0;
-  let currentTokens = 500; // Default starting tokens for a basic user
+  let currentTokens = 0;
 
   if (userDocSnap.exists()) {
     const data = userDocSnap.data();
     currentBonus = data.uploadBonusCount || 0;
-    // Instead of defaulting to 500 if tokens is falsy, check explicitly for undefined/null.
-    currentTokens = (data.tokens !== undefined && data.tokens !== null) ? data.tokens : 500;
+    // Use nullish coalescing with a fallback of 0 (not 500) so that if tokens are 0 they stay 0
+    currentTokens = data.tokens ?? 0;
   } else {
-    // If the user document doesn't exist, create one with default tokens and no bonus awarded yet
+    // If the user document doesn't exist, create one with default tokens of 500 and no bonus awarded yet
+    currentTokens = 500;
     await setDoc(userDocRef, { tokens: 500, uploadBonusCount: 0 });
   }
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { motion } from 'framer-motion';
-import { Loader2, Globe2, Search, Coins, CircleUserRound } from 'lucide-react';
+import { Loader2, Globe2, Search, Coins, CircleUserRound, Crown } from 'lucide-react';
 import { getCurrentUser } from '../lib/settings-firebase';
 import { uploadCommunityFile } from '../lib/community-firebase';
 import { pricing, db, storage } from '../lib/firebase';
@@ -56,6 +56,9 @@ export function Community() {
   const [abuseWarningCount, setAbuseWarningCount] = useState<number>(0);
   const [warning, setWarning] = useState<string>('');
   const [showWarning, setShowWarning] = useState<boolean>(false);
+
+  // New state: for insufficient tokens popup
+  const [insufficientTokensInfo, setInsufficientTokensInfo] = useState<{ missing: number, cost: number } | null>(null);
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     const stored = localStorage.getItem('isSidebarCollapsed');
@@ -184,7 +187,7 @@ export function Community() {
   // Remove a shared file (only allowed for DEV users)
   const removeFile = async (file: any) => {
     if (!user) return;
-    if (!DEV_EMAILS.includes(user.email)) return;
+    if (!DEV_EMAILS.includes(user.email)) return; // only devs can delete
     try {
       await deleteDoc(doc(db, 'communityFiles', file.id));
       const fileRef = storageRef(storage, `community/${file.userId}/${file.uniqueFileName}`);
@@ -229,6 +232,8 @@ export function Community() {
     }
 
     if (currentTokens < cost) {
+      // Show popup indicating insufficient tokens
+      setInsufficientTokensInfo({ missing: cost - currentTokens, cost });
       return;
     }
 
@@ -241,6 +246,9 @@ export function Community() {
     });
     setTokens(newTokens);
   };
+
+  // New state for insufficient tokens popup
+  const [insufficientTokensInfo, setInsufficientTokensInfo] = useState<{ missing: number, cost: number } | null>(null);
 
   if (loading) {
     return (
@@ -279,11 +287,33 @@ export function Community() {
         userName={userName}
       />
 
-      {/* Warning Popup */}
-      {showWarning && (
+      {/* Insufficient Tokens Popup */}
+      {insufficientTokensInfo && (
         <div className="fixed inset-0 flex items-center justify-center z-50">
-          <div className="bg-white text-black p-4 rounded shadow-lg">
-            <p className="font-semibold">{warning}</p>
+          <div className="absolute inset-0 bg-black opacity-50"></div>
+          <div className="bg-white rounded-lg p-6 z-50 max-w-sm mx-auto">
+            <h3 className="text-xl font-semibold mb-4">Insufficient Tokens</h3>
+            <p className="text-gray-700 mb-4">
+              You need {insufficientTokensInfo.missing} more tokens to unlock this file.
+            </p>
+            <p className="text-gray-700 mb-4">
+              Please upgrade your account or upload more files to earn tokens.
+            </p>
+            <div className="flex justify-end gap-4">
+              <button
+                onClick={() => setInsufficientTokensInfo(null)}
+                className="px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400 transition"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => { window.location.href = '/pricing'; }}
+                className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded flex items-center gap-2 hover:scale-105 transition"
+              >
+                <Crown className="w-5 h-5" />
+                Upgrade to Premium
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -299,16 +329,15 @@ export function Community() {
             </div>
             <div className="flex items-center gap-2 text-gray-300">
               <Coins className="w-5 h-5 text-yellow-400" />
-<motion.span
-  key={tokens}
-  initial={{ scale: 0.8, opacity: 0.5 }}
-  animate={{ scale: 1, opacity: 1 }}
-  transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-  className="text-lg"
->
-  {Number(tokens).toLocaleString()}
-</motion.span>
-
+              <motion.span
+                key={tokens}
+                initial={{ scale: 0.8, opacity: 0.5 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                className="text-lg"
+              >
+                {Number(tokens).toLocaleString()}
+              </motion.span>
             </div>
           </div>
 
@@ -408,7 +437,7 @@ export function Community() {
                               onClick={() => unlockFile(file)}
                               className="px-3 py-1 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-full text-sm transition-all transform hover:scale-105 flex flex-col items-center"
                             >
-                              <span></span>
+                              <span>Unlock</span>
                               <div className="flex items-center text-xs">
                                 <Coins className="w-4 h-4 text-yellow-400 mr-1" />
                                 <span>{cost}</span>

@@ -216,36 +216,34 @@ export function Community() {
     }
   };
 
-  // Unlock a file (deduct tokens, etc.)
-  const unlockFile = async (file: any) => {
-    if (!user) return;
-    const parts = file.fileName.split('.');
-    const ext = parts[parts.length - 1].toLowerCase();
-    const cost = pricing.Basic[ext] || pricing.Basic['*'];
+// Unlock a file (deduct tokens, etc.)
+const unlockFile = async (file: any) => {
+  if (!user) return;
+  const parts = file.fileName.split('.');
+  const ext = parts[parts.length - 1].toLowerCase();
+  const cost = pricing.Basic[ext] || pricing.Basic['*'];
 
-    const userDocRef = doc(db, 'users', user.uid);
-    const userDocSnap = await getDoc(userDocRef);
-    let currentTokens = 500;
-    if (userDocSnap.exists()) {
-      const data = userDocSnap.data();
-      currentTokens = data.tokens || 500;
-    }
+  const userDocRef = doc(db, 'users', user.uid);
+  const userDocSnap = await getDoc(userDocRef);
+  // Use nullish coalescing so that if tokens is 0, we keep 0
+  const currentTokens = userDocSnap.exists() ? (userDocSnap.data().tokens ?? 500) : 500;
 
-    if (currentTokens < cost) {
-      // Show popup indicating insufficient tokens
-      setInsufficientTokensInfo({ missing: cost - currentTokens, cost });
-      return;
-    }
+  if (currentTokens < cost) {
+    // Show popup indicating insufficient tokens
+    setInsufficientTokensInfo({ missing: cost - currentTokens, cost });
+    return;
+  }
 
-    const newTokens = currentTokens - cost;
-    await updateDoc(userDocRef, { tokens: newTokens });
-    await addDoc(collection(db, 'unlockedFiles'), {
-      userId: user.uid,
-      fileId: file.id,
-      unlockedAt: new Date()
-    });
-    setTokens(newTokens);
-  };
+  const newTokens = currentTokens - cost;
+  await updateDoc(userDocRef, { tokens: newTokens });
+  await addDoc(collection(db, 'unlockedFiles'), {
+    userId: user.uid,
+    fileId: file.id,
+    unlockedAt: new Date()
+  });
+  setTokens(newTokens);
+};
+
 
 
 

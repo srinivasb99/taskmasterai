@@ -152,9 +152,9 @@ Key Points:
 
     onProgress({ progress: 80, status: 'Generating study questions...', error: null });
 
-// Generate study questions
-const questionsPrompt = `
-Based on the following key points from a YouTube video, generate 11 multiple-choice questions:
+    // Generate study questions
+    const questionsPrompt = `
+Based on the following key points from a YouTube video, generate 10 multiple-choice questions:
 
 ${keyPoints.join('\n')}
 
@@ -167,65 +167,62 @@ D) (Fourth option)
 Correct: (Letter of correct answer)
 Explanation: (Why this is the correct answer)
 
-Generate 11 questions in this exact format.`;
+Generate 10 questions in this exact format.`;
 
-const questionsResponse = await fetch(
-  'https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct',
-  {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${huggingFaceApiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      inputs: questionsPrompt,
-      parameters: {
-        max_length: 1000,
-        temperature: 0.3,
-        top_p: 0.9,
-        return_full_text: false
+    const questionsResponse = await fetch(
+      'https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct',
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${huggingFaceApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          inputs: questionsPrompt,
+          parameters: {
+            max_length: 1000,
+            temperature: 0.3,
+            top_p: 0.9,
+            return_full_text: false
+          }
+        })
       }
-    })
-  }
-);
+    );
 
-if (!questionsResponse.ok) {
-  throw new Error('Failed to generate questions');
-}
+    if (!questionsResponse.ok) {
+      throw new Error('Failed to generate questions');
+    }
 
-const questionsResult = await questionsResponse.json();
-const questionsText = questionsResult[0].generated_text;
+    const questionsResult = await questionsResponse.json();
+    const questionsText = questionsResult[0].generated_text;
 
-// Parse questions
-const questionBlocks = questionsText.split(/Question: /).filter(Boolean);
-let questions = questionBlocks.map(block => {
-  const lines = block.split('\n').filter(Boolean);
-  const question = lines[0].trim();
-  const options = lines.slice(1, 5).map(opt => opt.replace(/^[A-D]\)\s*/, '').trim());
-  const correctAnswer = lines.find(l => l.startsWith('Correct:'))?.replace('Correct:', '').trim();
-  const explanation = lines.find(l => l.startsWith('Explanation:'))?.replace('Explanation:', '').trim() || '';
+    // Parse questions
+    const questionBlocks = questionsText.split(/Question: /).filter(Boolean);
+    const questions = questionBlocks.map(block => {
+      const lines = block.split('\n').filter(Boolean);
+      const question = lines[0].trim();
+      const options = lines.slice(1, 5).map(opt => opt.replace(/^[A-D]\)\s*/, '').trim());
+      const correctAnswer = lines.find(l => l.startsWith('Correct:'))?.replace('Correct:', '').trim();
+      const explanation = lines.find(l => l.startsWith('Explanation:'))?.replace('Explanation:', '').trim() || '';
 
-  return {
-    question,
-    options,
-    correctAnswer: ['A', 'B', 'C', 'D'].indexOf(correctAnswer || 'A'),
-    explanation
-  };
-});
+      return {
+        question,
+        options,
+        correctAnswer: ['A', 'B', 'C', 'D'].indexOf(correctAnswer || 'A'),
+        explanation
+      };
+    });
 
-// Remove the first question
-questions = questions.slice(1);
+    onProgress({ progress: 100, status: 'Processing complete!', error: null });
 
-onProgress({ progress: 100, status: 'Processing complete!', error: null });
-
-// Return processed data
-return {
-  title: videoInfo.title,
-  content: summary,
-  keyPoints,
-  questions,
-  sourceUrl: `https://www.youtube.com/watch?v=${videoId}`
-};
+    // Return processed data
+    return {
+      title: videoInfo.title,
+      content: summary,
+      keyPoints,
+      questions,
+      sourceUrl: `https://www.youtube.com/watch?v=${videoId}`
+    };
 
   } catch (error) {
     console.error('YouTube processing error:', error);

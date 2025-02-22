@@ -1,19 +1,22 @@
+import React from 'react';
+import { Sun, Cloud, Sunset, Moon } from 'lucide-react';
+
 interface Quote {
   text: string;
   author: string;
 }
 
-export const getTimeBasedGreeting = (): { greeting: string; emoji: string } => {
+export const getTimeBasedGreeting = (): { greeting: string; icon: JSX.Element } => {
   const hour = new Date().getHours();
 
   if (hour >= 5 && hour < 12) {
-    return { greeting: "Good morning", emoji: "" };
+    return { greeting: "Good morning", icon: <Sun className="w-5 h-5" /> };
   } else if (hour >= 12 && hour < 17) {
-    return { greeting: "Good afternoon", emoji: "" };
+    return { greeting: "Good afternoon", icon: <Cloud className="w-5 h-5" /> };
   } else if (hour >= 17 && hour < 21) {
-    return { greeting: "Good evening", emoji: "" };
+    return { greeting: "Good evening", icon: <Sunset className="w-5 h-5" /> };
   } else {
-    return { greeting: "Good night", emoji: "" };
+    return { greeting: "Good night", icon: <Moon className="w-5 h-5" /> };
   }
 };
 

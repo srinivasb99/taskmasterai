@@ -173,11 +173,8 @@ Key Points:
     onProgress({ progress: 80, status: 'Generating study questions...', error: null });
 
     // Generate study questions (generate 11 so we can remove the first)
-    // Note: Instruct the model to randomize the order of answer choices
     const questionsPrompt = `
-Based on the following key points, generate 11 multiple-choice questions.
-For each question, randomize the order of the answer choices so that the correct answer is not biased toward a particular letter.
-Ensure that the letter of the correct answer reflects the randomized order.
+Based on the following key points, generate 11 multiple-choice questions:
 
 ${keyPoints.join('\n')}
 

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Loader2, Crown, Gem } from 'lucide-react';
+import { Loader2, Crown, Gem, Check } from 'lucide-react';
 import { subscribeToAuthState } from '../lib/pricing-firebase';
 import { Logo } from './Logo';
 import { createCheckoutSession } from '../lib/stripe-client';
@@ -79,6 +79,14 @@ function Pricing() {
     hover: { scale: 1.05 },
     tap: { scale: 0.95 }
   };
+
+  // Helper to render list items with a check icon
+  const renderFeatureItem = (text: string) => (
+    <li className="flex items-center">
+      <Check className="w-4 h-4 text-green-500 mr-2" />
+      {text}
+    </li>
+  );
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-900 font-poppins">
@@ -224,11 +232,11 @@ function Pricing() {
             <p className="text-3xl font-extrabold text-indigo-400 mb-1">Free</p>
             <p className="text-sm text-gray-400 mb-4">Forever free</p>
             <ul className="mb-6 space-y-2 text-gray-300">
-              <li>2 PDF Uploads &amp; 2 AI-Generated Text Outputs</li>
-              <li>10 AI Chat Interactions per Month</li>
-              <li>1 AI-Generated Note from Audio &amp; YouTube Links</li>
-              <li>500 Tokens Included</li>
-              <li>Add Up to 3 Friends</li>
+              {renderFeatureItem("2 PDF Uploads & AI-Generated Text Outputs")}
+              {renderFeatureItem("10 AI Chat Interactions per Month")}
+              {renderFeatureItem("1 AI-Generated Note from Audio & YouTube Links")}
+              {renderFeatureItem("500 Tokens Included")}
+              {renderFeatureItem("Add Up to 3 Friends")}
             </ul>
             <motion.a 
               variants={buttonVariants}
@@ -253,11 +261,11 @@ function Pricing() {
             <p className="text-3xl font-extrabold text-indigo-400 mb-1">{standardPriceText}</p>
             <p className="text-sm text-gray-400 mb-4">{standardBillingText}</p>
             <ul className="mb-6 space-y-2 text-gray-300">
-              <li>Unlimited PDF Uploads &amp; AI-Generated Text Outputs</li>
-              <li>Unlimited AI Chat Interactions</li>
-              <li>Unlimited AI-Generated Notes</li>
-              <li>1,500 Tokens Included</li>
-              <li>Add Unlimited Friends</li>
+              {renderFeatureItem("Unlimited PDF Uploads & AI-Generated Text Outputs")}
+              {renderFeatureItem("Unlimited AI Chat Interactions")}
+              {renderFeatureItem("Unlimited AI-Generated Notes")}
+              {renderFeatureItem("1,500 Tokens Included")}
+              {renderFeatureItem("Add Unlimited Friends")}
             </ul>
             {user ? (
               <motion.button 
@@ -294,11 +302,11 @@ function Pricing() {
             <p className="text-3xl font-extrabold text-indigo-400 mb-1">{proPriceText}</p>
             <p className="text-sm text-gray-400 mb-4">{proBillingText}</p>
             <ul className="mb-6 space-y-2 text-gray-300">
-              <li>5 PDF Uploads &amp; 5 AI-Generated Text Outputs per Month</li>
-              <li>200 AI Chat Interactions per Month</li>
-              <li>5 AI-Generated Notes from Audio &amp; YouTube Links per Month</li>
-              <li>750 Tokens Included</li>
-              <li>Add Up to 10 Friends</li>
+              {renderFeatureItem("5 PDF Uploads & AI-Generated Text Outputs per Month")}
+              {renderFeatureItem("200 AI Chat Interactions per Month")}
+              {renderFeatureItem("5 AI-Generated Notes from Audio & YouTube Links per Month")}
+              {renderFeatureItem("750 Tokens Included")}
+              {renderFeatureItem("Add Up to 10 Friends")}
             </ul>
             {user ? (
               <motion.button 
@@ -334,7 +342,7 @@ function Pricing() {
               </a>
               <span className="text-gray-600">|</span>
               <a href="/terms" className="text-sm text-gray-400 hover:text-indigo-400">
-                Terms &amp; Conditions
+                Terms & Conditions
               </a>
             </div>
             <p className="text-sm text-gray-400 mt-4 md:mt-0">

@@ -230,115 +230,127 @@ function Pricing() {
           {/* Basic Plan */}
           <motion.div
             variants={cardVariants}
-            className="bg-gray-800 rounded-xl p-6 w-full sm:w-1/2 lg:w-1/3 min-h-[500px]"
+            className="bg-gray-800 rounded-xl p-6 w-full sm:w-1/3 min-h-[500px] flex flex-col"
           >
-            <h2 className="text-2xl font-bold mb-4">Basic</h2>
-            <p className="text-3xl font-extrabold text-indigo-400 mb-1">Free</p>
-            <p className="text-sm text-gray-400 mb-4">Forever free</p>
-            <ul className="mb-6 space-y-2 text-gray-300">
-              {renderFeatureItem("2 PDF and Text Notes per month")}
-              {renderFeatureItem("1 YouTube Notes per month")}
-              {renderFeatureItem("10 AI Chat Interactions per month")}
-              {renderFeatureItem("500 Tokens Included")}
-              {renderFeatureItem("Add Up to 3 Friends")}
-            </ul>
-            <motion.a 
-              variants={buttonVariants}
-              whileHover="hover"
-              whileTap="tap"
-              href={user ? "/dashboard" : "/signup"}
-              className="inline-block w-full text-center py-3 rounded-full font-semibold bg-indigo-500 text-white transition-transform"
-            >
-              {user ? 'Access Dashboard' : 'Sign Up Free'}
-            </motion.a>
+            <div>
+              <h2 className="text-2xl font-bold mb-4">Basic</h2>
+              <p className="text-3xl font-extrabold text-indigo-400 mb-1">Free</p>
+              <p className="text-sm text-gray-400 mb-4">Forever free</p>
+              <ul className="mb-6 space-y-2 text-gray-300">
+                {renderFeatureItem("2 PDF and Text Notes per month")}
+                {renderFeatureItem("1 YouTube Notes per month")}
+                {renderFeatureItem("10 AI Chat Interactions per month")}
+                {renderFeatureItem("500 Tokens Included")}
+                {renderFeatureItem("Add Up to 3 Friends")}
+              </ul>
+            </div>
+            <div className="mt-auto">
+              <motion.a 
+                variants={buttonVariants}
+                whileHover="hover"
+                whileTap="tap"
+                href={user ? "/dashboard" : "/signup"}
+                className="inline-block w-full text-center py-3 rounded-full font-semibold bg-indigo-500 text-white transition-transform"
+              >
+                {user ? 'Access Dashboard' : 'Sign Up Free'}
+              </motion.a>
+            </div>
           </motion.div>
 
           {/* Premium Plan */}
           <motion.div
             variants={cardVariants}
-            className="bg-gray-800 rounded-xl p-6 w-full sm:w-1/2 lg:w-1/3 min-h-[500px] border-2 border-indigo-500"
+            className="bg-gray-800 rounded-xl p-6 w-full sm:w-1/3 min-h-[500px] flex flex-col border-2 border-indigo-500"
           >
-            <h2 className="text-2xl font-bold mb-2 flex items-center gap-2">
-              <Crown className="w-6 h-6 text-yellow-400" />
-              Premium
-            </h2>
-            {/* Savings Badge */}
-            {isYearly && (
-              <div className="mb-2 bg-yellow-500 text-black text-xs font-bold px-2 py-1 rounded-full inline-block">
-                Recommended – Save ${premiumMonthlySavings}/month (${premiumAnnualSavings}/year)
-              </div>
-            )}
-            <p className="text-3xl font-extrabold text-indigo-400 mb-1">{standardPriceText}</p>
-            <p className="text-sm text-gray-400 mb-4">{standardBillingText}</p>
-            <ul className="mb-6 space-y-2 text-gray-300">
-              {renderFeatureItem("Unlimited PDF and Text Notes")}
-              {renderFeatureItem("Unlimited Youtube Notes")}
-              {renderFeatureItem("Unlimited AI Chat Interactions")}
-              {renderFeatureItem("2,500 Tokens Included")}
-              {renderFeatureItem("Add Unlimited Friends")}
-            </ul>
-            {user ? (
-              <motion.button 
-                variants={buttonVariants}
-                whileHover="hover"
-                whileTap="tap"
-                onClick={() => handleSubscribe(STRIPE_PRICES.PREMIUM[isYearly ? 'yearly' : 'monthly'])}
-                className="w-full text-center py-3 rounded-full font-semibold bg-white text-indigo-600 transition-transform"
-              >
-                Subscribe Now
-              </motion.button>
-            ) : (
-              <motion.a 
-                variants={buttonVariants}
-                whileHover="hover"
-                whileTap="tap"
-                href="/signup"
-                className="inline-block w-full text-center py-3 rounded-full font-semibold bg-white text-indigo-600 transition-transform"
-              >
-                Sign Up to Subscribe
-              </motion.a>
-            )}
+            <div>
+              <h2 className="text-2xl font-bold mb-2 flex items-center gap-2">
+                <Crown className="w-6 h-6 text-yellow-400" />
+                Premium
+              </h2>
+              {/* Savings Badge */}
+              {isYearly && (
+                <div className="mb-2 bg-yellow-500 text-black text-xs font-bold px-2 py-1 rounded-full inline-block">
+                  Recommended – Save ${premiumMonthlySavings}/month (${premiumAnnualSavings}/year)
+                </div>
+              )}
+              <p className="text-3xl font-extrabold text-indigo-400 mb-1">{standardPriceText}</p>
+              <p className="text-sm text-gray-400 mb-4">{standardBillingText}</p>
+              <ul className="mb-6 space-y-2 text-gray-300">
+                {renderFeatureItem("Unlimited PDF and Text Notes")}
+                {renderFeatureItem("Unlimited YouTube Notes")}
+                {renderFeatureItem("Unlimited AI Chat Interactions")}
+                {renderFeatureItem("2,500 Tokens Included")}
+                {renderFeatureItem("Add Unlimited Friends")}
+              </ul>
+            </div>
+            <div className="mt-auto">
+              {user ? (
+                <motion.button 
+                  variants={buttonVariants}
+                  whileHover="hover"
+                  whileTap="tap"
+                  onClick={() => handleSubscribe(STRIPE_PRICES.PREMIUM[isYearly ? 'yearly' : 'monthly'])}
+                  className="w-full text-center py-3 rounded-full font-semibold bg-white text-indigo-600 transition-transform"
+                >
+                  Subscribe Now
+                </motion.button>
+              ) : (
+                <motion.a 
+                  variants={buttonVariants}
+                  whileHover="hover"
+                  whileTap="tap"
+                  href="/signup"
+                  className="inline-block w-full text-center py-3 rounded-full font-semibold bg-white text-indigo-600 transition-transform"
+                >
+                  Sign Up to Subscribe
+                </motion.a>
+              )}
+            </div>
           </motion.div>
 
           {/* Pro Plan */}
           <motion.div
             variants={cardVariants}
-            className="bg-gray-800 rounded-xl p-6 w-full sm:w-1/2 lg:w-1/3 min-h-[500px]"
+            className="bg-gray-800 rounded-xl p-6 w-full sm:w-1/3 min-h-[500px] flex flex-col"
           >
-            <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
-              <Gem className="w-6 h-6 text-purple-400" />
-              Pro
-            </h2>
-            <p className="text-3xl font-extrabold text-indigo-400 mb-1">{proPriceText}</p>
-            <p className="text-sm text-gray-400 mb-4">{proBillingText}</p>
-            <ul className="mb-6 space-y-2 text-gray-300">
-              {renderFeatureItem("10 PDF and Text Notes per month")}
-              {renderFeatureItem("5 YouTube Notes per month")}
-              {renderFeatureItem("200 AI Chat Interactions per Month")}
-              {renderFeatureItem("1,000 Tokens Included")}
-              {renderFeatureItem("Add Up to 10 Friends")}
-            </ul>
-            {user ? (
-              <motion.button 
-                variants={buttonVariants}
-                whileHover="hover"
-                whileTap="tap"
-                onClick={() => handleSubscribe(STRIPE_PRICES.PRO[isYearly ? 'yearly' : 'monthly'])}
-                className="w-full text-center py-3 rounded-full font-semibold bg-indigo-500 text-white transition-transform"
-              >
-                Subscribe Now
-              </motion.button>
-            ) : (
-              <motion.a 
-                variants={buttonVariants}
-                whileHover="hover"
-                whileTap="tap"
-                href="/signup"
-                className="inline-block w-full text-center py-3 rounded-full font-semibold bg-indigo-500 text-white transition-transform"
-              >
-                Sign Up to Subscribe
-              </motion.a>
-            )}
+            <div>
+              <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
+                <Gem className="w-6 h-6 text-purple-400" />
+                Pro
+              </h2>
+              <p className="text-3xl font-extrabold text-indigo-400 mb-1">{proPriceText}</p>
+              <p className="text-sm text-gray-400 mb-4">{proBillingText}</p>
+              <ul className="mb-6 space-y-2 text-gray-300">
+                {renderFeatureItem("10 PDF and Text Notes per month")}
+                {renderFeatureItem("5 YouTube Notes per month")}
+                {renderFeatureItem("200 AI Chat Interactions per Month")}
+                {renderFeatureItem("1,000 Tokens Included")}
+                {renderFeatureItem("Add Up to 10 Friends")}
+              </ul>
+            </div>
+            <div className="mt-auto">
+              {user ? (
+                <motion.button 
+                  variants={buttonVariants}
+                  whileHover="hover"
+                  whileTap="tap"
+                  onClick={() => handleSubscribe(STRIPE_PRICES.PRO[isYearly ? 'yearly' : 'monthly'])}
+                  className="w-full text-center py-3 rounded-full font-semibold bg-indigo-500 text-white transition-transform"
+                >
+                  Subscribe Now
+                </motion.button>
+              ) : (
+                <motion.a 
+                  variants={buttonVariants}
+                  whileHover="hover"
+                  whileTap="tap"
+                  href="/signup"
+                  className="inline-block w-full text-center py-3 rounded-full font-semibold bg-indigo-500 text-white transition-transform"
+                >
+                  Sign Up to Subscribe
+                </motion.a>
+              )}
+            </div>
           </motion.div>
         </motion.div>
       </main>

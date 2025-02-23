@@ -787,36 +787,37 @@ const cleanAndValidate = (text: string) => {
     .map(line => line.trim())
     .filter(line => line.length > 0 && !/^[^a-zA-Z0-9]+$/.test(line));
 
-  // Check for patterns that trigger removal of subsequent lines:
-  // 1. "This is:" pattern
-  // 2. "<|reserved" pattern
-  // 3. Also, check for "Hello" pattern as before.
-  let helloCount = 0;
-  const truncatedLines = [];
-  for (const line of lines) {
-    // Skip empty lines
-    if (!line.trim()) continue;
+// Check for patterns that trigger removal of subsequent lines:
+// 1. "This is:" pattern
+// 2. "<|reserved" pattern
+// 3. Also, check for "Hello" pattern as before.
+let helloCount = 0;
+const truncatedLines = [];
+for (const line of lines) {
+  // Skip empty lines
+  if (!line.trim()) continue;
 
-    // Check for "This is:" pattern - remove it and everything after
-    if (line.trim().startsWith("This is:")) {
-      break;
-    }
-
-    // Check for "<|reserved" pattern - remove it and everything after
-    if (line.trim().startsWith("<|reserved")) {
-      break;
-    }
-
-    // Check for "Hello" pattern as before
-    if (line.trim().startsWith("Hello")) {
-      helloCount++;
-      if (helloCount === 2) {
-        break;
-      }
-    }
-
-    truncatedLines.push(line);
+  // Check for "This is:" pattern - remove it and everything after
+  if (line.trim().startsWith("This is:")) {
+    break;
   }
+
+  // Check for "<|reserved" pattern - remove it and everything after
+  if (line.trim().startsWith("<|reserved")) {
+    break;
+  }
+
+  // Check for "Hello" pattern as before (case-insensitive)
+  if (line.trim().toLowerCase().startsWith("Hello")) {
+    helloCount++;
+    if (helloCount === 2) {
+      break;
+    }
+  }
+
+  truncatedLines.push(line);
+}
+
 
   return truncatedLines.join('\n');
 };

@@ -3,6 +3,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { processYouTube } from '../../src/lib/youtube-processor';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  console.log("Received request method:", req.method);
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed. Use POST.' });
     return;
@@ -10,8 +11,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const { url, userId, huggingFaceApiKey } = req.body;
+    console.log("Request body:", req.body);
 
-    // Call the processing function and log progress updates
+    // Call the backend processing function with a progress callback
     const processedData = await processYouTube(url, userId, huggingFaceApiKey, (progress) => {
       console.log('Progress update:', progress);
     });

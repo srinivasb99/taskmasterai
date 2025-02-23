@@ -1135,16 +1135,19 @@ setSmartOverview(formattedHtml);
 <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6 mb-6">
   {/* Greeting Section */}
   <header className="dashboard-header transform transition-all duration-500 ease-out translate-y-0 opacity-100 pt-16 lg:pt-0">
-    <h1 className="text-2xl lg:text-4xl font-bold mb-2 text-white break-words">
-      {React.cloneElement(greeting.icon, {
-        className: "w-[0.9em] h-[0.9em] inline-block align-middle mr-2"
-      })}
-      {greeting.greeting}, <span className="font-bold">{userName || "Loading..."}</span>
-    </h1>
-    <p className="text-gray-400 italic text-base lg:text-lg">
-      "{quote.text}" - <span className="text-purple-400">{quote.author}</span>
-    </p>
-  </header>
+  <h1 className="text-2xl lg:text-4xl font-bold mb-2 text-white break-words">
+    {React.cloneElement(greeting.icon, {
+      className: 
+        // We combine the base sizing/positioning classes with whatever color class is on the icon
+        "w-4 h-4 inline-block align-middle mr-2 -translate-y-0.5 " + 
+        (greeting.icon.props.className ?? "")
+    })}
+    {greeting.greeting}, <span className="font-bold">{userName || "Loading..."}</span>
+  </h1>
+  <p className="text-gray-400 italic text-base lg:text-lg">
+    "{quote.text}" - <span className="text-purple-400">{quote.author}</span>
+  </p>
+</header>
 
 
 

@@ -535,32 +535,48 @@ let assistantReply = (result[0]?.generated_text as string || '')
   const [pomodoroTimeLeft, setPomodoroTimeLeft] = useState(25 * 60);
   const [pomodoroRunning, setPomodoroRunning] = useState(false);
   const pomodoroRef = useRef<NodeJS.Timer | null>(null);
+  const pomodoroAudioRef = useRef<HTMLAudioElement | null>(null);
 
-  const handlePomodoroStart = () => {
-    if (pomodoroRunning) return;
-    setPomodoroRunning(true);
-    pomodoroRef.current = setInterval(() => {
-      setPomodoroTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(pomodoroRef.current as NodeJS.Timer);
-          setPomodoroRunning(false);
-          return 0;
+const handlePomodoroStart = () => {
+  if (pomodoroRunning) return;
+  setPomodoroRunning(true);
+  pomodoroRef.current = setInterval(() => {
+    setPomodoroTimeLeft((prev) => {
+      if (prev <= 1) {
+        clearInterval(pomodoroRef.current as NodeJS.Timer);
+        setPomodoroRunning(false);
+        // Play the alarm sound (if not already playing)
+        if (!pomodoroAudioRef.current) {
+          const alarmAudio = new Audio('https://firebasestorage.googleapis.com/v0/b/deepworkai-c3419.appspot.com/o/ios-17-ringtone-tilt-gg8jzmiv_pUhS32fz.mp3?alt=media&token=a0a522e0-8a49-408a-9dfe-17e41d3bc801');
+          alarmAudio.loop = true;
+          alarmAudio.play();
+          pomodoroAudioRef.current = alarmAudio;
         }
-        return prev - 1;
-      });
-    }, 1000);
-  };
+        return 0;
+      }
+      return prev - 1;
+    });
+  }, 1000);
+};
 
-  const handlePomodoroPause = () => {
-    setPomodoroRunning(false);
-    if (pomodoroRef.current) clearInterval(pomodoroRef.current);
-  };
+const handlePomodoroPause = () => {
+  setPomodoroRunning(false);
+  if (pomodoroRef.current) clearInterval(pomodoroRef.current);
+  // (Optional: you might choose not to pause the alarm sound if it's playing,
+  // since the sound should keep looping until reset.)
+};
 
-  const handlePomodoroReset = () => {
-    setPomodoroRunning(false);
-    if (pomodoroRef.current) clearInterval(pomodoroRef.current);
-    setPomodoroTimeLeft(25 * 60);
-  };
+const handlePomodoroReset = () => {
+  setPomodoroRunning(false);
+  if (pomodoroRef.current) clearInterval(pomodoroRef.current);
+  setPomodoroTimeLeft(25 * 60);
+  // Stop the alarm sound if it's playing
+  if (pomodoroAudioRef.current) {
+    pomodoroAudioRef.current.pause();
+    pomodoroAudioRef.current.currentTime = 0;
+    pomodoroAudioRef.current = null;
+  }
+};
 
   const formatPomodoroTime = (timeInSeconds: number) => {
     const mins = Math.floor(timeInSeconds / 60);
@@ -1028,52 +1044,69 @@ setSmartOverview(formattedHtml);
       .padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
-  const startCustomTimer = (timerId: string) => {
-    setRunningTimers((prev) => {
-      const timerState = { ...prev[timerId] };
-      if (timerState.isRunning) return prev;
-      timerState.isRunning = true;
-      const intervalId = setInterval(() => {
-        setRunningTimers((old) => {
-          const copy = { ...old };
-          const tState = { ...copy[timerId] };
-          if (tState.timeLeft <= 1) {
-            clearInterval(tState.intervalRef as NodeJS.Timer);
-            tState.isRunning = false;
-            tState.timeLeft = 0;
-          } else {
-            tState.timeLeft -= 1;
+const startCustomTimer = (timerId: string) => {
+  setRunningTimers((prev) => {
+    const timerState = { ...prev[timerId] };
+    if (timerState.isRunning) return prev;
+    timerState.isRunning = true;
+    const intervalId = setInterval(() => {
+      setRunningTimers((old) => {
+        const copy = { ...old };
+        const tState = { ...copy[timerId] };
+        if (tState.timeLeft <= 1) {
+          clearInterval(tState.intervalRef as NodeJS.Timer);
+          tState.isRunning = false;
+          tState.timeLeft = 0;
+          // Only play the alarm if it's not already playing
+          if (!tState.audio) {
+            const alarmAudio = new Audio('https://firebasestorage.googleapis.com/v0/b/deepworkai-c3419.appspot.com/o/ios-17-ringtone-tilt-gg8jzmiv_pUhS32fz.mp3?alt=media&token=a0a522e0-8a49-408a-9dfe-17e41d3bc801');
+            alarmAudio.loop = true;
+            alarmAudio.play();
+            tState.audio = alarmAudio;
           }
-          copy[timerId] = tState;
-          return copy;
-        });
-      }, 1000);
-      timerState.intervalRef = intervalId as unknown as NodeJS.Timer;
-      return { ...prev, [timerId]: timerState };
-    });
-  };
+        } else {
+          tState.timeLeft -= 1;
+        }
+        copy[timerId] = tState;
+        return copy;
+      });
+    }, 1000);
+    timerState.intervalRef = intervalId as unknown as NodeJS.Timer;
+    return { ...prev, [timerId]: timerState };
+  });
+};
 
-  const pauseCustomTimer = (timerId: string) => {
-    setRunningTimers((prev) => {
-      const timerState = { ...prev[timerId] };
-      if (timerState.intervalRef) clearInterval(timerState.intervalRef);
-      timerState.isRunning = false;
-      timerState.intervalRef = null;
-      return { ...prev, [timerId]: timerState };
-    });
-  };
+const pauseCustomTimer = (timerId: string) => {
+  setRunningTimers((prev) => {
+    const timerState = { ...prev[timerId] };
+    if (timerState.intervalRef) clearInterval(timerState.intervalRef);
+    timerState.isRunning = false;
+    timerState.intervalRef = null;
+    // Optionally pause the alarm if it's playing (if you wish to pause after finishing)
+    if (timerState.audio) {
+      timerState.audio.pause();
+    }
+    return { ...prev, [timerId]: timerState };
+  });
+};
 
-  const resetCustomTimer = (timerId: string, defaultTime?: number) => {
-    setRunningTimers((prev) => {
-      const timerState = { ...prev[timerId] };
-      if (timerState.intervalRef) clearInterval(timerState.intervalRef);
-      timerState.isRunning = false;
-      timerState.timeLeft =
-        defaultTime ?? (customTimers.find((t) => t.id === timerId)?.data.time || 25 * 60);
-      timerState.intervalRef = null;
-      return { ...prev, [timerId]: timerState };
-    });
-  };
+const resetCustomTimer = (timerId: string, defaultTime?: number) => {
+  setRunningTimers((prev) => {
+    const timerState = { ...prev[timerId] };
+    if (timerState.intervalRef) clearInterval(timerState.intervalRef);
+    timerState.isRunning = false;
+    timerState.timeLeft =
+      defaultTime ?? (customTimers.find((t) => t.id === timerId)?.data.time || 25 * 60);
+    timerState.intervalRef = null;
+    // Stop and reset the alarm sound if it's playing
+    if (timerState.audio) {
+      timerState.audio.pause();
+      timerState.audio.currentTime = 0;
+      timerState.audio = null;
+    }
+    return { ...prev, [timerId]: timerState };
+  });
+};
 
   const handleEditTimerClick = (timerId: string, currentName: string, currentTime: number) => {
     setEditingTimerId(timerId);

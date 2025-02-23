@@ -154,6 +154,7 @@ createRoot(document.getElementById('root')!).render(
             <Route path="/school" element={<PageTitle title="School"><SchoolPage /></PageTitle>} />
             <Route path="/community" element={<PageTitle title="Community"><Community /></PageTitle>} />
             <Route path="/" element={<RootTitle><App /></RootTitle>} />
+            <Route path="/api/*" element={null} />
             {/* Catch-all route for 404 */}
             <Route path="*" element={<PageTitle title="404 Not Found"><NotFound /></PageTitle>} />
           </Routes>

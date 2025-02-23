@@ -28,6 +28,7 @@ import {
   createTask,
   createGoal,
   createProject,
+  updateDashboardLastSeen,
   createPlan,
   addCustomTimer,
   onCustomTimersSnapshot,

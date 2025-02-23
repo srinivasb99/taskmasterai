@@ -413,3 +413,10 @@ export async function checkSplashScreen(userId: string) {
 
   return true;
 }
+
+
+export async function updateDashboardLastSeen(userId: string) {
+  await updateDoc(doc(db, 'users', userId), {
+    lastSeen: serverTimestamp(),
+  });
+}

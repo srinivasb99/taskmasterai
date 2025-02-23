@@ -808,7 +808,7 @@ for (const line of lines) {
   }
 
   // Check for "Hello" pattern as before (case-insensitive)
-  if (line.trim().toLowerCase().startsWith("Hello")) {
+  if (line.trim().toLowerCase().startsWith("hello")) {
     helloCount++;
     if (helloCount === 2) {
       break;

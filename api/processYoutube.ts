@@ -11,9 +11,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const { url, userId, huggingFaceApiKey } = req.body;
 
-    // Optional: validate your input here (e.g., ensure url, userId, and huggingFaceApiKey are provided)
-
-    // Call your processing function and log progress updates on the backend
+    // Call the processing function and log progress updates
     const processedData = await processYouTube(url, userId, huggingFaceApiKey, (progress) => {
       console.log('Progress update:', progress);
     });

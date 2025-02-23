@@ -365,9 +365,9 @@ export function Settings() {
             <div className="text-gray-300">
               <p className="mb-2">Your free plan includes:</p>
               <ul className="list-disc list-inside space-y-1 text-sm">
-                <li>2 PDF Uploads & 2 AI-Generated Text Outputs</li>
-                <li>10 AI Chat Interactions per Month</li>
-                <li>1 AI-Generated Note from Audio & YouTube Links</li>
+                <li>2 PDF and Text Notes per month</li>
+                <li>1 Youtube Notes per month</li>
+                <li>10 AI Chat Interactions per month</li>
                 <li>500 Tokens Included</li>
                 <li>Add Up to 3 Friends</li>
               </ul>

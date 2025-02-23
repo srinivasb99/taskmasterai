@@ -422,7 +422,7 @@ export function Notes() {
 const handleYoutubeLink = async (url: string) => {
   if (!user) return;
   try {
-    const response = await fetch('/api/processYouTube', {
+    const response = await fetch('/api/processYoutube', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

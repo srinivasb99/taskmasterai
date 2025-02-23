@@ -279,6 +279,7 @@ function Pricing() {
                 {renderFeatureItem("Unlimited AI Chat Interactions")}
                 {renderFeatureItem("2,500 Tokens Included")}
                 {renderFeatureItem("Add Unlimited Friends")}
+                {renderFeatureItem("Unlimited Access to Smart Overview")}
               </ul>
             </div>
             <div className="mt-auto">
@@ -324,6 +325,7 @@ function Pricing() {
                 {renderFeatureItem("200 AI Chat Interactions per Month")}
                 {renderFeatureItem("1,000 Tokens Included")}
                 {renderFeatureItem("Add Up to 10 Friends")}
+                {renderFeatureItem("Limited Access to Smart Overview")}
               </ul>
             </div>
             <div className="mt-auto">

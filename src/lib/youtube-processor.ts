@@ -1,15 +1,13 @@
-import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
-import { storage } from './firebase';
-import { v4 as uuidv4 } from 'uuid';
+// src/lib/youtube-processor.ts
 import { YoutubeTranscript } from 'youtube-transcript';
 
-interface ProcessingProgress {
+export interface ProcessingProgress {
   progress: number;
   status: string;
   error: string | null;
 }
 
-interface ProcessedYouTube {
+export interface ProcessedYouTube {
   title: string;
   content: string;
   keyPoints: string[];
@@ -24,13 +22,28 @@ interface ProcessedYouTube {
 
 const YOUTUBE_API_KEY = 'AIzaSyD4iosX8Y1X4bOThSGhYyUfCmWKBEkc6x4';
 
-// Extract video ID from YouTube URL
+/**
+ * Extracts the video ID from a given YouTube URL.
+ */
 function getVideoId(url: string): string | null {
   const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
   const match = url.match(regex);
   return match ? match[1] : null;
 }
 
+/**
+ * Processes a YouTube video by fetching its transcript, generating a summary
+ * and key points, and then creating study questions via Hugging Face's AI model.
+ *
+ * This function is intended to run on the backend (e.g. within a Vercel serverless function)
+ * so that sensitive operations and API calls (like to Hugging Face) occur server-side.
+ *
+ * @param url - The YouTube video URL provided by the user.
+ * @param userId - The ID of the user requesting processing.
+ * @param huggingFaceApiKey - Your Hugging Face API key.
+ * @param onProgress - Callback to report processing progress.
+ * @returns Processed video data including title, summary, key points, and study questions.
+ */
 export async function processYouTube(
   url: string,
   userId: string,
@@ -38,47 +51,41 @@ export async function processYouTube(
   onProgress: (progress: ProcessingProgress) => void
 ): Promise<ProcessedYouTube> {
   try {
-    // Initial progress update
     onProgress({ progress: 0, status: 'Starting YouTube processing...', error: null });
-
+    
     // Extract video ID
     const videoId = getVideoId(url);
     if (!videoId) {
       throw new Error('Invalid YouTube URL');
     }
-
+    
     onProgress({ progress: 20, status: 'Fetching video data...', error: null });
-
-    // Fetch video data from YouTube API
+    // Fetch video data (title and description) using YouTube Data API
     const videoResponse = await fetch(
       `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoId}&key=${YOUTUBE_API_KEY}`
     );
-
     if (!videoResponse.ok) {
       throw new Error('Failed to fetch video data');
     }
-
     const videoData = await videoResponse.json();
     if (!videoData.items?.[0]) {
       throw new Error('Video not found');
     }
-
     const videoInfo = videoData.items[0].snippet;
+    
     onProgress({ progress: 40, status: 'Retrieving transcript...', error: null });
-
-    // Fetch video transcript using youtube-transcript package
+    // Fetch transcript using the unofficial youtube-transcript package
     let transcript = '';
     try {
       const transcriptPieces = await YoutubeTranscript.fetchTranscript(videoId);
       transcript = transcriptPieces.map(piece => piece.text).join(' ');
     } catch (transcriptError) {
       console.error('Error fetching transcript:', transcriptError);
-      transcript = ''; // fallback to empty transcript if error occurs
+      transcript = ''; // Fallback to empty transcript if fetching fails
     }
-
+    
     onProgress({ progress: 60, status: 'Generating summary...', error: null });
-
-    // Generate summary using Hugging Face API
+    // Prepare prompt for summary and key points
     const summaryPrompt = `
 Analyze the following YouTube video content and generate:
 1. A clear, concise summary (4-6 sentences)
@@ -105,13 +112,14 @@ Key Points:
 9. [Ninth key point]
 10. [Tenth key point]`;
 
+    // Call the Hugging Face API for summary generation
     const summaryResponse = await fetch(
       'https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct',
       {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${huggingFaceApiKey}`,
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           inputs: summaryPrompt,
@@ -124,25 +132,22 @@ Key Points:
         })
       }
     );
-
     if (!summaryResponse.ok) {
       throw new Error('Failed to generate summary');
     }
-
     const summaryResult = await summaryResponse.json();
     const summaryText = summaryResult[0].generated_text;
-
-    // Parse summary and key points
+    
+    // Parse summary and key points from the AI response
     const summary = summaryText.split('Key Points:')[0].replace('Summary:', '').trim();
     const keyPoints = summaryText
       .split('Key Points:')[1]
       .split('\n')
       .filter(line => line.trim().match(/^\d+\./))
       .map(point => point.replace(/^\d+\.\s*/, '').trim());
-
+    
     onProgress({ progress: 80, status: 'Generating study questions...', error: null });
-
-    // Generate study questions (generate 11 so we can remove the first question)
+    // Prepare prompt for generating multiple-choice questions
     const questionsPrompt = `
 Based on the following key points from a YouTube video, generate 11 multiple-choice questions:
 
@@ -158,14 +163,15 @@ Correct: (Letter of correct answer)
 Explanation: (Why this is the correct answer)
 
 Generate 11 questions in this exact format.`;
-
+    
+    // Call the Hugging Face API for question generation
     const questionsResponse = await fetch(
       'https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct',
       {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${huggingFaceApiKey}`,
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           inputs: questionsPrompt,
@@ -178,15 +184,13 @@ Generate 11 questions in this exact format.`;
         })
       }
     );
-
     if (!questionsResponse.ok) {
       throw new Error('Failed to generate questions');
     }
-
     const questionsResult = await questionsResponse.json();
     const questionsText = questionsResult[0].generated_text;
-
-    // Parse questions
+    
+    // Parse questions into structured objects
     const questionBlocks = questionsText.split(/Question: /).filter(Boolean);
     let questions = questionBlocks.map(block => {
       const lines = block.split('\n').filter(Boolean);
@@ -194,7 +198,6 @@ Generate 11 questions in this exact format.`;
       const options = lines.slice(1, 5).map(opt => opt.replace(/^[A-D]\)\s*/, '').trim());
       const correctAnswer = lines.find(l => l.startsWith('Correct:'))?.replace('Correct:', '').trim();
       const explanation = lines.find(l => l.startsWith('Explanation:'))?.replace('Explanation:', '').trim() || '';
-
       return {
         question,
         options,
@@ -202,13 +205,11 @@ Generate 11 questions in this exact format.`;
         explanation
       };
     });
-
-    // Remove the first question (usually contains mistakes)
+    // Remove the first question block if it tends to contain mistakes
     questions = questions.slice(1);
-
+    
     onProgress({ progress: 100, status: 'Processing complete!', error: null });
-
-    // Return processed data
+    
     return {
       title: videoInfo.title,
       content: summary,
@@ -216,7 +217,6 @@ Generate 11 questions in this exact format.`;
       questions,
       sourceUrl: `https://www.youtube.com/watch?v=${videoId}`
     };
-
   } catch (error) {
     console.error('YouTube processing error:', error);
     onProgress({

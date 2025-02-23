@@ -1137,9 +1137,8 @@ setSmartOverview(formattedHtml);
   <header className="dashboard-header transform transition-all duration-500 ease-out translate-y-0 opacity-100 pt-16 lg:pt-0">
   <h1 className="text-2xl lg:text-4xl font-bold mb-2 text-white break-words">
     {React.cloneElement(greeting.icon, {
-      className: 
-        // We combine the base sizing/positioning classes with whatever color class is on the icon
-        "w-4 h-4 inline-block align-middle mr-2 -translate-y-0.5 " + 
+      className:
+        "w-5 h-5 lg:w-6 lg:h-6 inline-block align-middle mr-2 -translate-y-0.5 " +
         (greeting.icon.props.className ?? "")
     })}
     {greeting.greeting}, <span className="font-bold">{userName || "Loading..."}</span>

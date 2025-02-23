@@ -419,38 +419,43 @@ export function Notes() {
     }
   };
 
-  // Handle YouTube link
-  const handleYoutubeLink = async (url: string) => {
-    if (!user) return;
-    try {
-      const processedYouTube = await processYouTube(
+const handleYoutubeLink = async (url: string) => {
+  if (!user) return;
+  try {
+    const response = await fetch('/api/processYouTube', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         url,
-        user.uid,
-        huggingFaceApiKey,
-        setUploadProgress
-      );
-
-      await saveNote({
-        title: processedYouTube.title,
-        content: processedYouTube.content,
-        type: 'youtube',
-        keyPoints: processedYouTube.keyPoints,
-        questions: processedYouTube.questions,
-        sourceUrl: processedYouTube.sourceUrl,
         userId: user.uid,
-        isPublic: false,
-        tags: []
-      });
-
-      setShowNewNoteModal(false);
-    } catch (error) {
-      console.error('Error processing YouTube video:', error);
-      setUploadProgress(prev => ({
-        ...prev,
-        error: error instanceof Error ? error.message : 'Failed to process YouTube video'
-      }));
+        huggingFaceApiKey
+      })
+    });
+    if (!response.ok) {
+      throw new Error('Server error while processing YouTube video');
     }
-  };
+    const processedYouTube = await response.json();
+
+    await saveNote({
+      title: processedYouTube.title,
+      content: processedYouTube.content,
+      type: 'youtube',
+      keyPoints: processedYouTube.keyPoints,
+      questions: processedYouTube.questions,
+      sourceUrl: processedYouTube.sourceUrl,
+      userId: user.uid,
+      isPublic: false,
+      tags: []
+    });
+    setShowNewNoteModal(false);
+  } catch (error) {
+    console.error('Error processing YouTube video:', error);
+    setUploadProgress(prev => ({
+      ...prev,
+      error: error instanceof Error ? error.message : 'Failed to process YouTube video'
+    }));
+  }
+};
 
   // Handle answer selection for questions
   const handleAnswerSelect = (questionIndex: number, selectedOption: number) => {

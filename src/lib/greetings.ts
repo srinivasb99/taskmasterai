@@ -12,26 +12,25 @@ export const getTimeBasedGreeting = (): { greeting: string; icon: JSX.Element } 
   if (hour >= 5 && hour < 12) {
     return {
       greeting: 'Good morning',
-      icon: <Sun className="text-yellow-400" />
+      icon: React.createElement(Sun, { className: 'text-yellow-400' })
     };
   } else if (hour >= 12 && hour < 17) {
     return {
       greeting: 'Good afternoon',
-      icon: <Cloud className="text-sky-300" />
+      icon: React.createElement(Cloud, { className: 'text-sky-300' })
     };
   } else if (hour >= 17 && hour < 21) {
     return {
       greeting: 'Good evening',
-      icon: <Sunset className="text-orange-400" />
+      icon: React.createElement(Sunset, { className: 'text-orange-400' })
     };
   } else {
     return {
       greeting: 'Good night',
-      icon: <Moon className="text-purple-400" />
+      icon: React.createElement(Moon, { className: 'text-purple-400' })
     };
   }
 };
-
 
 export const getRandomQuote = (): Quote => {
   const quotes: Quote[] = [

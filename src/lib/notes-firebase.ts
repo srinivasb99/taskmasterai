@@ -121,7 +121,7 @@ Key Points:
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${huggingFaceApiKey}`,
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           inputs: summaryPrompt,
@@ -151,8 +151,9 @@ Key Points:
       .map(point => point.replace(/^\d+\.\s*/, '').trim());
 
     // Generate study questions based on key points
+    // Request 11 questions so we can remove the first (error-prone) one.
     const questionsPrompt = `
-Based on the following key points, generate 10 multiple-choice questions:
+Based on the following key points, generate 11 multiple-choice questions:
 
 ${keyPoints.join('\n')}
 
@@ -165,7 +166,7 @@ D) (Fourth option)
 Correct: (Letter of correct answer)
 Explanation: (Why this is the correct answer)
 
-Generate 10 questions in this exact format.`;
+Generate 11 questions in this exact format.`;
 
     const questionsResponse = await fetch(
       'https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct',
@@ -173,7 +174,7 @@ Generate 10 questions in this exact format.`;
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${huggingFaceApiKey}`,
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           inputs: questionsPrompt,
@@ -194,9 +195,9 @@ Generate 10 questions in this exact format.`;
     const questionsResult = await questionsResponse.json();
     const questionsText = questionsResult[0].generated_text;
 
-    // Parse questions and ensure exactly 10 are returned
+    // Parse questions
     const questionBlocks = questionsText.split(/Question: /).filter(Boolean);
-    const parsedQuestions = questionBlocks.map(block => {
+    let parsedQuestions = questionBlocks.map(block => {
       const lines = block.split('\n').filter(Boolean);
       const question = lines[0].trim();
       const options = lines.slice(1, 5).map(opt => opt.replace(/^[A-D]\)\s*/, '').trim());
@@ -209,16 +210,20 @@ Generate 10 questions in this exact format.`;
         correctAnswer: ['A', 'B', 'C', 'D'].indexOf(correctAnswer || 'A'),
         explanation
       };
-    }).slice(0, 10); // Ensure exactly 10 questions
+    });
+
+    // Remove the first question (often contains mistakes) and ensure exactly 10 questions remain.
+    parsedQuestions = parsedQuestions.slice(1).slice(0, 10);
 
     return {
       title: 'AI-Generated Note',
       content: summary,
       keyPoints,
       questions: parsedQuestions,
-      type: 'text' as const,
+      type: 'text',
       isPublic: false,
-      tags: []
+      tags: [],
+      userId
     };
   } catch (error) {
     console.error('Error processing text:', error);
@@ -228,8 +233,9 @@ Generate 10 questions in this exact format.`;
 
 export async function regenerateStudyQuestions(noteId: string, content: string, huggingFaceApiKey: string) {
   try {
+    // Request 11 questions so we can remove the first one.
     const questionsPrompt = `
-Based on the following content, generate 10 multiple-choice questions:
+Based on the following content, generate 11 multiple-choice questions:
 
 ${content}
 
@@ -242,7 +248,7 @@ D) (Fourth option)
 Correct: (Letter of correct answer)
 Explanation: (Why this is the correct answer)
 
-Generate 10 questions in this exact format.`;
+Generate 11 questions in this exact format.`;
 
     const questionsResponse = await fetch(
       'https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct',
@@ -250,7 +256,7 @@ Generate 10 questions in this exact format.`;
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${huggingFaceApiKey}`,
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           inputs: questionsPrompt,
@@ -271,9 +277,9 @@ Generate 10 questions in this exact format.`;
     const questionsResult = await questionsResponse.json();
     const questionsText = questionsResult[0].generated_text;
 
-    // Parse questions and ensure exactly 10 are returned
+    // Parse questions
     const questionBlocks = questionsText.split(/Question: /).filter(Boolean);
-    const parsedQuestions = questionBlocks.map(block => {
+    let parsedQuestions = questionBlocks.map(block => {
       const lines = block.split('\n').filter(Boolean);
       const question = lines[0].trim();
       const options = lines.slice(1, 5).map(opt => opt.replace(/^[A-D]\)\s*/, '').trim());
@@ -286,7 +292,10 @@ Generate 10 questions in this exact format.`;
         correctAnswer: ['A', 'B', 'C', 'D'].indexOf(correctAnswer || 'A'),
         explanation
       };
-    }).slice(0, 10); // Ensure exactly 10 questions
+    });
+
+    // Remove the first question and ensure exactly 10 questions remain.
+    parsedQuestions = parsedQuestions.slice(1).slice(0, 10);
 
     const noteRef = doc(db, 'notes', noteId);
     await updateDoc(noteRef, {

@@ -10,13 +10,25 @@ export const getTimeBasedGreeting = (): { greeting: string; icon: JSX.Element } 
   const hour = new Date().getHours();
 
   if (hour >= 5 && hour < 12) {
-    return { greeting: "Good morning", icon: React.createElement(Sun, { className: "w-5 h-5" }) };
+    return {
+      greeting: 'Good morning',
+      icon: <Sun className="text-yellow-400" />
+    };
   } else if (hour >= 12 && hour < 17) {
-    return { greeting: "Good afternoon", icon: React.createElement(Cloud, { className: "w-5 h-5" }) };
+    return {
+      greeting: 'Good afternoon',
+      icon: <Cloud className="text-sky-300" />
+    };
   } else if (hour >= 17 && hour < 21) {
-    return { greeting: "Good evening", icon: React.createElement(Sunset, { className: "w-5 h-5" }) };
+    return {
+      greeting: 'Good evening',
+      icon: <Sunset className="text-orange-400" />
+    };
   } else {
-    return { greeting: "Good night", icon: React.createElement(Moon, { className: "w-5 h-5" }) };
+    return {
+      greeting: 'Good night',
+      icon: <Moon className="text-purple-400" />
+    };
   }
 };
 

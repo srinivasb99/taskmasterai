@@ -228,7 +228,7 @@ function Pricing() {
           {/* Basic Plan */}
           <motion.div
             variants={cardVariants}
-            className="bg-gray-800 rounded-xl p-6 w-full sm:w-1/3 min-h-[500px] flex flex-col"
+            className="bg-gray-800 rounded-xl p-6 w-full sm:w-1/2 min-h-[500px] flex flex-col"
           >
             <div>
               <h2 className="text-2xl font-bold mb-4">Basic</h2>
@@ -258,7 +258,7 @@ function Pricing() {
           {/* Premium Plan */}
           <motion.div
             variants={cardVariants}
-            className="bg-gray-800 rounded-xl p-6 w-full sm:w-1/3 min-h-[500px] flex flex-col border-2 border-indigo-500"
+            className="bg-gray-800 rounded-xl p-6 w-full sm:w-1/2 min-h-[500px] flex flex-col border-2 border-indigo-500"
           >
             <div>
               <h2 className="text-2xl font-bold mb-2 flex items-center gap-2">
@@ -310,7 +310,7 @@ function Pricing() {
           {/* Pro Plan */}
           <motion.div
             variants={cardVariants}
-            className="bg-gray-800 rounded-xl p-6 w-full sm:w-1/3 min-h-[500px] flex flex-col"
+            className="bg-gray-800 rounded-xl p-6 w-full sm:w-1/2 min-h-[500px] flex flex-col"
           >
             <div>
               <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">

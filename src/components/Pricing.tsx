@@ -223,7 +223,7 @@ function Pricing() {
           initial="hidden"
           animate="visible"
           variants={containerVariants}
-          className="flex flex-col sm:flex-row items-center justify-center gap-6"
+          className="flex flex-col w-full sm:flex-row items-center justify-center gap-6"
         >
           {/* Basic Plan */}
           <motion.div

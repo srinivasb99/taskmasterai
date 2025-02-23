@@ -1,6 +1,7 @@
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { storage } from './firebase';
 import { v4 as uuidv4 } from 'uuid';
+import { YoutubeTranscript } from 'youtube-transcript';
 
 interface ProcessingProgress {
   progress: number;
@@ -65,25 +66,14 @@ export async function processYouTube(
     const videoInfo = videoData.items[0].snippet;
     onProgress({ progress: 40, status: 'Retrieving transcript...', error: null });
 
-    // Fetch video transcript
-    const transcriptResponse = await fetch(
-      `https://www.googleapis.com/youtube/v3/captions?part=snippet&videoId=${videoId}&key=${YOUTUBE_API_KEY}`
-    );
-
+    // Fetch video transcript using youtube-transcript package
     let transcript = '';
-    if (transcriptResponse.ok) {
-      const transcriptData = await transcriptResponse.json();
-      if (transcriptData.items?.[0]) {
-        const captionId = transcriptData.items[0].id;
-        const captionResponse = await fetch(
-          `https://www.googleapis.com/youtube/v3/captions/${captionId}?key=${YOUTUBE_API_KEY}`
-        );
-
-        if (captionResponse.ok) {
-          const captionData = await captionResponse.json();
-          transcript = captionData.snippet?.text || '';
-        }
-      }
+    try {
+      const transcriptPieces = await YoutubeTranscript.fetchTranscript(videoId);
+      transcript = transcriptPieces.map(piece => piece.text).join(' ');
+    } catch (transcriptError) {
+      console.error('Error fetching transcript:', transcriptError);
+      transcript = ''; // fallback to empty transcript if error occurs
     }
 
     onProgress({ progress: 60, status: 'Generating summary...', error: null });

@@ -34,7 +34,8 @@
     "styled-components": "^6.1.8",
     "tesseract.js": "^5.1.1",
     "uuid": "^9.0.1",
-    "framer-motion": "^10.12.16"
+    "framer-motion": "^10.12.16",
+    "youtube-transcript": "^1.2.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.1",

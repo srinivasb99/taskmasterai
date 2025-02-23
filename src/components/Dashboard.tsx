@@ -1711,20 +1711,20 @@ setSmartOverview(formattedHtml);
                                   className="bg-gradient-to-r from-green-400 to-green-600 px-4 py-2 rounded-full text-white flex items-center gap-2 hover:shadow-lg hover:shadow-green-500/20 transition-all duration-300 transform hover:scale-105"
                                   onClick={() => handleMarkComplete(itemId)}
                                 >
-                                  <CheckCircle className="w-4 h-4" /> Complete
+                                  <CheckCircle className="w-4 h-4" /> 
                                 </button>
                               )}
                               <button
                                 className="bg-gradient-to-r from-blue-400 to-blue-600 px-4 py-2 rounded-full text-white flex items-center gap-2 hover:shadow-lg hover:shadow-blue-500/20 transition-all duration-300 transform hover:scale-105"
                                 onClick={() => handleEditClick(itemId, textValue, item.data.dueDate)}
                               >
-                                <Edit className="w-4 h-4" /> Edit
+                                <Edit className="w-4 h-4" /> 
                               </button>
                               <button
                                 className="bg-gradient-to-r from-red-400 to-red-600 px-4 py-2 rounded-full text-white flex items-center gap-2 hover:shadow-lg hover:shadow-red-500/20 transition-all duration-300 transform hover:scale-105"
                                 onClick={() => handleDelete(itemId)}
                               >
-                                <Trash className="w-4 h-4" /> Delete
+                                <Trash className="w-4 h-4" /> 
                               </button>
                             </>
                           ) : (

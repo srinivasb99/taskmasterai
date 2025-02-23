@@ -84,11 +84,14 @@ export function Dashboard() {
     localStorage.setItem('isSidebarCollapsed', JSON.stringify(isSidebarCollapsed));
   }, [isSidebarCollapsed]);
 
-  // Check for authenticated user
   useEffect(() => {
     const user = getCurrentUser();
     if (!user) {
+      // If no user is logged in, redirect to login
       navigate('/login');
+    } else {
+      // If user exists, update their lastSeen in Firestore
+      updateDashboardLastSeen(user.uid);
     }
   }, [navigate]);
 

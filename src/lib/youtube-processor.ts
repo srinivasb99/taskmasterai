@@ -23,7 +23,7 @@ export interface ProcessedYouTube {
 const YOUTUBE_API_KEY = 'AIzaSyD4iosX8Y1X4bOThSGhYyUfCmWKBEkc6x4';
 
 /**
- * Extracts the video ID from a given YouTube URL.
+ * Extracts the video ID from a YouTube URL.
  */
 function getVideoId(url: string): string | null {
   const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
@@ -32,17 +32,12 @@ function getVideoId(url: string): string | null {
 }
 
 /**
- * Processes a YouTube video by fetching its transcript, generating a summary
- * and key points, and then creating study questions via Hugging Face's AI model.
+ * Processes a YouTube video:
+ *  - Fetches video details (title, description) from the YouTube API.
+ *  - Retrieves the transcript using the unofficial youtube-transcript package.
+ *  - Calls the Hugging Face API to generate a summary, key points, and study questions.
  *
- * This function is intended to run on the backend (e.g. within a Vercel serverless function)
- * so that sensitive operations and API calls (like to Hugging Face) occur server-side.
- *
- * @param url - The YouTube video URL provided by the user.
- * @param userId - The ID of the user requesting processing.
- * @param huggingFaceApiKey - Your Hugging Face API key.
- * @param onProgress - Callback to report processing progress.
- * @returns Processed video data including title, summary, key points, and study questions.
+ * This function is intended to run on the backend to avoid CORS issues.
  */
 export async function processYouTube(
   url: string,
@@ -52,15 +47,15 @@ export async function processYouTube(
 ): Promise<ProcessedYouTube> {
   try {
     onProgress({ progress: 0, status: 'Starting YouTube processing...', error: null });
-    
-    // Extract video ID
+
+    // Extract video ID from URL
     const videoId = getVideoId(url);
     if (!videoId) {
       throw new Error('Invalid YouTube URL');
     }
-    
+
     onProgress({ progress: 20, status: 'Fetching video data...', error: null });
-    // Fetch video data (title and description) using YouTube Data API
+    // Fetch video data from YouTube API (title, description)
     const videoResponse = await fetch(
       `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoId}&key=${YOUTUBE_API_KEY}`
     );
@@ -72,7 +67,7 @@ export async function processYouTube(
       throw new Error('Video not found');
     }
     const videoInfo = videoData.items[0].snippet;
-    
+
     onProgress({ progress: 40, status: 'Retrieving transcript...', error: null });
     // Fetch transcript using the unofficial youtube-transcript package
     let transcript = '';
@@ -81,11 +76,11 @@ export async function processYouTube(
       transcript = transcriptPieces.map(piece => piece.text).join(' ');
     } catch (transcriptError) {
       console.error('Error fetching transcript:', transcriptError);
-      transcript = ''; // Fallback to empty transcript if fetching fails
+      transcript = ''; // fallback to empty transcript if an error occurs
     }
-    
+
     onProgress({ progress: 60, status: 'Generating summary...', error: null });
-    // Prepare prompt for summary and key points
+    // Prepare prompt for the Hugging Face API
     const summaryPrompt = `
 Analyze the following YouTube video content and generate:
 1. A clear, concise summary (4-6 sentences)
@@ -112,7 +107,7 @@ Key Points:
 9. [Ninth key point]
 10. [Tenth key point]`;
 
-    // Call the Hugging Face API for summary generation
+    // Call Hugging Face API for summary generation
     const summaryResponse = await fetch(
       'https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct',
       {
@@ -137,17 +132,17 @@ Key Points:
     }
     const summaryResult = await summaryResponse.json();
     const summaryText = summaryResult[0].generated_text;
-    
-    // Parse summary and key points from the AI response
+
+    // Parse summary and key points
     const summary = summaryText.split('Key Points:')[0].replace('Summary:', '').trim();
     const keyPoints = summaryText
       .split('Key Points:')[1]
       .split('\n')
       .filter(line => line.trim().match(/^\d+\./))
       .map(point => point.replace(/^\d+\.\s*/, '').trim());
-    
+
     onProgress({ progress: 80, status: 'Generating study questions...', error: null });
-    // Prepare prompt for generating multiple-choice questions
+    // Prepare prompt for generating study questions
     const questionsPrompt = `
 Based on the following key points from a YouTube video, generate 11 multiple-choice questions:
 
@@ -163,8 +158,8 @@ Correct: (Letter of correct answer)
 Explanation: (Why this is the correct answer)
 
 Generate 11 questions in this exact format.`;
-    
-    // Call the Hugging Face API for question generation
+
+    // Call Hugging Face API for question generation
     const questionsResponse = await fetch(
       'https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct',
       {
@@ -189,7 +184,7 @@ Generate 11 questions in this exact format.`;
     }
     const questionsResult = await questionsResponse.json();
     const questionsText = questionsResult[0].generated_text;
-    
+
     // Parse questions into structured objects
     const questionBlocks = questionsText.split(/Question: /).filter(Boolean);
     let questions = questionBlocks.map(block => {
@@ -207,9 +202,9 @@ Generate 11 questions in this exact format.`;
     });
     // Remove the first question block if it tends to contain mistakes
     questions = questions.slice(1);
-    
+
     onProgress({ progress: 100, status: 'Processing complete!', error: null });
-    
+
     return {
       title: videoInfo.title,
       content: summary,

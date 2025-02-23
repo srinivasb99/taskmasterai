@@ -181,9 +181,10 @@ export function Sidebar({
                 <div className="flex items-center gap-1.5">
                   <span className="text-xs text-gray-500">Basic Plan</span>
                   {isDev && (
-<span className="px-1 py-0.5 text-[9px] font-semibold bg-gradient-to-r from-gray-600 to-gray-800 text-white rounded-full leading-none">
+<span className="px-1 py-0.5 text-[9px] font-semibold bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-full leading-none">
   DEV
 </span>
+
 
 
                   )}

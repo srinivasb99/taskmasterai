@@ -790,34 +790,36 @@ const cleanAndValidate = (text: string) => {
 // Check for patterns that trigger removal of subsequent lines:
 // 1. "This is:" pattern
 // 2. "<|reserved" pattern
-// 3. Also, check for "Hello" pattern as before.
+// 3. Also, check for "Hello" pattern as before, but more robustly.
 let helloCount = 0;
-const truncatedLines = [];
+const truncatedLines: string[] = [];
+
 for (const line of lines) {
   // Skip empty lines
   if (!line.trim()) continue;
 
-  // Check for "This is:" pattern - remove it and everything after
+  // 1) "This is:"
   if (line.trim().startsWith("This is:")) {
     break;
   }
 
-  // Check for "<|reserved" pattern - remove it and everything after
+  // 2) "<|reserved"
   if (line.trim().startsWith("<|reserved")) {
     break;
   }
 
-  // Check for "Hello" pattern as before (case-insensitive)
-  if (line.trim().toLowerCase().startsWith("hello")) {
+  // 3) "Hello" pattern (case-insensitive, ignoring leading spaces, 
+  //    allowing punctuation like "Hello," or "Hello.")
+  if (/^\s*hello[\s,.!?]?/i.test(line)) {
     helloCount++;
     if (helloCount === 2) {
+      // Stop processing any further lines
       break;
     }
   }
 
   truncatedLines.push(line);
 }
-
 
   return truncatedLines.join('\n');
 };

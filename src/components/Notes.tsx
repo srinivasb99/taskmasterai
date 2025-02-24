@@ -88,7 +88,9 @@ interface UploadProgressState {
   progress: number;
   status: string;
   error: string | null;
+  estimatedTimeRemaining: number;
 }
+
 
 const huggingFaceApiKey = "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";
 
@@ -386,38 +388,55 @@ export function Notes() {
     }
   };
 
-  // Handle PDF upload
-  const handlePDFUpload = async (file: File) => {
-    if (!user) return;
-    try {
-      const processedPDF = await processPDF(
-        file,
-        user.uid,
-        huggingFaceApiKey,
-        setUploadProgress
-      );
+// Handle PDF upload
+const handlePDFUpload = async (file: File) => {
+  if (!user) return;
+  try {
+    // Optionally, initialize the progress state
+    setUploadProgress({
+      progress: 0,
+      status: 'Starting upload...',
+      error: null,
+      estimatedTimeRemaining: 0,
+    });
 
-      await saveNote({
-        title: processedPDF.title,
-        content: processedPDF.content,
-        type: 'pdf',
-        keyPoints: processedPDF.keyPoints,
-        questions: processedPDF.questions,
-        sourceUrl: processedPDF.sourceUrl,
-        userId: user.uid,
-        isPublic: false,
-        tags: []
-      });
+    // Call processPDF with a progress callback that updates the UI
+    const processedPDF = await processPDF(
+      file,
+      user.uid,
+      huggingFaceApiKey,
+      (progress) => {
+        // Update the progress state with the estimated time remaining
+        setUploadProgress(progress);
+        console.log(
+          `Progress: ${progress.progress}% | Status: ${progress.status} | Estimated time remaining: ${progress.estimatedTimeRemaining.toFixed(1)} seconds`
+        );
+      }
+    );
 
-      setShowNewNoteModal(false);
-    } catch (error) {
-      console.error('Error processing PDF:', error);
-      setUploadProgress(prev => ({
-        ...prev,
-        error: error instanceof Error ? error.message : 'Failed to process PDF'
-      }));
-    }
-  };
+    // Save the note after successful processing
+    await saveNote({
+      title: processedPDF.title,
+      content: processedPDF.content,
+      type: 'pdf',
+      keyPoints: processedPDF.keyPoints,
+      questions: processedPDF.questions,
+      sourceUrl: processedPDF.sourceUrl,
+      userId: user.uid,
+      isPublic: false,
+      tags: []
+    });
+
+    setShowNewNoteModal(false);
+  } catch (error) {
+    console.error('Error processing PDF:', error);
+    setUploadProgress(prev => ({
+      ...prev,
+      error: error instanceof Error ? error.message : 'Failed to process PDF'
+    }));
+  }
+};
+
 
   // Handle YouTube link
   const handleYoutubeLink = async (url: string) => {

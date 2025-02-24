@@ -5,6 +5,7 @@ import {
   Upload,
   Youtube,
   Mic,
+  Clock,
   Plus,
   Search,
   Filter,
@@ -61,6 +62,7 @@ import { NewNoteModal } from './NewNoteModal';
 import { SplitView } from './SplitView';
 import { NoteChat } from './NoteChat';
 import { getCurrentUser } from '../lib/settings-firebase';
+import { motion } from 'framer-motion';
 
 
 // Types
@@ -979,26 +981,48 @@ return (
         </div>
       </div>
 
-      {/* Global Upload Progress Indicator */}
-      {uploadProgress.progress > 0 && uploadProgress.progress < 100 && (
-        <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-gray-800 p-4 rounded-lg shadow-lg z-50">
-          <div className="flex justify-between items-center">
-            <span className="text-white">{uploadProgress.status}</span>
-            <span className="text-white">
-              {uploadProgress.estimatedTimeRemaining > 0
-                ? `Time remaining: ${uploadProgress.estimatedTimeRemaining.toFixed(1)}s`
-                : 'Calculating...'}
-            </span>
-          </div>
-          <div className="w-full bg-gray-700 rounded-full h-2 mt-2">
-            <div
-              className="bg-blue-500 h-2 rounded-full"
-              style={{ width: `${uploadProgress.progress}%` }}
-            ></div>
-          </div>
-        </div>
-      )}
-
+ // Global Upload Progress Indicator
+{uploadProgress.progress > 0 && uploadProgress.progress < 100 && (
+  <motion.div
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    exit={{ opacity: 0, y: 20 }}
+    transition={{ duration: 0.5, type: 'spring', stiffness: 100 }}
+    className="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-gray-800 p-4 rounded-lg shadow-lg z-50"
+  >
+    <div className="flex justify-between items-center mb-2">
+      <span className="text-white font-medium">
+        Ongoing{" "}
+        {uploadProgress.uploadType
+          ? uploadProgress.uploadType === "pdf"
+            ? "PDF"
+            : uploadProgress.uploadType === "youtube"
+            ? "YouTube"
+            : uploadProgress.uploadType === "text"
+            ? "Text"
+            : uploadProgress.uploadType === "audio"
+            ? "Audio"
+            : "Processing"
+          : "Processing"}{" "}
+        Generation
+      </span>
+      <div className="flex items-center gap-1">
+        <Clock className="w-5 h-5 text-white" />
+        <span className="text-white">
+          {uploadProgress.estimatedTimeRemaining > 0
+            ? `Time remaining: ${uploadProgress.estimatedTimeRemaining.toFixed(1)}s`
+            : "Calculating..."}
+        </span>
+      </div>
+    </div>
+    <div className="w-full bg-gray-700 rounded-full h-2">
+      <div
+        className="bg-blue-500 h-2 rounded-full"
+        style={{ width: `${uploadProgress.progress}%` }}
+      ></div>
+    </div>
+  </motion.div>
+)}
       {/* New Note Modal */}
       {showNewNoteModal && (
         <NewNoteModal

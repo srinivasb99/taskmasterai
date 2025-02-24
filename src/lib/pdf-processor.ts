@@ -7,10 +7,12 @@ import { storage } from './firebase';
 // Set PDF.js worker source
 GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
 
+// Added estimatedTimeRemaining (in seconds) to the interface.
 interface ProcessingProgress {
   progress: number;
   status: string;
   error: string | null;
+  estimatedTimeRemaining: number;
 }
 
 interface ProcessedPDF {
@@ -32,16 +34,32 @@ export async function processPDF(
   huggingFaceApiKey: string,
   onProgress: (progress: ProcessingProgress) => void
 ): Promise<ProcessedPDF> {
+  // Record the start time for the process.
+  const startTime = Date.now();
+
+  // Helper function to update progress with estimated time remaining.
+  function updateProgress(progress: number, status: string, error: string | null) {
+    const elapsed = (Date.now() - startTime) / 1000; // elapsed time in seconds
+    let estimatedTimeRemaining = 0;
+    // Avoid division by zero. If progress is 0, we leave remaining as 0.
+    if (progress > 0) {
+      // Estimate the total time based on current progress.
+      const estimatedTotalTime = elapsed / (progress / 100);
+      estimatedTimeRemaining = estimatedTotalTime - elapsed;
+    }
+    onProgress({ progress, status, error, estimatedTimeRemaining });
+  }
+
   try {
     // Initial progress update
-    onProgress({ progress: 0, status: 'Starting PDF processing...', error: null });
+    updateProgress(0, 'Starting PDF processing...', null);
 
     // Upload PDF to Firebase Storage
     const fileRef = ref(storage, `pdfs/${userId}/${uuidv4()}-${file.name}`);
     await uploadBytes(fileRef, file);
     const pdfUrl = await getDownloadURL(fileRef);
 
-    onProgress({ progress: 10, status: 'PDF uploaded, extracting text...', error: null });
+    updateProgress(10, 'PDF uploaded, extracting text...', null);
 
     // Load PDF document
     const arrayBuffer = await file.arrayBuffer();
@@ -59,16 +77,12 @@ export async function processPDF(
 
       // Update progress for text extraction
       const extractionProgress = 10 + (pageNum / numPages) * 30;
-      onProgress({
-        progress: extractionProgress,
-        status: `Extracting text from page ${pageNum} of ${numPages}...`,
-        error: null
-      });
+      updateProgress(extractionProgress, `Extracting text from page ${pageNum} of ${numPages}...`, null);
     }
 
     // Check for scanned pages using OCR
     if (extractedText.trim().length < 100) {
-      onProgress({ progress: 40, status: 'Detected scanned PDF, performing OCR...', error: null });
+      updateProgress(40, 'Detected scanned PDF, performing OCR...', null);
       
       const worker = await createWorker();
       
@@ -97,17 +111,13 @@ export async function processPDF(
         
         // Update progress for OCR
         const ocrProgress = 40 + (pageNum / numPages) * 20;
-        onProgress({
-          progress: ocrProgress,
-          status: `Performing OCR on page ${pageNum} of ${numPages}...`,
-          error: null
-        });
+        updateProgress(ocrProgress, `Performing OCR on page ${pageNum} of ${numPages}...`, null);
       }
       
       await worker.terminate();
     }
 
-    onProgress({ progress: 60, status: 'Generating summary and key points...', error: null });
+    updateProgress(60, 'Generating summary and key points...', null);
 
     // Generate summary and key points using Hugging Face API
     const summaryPrompt = `
@@ -170,7 +180,7 @@ Key Points:
       .filter(line => line.trim().match(/^\d+\./))
       .map(point => point.replace(/^\d+\.\s*/, '').trim());
 
-    onProgress({ progress: 80, status: 'Generating study questions...', error: null });
+    updateProgress(80, 'Generating study questions...', null);
 
     // Generate study questions (generate 11 so we can remove the first)
     const questionsPrompt = `
@@ -236,7 +246,7 @@ Generate 11 questions in this exact format.`;
     // Remove the first question (often contains mistakes)
     questions = questions.slice(1);
 
-    onProgress({ progress: 100, status: 'Processing complete!', error: null });
+    updateProgress(100, 'Processing complete!', null);
 
     // Return processed data
     return {
@@ -249,11 +259,7 @@ Generate 11 questions in this exact format.`;
 
   } catch (error) {
     console.error('PDF processing error:', error);
-    onProgress({
-      progress: 0,
-      status: 'Error processing PDF',
-      error: error instanceof Error ? error.message : 'Unknown error occurred'
-    });
+    updateProgress(0, 'Error processing PDF', error instanceof Error ? error.message : 'Unknown error occurred');
     throw error;
   }
 }

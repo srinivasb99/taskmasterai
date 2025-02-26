@@ -54,7 +54,7 @@ export async function processPDF(
     for (let pageNum = 1; pageNum <= numPages; pageNum++) {
       const page = await pdf.getPage(pageNum);
       const content = await page.getTextContent();
-      const pageText = content.items.map(item => 'str' in item ? item.str : '').join(' ');
+      const pageText = content.items.map(item => ('str' in item ? item.str : '')).join(' ');
       extractedText += pageText + '\n';
 
       // Update progress for text extraction
@@ -172,9 +172,9 @@ Key Points:
 
     onProgress({ progress: 80, status: 'Generating study questions...', error: null });
 
-    // Generate study questions
+    // Generate study questions (generate 11 so we can remove the first)
     const questionsPrompt = `
-Based on the following key points, generate 10 multiple-choice questions:
+Based on the following key points, generate 11 multiple-choice questions:
 
 ${keyPoints.join('\n')}
 
@@ -187,7 +187,7 @@ D) (Fourth option)
 Correct: (Letter of correct answer)
 Explanation: (Why this is the correct answer)
 
-Generate 10 questions in this exact format.`;
+Generate 11 questions in this exact format.`;
 
     const questionsResponse = await fetch(
       'https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct',
@@ -218,7 +218,7 @@ Generate 10 questions in this exact format.`;
 
     // Parse questions
     const questionBlocks = questionsText.split(/Question: /).filter(Boolean);
-    const questions = questionBlocks.map(block => {
+    let questions = questionBlocks.map(block => {
       const lines = block.split('\n').filter(Boolean);
       const question = lines[0].trim();
       const options = lines.slice(1, 5).map(opt => opt.replace(/^[A-D]\)\s*/, '').trim());
@@ -232,6 +232,9 @@ Generate 10 questions in this exact format.`;
         explanation
       };
     });
+
+    // Remove the first question (often contains mistakes)
+    questions = questions.slice(1);
 
     onProgress({ progress: 100, status: 'Processing complete!', error: null });
 

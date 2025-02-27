@@ -1,5 +1,4 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
   PlusCircle,
@@ -1162,687 +1161,367 @@ const resetCustomTimer = (timerId: string, defaultTime?: number) => {
   const plansProgress = totalPlans > 0 ? (completedPlans / totalPlans) * 100 : 0;
 
 
-// Reusable animation variants
-const fadeInUp = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { 
-    opacity: 1, 
-    y: 0,
-    transition: {
-      duration: 0.4,
-      ease: "easeOut"
-    }
-  },
-  exit: { 
-    opacity: 0, 
-    y: 20,
-    transition: {
-      duration: 0.2
-    }
-  }
-};
 
-const staggerContainer = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.08,
-      delayChildren: 0.1
-    }
-  }
-};
-
-const pulseAnimation = {
-  initial: { scale: 1 },
-  pulse: {
-    scale: [1, 1.05, 1],
-    transition: {
-      duration: 2,
-      repeat: Infinity,
-      repeatType: "reverse"
-    }
-  }
-};
-
-const progressAnimation = (progress) => ({
-  initial: { width: "0%" },
-  animate: { 
-    width: `${progress}%`,
-    transition: { 
-      duration: 1.5,
-      ease: "easeOut" 
-    }
-  }
-});
 
 
  return (
-  <div className="bg-gray-900 text-white min-h-screen w-full overflow-hidden">
-    {/* Pass collapse state & toggle handler to Sidebar */}
-    <Sidebar 
-      userName={userName}
-      isCollapsed={isSidebarCollapsed}
-      onToggle={handleToggleSidebar}
-    />
+    <div className="bg-gray-900 text-white min-h-screen w-full overflow-hidden">
+      {/* Pass collapse state & toggle handler to Sidebar */}
+      <Sidebar 
+        userName={userName}
+        isCollapsed={isSidebarCollapsed}
+        onToggle={handleToggleSidebar}
+      />
 
-    {/* Adjust the main content's left margin depending on sidebar width */}
-    <motion.main
-      className={`transition-all duration-300 ease-in-out min-h-screen
-        ${isSidebarCollapsed ? 'ml-20' : 'ml-64'} 
-        p-4 lg:p-8 overflow-auto`}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.5 }}
-    >
-      {/* Header Section with Calendar */}
-      <motion.div 
-        className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6 mb-6"
-        variants={staggerContainer}
-        initial="hidden"
-        animate="visible"
+      {/* Adjust the main content's left margin depending on sidebar width */}
+      <main
+        className={`transition-all duration-300 ease-in-out min-h-screen
+          ${isSidebarCollapsed ? 'ml-20' : 'ml-64'} 
+          p-4 lg:p-8 overflow-auto`}
       >
-        {/* Greeting Section */}
-        <motion.header 
-          className="dashboard-header transform transition-all duration-500 ease-out translate-y-0 opacity-100 pt-16 lg:pt-0"
-          variants={fadeInUp}
-        >
-          <motion.h1 
-            className="text-2xl lg:text-4xl font-bold mb-2 text-white break-words"
-            animate={{ 
-              textShadow: ["0px 0px 0px rgba(255,255,255,0)", "0px 0px 10px rgba(167,139,250,0.5)", "0px 0px 0px rgba(255,255,255,0)"]
-            }}
-            transition={{ 
-              duration: 3, 
-              repeat: Infinity,
-              repeatType: "reverse" 
-            }}
-          >
-            {React.cloneElement(greeting.icon, {
-              className:
-                "w-5 h-5 lg:w-6 lg:h-6 inline-block align-middle mr-2 -translate-y-0.5 " +
-                (greeting.icon.props.className ?? "")
-            })}
-            {greeting.greeting}, <span className="font-bold">{userName || "Loading..."}</span>
-          </motion.h1>
-          <motion.p 
-            className="text-gray-400 italic text-base lg:text-lg"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.3, duration: 0.8 }}
-          >
-            "{quote.text}" - <span className="text-purple-400">{quote.author}</span>
-          </motion.p>
-        </motion.header>
+{/* Header Section with Calendar */}
+<div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6 mb-6">
+  {/* Greeting Section */}
+  <header className="dashboard-header transform transition-all duration-500 ease-out translate-y-0 opacity-100 pt-16 lg:pt-0">
+  <h1 className="text-2xl lg:text-4xl font-bold mb-2 text-white break-words">
+    {React.cloneElement(greeting.icon, {
+      className:
+        "w-5 h-5 lg:w-6 lg:h-6 inline-block align-middle mr-2 -translate-y-0.5 " +
+        (greeting.icon.props.className ?? "")
+    })}
+    {greeting.greeting}, <span className="font-bold">{userName || "Loading..."}</span>
+  </h1>
+  <p className="text-gray-400 italic text-base lg:text-lg">
+    "{quote.text}" - <span className="text-purple-400">{quote.author}</span>
+  </p>
+</header>
 
-        {/* Calendar Card */}
-        <motion.div 
-          className="bg-gray-800 rounded-xl p-2 min-w-[100px] max-w-[550px] w-full h-[80px] transform hover:scale-[1.02] transition-all duration-300 flex-shrink-0 lg:flex-shrink"
-          variants={fadeInUp}
-          whileHover={{ 
-            boxShadow: "0px 5px 15px rgba(138, 75, 175, 0.2)",
-            transition: { duration: 0.3 }
-          }}
-        >
-          {/* Calendar content remains the same */}
-          <div className="grid grid-cols-9 gap-1 h-full">
-            {/* Previous Week Button */}
-            <motion.button 
-              onClick={() => {
-                const prevWeek = new Date(currentWeek[0]);
-                prevWeek.setDate(prevWeek.getDate() - 7);
-                setCurrentWeek(getWeekDates(prevWeek));
-              }}
-              className="text-gray-400 hover:text-white transition-colors w-8 h-full flex items-center justify-center"
-              whileHover={{ scale: 1.2 }}
-              whileTap={{ scale: 0.9 }}
-            >
-              ←
-            </motion.button>
 
-            {/* Calendar Content */}
-            <motion.div 
-              className="col-span-7"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.5 }}
-            >
-              <div className="grid grid-cols-7 gap-1 h-full">
-                {/* Day Labels */}
-                <div className="col-span-7 grid grid-cols-7 gap-1">
-                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-                    <div key={day} className="text-center text-gray-400 text-[10px] font-medium">
-                      {day}
-                    </div>
-                  ))}
-                </div>
 
-                {/* Date Cells */}
-                <AnimatePresence mode="wait">
-                  <motion.div 
-                    key={currentWeek[0].toString()}
-                    className="col-span-7 grid grid-cols-7 gap-1"
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 20 }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    {currentWeek.map((date, index) => {
-                      // Existing code for calculating hasDeadline and isToday
-                      const tasksWithType = tasks.map((t) => ({ ...t, type: 'Task' }));
-                      const goalsWithType = goals.map((g) => ({ ...g, type: 'Goal' }));
-                      const projectsWithType = projects.map((p) => ({ ...p, type: 'Project' }));
-                      const plansWithType = plans.map((p) => ({ ...p, type: 'Plan' }));
 
-                      const allItems = [
-                        ...tasksWithType,
-                        ...goalsWithType,
-                        ...projectsWithType,
-                        ...plansWithType,
-                      ];
-                      
-                      const hasDeadline = allItems?.some(item => {
-                        if (!item?.data?.dueDate) return false;
-                        
-                        let itemDate;
-                        try {
-                          itemDate = typeof item.data.dueDate.toDate === 'function'
-                            ? item.data.dueDate.toDate()
-                            : new Date(item.data.dueDate);
-                          
-                          itemDate.setHours(0, 0, 0, 0);
-                          const compareDate = new Date(date);
-                          compareDate.setHours(0, 0, 0, 0);
-                          
-                          return itemDate.getTime() === compareDate.getTime();
-                        } catch (e) {
-                          console.error('Error parsing date:', e);
-                          return false;
-                        }
-                      }) || false;
-
-                      const isToday = formatDateForComparison(date) === formatDateForComparison(today);
-
-                      return (
-                        <motion.div
-                          key={index}
-                          className={`relative w-full h-6 text-center rounded-lg transition-all duration-200
-                            ${isToday ? 'bg-blue-500/20 text-blue-300 font-bold' : 'text-gray-300'}
-                            ${hasDeadline ? 'bg-red-500/10 hover:bg-red-500/20' : 'hover:bg-gray-700/50'}
-                            cursor-pointer flex items-center justify-center`}
-                          whileHover={{ scale: 1.15 }}
-                          whileTap={{ scale: 0.95 }}
-                          initial={{ opacity: 0, scale: 0.8 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          transition={{ duration: 0.2, delay: index * 0.03 }}
-                        >
-                          <span className="text-xs">{date.getDate()}</span>
-                          {hasDeadline && (
-                            <motion.div 
-                              className="absolute bottom-0.5 left-1/2 transform -translate-x-1/2 w-1 h-1 rounded-full bg-red-400"
-                              animate={{ 
-                                scale: [1, 1.5, 1],
-                                opacity: [0.7, 1, 0.7]
-                              }}
-                              transition={{ 
-                                duration: 1.5, 
-                                repeat: Infinity,
-                                repeatType: "reverse" 
-                              }}
-                            ></motion.div>
-                          )}
-                        </motion.div>
-                      );
-                    })}
-                  </motion.div>
-                </AnimatePresence>
-              </div>
-            </motion.div>
-
-            {/* Next Week Button */}
-            <motion.button 
-              onClick={() => {
-                const nextWeek = new Date(currentWeek[0]);
-                nextWeek.setDate(nextWeek.getDate() + 7);
-                setCurrentWeek(getWeekDates(nextWeek));
-              }}
-              className="text-gray-400 hover:text-white transition-colors w-8 h-full flex items-center justify-center"
-              whileHover={{ scale: 1.2 }}
-              whileTap={{ scale: 0.9 }}
-            >
-              →
-            </motion.button>
-          </div>
-        </motion.div>
-      </motion.div>
-
-      {/* Smart Overview Card */}
-      <motion.div
-        className={`bg-gray-800 rounded-xl p-6 relative min-h-[200px] 
-          transform transition-all duration-500 ease-out 
-          ${cardVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'} 
-          hover:shadow-lg hover:shadow-purple-500/10`}
-        initial="hidden"
-        animate="visible"
-        variants={fadeInUp}
-        whileHover={{ 
-          boxShadow: "0px 8px 30px rgba(138, 75, 175, 0.3)",
-          y: -5
+  {/* Calendar Card */}
+  <div className="bg-gray-800 rounded-xl p-2 min-w-[100px] max-w-[550px] w-full h-[80px] transform hover:scale-[1.02] transition-all duration-300 flex-shrink-0 lg:flex-shrink">
+    <div className="grid grid-cols-9 gap-1 h-full">
+      {/* Previous Week Button */}
+      <button 
+        onClick={() => {
+          const prevWeek = new Date(currentWeek[0]);
+          prevWeek.setDate(prevWeek.getDate() - 7);
+          setCurrentWeek(getWeekDates(prevWeek));
         }}
+        className="text-gray-400 hover:text-white transition-colors w-8 h-full flex items-center justify-center"
       >
-        <motion.div className="flex items-center mb-4">
-          <motion.h2 
-            className="text-xl font-semibold text-blue-300 mr-2 flex items-center"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-          >
-            <motion.span
-              animate={{ 
-                rotate: [0, 360],
-                opacity: [0.5, 1, 0.5]
-              }}
-              transition={{ 
-                rotate: { duration: 5, repeat: Infinity, ease: "linear" },
-                opacity: { duration: 2, repeat: Infinity, repeatType: "reverse" }
-              }}
-            >
-              <Sparkles className="w-5 h-5 mr-2 text-yellow-400" />
-            </motion.span>
-            Smart Overview
-          </motion.h2>
-          <motion.button
-            onClick={() => setIsChatModalOpen(true)}
-            className="p-2 text-blue-300 hover:text-blue-400 hover:bg-blue-500/10 rounded-full transition-colors duration-200"
-            title="Chat with TaskMaster"
-            whileHover={{ scale: 1.1, rotate: 5 }}
-            whileTap={{ scale: 0.9 }}
-          >
-            <MessageCircle className="w-5 h-5" />
-          </motion.button>
-          <motion.span 
-            className="text-xs bg-gradient-to-r from-pink-500 to-purple-500 text-white px-3 py-1 rounded-full font-medium ml-2"
-            initial={{ opacity: 0, x: -10 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.3 }}
-          >
-            BETA
-          </motion.span>
-        </motion.div>
+        ←
+      </button>
 
-        {overviewLoading ? (
-          <div className="space-y-3">
-            <motion.div 
-              className="h-4 bg-gray-700 rounded-full w-3/4"
-              animate={{ 
-                opacity: [0.5, 1, 0.5],
-                backgroundPosition: ['0% 50%', '100% 50%', '0% 50%']
-              }}
-              transition={{ 
-                duration: 2, 
-                repeat: Infinity, 
-                ease: "easeInOut" 
-              }}
-              style={{
-                backgroundSize: '200% 100%',
-                backgroundImage: 'linear-gradient(90deg, rgba(75, 85, 99, 0) 0%, rgba(99, 102, 241, 0.3) 50%, rgba(75, 85, 99, 0) 100%)'
-              }}
-            ></motion.div>
-            <motion.div 
-              className="h-4 bg-gray-700 rounded-full w-2/3" 
-              animate={{ 
-                opacity: [0.5, 1, 0.5],
-                backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'] 
-              }}
-              transition={{ 
-                duration: 2, 
-                repeat: Infinity, 
-                ease: "easeInOut",
-                delay: 0.3
-              }}
-              style={{
-                backgroundSize: '200% 100%',
-                backgroundImage: 'linear-gradient(90deg, rgba(75, 85, 99, 0) 0%, rgba(99, 102, 241, 0.3) 50%, rgba(75, 85, 99, 0) 100%)'
-              }}
-            ></motion.div>
-            <motion.div 
-              className="h-4 bg-gray-700 rounded-full w-4/5" 
-              animate={{ 
-                opacity: [0.5, 1, 0.5],
-                backgroundPosition: ['0% 50%', '100% 50%', '0% 50%']
-              }}
-              transition={{ 
-                duration: 2, 
-                repeat: Infinity, 
-                ease: "easeInOut",
-                delay: 0.6
-              }}
-              style={{
-                backgroundSize: '200% 100%',
-                backgroundImage: 'linear-gradient(90deg, rgba(75, 85, 99, 0) 0%, rgba(99, 102, 241, 0.3) 50%, rgba(75, 85, 99, 0) 100%)'
-              }}
-            ></motion.div>
-          </div>
-        ) : (
-          <>
-            <motion.div
-              className="text-sm text-gray-300 prose prose-invert"
-              dangerouslySetInnerHTML={{ __html: smartOverview }}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.5, delay: 0.2 }}
-            />
-            <motion.div 
-              className="text-left mt-4 text-xs text-gray-400"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.5, delay: 0.4 }}
-            >
-              TaskMaster can make mistakes. Verify details.
-            </motion.div>
-          </>
-        )}
-      </motion.div>
-
-      {/* Chat Modal */}
-      <AnimatePresence>
-        {isChatModalOpen && (
-          <motion.div 
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <motion.div 
-              className="bg-gray-800 rounded-xl w-full max-w-2xl mx-4 max-h-[80vh] flex flex-col"
-              initial={{ scale: 0.9, y: 20, opacity: 0 }}
-              animate={{ scale: 1, y: 0, opacity: 1 }}
-              exit={{ scale: 0.9, y: 20, opacity: 0 }}
-              transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            >
-              <div className="p-4 border-b border-gray-700 flex justify-between items-center">
-                <h3 className="text-lg font-semibold text-blue-300 flex items-center">
-                  <MessageCircle className="w-5 h-5 mr-2" />
-                  Chat with TaskMaster
-                  <span className="ml-2 text-xs bg-gradient-to-r from-pink-500 to-purple-500 text-gray-300 px-2 py-0.5 rounded-full">BETA</span>
-                  <span className="ml-2 text-xs bg-blue text-gray-300 px-2 py-0.5 rounded-full">Chat history is not saved.</span>
-                </h3>
-                <motion.button
-                  onClick={() => setIsChatModalOpen(false)}
-                  className="text-gray-400 hover:text-gray-200 transition-colors"
-                  whileHover={{ scale: 1.2, rotate: 90 }}
-                  whileTap={{ scale: 0.9 }}
-                >
-                  <X className="w-5 h-5" />
-                </motion.button>
+      {/* Calendar Content */}
+      <div className="col-span-7">
+        <div className="grid grid-cols-7 gap-1 h-full">
+          {/* Day Labels */}
+          <div className="col-span-7 grid grid-cols-7 gap-1">
+            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+              <div key={day} className="text-center text-gray-400 text-[10px] font-medium">
+                {day}
               </div>
+            ))}
+          </div>
 
-              <motion.div 
-                className="flex-1 overflow-y-auto p-4 space-y-4" 
-                ref={chatEndRef}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
+          {/* Date Cells */}
+          {currentWeek.map((date, index) => {
+            // 1. Combine all items with a 'type' label
+            const tasksWithType = tasks.map((t) => ({ ...t, type: 'Task' }));
+            const goalsWithType = goals.map((g) => ({ ...g, type: 'Goal' }));
+            const projectsWithType = projects.map((p) => ({ ...p, type: 'Project' }));
+            const plansWithType = plans.map((p) => ({ ...p, type: 'Plan' }));
+
+            // 2. Merge into a single array
+            const allItems = [
+              ...tasksWithType,
+              ...goalsWithType,
+              ...projectsWithType,
+              ...plansWithType,
+            ];
+            
+            // Safely check for deadlines on this date
+            const hasDeadline = allItems?.some(item => {
+              if (!item?.data?.dueDate) return false;
+              
+              let itemDate;
+              try {
+                itemDate = typeof item.data.dueDate.toDate === 'function'
+                  ? item.data.dueDate.toDate()
+                  : new Date(item.data.dueDate);
+                
+                // Ensure we're comparing dates at midnight for accurate comparison
+                itemDate.setHours(0, 0, 0, 0);
+                const compareDate = new Date(date);
+                compareDate.setHours(0, 0, 0, 0);
+                
+                return itemDate.getTime() === compareDate.getTime();
+              } catch (e) {
+                console.error('Error parsing date:', e);
+                return false;
+              }
+            }) || false;
+
+            const isToday = formatDateForComparison(date) === formatDateForComparison(today);
+
+            return (
+              <div
+                key={index}
+                className={`relative w-full h-6 text-center rounded-lg transition-all duration-200
+                  ${isToday ? 'bg-blue-500/20 text-blue-300 font-bold' : 'text-gray-300'}
+                  ${hasDeadline ? 'bg-red-500/10 hover:bg-red-500/20' : 'hover:bg-gray-700/50'}
+                  cursor-pointer flex items-center justify-center`}
               >
-                <AnimatePresence>
-                  {chatHistory.map((message, index) => (
-                    <motion.div
-                      key={index}
-                      className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                      initial={{ opacity: 0, y: 20, scale: 0.95 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.95 }}
-                      transition={{ duration: 0.3, delay: index * 0.1 }}
-                    >
-                      <motion.div
-                        className={`max-w-[80%] rounded-lg px-4 py-2 ${
-                          message.role === 'user'
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-gray-700 text-gray-200'
-                        }`}
-                        whileHover={{ scale: 1.01 }}
-                      >
-                        <ReactMarkdown
-                          remarkPlugins={[remarkMath, remarkGfm]}
-                          rehypePlugins={[rehypeKatex]}
-                          components={{
-                            p: ({ children }) => <p className="mb-2">{children}</p>,
-                            ul: ({ children }) => <ul className="list-disc ml-4 mb-2">{children}</ul>,
-                            ol: ({ children }) => <ol className="list-decimal ml-4 mb-2">{children}</ol>,
-                            li: ({ children }) => <li className="mb-1">{children}</li>,
-                            code: ({ inline, children }) =>
-                              inline ? (
-                                <code className="bg-gray-800 px-1 rounded">{children}</code>
-                              ) : (
-                                <pre className="bg-gray-800 p-2 rounded-lg overflow-x-auto">
-                                  <code>{children}</code>
-                                </pre>
-                              ),
-                          }}
-                        >
-                          {message.content}
-                        </ReactMarkdown>
-                        {message.timer && (
-                          <motion.div 
-                            className="mt-2"
-                            initial={{ opacity: 0, y: 5 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.2 }}
-                          >
-                            <div className="flex items-center space-x-2 bg-gray-900 rounded-lg px-4 py-2">
-                              <motion.span
-                                animate={{ rotate: [0, 360] }}
-                                transition={{ duration: 5, repeat: Infinity, ease: "linear" }}
-                              >
-                                <TimerIcon className="w-5 h-5 text-blue-400" />
-                              </motion.span>
-                              <Timer
-                                key={message.timer.id}
-                                initialDuration={message.timer.duration}
-                                onComplete={() => handleTimerComplete(message.timer!.id)}
-                              />
-                            </div>
-                          </motion.div>
-                        )}
-                        {message.flashcard && (
-                          <motion.div 
-                            className="mt-2"
-                            initial={{ opacity: 0, y: 5 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.2 }}
-                          >
-                            <FlashcardsQuestions
-                              type="flashcard"
-                              data={message.flashcard.data}
-                              onComplete={() => {}}
-                            />
-                          </motion.div>
-                        )}
-                        {message.question && (
-                          <motion.div 
-                            className="mt-2"
-                            initial={{ opacity: 0, y: 5 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.2 }}
-                          >
-                            <FlashcardsQuestions
-                              type="question"
-                              data={message.question.data}
-                              onComplete={() => {}}
-                            />
-                          </motion.div>
-                        )}
-                      </motion.div>
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
-                {isChatLoading && (
-                  <motion.div 
-                    className="flex justify-start"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 10 }}
-                  >
-                    <div className="bg-gray-700 text-gray-200 rounded-lg px-4 py-2 max-w-[80%]">
-                      <div className="flex space-x-2">
-                        <motion.div 
-                          className="w-2 h-2 bg-gray-400 rounded-full"
-                          animate={{ y: [0, -5, 0] }}
-                          transition={{ duration: 0.6, repeat: Infinity }}
-                        ></motion.div>
-                        <motion.div 
-                          className="w-2 h-2 bg-gray-400 rounded-full"
-                          animate={{ y: [0, -5, 0] }}
-                          transition={{ duration: 0.6, delay: 0.1, repeat: Infinity }}
-                        ></motion.div>
-                        <motion.div 
-                          className="w-2 h-2 bg-gray-400 rounded-full"
-                          animate={{ y: [0, -5, 0] }}
-                          transition={{ duration: 0.6, delay: 0.2, repeat: Infinity }}
-                        ></motion.div>
-                      </div>
-                    </div>
-                  </motion.div>
+                <span className="text-xs">{date.getDate()}</span>
+                {hasDeadline && (
+                  <div className="absolute bottom-0.5 left-1/2 transform -translate-x-1/2 w-1 h-1 rounded-full bg-red-400"></div>
                 )}
-              </motion.div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
 
-              <motion.form 
-                onSubmit={handleChatSubmit} 
-                className="p-4 border-t border-gray-700"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-              >
-                <div className="flex gap-2">
-                  <motion.input
-                    type="text"
-                    value={chatMessage}
-                    onChange={(e) => setChatMessage(e.target.value)}
-                    placeholder="Ask TaskMaster about your items or set a timer..."
-                    className="flex-1 bg-gray-700 text-gray-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    whileFocus={{ scale: 1.01, boxShadow: "0px 0px 8px rgba(59, 130, 246, 0.5)" }}
-                  />
-                  <motion.button
-                    type="submit"
-                    disabled={isChatLoading}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    <Send className="w-5 h-5" />
-                  </motion.button>
-                </div>
-              </motion.form>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <motion.div 
-        className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6"
-        variants={staggerContainer}
-        initial="hidden"
-        animate="visible"
+      {/* Next Week Button */}
+      <button 
+        onClick={() => {
+          const nextWeek = new Date(currentWeek[0]);
+          nextWeek.setDate(nextWeek.getDate() + 7);
+          setCurrentWeek(getWeekDates(nextWeek));
+        }}
+        className="text-gray-400 hover:text-white transition-colors w-8 h-full flex items-center justify-center"
       >
-        <motion.div className="flex flex-col gap-6" variants={fadeInUp}>
-          {/* Productivity Card */}
-          <motion.div 
-            className="bg-gray-800 rounded-xl p-6 transform hover:scale-[1.02] transition-all duration-300"
-            variants={fadeInUp}
-            whileHover={{ 
-              boxShadow: "0px 5px 15px rgba(138, 75, 175, 0.2)",
-              y: -5
-            }}
+        →
+      </button>
+    </div>
+  </div>
+</div>
+
+
+        
+
+{/* Smart Overview Card */}
+<div
+  className={`bg-gray-800 rounded-xl p-6 relative min-h-[200px] transform transition-all duration-500 ease-out ${cardVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'} hover:shadow-lg hover:shadow-purple-500/10`}
+>
+  <div className="flex items-center mb-4">
+    <h2 className="text-xl font-semibold text-blue-300 mr-2 flex items-center">
+      <Sparkles className="w-5 h-5 mr-2 text-yellow-400" />
+      Smart Overview
+    </h2>
+    <button
+      onClick={() => setIsChatModalOpen(true)}
+      className="p-2 text-blue-300 hover:text-blue-400 hover:bg-blue-500/10 rounded-full transition-colors duration-200"
+      title="Chat with TaskMaster"
+    >
+      <MessageCircle className="w-5 h-5" />
+    </button>
+    <span className="text-xs bg-gradient-to-r from-pink-500 to-purple-500 text-white px-3 py-1 rounded-full font-medium ml-2">
+      BETA
+    </span>
+  </div>
+
+  {overviewLoading ? (
+    <div className="space-y-3">
+      <div className="h-4 bg-gray-700 rounded-full w-3/4 animate-pulse"></div>
+      <div className="h-4 bg-gray-700 rounded-full w-2/3 animate-pulse delay-75"></div>
+      <div className="h-4 bg-gray-700 rounded-full w-4/5 animate-pulse delay-150"></div>
+    </div>
+  ) : (
+    <>
+      <div
+        className="text-sm text-gray-300 prose prose-invert"
+        dangerouslySetInnerHTML={{ __html: smartOverview }}
+      />
+      <div className="text-left mt-4 text-xs text-gray-400">
+        TaskMaster can make mistakes. Verify details.
+      </div>
+    </>
+  )}
+</div>
+
+ {/* Chat Modal */}
+{isChatModalOpen && (
+  <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
+    <div className="bg-gray-800 rounded-xl w-full max-w-2xl mx-4 max-h-[80vh] flex flex-col">
+      <div className="p-4 border-b border-gray-700 flex justify-between items-center">
+        <h3 className="text-lg font-semibold text-blue-300 flex items-center">
+          <MessageCircle className="w-5 h-5 mr-2" />
+          Chat with TaskMaster
+          <span className="ml-2 text-xs bg-gradient-to-r from-pink-500 to-purple-500 text-gray-300 px-2 py-0.5 rounded-full">BETA</span>
+          <span className="ml-2 text-xs bg-blue text-gray-300 px-2 py-0.5 rounded-full">Chat history is not saved.</span>
+        </h3>
+        <button
+          onClick={() => setIsChatModalOpen(false)}
+          className="text-gray-400 hover:text-gray-200 transition-colors"
+        >
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={chatEndRef}>
+        {chatHistory.map((message, index) => (
+          <div
+            key={index}
+            className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
           >
-            <motion.h2 
-              className="text-xl font-semibold text-purple-400 mb-4"
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.5 }}
+            <div
+              className={`max-w-[80%] rounded-lg px-4 py-2 ${
+                message.role === 'user'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-700 text-gray-200'
+              }`}
             >
-              Your Productivity
-            </motion.h2>
-            <motion.div 
-              className="space-y-4"
-              variants={staggerContainer}
-              initial="hidden"
-              animate="visible"
-            >
-              {totalTasks > 0 && (
-                <motion.div 
-                  className="mb-4"
-                  variants={fadeInUp}
-                >
-                  <div className="flex justify-between mb-2">
-                    <p>Tasks</p>
-                    <motion.p 
-                      className="text-green-400"
-                      animate={tasksProgress > 75 ? "pulse" : "initial"}
-                      variants={pulseAnimation}
-                    >
-                      {completedTasks}/{totalTasks}
-                    </motion.p>
-                  </div>
-                  <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
-                    <motion.div
-                      className="h-full bg-gradient-to-r from-green-400 to-green-600 rounded-full"
-                      variants={progressAnimation(tasksProgress)}
-                      initial="initial"
-                      animate="animate"
+              <ReactMarkdown
+                remarkPlugins={[remarkMath, remarkGfm]}
+                rehypePlugins={[rehypeKatex]}
+                components={{
+                  p: ({ children }) => <p className="mb-2">{children}</p>,
+                  ul: ({ children }) => <ul className="list-disc ml-4 mb-2">{children}</ul>,
+                  ol: ({ children }) => <ol className="list-decimal ml-4 mb-2">{children}</ol>,
+                  li: ({ children }) => <li className="mb-1">{children}</li>,
+                  code: ({ inline, children }) =>
+                    inline ? (
+                      <code className="bg-gray-800 px-1 rounded">{children}</code>
+                    ) : (
+                      <pre className="bg-gray-800 p-2 rounded-lg overflow-x-auto">
+                        <code>{children}</code>
+                      </pre>
+                    ),
+                }}
+              >
+                {message.content}
+              </ReactMarkdown>
+              {message.timer && (
+                <div className="mt-2">
+                  <div className="flex items-center space-x-2 bg-gray-900 rounded-lg px-4 py-2">
+                    <TimerIcon className="w-5 h-5 text-blue-400" />
+                    <Timer
+                      key={message.timer.id}
+                      initialDuration={message.timer.duration}
+                      onComplete={() => handleTimerComplete(message.timer!.id)}
                     />
                   </div>
-                </motion.div>
+                </div>
               )}
+{message.flashcard && (
+  <div className="mt-2">
+    <FlashcardsQuestions
+      type="flashcard"
+      data={message.flashcard.data}
+      onComplete={() => {}}
+    />
+  </div>
+)}
+{message.question && (
+  <div className="mt-2">
+    <FlashcardsQuestions
+      type="question"
+      data={message.question.data}
+      onComplete={() => {}}
+    />
+  </div>
+)}
+                </div>
+              </div>
+            ))}
+            {isChatLoading && (
+              <div className="flex justify-start">
+                <div className="bg-gray-700 text-gray-200 rounded-lg px-4 py-2 max-w-[80%]">
+                  <div className="flex space-x-2">
+                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100"></div>
+                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200"></div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
 
-              {totalGoals > 0 && (
-                <motion.div 
-                  className="mb-4"
-                  variants={fadeInUp}
-                >
-                  <div className="flex justify-between mb-2">
-                    <p>Goals</p>
-                    <motion.p 
-                      className="text-pink-400"
-                      animate={goalsProgress > 75 ? "pulse" : "initial"}
-                      variants={pulseAnimation}
-                    >
-                      {completedGoals}/{totalGoals}
-                    </motion.p>
-                  </div>
-                  <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
-                    <motion.div
-                      className="h-full bg-gradient-to-r from-pink-400 to-pink-600 rounded-full"
-                      variants={progressAnimation(goalsProgress)}
-                      initial="initial"
-                      animate="animate"
-                    />
-                  </div>
-                </motion.div>
-              )}
+          <form onSubmit={handleChatSubmit} className="p-4 border-t border-gray-700">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={chatMessage}
+                onChange={(e) => setChatMessage(e.target.value)}
+                placeholder="Ask TaskMaster about your items or set a timer..."
+                className="flex-1 bg-gray-700 text-gray-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                type="submit"
+                disabled={isChatLoading}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Send className="w-5 h-5" />
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    )}
 
-              {totalProjects > 0 && (
-                <motion.div 
-                  className="mb-4"
-                  variants={fadeInUp}
-                >
-                  <div className="flex justify-between mb-2">
-                    <p>Projects</p>
-                    <motion.p 
-                      className="text-blue-400"
-                      animate={projectsProgress > 75 ? "pulse" : "initial"}
-                      variants={pulseAnimation}
-                    >
-                      {completedProjects}/{totalProjects}
-                    </motion.p>
+
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+          <div className="flex flex-col gap-6">
+            {/* Productivity Card */}
+            <div className="bg-gray-800 rounded-xl p-6 transform hover:scale-[1.02] transition-all duration-300">
+              <h2 className="text-xl font-semibold text-purple-400 mb-4">
+                Your Productivity
+              </h2>
+              <div className="space-y-4">
+                {totalTasks > 0 && (
+                  <div className="mb-4">
+                    <div className="flex justify-between mb-2">
+                      <p>Tasks</p>
+                      <p className="text-green-400">
+                        {completedTasks}/{totalTasks}
+                      </p>
+                    </div>
+                    <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-green-400 to-green-600 rounded-full transition-all duration-1000 ease-out"
+                        style={{ width: `${tasksProgress}%` }}
+                      />
+                    </div>
                   </div>
-                  <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
-                    <motion.div
-                      className="h-full bg-gradient-to-r from-blue-400 to-blue-600 rounded-full"
-                      variants={progressAnimation(projectsProgress)}
-                      initial="initial"
-                      animate="animate"
-                    />
+                )}
+
+                {totalGoals > 0 && (
+                  <div className="mb-4">
+                    <div className="flex justify-between mb-2">
+                      <p>Goals</p>
+                      <p className="text-pink-400">
+                        {completedGoals}/{totalGoals}
+                      </p>
+                    </div>
+                    <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-pink-400 to-pink-600 rounded-full transition-all duration-1000 ease-out"
+                        style={{ width: `${goalsProgress}%` }}
+                      />
+                    </div>
                   </div>
-                </motion.div>
-              )}
+                )}
+
+                {totalProjects > 0 && (
+                  <div className="mb-4">
+                    <div className="flex justify-between mb-2">
+                      <p>Projects</p>
+                      <p className="text-blue-400">
+                        {completedProjects}/{totalProjects}
+                      </p>
+                    </div>
+                    <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-blue-400 to-blue-600 rounded-full transition-all duration-1000 ease-out"
+                        style={{ width: `${projectsProgress}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
 
                 {totalPlans > 0 && (
                   <div className="mb-4">
@@ -2417,7 +2096,7 @@ const progressAnimation = (progress) => ({
             </div>
           </div>
         </div>
-      </motion.main>
+      </main>
     </div>
   );
 }

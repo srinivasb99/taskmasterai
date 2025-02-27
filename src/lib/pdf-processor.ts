@@ -26,6 +26,28 @@ interface ProcessedPDF {
   sourceUrl: string;
 }
 
+// Helper function to delay execution
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Helper function to retry fetch requests for the questions generation
+async function fetchWithRetry(url: string, options: RequestInit, retries = 3, delayMs = 2000): Promise<Response> {
+  for (let attempt = 0; attempt < retries; attempt++) {
+    const response = await fetch(url, options);
+    if (response.ok) {
+      return response;
+    }
+    // Retry only on timeout-related status codes (503, 504)
+    if (response.status === 503 || response.status === 504) {
+      await sleep(delayMs);
+    } else {
+      throw new Error(`Request failed with status: ${response.status}`);
+    }
+  }
+  throw new Error(`Max retries reached for: ${url}`);
+}
+
 export async function processPDF(
   file: File,
   userId: string,
@@ -116,7 +138,7 @@ Analyze the following text and generate:
 2. 10 key points that capture the most important information
 
 Text to analyze:
-${extractedText.slice(0, 4000)} // Limit text length for API
+${extractedText.slice(0, 10000)} // Limit text length for API
 
 Format your response exactly as follows:
 
@@ -189,7 +211,8 @@ Explanation: (Why this is the correct answer)
 
 Generate 11 questions in this exact format.`;
 
-    const questionsResponse = await fetch(
+    // Use the retry logic for the questions request
+    const questionsResponse = await fetchWithRetry(
       'https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct',
       {
         method: 'POST',

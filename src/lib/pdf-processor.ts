@@ -213,7 +213,7 @@ Generate 11 questions in this exact format.`;
 
     // Use the retry logic for the questions request
     const questionsResponse = await fetchWithRetry(
-      'https://api-inference.huggingface.co/models/meta-llama/Llama-3.2-11B-Vision-Instruct',
+      'https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct',
       {
         method: 'POST',
         headers: {

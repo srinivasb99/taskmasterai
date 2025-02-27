@@ -2417,7 +2417,7 @@ const progressAnimation = (progress) => ({
             </div>
           </div>
         </div>
-      </main>
+      </motion.main>
     </div>
   );
 }

@@ -9,6 +9,7 @@ import { SignUp } from './components/SignUp';
 import { AuthProvider } from './contexts/AuthContext';
 import Pricing from './components/Pricing';
 import Terms from './components/Terms';
+import Friends from './components/Friends';
 import Settings from './components/Settings';
 import SplashScreen from './components/SplashScreen';
 import ForgotPassword from './components/Forgot-Password';
@@ -142,6 +143,7 @@ createRoot(document.getElementById('root')!).render(
             <Route path="/signup" element={<PageTitle title="Sign Up"><SignUp /></PageTitle>} />
             <Route path="/pricing" element={<PageTitle title="Pricing"><Pricing /></PageTitle>} />
             <Route path="/terms" element={<PageTitle title="Terms of Service"><Terms /></PageTitle>} />
+            <Route path="/friends" element={<PageTitle title="Friends"><Friends /></PageTitle>} />
             <Route path="/settings" element={<PageTitle title="Settings"><Settings /></PageTitle>} />
             <Route path="/splashscreen" element={<PageTitle title="Welcome"><SplashScreen /></PageTitle>} />
             <Route path="/privacy-policy" element={<PageTitle title="Privacy Policy"><PrivacyPolicy /></PageTitle>} />

@@ -170,14 +170,11 @@ export const acceptFriendRequest = async (requestId: string): Promise<void> => {
   });
 
   if (!chatExists) {
-    // Optionally, store a mapping of member IDs to their names so that each user can see the other's name.
-    // For example: { [userId]: userName, [otherUserId]: otherUserName }
     await addDoc(chatsRef, {
       members: [requestData.fromUserId, requestData.toUserId],
       isGroup: false,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-      // Do not set a generic name here; the UI can compute the display name based on memberNames.
     });
   }
 };
@@ -197,6 +194,53 @@ export const rejectFriendRequest = async (requestId: string): Promise<void> => {
     return;
   }
   await updateDoc(reqRef, { status: 'rejected' });
+};
+
+/* -------------------------------------------------------------
+   2.5) GROUP CHAT CREATION
+------------------------------------------------------------- */
+
+/**
+ * Create a new group chat with the given name and member emails.
+ * The owner (creator) is automatically included in the members array.
+ */
+export const createGroupChat = async (
+  groupName: string,
+  emails: string[],
+  ownerId: string
+): Promise<string> => {
+  if (!groupName.trim()) {
+    throw new Error('Group name is required');
+  }
+  if (emails.length === 0) {
+    throw new Error('At least one member email is required');
+  }
+
+  const usersRef = collection(db, 'users');
+  const memberIds: string[] = [ownerId];
+
+  for (const email of emails) {
+    if (!email) continue;
+    const q = query(usersRef, where('email', '==', email));
+    const snapshot = await getDocs(q);
+    if (!snapshot.empty) {
+      const docSnap = snapshot.docs[0];
+      if (docSnap?.id && !memberIds.includes(docSnap.id)) {
+        memberIds.push(docSnap.id);
+      }
+    }
+  }
+
+  const chatsRef = collection(db, 'chats');
+  const newChatRef = await addDoc(chatsRef, {
+    name: groupName,
+    members: memberIds,
+    isGroup: true,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+
+  return newChatRef.id;
 };
 
 /* -------------------------------------------------------------
@@ -238,7 +282,6 @@ export const deleteChat = async (
   } else {
     // For direct chats, delete the chat document entirely.
     await deleteDoc(chatRef);
-    // Note: If you require deletion of all message subcollections, you’ll need additional logic.
   }
 };
 

@@ -9,12 +9,12 @@ import {
   Users,
   CheckCircle,
   XCircle,
+  Edit,
+  Trash2,
 } from 'lucide-react';
-
 import { Sidebar } from './Sidebar';
 import { getCurrentUser } from '../lib/settings-firebase';
 import {
-  // NOTE: These are placeholders; you must implement them in friends-firebase.ts
   listenToChatsRealtime,
   listenToMessagesRealtime,
   listenToFriendRequests,
@@ -24,22 +24,25 @@ import {
   createGroupChat,
   sendMessage,
   uploadChatFile,
+  renameChat,
+  deleteChat,
+  unfriendUser,
+  getUserProfile,
 } from '../lib/friends-firebase';
 
-// Types for our data (simplified; adjust as needed)
 interface Chat {
   id: string;
   isGroup: boolean;
   members: string[];
-  name?: string; // used if isGroup=true
-  // for private chats, we might store no 'name', or store "private"
-  // we'll compute the "displayName" from the other user
+  name?: string; // For direct chats, this should be the other user's name; for groups, a custom name.
 }
 
 interface Message {
   id: string;
   text: string;
   senderId: string;
+  senderName?: string;
+  senderPhotoURL?: string;
   fileURL?: string;
   timestamp?: any;
 }
@@ -59,13 +62,13 @@ export function Friends() {
   // Auth state
   const [user, setUser] = useState<any>(null);
 
-  // Sidebar collapse state (persisted in localStorage)
+  // Sidebar collapse state (persisted)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     const stored = localStorage.getItem('isSidebarCollapsed');
     return stored ? JSON.parse(stored) : false;
   });
 
-  // Right‐hand side panels
+  // Right-hand panels
   const [chats, setChats] = useState<Chat[]>([]);
   const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
 
@@ -74,19 +77,22 @@ export function Friends() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
 
-  // Adding friend
+  // Renaming chat
+  const [isEditingChatName, setIsEditingChatName] = useState(false);
+  const [newChatName, setNewChatName] = useState('');
+
+  // Adding friend by email
   const [friendEmail, setFriendEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   // Creating group chat
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
   const [groupName, setGroupName] = useState('');
-  const [groupEmails, setGroupEmails] = useState<string>(''); // comma‐separated emails
+  const [groupEmails, setGroupEmails] = useState(''); // comma-separated emails
 
   // File uploading
   const [fileUploading, setFileUploading] = useState(false);
 
-  // On mount, check auth user and set up real-time listeners
   useEffect(() => {
     const currentUser = getCurrentUser();
     if (!currentUser) {
@@ -95,71 +101,69 @@ export function Friends() {
     }
     setUser(currentUser);
 
-    // Real-time listener for chats
     const unsubscribeChats = listenToChatsRealtime(currentUser.uid, (newChats) => {
       setChats(newChats);
     });
-
-    // Real-time listener for friend requests
     const unsubscribeRequests = listenToFriendRequests(currentUser.uid, (requests) => {
       setFriendRequests(requests);
     });
 
     return () => {
-      // Clean up listeners
       unsubscribeChats();
       unsubscribeRequests();
     };
   }, [navigate]);
 
-  // Whenever selectedChat changes, set up a real-time listener for messages
+  // Listen to messages in selected chat
   useEffect(() => {
     if (!selectedChat) {
       setMessages([]);
       return;
     }
-
-    // Real-time messages
     const unsubscribeMessages = listenToMessagesRealtime(selectedChat.id, (msgs) => {
       setMessages(msgs);
     });
-
-    return () => {
-      unsubscribeMessages();
-    };
+    return () => unsubscribeMessages();
   }, [selectedChat]);
 
-  // --- Chat name helper: for a private chat, show the other user's name ---
-  // This is a naive approach. In production, you might store user info in state or fetch from DB.
+  // Helper to compute display name for a chat:
+  // For direct chats, we assume the chat "name" field stores the friend’s name.
   const getChatDisplayName = (chat: Chat): string => {
     if (chat.isGroup) {
       return chat.name || 'Group Chat';
     }
-    // Private chat: show the *other* user's name
-    // If the current user is in members[0], the other is members[1], etc.
-    const otherUserId = chat.members.find((m) => m !== user?.uid);
-    // For simplicity, we assume you store the other user's name somewhere (maybe in the chat doc),
-    // or you can look it up from your user profiles in the DB. We'll do a placeholder here:
-    // chat might have an object like chat.memberNames = { uid1: "Alice", uid2: "Bob" }
-    // We'll assume you store that in your chat doc for easy reference.
-    // For now, let's do:
-    return chat.name || 'Private Chat';
+    return chat.name || 'Direct Chat';
   };
 
-  // --- Sending messages ---
+  // Handle sending text message
   const handleSendMessage = async (e: FormEvent) => {
     e.preventDefault();
     if (!selectedChat || !newMessage.trim()) return;
 
     try {
-      await sendMessage(selectedChat.id, newMessage.trim(), user.uid);
+      // For group chats, include senderName and senderPhotoURL.
+      let senderName: string | undefined;
+      let senderPhotoURL: string | undefined;
+      if (selectedChat.isGroup) {
+        const profile = await getUserProfile(user.uid);
+        senderName = profile?.name || profile?.displayName;
+        senderPhotoURL = profile?.photoURL;
+      }
+      await sendMessage(
+        selectedChat.id,
+        newMessage.trim(),
+        user.uid,
+        undefined,
+        senderName,
+        senderPhotoURL
+      );
       setNewMessage('');
     } catch (err) {
       console.error('Error sending message:', err);
     }
   };
 
-  // --- File upload ---
+  // Handle file upload
   const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !selectedChat) return;
@@ -167,7 +171,21 @@ export function Friends() {
     setFileUploading(true);
     try {
       const fileURL = await uploadChatFile(selectedChat.id, file);
-      await sendMessage(selectedChat.id, '', user.uid, fileURL);
+      let senderName: string | undefined;
+      let senderPhotoURL: string | undefined;
+      if (selectedChat.isGroup) {
+        const profile = await getUserProfile(user.uid);
+        senderName = profile?.name || profile?.displayName;
+        senderPhotoURL = profile?.photoURL;
+      }
+      await sendMessage(
+        selectedChat.id,
+        '',
+        user.uid,
+        fileURL,
+        senderName,
+        senderPhotoURL
+      );
     } catch (err) {
       console.error('Error uploading file:', err);
     } finally {
@@ -175,7 +193,7 @@ export function Friends() {
     }
   };
 
-  // --- Friend requests ---
+  // Send friend request
   const handleSendFriendRequest = async () => {
     setError(null);
     if (!friendEmail.trim()) return;
@@ -205,18 +223,16 @@ export function Friends() {
     }
   };
 
-  // --- Group chat creation ---
+  // Create group chat
   const handleCreateGroupChat = async () => {
     if (!groupName.trim() || !groupEmails.trim()) return;
 
     try {
-      // Suppose groupEmails is a comma‐separated list of user emails
       const emails = groupEmails
         .split(',')
         .map((email) => email.trim())
         .filter((e) => e);
       await createGroupChat(groupName.trim(), emails, user.uid);
-      // Close modal and reset
       setGroupName('');
       setGroupEmails('');
       setIsGroupModalOpen(false);
@@ -225,9 +241,37 @@ export function Friends() {
     }
   };
 
+  // Rename the current chat
+  const handleRenameChat = async () => {
+    if (!selectedChat || !newChatName.trim()) return;
+    try {
+      await renameChat(selectedChat.id, newChatName.trim());
+      // Optionally update the local state (if not using real-time update)
+      setSelectedChat({ ...selectedChat, name: newChatName.trim() });
+      setIsEditingChatName(false);
+    } catch (err) {
+      console.error('Error renaming chat:', err);
+    }
+  };
+
+  // Delete or leave chat: For direct chat, unfriend; for group, leave.
+  const handleDeleteChat = async () => {
+    if (!selectedChat) return;
+    try {
+      if (selectedChat.isGroup) {
+        await deleteChat(selectedChat.id, user.uid);
+      } else {
+        await unfriendUser(selectedChat.id, user.uid);
+      }
+      setSelectedChat(null);
+    } catch (err) {
+      console.error('Error deleting chat:', err);
+    }
+  };
+
   return (
     <div className="flex h-screen bg-gray-900">
-      {/* Left: main nav sidebar */}
+      {/* Left: Navigation Sidebar */}
       <Sidebar
         isCollapsed={isSidebarCollapsed}
         onToggle={() => {
@@ -245,7 +289,7 @@ export function Friends() {
           isSidebarCollapsed ? 'ml-16' : 'ml-64'
         } flex flex-col`}
       >
-        {/* Page Header */}
+        {/* Header */}
         <div className="px-6 py-4 border-b border-gray-800">
           <h1 className="text-3xl font-bold text-white flex items-center gap-3">
             <User className="w-8 h-8 text-blue-400" />
@@ -256,17 +300,53 @@ export function Friends() {
           </p>
         </div>
 
-        {/* The chat display (center content) */}
+        {/* Chat Display */}
         {selectedChat ? (
           <>
-            {/* Chat Header */}
-            <div className="bg-gray-800 p-4 border-b border-gray-700">
-              <h2 className="text-xl text-white font-semibold">
-                {getChatDisplayName(selectedChat)}
-              </h2>
+            <div className="bg-gray-800 p-4 border-b border-gray-700 flex items-center justify-between">
+              <div>
+                {isEditingChatName ? (
+                  <input
+                    type="text"
+                    value={newChatName}
+                    onChange={(e) => setNewChatName(e.target.value)}
+                    onBlur={handleRenameChat}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleRenameChat();
+                      }
+                    }}
+                    className="bg-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    autoFocus
+                  />
+                ) : (
+                  <h2 className="text-xl text-white font-semibold">
+                    {getChatDisplayName(selectedChat)}
+                  </h2>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    setIsEditingChatName(true);
+                    setNewChatName(selectedChat.name || '');
+                  }}
+                  className="text-blue-400 hover:text-blue-300"
+                  title="Rename Chat"
+                >
+                  <Edit className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={handleDeleteChat}
+                  className="text-red-400 hover:text-red-300"
+                  title={selectedChat.isGroup ? 'Leave Group Chat' : 'Unfriend'}
+                >
+                  <Trash2 className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
-            {/* Messages list */}
+            {/* Messages */}
             <div className="flex-1 p-4 overflow-y-auto bg-gray-700 flex flex-col">
               {messages.length === 0 ? (
                 <p className="text-gray-400">
@@ -283,6 +363,23 @@ export function Friends() {
                     }`}
                     style={{ maxWidth: '75%' }}
                   >
+                    {/* For group chats, show sender info */}
+                    {selectedChat.isGroup && msg.senderId !== user.uid && (
+                      <div className="flex items-center mb-1">
+                        {msg.senderPhotoURL && (
+                          <img
+                            src={msg.senderPhotoURL}
+                            alt="avatar"
+                            className="w-6 h-6 rounded-full mr-2"
+                          />
+                        )}
+                        {msg.senderName && (
+                          <span className="text-sm text-gray-200">
+                            {msg.senderName}
+                          </span>
+                        )}
+                      </div>
+                    )}
                     {msg.text && <p className="text-white">{msg.text}</p>}
                     {msg.fileURL && (
                       <a
@@ -299,7 +396,7 @@ export function Friends() {
               )}
             </div>
 
-            {/* Message input */}
+            {/* Message Input */}
             <form
               onSubmit={handleSendMessage}
               className="bg-gray-800 p-4 flex items-center gap-2"
@@ -336,14 +433,13 @@ export function Friends() {
             </form>
           </>
         ) : (
-          // If no chat selected
           <div className="flex-1 flex items-center justify-center bg-gray-700">
             <p className="text-gray-400">Select a chat to start messaging</p>
           </div>
         )}
       </main>
 
-      {/* Right: Chat List + Friend Requests + Add Friend + Group Chat */}
+      {/* Right: Friend Requests, Add Friend, Group Chat, and Chat List */}
       <aside className="w-72 bg-gray-800 border-l border-gray-700 flex-shrink-0 flex flex-col">
         {/* Friend Requests */}
         <div className="p-4 border-b border-gray-700">
@@ -355,39 +451,38 @@ export function Friends() {
             <p className="text-gray-400 text-sm">No friend requests.</p>
           )}
           <div className="space-y-2">
-            {friendRequests.map((req) => {
-              if (req.status === 'pending') {
-                return (
-                  <div
-                    key={req.id}
-                    className="flex items-center justify-between bg-gray-700 px-3 py-2 rounded-lg"
-                  >
-                    <div className="text-white text-sm">
-                      {req.fromUserName} wants to be your friend
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleAcceptRequest(req.id)}
-                        className="text-green-400 hover:text-green-300"
-                      >
-                        <CheckCircle className="w-5 h-5" />
-                      </button>
-                      <button
-                        onClick={() => handleRejectRequest(req.id)}
-                        className="text-red-400 hover:text-red-300"
-                      >
-                        <XCircle className="w-5 h-5" />
-                      </button>
-                    </div>
+            {friendRequests.map((req) =>
+              req.status === 'pending' ? (
+                <div
+                  key={req.id}
+                  className="flex items-center justify-between bg-gray-700 px-3 py-2 rounded-lg"
+                >
+                  <div className="text-white text-sm">
+                    {req.fromUserName} wants to be your friend
                   </div>
-                );
-              }
-              return null; // for accepted/rejected, you might show them differently
-            })}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleAcceptRequest(req.id)}
+                      className="text-green-400 hover:text-green-300"
+                      title="Accept"
+                    >
+                      <CheckCircle className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={() => handleRejectRequest(req.id)}
+                      className="text-red-400 hover:text-red-300"
+                      title="Reject"
+                    >
+                      <XCircle className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+              ) : null
+            )}
           </div>
         </div>
 
-        {/* Friend (Add) */}
+        {/* Add Friend */}
         <div className="p-4 border-b border-gray-700">
           <h2 className="text-xl font-semibold text-white mb-3 flex items-center gap-2">
             <PlusCircle className="w-5 h-5" />
@@ -411,7 +506,7 @@ export function Friends() {
           {error && <p className="text-red-400 text-sm mt-2">{error}</p>}
         </div>
 
-        {/* Group Chat */}
+        {/* Group Chat Creation */}
         <div className="p-4 border-b border-gray-700">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-xl font-semibold text-white flex items-center gap-2">
@@ -425,10 +520,10 @@ export function Friends() {
               Create
             </button>
           </div>
-          {/* In a real app, you might list group chats separately here */}
+          {/* List of group chats could be shown here if needed */}
         </div>
 
-        {/* Chats List */}
+        {/* Chat List */}
         <div className="p-4 flex-1 overflow-y-auto">
           <h2 className="text-xl font-semibold text-white mb-3">Your Chats</h2>
           {chats.length === 0 ? (
@@ -440,9 +535,7 @@ export function Friends() {
                   key={chat.id}
                   onClick={() => setSelectedChat(chat)}
                   className={`w-full text-left px-3 py-2 rounded-lg ${
-                    selectedChat?.id === chat.id
-                      ? 'bg-blue-600'
-                      : 'bg-gray-700'
+                    selectedChat?.id === chat.id ? 'bg-blue-600' : 'bg-gray-700'
                   } text-white text-sm`}
                 >
                   {getChatDisplayName(chat)}
@@ -453,7 +546,7 @@ export function Friends() {
         </div>
       </aside>
 
-      {/* Modal for Creating Group Chat */}
+      {/* Modal for Group Chat Creation */}
       {isGroupModalOpen && (
         <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/50">
           <div className="bg-gray-800 p-6 rounded-lg w-96">
@@ -462,7 +555,9 @@ export function Friends() {
               Create Group Chat
             </h2>
             <div className="mb-4">
-              <label className="block text-gray-300 text-sm mb-1">Group Name</label>
+              <label className="block text-gray-300 text-sm mb-1">
+                Group Name
+              </label>
               <input
                 type="text"
                 value={groupName}
@@ -472,7 +567,7 @@ export function Friends() {
             </div>
             <div className="mb-4">
               <label className="block text-gray-300 text-sm mb-1">
-                Member Emails (comma‐separated)
+                Member Emails (comma-separated)
               </label>
               <textarea
                 value={groupEmails}

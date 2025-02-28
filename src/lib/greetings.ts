@@ -219,16 +219,8 @@ export const getRandomQuote = (): Quote => {
       author: "Jim Rohn"
     },
     {
-      text: "The most efficient way to live reasonably is every morning to make a plan of one's day and every night to examine the results obtained.",
-      author: "Alexis Carrel"
-    },
-    {
       text: "Perfection is the enemy of progress.",
       author: "Winston Churchill"
-    },
-    {
-      text: "Don't say you don't have enough time. You have exactly the same number of hours per day that were given to Helen Keller, Pasteur, Michelangelo, Mother Teresa, Leonardo da Vinci, Thomas Jefferson, and Albert Einstein.",
-      author: "H. Jackson Brown Jr."
     },
     {
       text: "Success is the sum of small efforts, repeated day in and day out.",

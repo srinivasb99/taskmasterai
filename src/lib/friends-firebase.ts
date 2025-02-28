@@ -7,40 +7,35 @@ import {
   getDocs,
   addDoc,
   updateDoc,
+  deleteDoc,
   query,
   where,
   orderBy,
   serverTimestamp,
   onSnapshot,
-  DocumentData,
-  DocumentReference,
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { getCurrentUser } from './settings-firebase';
 
 /* -------------------------------------------------------------
-   1) Real-time listeners for Chats, Messages, and Friend Requests
-   ------------------------------------------------------------- */
+   1) REAL-TIME LISTENERS
+------------------------------------------------------------- */
 
 /**
- * Listen to all chats for a given user in real-time.
- * Calls `callback` with an array of chat objects whenever data changes.
+ * Listen in real time to chats for a given user.
  */
 export const listenToChatsRealtime = (
   userId: string,
   callback: (chats: any[]) => void
 ) => {
   const chatsRef = collection(db, 'chats');
-  // Query all chats where 'members' array contains the current user
   const q = query(chatsRef, where('members', 'array-contains', userId));
-  
-  // Subscribe in real-time
   const unsubscribe = onSnapshot(q, (snapshot) => {
     const chatList: any[] = [];
     snapshot.forEach((docSnap) => {
       chatList.push({ id: docSnap.id, ...docSnap.data() });
     });
-    // Sort by updatedAt descending if you wish
+    // Optionally sort by updatedAt descending:
     chatList.sort((a, b) => {
       if (a.updatedAt?.seconds && b.updatedAt?.seconds) {
         return b.updatedAt.seconds - a.updatedAt.seconds;
@@ -49,12 +44,11 @@ export const listenToChatsRealtime = (
     });
     callback(chatList);
   });
-
-  return unsubscribe; // Caller should unsubscribe when component unmounts
+  return unsubscribe;
 };
 
 /**
- * Listen to all messages in a specific chat (ordered by timestamp ascending).
+ * Listen in real time to messages for a given chat.
  */
 export const listenToMessagesRealtime = (
   chatId: string,
@@ -62,7 +56,6 @@ export const listenToMessagesRealtime = (
 ) => {
   const messagesRef = collection(db, 'chats', chatId, 'messages');
   const q = query(messagesRef, orderBy('timestamp', 'asc'));
-
   const unsubscribe = onSnapshot(q, (snapshot) => {
     const msgList: any[] = [];
     snapshot.forEach((docSnap) => {
@@ -70,13 +63,11 @@ export const listenToMessagesRealtime = (
     });
     callback(msgList);
   });
-
   return unsubscribe;
 };
 
 /**
- * Listen to friend requests for the current user where `toUserId` = userId.
- * Optionally filter by status = 'pending' if you only want to see open requests.
+ * Listen in real time to friend requests for the current user.
  */
 export const listenToFriendRequests = (
   userId: string,
@@ -84,9 +75,6 @@ export const listenToFriendRequests = (
 ) => {
   const friendReqRef = collection(db, 'friendRequests');
   const q = query(friendReqRef, where('toUserId', '==', userId));
-  // If you only want pending requests:
-  // const q = query(friendReqRef, where('toUserId', '==', userId), where('status', '==', 'pending'));
-
   const unsubscribe = onSnapshot(q, (snapshot) => {
     const requests: any[] = [];
     snapshot.forEach((docSnap) => {
@@ -94,23 +82,21 @@ export const listenToFriendRequests = (
     });
     callback(requests);
   });
-
   return unsubscribe;
 };
 
 /* -------------------------------------------------------------
-   2) Friend Request Flow (Send, Accept, Reject)
-   ------------------------------------------------------------- */
+   2) FRIEND REQUEST FLOW
+------------------------------------------------------------- */
 
 /**
- * Send a friend request to a user with the given email.
- * We assume you have a "users" collection where you can look up the user by email.
+ * Send a friend request from the current user to the user with the given email.
  */
 export const sendFriendRequest = async (
   fromUserId: string,
   friendEmail: string
 ): Promise<void> => {
-  // 1. Lookup the "toUser" by email in the "users" collection
+  // Lookup the "toUser" by email in the "users" collection.
   const usersRef = collection(db, 'users');
   const q = query(usersRef, where('email', '==', friendEmail));
   const userSnap = await getDocs(q);
@@ -127,12 +113,13 @@ export const sendFriendRequest = async (
     throw new Error('Invalid user document');
   }
 
-  // 2. Get the current user's display name for convenience (or you can store only IDs)
+  // Retrieve the sender's display name.
   const fromUserDoc = await getDoc(doc(db, 'users', fromUserId));
   const fromUserData = fromUserDoc.exists() ? fromUserDoc.data() : null;
-  const fromUserName = fromUserData?.name || fromUserData?.displayName || 'Unknown User';
+  const fromUserName =
+    fromUserData?.name || fromUserData?.displayName || 'Unknown User';
 
-  // 3. Create a friendRequests document with status = 'pending'
+  // Create a friendRequests document.
   await addDoc(collection(db, 'friendRequests'), {
     fromUserId,
     fromUserName,
@@ -143,7 +130,8 @@ export const sendFriendRequest = async (
 };
 
 /**
- * Accept a friend request. Mark it as accepted and create a new private chat if not existing.
+ * Accept a friend request.
+ * Updates the request to "accepted" and creates a private chat if one doesn’t exist.
  */
 export const acceptFriendRequest = async (requestId: string): Promise<void> => {
   const reqRef = doc(db, 'friendRequests', requestId);
@@ -154,15 +142,13 @@ export const acceptFriendRequest = async (requestId: string): Promise<void> => {
   }
   const requestData: any = reqSnap.data();
   if (requestData.status !== 'pending') {
-    // Already accepted or rejected
     return;
   }
 
-  // 1. Update the friend request to "accepted"
+  // Mark the request as accepted.
   await updateDoc(reqRef, { status: 'accepted' });
 
-  // 2. Create a new private chat (isGroup=false) with members [fromUserId, toUserId]
-  //    Check if a chat already exists. If you want to skip duplicates, query by members array.
+  // Create a private chat if one does not already exist.
   const chatsRef = collection(db, 'chats');
   const q = query(
     chatsRef,
@@ -184,19 +170,20 @@ export const acceptFriendRequest = async (requestId: string): Promise<void> => {
   });
 
   if (!chatExists) {
+    // Optionally, store a mapping of member IDs to their names so that each user can see the other's name.
+    // For example: { [userId]: userName, [otherUserId]: otherUserName }
     await addDoc(chatsRef, {
       members: [requestData.fromUserId, requestData.toUserId],
       isGroup: false,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-      // Optionally store display names in the doc for quick reference
-      // or you can look them up each time from "users" collection
+      // Do not set a generic name here; the UI can compute the display name based on memberNames.
     });
   }
 };
 
 /**
- * Reject a friend request (set status to 'rejected').
+ * Reject a friend request.
  */
 export const rejectFriendRequest = async (requestId: string): Promise<void> => {
   const reqRef = doc(db, 'friendRequests', requestId);
@@ -207,87 +194,93 @@ export const rejectFriendRequest = async (requestId: string): Promise<void> => {
   }
   const requestData: any = reqSnap.data();
   if (requestData.status !== 'pending') {
-    // Already accepted or rejected
     return;
   }
-
   await updateDoc(reqRef, { status: 'rejected' });
 };
 
 /* -------------------------------------------------------------
-   3) Group Chat Creation
-   ------------------------------------------------------------- */
+   3) CHAT MANAGEMENT: RENAME, DELETE, UNFRIEND
+------------------------------------------------------------- */
 
 /**
- * Create a new group chat with the given name and member emails.
- * We include the creator's userId in the members array.
+ * Rename a chat. For group chats or custom-named chats, update the "name" field.
  */
-export const createGroupChat = async (
-  groupName: string,
-  emails: string[],
-  ownerId: string
-) => {
-  if (!groupName.trim()) {
-    throw new Error('Group name is required');
+export const renameChat = async (
+  chatId: string,
+  newName: string
+): Promise<void> => {
+  const chatRef = doc(db, 'chats', chatId);
+  await updateDoc(chatRef, { name: newName, updatedAt: serverTimestamp() });
+};
+
+/**
+ * Delete a chat.
+ * For group chats, this function removes the current user from the chat.
+ * For direct (private) chats, it deletes the chat document entirely.
+ */
+export const deleteChat = async (
+  chatId: string,
+  currentUserId: string
+): Promise<void> => {
+  const chatRef = doc(db, 'chats', chatId);
+  const chatSnap = await getDoc(chatRef);
+  if (!chatSnap.exists()) {
+    throw new Error('Chat not found');
   }
-  if (emails.length === 0) {
-    throw new Error('At least one member email is required');
+  const chatData: any = chatSnap.data();
+  if (chatData.isGroup) {
+    // For group chats, remove the user from the members array.
+    const updatedMembers = chatData.members.filter(
+      (m: string) => m !== currentUserId
+    );
+    await updateDoc(chatRef, { members: updatedMembers, updatedAt: serverTimestamp() });
+  } else {
+    // For direct chats, delete the chat document entirely.
+    await deleteDoc(chatRef);
+    // Note: If you require deletion of all message subcollections, you’ll need additional logic.
   }
+};
 
-  // 1. For each email, find the user doc
-  const usersRef = collection(db, 'users');
-  const memberIds: string[] = [];
-  // Always include the owner
-  memberIds.push(ownerId);
-
-  for (const email of emails) {
-    if (!email) continue;
-    const q = query(usersRef, where('email', '==', email));
-    const snapshot = await getDocs(q);
-    if (!snapshot.empty) {
-      const docSnap = snapshot.docs[0];
-      if (docSnap?.id && !memberIds.includes(docSnap.id)) {
-        memberIds.push(docSnap.id);
-      }
-    }
-  }
-
-  // 2. Create a chat doc with isGroup = true
-  const chatsRef = collection(db, 'chats');
-  const newChatRef = await addDoc(chatsRef, {
-    name: groupName,
-    members: memberIds,
-    isGroup: true,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
-
-  return newChatRef.id;
+/**
+ * Unfriend a user in a direct chat.
+ * This is a wrapper around deleteChat for private chats.
+ */
+export const unfriendUser = async (
+  chatId: string,
+  currentUserId: string
+): Promise<void> => {
+  await deleteChat(chatId, currentUserId);
 };
 
 /* -------------------------------------------------------------
-   4) Sending Messages and Uploading Files
-   ------------------------------------------------------------- */
+   4) SENDING MESSAGES & FILE UPLOAD
+------------------------------------------------------------- */
 
 /**
- * Send a message in a given chat. Optionally include a file URL.
+ * Send a message in a chat.
+ * Optionally include a file URL, and for group chats, store the sender’s name and profile picture.
  */
 export const sendMessage = async (
   chatId: string,
   text: string,
   senderId: string,
-  fileURL?: string
-) => {
+  fileURL?: string,
+  senderName?: string,
+  senderPhotoURL?: string
+): Promise<void> => {
   const messagesRef = collection(db, 'chats', chatId, 'messages');
-  const messageData = {
+  const messageData: any = {
     text: text || '',
     senderId,
     fileURL: fileURL || '',
     timestamp: serverTimestamp(),
   };
+  if (senderName) messageData.senderName = senderName;
+  if (senderPhotoURL) messageData.senderPhotoURL = senderPhotoURL;
   await addDoc(messagesRef, messageData);
 
-  // Update the chat doc with lastMessage and updatedAt
+  // Update the parent chat with lastMessage and updatedAt.
   const chatDocRef = doc(db, 'chats', chatId);
   await updateDoc(chatDocRef, {
     lastMessage: text || (fileURL ? 'Sent a file' : ''),
@@ -296,14 +289,31 @@ export const sendMessage = async (
 };
 
 /**
- * Upload a file to Firebase Storage for a specific chat, then return its download URL.
+ * Upload a file to Firebase Storage for a chat and return its download URL.
  */
-export const uploadChatFile = async (chatId: string, file: File): Promise<string> => {
+export const uploadChatFile = async (
+  chatId: string,
+  file: File
+): Promise<string> => {
   const fileExtension = file.name.split('.').pop()?.toLowerCase() || 'dat';
   const filePath = `chat_files/${chatId}/${Date.now()}.${fileExtension}`;
   const fileRef = ref(storage, filePath);
-
   const snapshot = await uploadBytes(fileRef, file);
   const downloadURL = await getDownloadURL(snapshot.ref);
   return downloadURL;
+};
+
+/* -------------------------------------------------------------
+   5) HELPER: GET USER PROFILE
+------------------------------------------------------------- */
+
+/**
+ * Retrieve a user's profile data (e.g., name and photoURL) from the "users" collection.
+ */
+export const getUserProfile = async (userId: string): Promise<any> => {
+  const userDoc = await getDoc(doc(db, 'users', userId));
+  if (userDoc.exists()) {
+    return userDoc.data();
+  }
+  return null;
 };

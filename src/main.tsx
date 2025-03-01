@@ -23,6 +23,8 @@ import Community from './components/Community';
 import SchoolPage from './components/SchoolPage';
 import './index.css';
 import NotesOutage from './outage-pages/NotesOutage';
+import Status from './status/Status'; // Import the new Status page
+
 
 // Advanced NotFound component with layered animations and animated logo
 const NotFound = () => (
@@ -158,6 +160,7 @@ createRoot(document.getElementById('root')!).render(
             <Route path="/school" element={<PageTitle title="School"><SchoolPage /></PageTitle>} />
             <Route path="/community" element={<PageTitle title="Community"><Community /></PageTitle>} />
             <Route path="/" element={<RootTitle><App /></RootTitle>} />
+            <Route path="/status" element={<PageTitle title="Status"><Status /></PageTitle>} />
             <Route path="/api/*" element={null} />
             {/* Catch-all route for 404 */}
             <Route path="*" element={<PageTitle title="404 Not Found"><NotFound /></PageTitle>} />

@@ -810,13 +810,13 @@ const cleanAndValidate = (text: string) => {
   // Check for patterns that trigger removal of subsequent lines:
   // 1. "This is:" pattern
   // 2. "<|reserved" pattern
-  // 3. Also, check for "Hello" pattern as before, but more robustly.
-  // 4. New: Remove any line starting with "I" and all lines after.
+  // 3. Lines starting with "[/" pattern
+  // 4. Lines starting with "I" pattern
+  // 5. "Hello" pattern (case-insensitive, allowing punctuation)
   let helloCount = 0;
   const truncatedLines: string[] = [];
 
   for (const line of lines) {
-    // Skip empty lines
     if (!line.trim()) continue;
 
     // 1) "This is:" pattern
@@ -829,12 +829,17 @@ const cleanAndValidate = (text: string) => {
       break;
     }
 
-    // 3) New condition: If the line starts with "I", break out of the loop.
+    // 3) Remove any line starting with "[/" and all lines after
+    if (line.trim().startsWith("[/")) {
+      break;
+    }
+
+    // 4) If the line starts with "I", break out of the loop
     if (line.trim().startsWith("I")) {
       break;
     }
 
-    // 4) "Hello" pattern (case-insensitive, allowing punctuation)
+    // 5) "Hello" pattern (case-insensitive, allowing punctuation)
     if (/^\s*hello[\s,.!?]?/i.test(line)) {
       helloCount++;
       if (helloCount === 2) {

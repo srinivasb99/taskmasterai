@@ -22,6 +22,7 @@ import Calendar from './components/Calendar';
 import Community from './components/Community';
 import SchoolPage from './components/SchoolPage';
 import './index.css';
+import NotesOutage from './outage-pages/NotesOutage';
 
 // Advanced NotFound component with layered animations and animated logo
 const NotFound = () => (

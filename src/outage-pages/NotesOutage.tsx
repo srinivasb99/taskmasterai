@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React from 'react';
+import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 
-// Optional: If you have a global CSS file, move this @keyframes there.
+// Inline keyframes for demonstration (optional)
 const spinAnimation = `
   @keyframes spin {
     0% { transform: rotate(0deg); }
@@ -11,22 +11,6 @@ const spinAnimation = `
 `;
 
 const NotesOutage = () => {
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const navigate = useNavigate();
-
-  const correctPassword = '!LoveN2Chain';
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (password === correctPassword) {
-      // Redirect to the main Notes page
-      navigate('/notes/main');
-    } else {
-      setError('Incorrect password. Please try again.');
-    }
-  };
-
   return (
     <div className="relative flex flex-col items-center justify-center min-h-screen bg-[#0f172a] text-white font-poppins p-6 overflow-hidden">
       {/* Inline keyframes for demonstration */}
@@ -37,25 +21,25 @@ const NotesOutage = () => {
         className="absolute bg-indigo-500 rounded-full opacity-30"
         style={{ width: 350, height: 350, top: '-100px', left: '-100px' }}
         animate={{ x: [0, 80, 0], y: [0, 50, 0] }}
-        transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+        transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut' }}
       />
       <motion.div
         className="absolute bg-purple-500 rounded-full opacity-30"
         style={{ width: 300, height: 300, bottom: '-150px', right: '-150px' }}
         animate={{ x: [0, -80, 0], y: [0, -50, 0] }}
-        transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
+        transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut' }}
       />
       <motion.div
         className="absolute bg-indigo-500 rounded-full opacity-20"
         style={{ width: 200, height: 200, bottom: '20%', left: '-100px' }}
         animate={{ rotate: [0, 360] }}
-        transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
+        transition={{ duration: 25, repeat: Infinity, ease: 'linear' }}
       />
       <motion.div
         className="absolute bg-purple-500 rounded-full opacity-20"
         style={{ width: 150, height: 150, top: '30%', right: '-70px' }}
         animate={{ x: [0, -40, 0], y: [0, 40, 0] }}
-        transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+        transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
       />
 
       {/* Main Content */}
@@ -89,51 +73,21 @@ const NotesOutage = () => {
           Rest assured, your notes are safe and secure during this period.
         </label>
 
-        {/* Developer Password Gate */}
-        <form 
-          onSubmit={handleSubmit} 
-          className="mt-8 flex flex-col items-center space-y-4 w-full max-w-sm"
-        >
-          <label className="block text-lg font-semibold whitespace-nowrap" htmlFor="dev-password">
-            Enter Developer Password:
-          </label>
-          <input
-            id="dev-password"
-            type="password"
-            placeholder="Enter developer password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-full 
-                       focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-          {error && <p className="text-red-500 whitespace-nowrap">{error}</p>}
-
-          {/* Buttons Side by Side */}
-          <div className="flex flex-col sm:flex-row sm:space-x-4 space-y-4 sm:space-y-0">
-            <button
-              type="submit"
-              className="px-6 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 
-                         text-white rounded-full transition-transform transform hover:scale-105 
-                         whitespace-nowrap"
-            >
-              Access Notes
-            </button>
-            <Link
-              to="/dashboard"
-              className="px-6 py-2 bg-gray-700 text-white rounded-full transition-transform 
-                         transform hover:scale-105 whitespace-nowrap"
-            >
-              Return to Dashboard
-            </Link>
-            <Link
-              to="/status"
-              className="px-6 py-2 bg-gray-700 text-white rounded-full transition-transform 
-                         transform hover:scale-105 whitespace-nowrap"
-            >
-              Check Status
-            </Link>
-          </div>
-        </form>
+        {/* Navigation Buttons */}
+        <div className="mt-8 flex flex-col sm:flex-row sm:space-x-4 space-y-4 sm:space-y-0">
+          <Link
+            to="/dashboard"
+            className="px-6 py-2 bg-gray-700 text-white rounded-full transition-transform transform hover:scale-105 whitespace-nowrap"
+          >
+            Return to Dashboard
+          </Link>
+          <Link
+            to="/status"
+            className="px-6 py-2 bg-gray-700 text-white rounded-full transition-transform transform hover:scale-105 whitespace-nowrap"
+          >
+            Check Status
+          </Link>
+        </div>
       </motion.div>
     </div>
   );

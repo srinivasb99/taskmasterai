@@ -81,7 +81,10 @@ const NotesOutage = () => {
         </p>
 
         {/* Bold, Single-Line Reassurance with Extra Spacing and Styling */}
-        <label className="max-w-xl mt-8 font-bold text-gray-300 text-lg md:text-xl leading-relaxed whitespace-nowrap bg-gray-800 px-4 py-2 rounded-lg shadow">
+        <label 
+          className="inline-block mx-auto mt-8 font-bold text-gray-300 text-lg md:text-xl 
+                     leading-relaxed px-4 py-2 rounded-lg shadow whitespace-nowrap bg-gray-800"
+        >
           Rest assured, your notes are safe and secure during this period.
         </label>
 
@@ -99,7 +102,8 @@ const NotesOutage = () => {
             placeholder="Enter developer password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-full 
+                       focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
           {error && <p className="text-red-500 whitespace-nowrap">{error}</p>}
 
@@ -107,13 +111,16 @@ const NotesOutage = () => {
           <div className="flex flex-col sm:flex-row sm:space-x-4 space-y-4 sm:space-y-0">
             <button
               type="submit"
-              className="px-6 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-full transition-transform transform hover:scale-105 whitespace-nowrap"
+              className="px-6 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 
+                         text-white rounded-full transition-transform transform hover:scale-105 
+                         whitespace-nowrap"
             >
               Access Notes
             </button>
             <Link
               to="/dashboard"
-              className="px-6 py-2 bg-gray-700 text-white rounded-full transition-transform transform hover:scale-105 whitespace-nowrap"
+              className="px-6 py-2 bg-gray-700 text-white rounded-full transition-transform 
+                         transform hover:scale-105 whitespace-nowrap"
             >
               Return to Dashboard
             </Link>

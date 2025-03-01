@@ -807,12 +807,6 @@ const cleanAndValidate = (text: string) => {
     .map(line => line.trim())
     .filter(line => line.length > 0 && !/^[^a-zA-Z0-9]+$/.test(line));
 
-  // Check for patterns that trigger removal of subsequent lines:
-  // 1. "This is:" pattern
-  // 2. "<|reserved" pattern
-  // 3. Lines starting with "[/" pattern
-  // 4. Lines starting with "I" pattern
-  // 5. "Hello" pattern (case-insensitive, allowing punctuation)
   let helloCount = 0;
   const truncatedLines: string[] = [];
 
@@ -829,12 +823,21 @@ const cleanAndValidate = (text: string) => {
       break;
     }
 
-    // 3) Remove any line starting with "[/" and all lines after
-    if (line.trim().startsWith("[/")) {
-      break;
+    // 3) Check if line contains "[/"
+    if (line.indexOf("[/") !== -1) {
+      if (line.trim().startsWith("[/")) {
+        break;
+      } else {
+        // Truncate the line at the occurrence of "[/"
+        const truncatedLine = line.substring(0, line.indexOf("[/")).trim();
+        if (truncatedLine) {
+          truncatedLines.push(truncatedLine);
+        }
+        break;
+      }
     }
 
-    // 4) If the line starts with "I", break out of the loop
+    // 4) If the line starts with "I", break out of the loop.
     if (line.trim().startsWith("I")) {
       break;
     }
@@ -883,6 +886,7 @@ const formattedHtml = cleanTextLines
   .join('');
 
 setSmartOverview(formattedHtml);
+
 
 
 

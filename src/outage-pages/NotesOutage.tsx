@@ -80,7 +80,7 @@ const NotesOutage = () => {
           Notes is currently experiencing a major outage due to unforeseen issues.
         </p>
         <p className="max-w-xl text-gray-300 text-lg md:text-xl leading-relaxed whitespace-nowrap">
-          We’re actively working to restore full functionality, and you can expect service to resume by <strong>March 22</strong>.
+          We're working to restore full functionality, with service resuming by <strong>March 22</strong>.
         </p>
         <p className="max-w-xl font-bold text-gray-300 text-lg md:text-xl leading-relaxed whitespace-nowrap">
           Rest assured, your notes are safe and secure during this period.

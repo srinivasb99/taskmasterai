@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 
-// New Logo component using only the SVG (without text)
+// New Logo component using only the SVG (without text) – increased size.
 const Logo = () => (
   <svg
-    className="w-8 h-8 text-indigo-500"
+    className="w-12 h-12 text-indigo-500"  // increased to 12x12
     viewBox="0 0 24 24"
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
@@ -76,14 +76,12 @@ const cardVariants = {
 const Status = () => {
   const [isOpen, setIsOpen] = useState(false);
 
-  const toggleMenu = () => {
-    setIsOpen(!isOpen);
-  };
+  const toggleMenu = () => setIsOpen(!isOpen);
 
   // Determine if any service has a major issue
   const hasMajorOutage = serviceStatus.some(service => service.majorIssue);
 
-  // Example last updated time (you can dynamically update this)
+  // Example last updated time (dynamically update if needed)
   const lastUpdated = "Mar 4 at 02:59pm EST";
 
   return (
@@ -96,8 +94,8 @@ const Status = () => {
       >
         <div className="container mx-auto px-4 py-4">
           <nav className="flex items-center justify-between">
-            {/* Centered Logo */}
-            <div className="flex-1 flex justify-center">
+            {/* Logo on the left */}
+            <div className="flex items-center">
               <Logo />
             </div>
 

@@ -20,7 +20,7 @@ const NotesOutage = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (password === correctPassword) {
-      // Redirect to the main Notes page (update the route if needed)
+      // Redirect to the main Notes page
       navigate('/notes/main');
     } else {
       setError('Incorrect password. Please try again.');
@@ -75,9 +75,10 @@ const NotesOutage = () => {
           Maintenance Mode
         </h1>
 
-        {/* Combined Outage Message */}
+        {/* Outage Message */}
         <p className="max-w-xl text-gray-300 text-lg md:text-xl leading-relaxed text-center">
-          Notes is currently experiencing a major outage due to unforeseen issues. We're working to restore full functionality, with service resuming by <strong>March 22</strong>.
+          Notes is currently experiencing a major outage due to unforeseen issues. We're working
+          to restore full functionality, with service resuming by <strong>March 22</strong>.
         </p>
 
         {/* Bold, Single-Line Reassurance with Extra Spacing and Styling */}
@@ -123,6 +124,13 @@ const NotesOutage = () => {
                          transform hover:scale-105 whitespace-nowrap"
             >
               Return to Dashboard
+            </Link>
+            <Link
+              to="/status"
+              className="px-6 py-2 bg-gray-700 text-white rounded-full transition-transform 
+                         transform hover:scale-105 whitespace-nowrap"
+            >
+              Check Status
             </Link>
           </div>
         </form>

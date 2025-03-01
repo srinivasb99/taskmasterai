@@ -80,10 +80,10 @@ const NotesOutage = () => {
           Notes is currently experiencing a major outage due to unforeseen issues. We're working to restore full functionality, with service resuming by <strong>March 22</strong>.
         </p>
 
-        {/* Bold, Single-Line Reassurance with Spacing */}
-        <p className="max-w-xl mt-4 font-bold text-gray-300 text-lg md:text-xl leading-relaxed whitespace-nowrap">
+        {/* Bold, Single-Line Reassurance with Extra Spacing and Styling */}
+        <label className="max-w-xl mt-8 font-bold text-gray-300 text-lg md:text-xl leading-relaxed whitespace-nowrap bg-gray-800 px-4 py-2 rounded-lg shadow">
           Rest assured, your notes are safe and secure during this period.
-        </p>
+        </label>
 
         {/* Developer Password Gate */}
         <form 

@@ -154,6 +154,7 @@ createRoot(document.getElementById('root')!).render(
             <Route path="/ai" element={<PageTitle title="AI Assistant"><AIChat /></PageTitle>} />
             <Route path="/calendar" element={<PageTitle title="Calendar"><Calendar /></PageTitle>} />
             <Route path="/notes" element={<PageTitle title="Notes"><NotesOutage /></PageTitle>} />
+            <Route path="/notes/main" element={<PageTitle title="Notes"><Notes /></PageTitle>} />
             <Route path="/school" element={<PageTitle title="School"><SchoolPage /></PageTitle>} />
             <Route path="/community" element={<PageTitle title="Community"><Community /></PageTitle>} />
             <Route path="/" element={<RootTitle><App /></RootTitle>} />

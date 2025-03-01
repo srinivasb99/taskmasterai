@@ -75,14 +75,13 @@ const NotesOutage = () => {
           Maintenance Mode
         </h1>
 
-        {/* Outage Message */}
+        {/* Combined Outage Message */}
         <p className="max-w-xl text-gray-300 text-lg md:text-xl leading-relaxed text-center">
-          Notes is currently experiencing a major outage due to unforeseen issues.
+          Notes is currently experiencing a major outage due to unforeseen issues. We're working to restore full functionality, with service resuming by <strong>March 22</strong>.
         </p>
-        <p className="max-w-xl text-gray-300 text-lg md:text-xl leading-relaxed text-center">
-          We're working to restore full functionality, with service resuming by <strong>March 22</strong>.
-        </p>
-        <p className="max-w-xl font-bold text-gray-300 text-lg md:text-xl leading-relaxed whitespace-nowrap">
+
+        {/* Bold, Single-Line Reassurance with Spacing */}
+        <p className="max-w-xl mt-4 font-bold text-gray-300 text-lg md:text-xl leading-relaxed whitespace-nowrap">
           Rest assured, your notes are safe and secure during this period.
         </p>
 

@@ -75,9 +75,10 @@ const NotesOutage = () => {
 
         {/* Navigation Buttons */}
         <div className="mt-8 flex flex-col sm:flex-row sm:space-x-4 space-y-4 sm:space-y-0">
+          {/* Return to Dashboard with new gradient classes */}
           <Link
             to="/dashboard"
-            className="px-6 py-2 bg-gray-700 text-white rounded-full transition-transform transform hover:scale-105 whitespace-nowrap"
+            className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-full transition-all transform hover:scale-105"
           >
             Return to Dashboard
           </Link>

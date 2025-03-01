@@ -1,20 +1,19 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 
 const NotesOutage = () => {
   const [password, setPassword] = useState('');
-  const [accessGranted, setAccessGranted] = useState(false);
   const [error, setError] = useState('');
+  const navigate = useNavigate();
 
-  // Updated developer password
   const correctPassword = '!LoveN2Chain';
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (password === correctPassword) {
-      setAccessGranted(true);
-      setError('');
+      // Redirect to the main Notes page (update the route if needed)
+      navigate('/notes/main');
     } else {
       setError('Incorrect password. Please try again.');
     }
@@ -93,48 +92,47 @@ const NotesOutage = () => {
       </motion.p>
 
       {/* Developer Password Gate */}
-      {!accessGranted && (
-        <motion.form
-          onSubmit={handleSubmit}
-          className="mt-8 relative z-10 flex flex-col items-center"
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{ delay: 1.2, type: "spring", stiffness: 260, damping: 20 }}
+      <motion.form
+        onSubmit={handleSubmit}
+        className="mt-8 relative z-10 flex flex-col items-center"
+        initial={{ scale: 0 }}
+        animate={{ scale: 1 }}
+        transition={{ delay: 1.2, type: "spring", stiffness: 260, damping: 20 }}
+      >
+        <label className="mb-2 text-lg font-semibold" htmlFor="dev-password">
+          Enter Developer Password:
+        </label>
+        <input 
+          id="dev-password"
+          type="password"
+          placeholder="Enter developer password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          className="px-4 py-2 mb-4 bg-gray-800 border border-gray-700 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        />
+        <button 
+          type="submit"
+          className="px-6 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-full transition-all transform hover:scale-105"
         >
-          <input 
-            type="password"
-            placeholder="Enter developer password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="px-4 py-2 mb-4 bg-gray-800 border border-gray-700 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-          <button 
-            type="submit"
-            className="px-6 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-full transition-all transform hover:scale-105"
-          >
-            Access Notes
-          </button>
-          {error && <p className="mt-2 text-red-500">{error}</p>}
-        </motion.form>
-      )}
+          Access Notes
+        </button>
+        {error && <p className="mt-2 text-red-500">{error}</p>}
+      </motion.form>
 
-      {accessGranted && (
-        <motion.div
-          className="mt-8 relative z-10"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.5 }}
+      {/* Return to Dashboard Button */}
+      <motion.div
+        className="mt-6 relative z-10"
+        initial={{ scale: 0 }}
+        animate={{ scale: 1 }}
+        transition={{ delay: 1.4, type: "spring", stiffness: 260, damping: 20 }}
+      >
+        <Link 
+          to="/dashboard" 
+          className="px-4 py-2 bg-gray-700 text-white rounded-full transition-all transform hover:scale-105"
         >
-          <p className="text-xl text-green-400">Access Granted. Welcome, Developer!</p>
-          {/* Optionally reveal additional developer-only content here */}
-          <Link 
-            to="/dashboard" 
-            className="mt-4 inline-block px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-full transition-all transform hover:scale-105"
-          >
-            Go to Dashboard
-          </Link>
-        </motion.div>
-      )}
+          Return to Dashboard
+        </Link>
+      </motion.div>
     </div>
   );
 };

@@ -807,39 +807,43 @@ const cleanAndValidate = (text: string) => {
     .map(line => line.trim())
     .filter(line => line.length > 0 && !/^[^a-zA-Z0-9]+$/.test(line));
 
-// Check for patterns that trigger removal of subsequent lines:
-// 1. "This is:" pattern
-// 2. "<|reserved" pattern
-// 3. Also, check for "Hello" pattern as before, but more robustly.
-let helloCount = 0;
-const truncatedLines: string[] = [];
+  // Check for patterns that trigger removal of subsequent lines:
+  // 1. "This is:" pattern
+  // 2. "<|reserved" pattern
+  // 3. Also, check for "Hello" pattern as before, but more robustly.
+  // 4. New: Remove any line starting with "I" and all lines after.
+  let helloCount = 0;
+  const truncatedLines: string[] = [];
 
-for (const line of lines) {
-  // Skip empty lines
-  if (!line.trim()) continue;
+  for (const line of lines) {
+    // Skip empty lines
+    if (!line.trim()) continue;
 
-  // 1) "This is:"
-  if (line.trim().startsWith("This is:")) {
-    break;
-  }
-
-  // 2) "<|reserved"
-  if (line.trim().startsWith("<|reserved")) {
-    break;
-  }
-
-  // 3) "Hello" pattern (case-insensitive, ignoring leading spaces, 
-  //    allowing punctuation like "Hello," or "Hello.")
-  if (/^\s*hello[\s,.!?]?/i.test(line)) {
-    helloCount++;
-    if (helloCount === 2) {
-      // Stop processing any further lines
+    // 1) "This is:" pattern
+    if (line.trim().startsWith("This is:")) {
       break;
     }
-  }
 
-  truncatedLines.push(line);
-}
+    // 2) "<|reserved" pattern
+    if (line.trim().startsWith("<|reserved")) {
+      break;
+    }
+
+    // 3) New condition: If the line starts with "I", break out of the loop.
+    if (line.trim().startsWith("I")) {
+      break;
+    }
+
+    // 4) "Hello" pattern (case-insensitive, allowing punctuation)
+    if (/^\s*hello[\s,.!?]?/i.test(line)) {
+      helloCount++;
+      if (helloCount === 2) {
+        break;
+      }
+    }
+
+    truncatedLines.push(line);
+  }
 
   return truncatedLines.join('\n');
 };
@@ -874,6 +878,7 @@ const formattedHtml = cleanTextLines
   .join('');
 
 setSmartOverview(formattedHtml);
+
 
 
 

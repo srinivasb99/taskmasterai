@@ -76,10 +76,10 @@ const NotesOutage = () => {
         </h1>
 
         {/* Outage Message */}
-        <p className="max-w-xl text-gray-300 text-lg md:text-xl leading-relaxed whitespace-nowrap">
+        <p className="max-w-xl text-gray-300 text-lg md:text-xl leading-relaxed text-center">
           Notes is currently experiencing a major outage due to unforeseen issues.
         </p>
-        <p className="max-w-xl text-gray-300 text-lg md:text-xl leading-relaxed whitespace-nowrap">
+        <p className="max-w-xl text-gray-300 text-lg md:text-xl leading-relaxed text-center">
           We're working to restore full functionality, with service resuming by <strong>March 22</strong>.
         </p>
         <p className="max-w-xl font-bold text-gray-300 text-lg md:text-xl leading-relaxed whitespace-nowrap">

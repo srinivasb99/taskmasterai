@@ -112,7 +112,7 @@ export function AIChat() {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([
     {
       role: 'assistant',
-      content: "👋 Hi, I'm TaskMaster. How can I help you today? Need assistance with your items or study content? Just ask!"
+      content: "👋 Hi I'm TaskMaster, How can I help you today? Need help with your items? Simply ask me!"
     }
   ]);
   const [isChatLoading, setIsChatLoading] = useState(false);
@@ -122,7 +122,7 @@ export function AIChat() {
   const [projects, setProjects] = useState<Array<{ id: string; data: any }>>([]);
   const [plans, setPlans] = useState<Array<{ id: string; data: any }>>([]);
 
-  // Sidebar state persisted in localStorage
+  // Sidebar state from localStorage
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     const stored = localStorage.getItem('isSidebarCollapsed');
     return stored ? JSON.parse(stored) : false;
@@ -168,10 +168,10 @@ export function AIChat() {
   const handleToggleSidebar = () => setIsSidebarCollapsed(prev => !prev);
 
   const handleTimerComplete = (timerId: string) => {
-    setChatHistory(prev => [
-      ...prev,
-      { role: 'assistant', content: "⏰ Time's up! Your timer has finished." }
-    ]);
+    setChatHistory(prev => [...prev, {
+      role: 'assistant',
+      content: "⏰ Time's up! Your timer has finished."
+    }]);
   };
 
   const parseTimerRequest = (message: string): number | null => {
@@ -275,6 +275,7 @@ IMPORTANT:
 3. Provide only the JSON in your response, with no extra text.`;
   };
 
+  // Helper to update the last assistant message (used for streaming)
   const updateLastAssistantMessage = (newContent: string) => {
     setChatHistory(prev => {
       const updated = [...prev];
@@ -286,10 +287,30 @@ IMPORTANT:
     });
   };
 
+  // Extract candidate text from Gemini JSON response.
+  const extractCandidateText = (text: string): string => {
+    let candidateText = text;
+    try {
+      const jsonResponse = JSON.parse(text);
+      if (
+        jsonResponse &&
+        jsonResponse.candidates &&
+        jsonResponse.candidates[0] &&
+        jsonResponse.candidates[0].content &&
+        jsonResponse.candidates[0].content.parts &&
+        jsonResponse.candidates[0].content.parts[0]
+      ) {
+        candidateText = jsonResponse.candidates[0].content.parts[0].text;
+      }
+    } catch (err) {
+      console.error("Error parsing Gemini response:", err);
+    }
+    return candidateText;
+  };
+
   const handleChatSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatMessage.trim()) return;
-
     const timerDuration = parseTimerRequest(chatMessage);
     const userMsg: ChatMessage = { role: 'user', content: chatMessage };
     setChatHistory(prev => [...prev, userMsg]);
@@ -299,11 +320,7 @@ IMPORTANT:
       const timerId = Math.random().toString(36).substr(2, 9);
       setChatHistory(prev => [
         ...prev,
-        {
-          role: 'assistant',
-          content: `Starting a timer for ${timerDuration} seconds.`,
-          timer: { type: 'timer', duration: timerDuration, id: timerId }
-        }
+        { role: 'assistant', content: `Starting a timer for ${timerDuration} seconds.`, timer: { type: 'timer', duration: timerDuration, id: timerId } }
       ]);
       return;
     }
@@ -312,57 +329,38 @@ IMPORTANT:
     setIsChatLoading(true);
 
     try {
+      // Educational content branch
       if (educationalRequest.type) {
         setChatHistory(prev => [...prev, { role: 'assistant', content: "" }]);
         const educationalPrompt = createEducationalPrompt(userMsg.content, educationalRequest.type, educationalRequest.count);
         const options = {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          // Gemini expects only the "contents" field.
           body: JSON.stringify({
             contents: [{ parts: [{ text: educationalPrompt }] }]
           })
         };
-        const finalText = await streamResponse(geminiEndpoint, options, (text) => {
+        const rawText = await streamResponse(geminiEndpoint, options, (text) => {
           updateLastAssistantMessage(text);
         }, 45000);
-        const jsonMatches = finalText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-        if (jsonMatches && jsonMatches[1]) {
-          try {
-            const jsonText = jsonMatches[1].trim();
-            const jsonContent = JSON.parse(jsonText);
-            if (
-              jsonContent.type === educationalRequest.type &&
-              jsonContent.data &&
-              Array.isArray(jsonContent.data) &&
-              jsonContent.data.length > 0
-            ) {
-              const responseText = educationalRequest.type === 'flashcard'
-                ? `Here are ${jsonContent.data.length} flashcards. You can flip each card to see the answer.`
-                : `Here are ${jsonContent.data.length} quiz questions for you to practice with.`;
-              setChatHistory(prev => {
-                const filteredPrev = prev.filter(msg => msg.role !== 'assistant' || msg.content !== "");
-                return [
-                  ...filteredPrev,
-                  {
-                    role: 'assistant',
-                    content: responseText,
-                    ...(educationalRequest.type === 'flashcard' && { flashcard: jsonContent as FlashcardMessage }),
-                    ...(educationalRequest.type === 'question' && { question: jsonContent as QuestionMessage })
-                  }
-                ];
-              });
-              setIsChatLoading(false);
-              return;
-            } else {
-              throw new Error('Invalid JSON structure');
-            }
-          } catch (jsonError) {
-            console.error('Failed to parse educational JSON:', jsonError);
-            throw new Error('JSON parsing error');
-          }
+        const finalText = extractCandidateText(rawText);
+        if (finalText) {
+          // Process JSON for educational content if needed (flashcards/questions)
+          // Here you can add extra JSON parsing if required.
+          const responseText = educationalRequest.type === 'flashcard'
+            ? `Here are your ${educationalRequest.count} flashcards.`
+            : `Here are your ${educationalRequest.count} quiz questions.`;
+          setChatHistory(prev => {
+            const filteredPrev = prev.filter(msg => msg.role !== 'assistant' || msg.content !== "");
+            return [
+              ...filteredPrev,
+              { role: 'assistant', content: responseText }
+            ];
+          });
+          setIsChatLoading(false);
+          return;
         } else {
-          throw new Error('No JSON found in educational response');
+          throw new Error('No valid candidate text found.');
         }
       }
 
@@ -377,7 +375,6 @@ IMPORTANT:
         date: now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
         time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
       };
-
       const prompt = `
 [CONTEXT]
 User's Name: ${userName}
@@ -393,25 +390,18 @@ ${conversation}
 ${userName}: ${userMsg.content}
 
 You are TaskMaster, a friendly and versatile AI productivity assistant. Engage in casual conversation, provide productivity advice, and discuss ${userName}'s items.
-
-Guidelines:
-1. Always check user data and include relevant context.
-2. Respond in a friendly tone with no extra meta commentary.
-3. Provide a direct, helpful answer.
 `;
       const options = {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        // Gemini payload without extra "parameters" field.
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }]
         })
       };
-
-      const finalText = await streamResponse(geminiEndpoint, options, (text) => {
+      const rawText = await streamResponse(geminiEndpoint, options, (text) => {
         updateLastAssistantMessage(text);
       }, 30000);
-
+      const finalText = extractCandidateText(rawText);
       setChatHistory(prev => {
         const updated = [...prev];
         updated[updated.length - 1] = { ...updated[updated.length - 1], content: finalText.trim() };
@@ -436,7 +426,7 @@ Guidelines:
   };
 
   return (
-    <div className="flex h-screen bg-gradient-to-b from-gray-900 to-gray-800">
+    <div className="flex h-screen bg-gray-900">
       <Sidebar 
         isCollapsed={isSidebarCollapsed} 
         onToggle={handleToggleSidebar}
@@ -445,45 +435,45 @@ Guidelines:
       <main className={`flex-1 overflow-hidden transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'}`}>
         <div className="h-full flex flex-col">
           {/* Header */}
-          <header className="p-6 bg-gray-700 shadow-md">
+          <div className="p-4 border-b border-gray-800">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <Bot className="w-8 h-8 text-blue-400" />
+              <div className="flex items-center gap-3">
+                <Bot className="w-6 h-6 text-blue-400" />
                 <div>
-                  <h1 className="text-2xl font-bold text-white">AI Assistant</h1>
-                  <p className="text-sm text-gray-300">Chat with TaskMaster</p>
+                  <h1 className="text-xl font-semibold text-white">AI Assistant</h1>
+                  <p className="text-sm text-gray-400">Chat with TaskMaster</p>
                 </div>
               </div>
               <div className="flex items-center gap-4">
-                <div className="flex items-center gap-1 text-sm text-gray-300">
-                  <AlertTriangle className="w-5 h-5 text-yellow-400" />
+                <div className="flex items-center gap-2 text-xs text-gray-400">
+                  <AlertTriangle className="w-4 h-4 text-yellow-400" />
                   <span>Chat history is not saved</span>
                 </div>
-                <div className="flex items-center gap-1 text-sm text-gray-300">
-                  <AlertTriangle className="w-5 h-5 text-yellow-400" />
-                  <span>Verify details carefully</span>
+                <div className="flex items-center gap-2 text-xs text-gray-400">
+                  <AlertTriangle className="w-4 h-4 text-yellow-400" />
+                  <span>TaskMaster can make mistakes. Verify details.</span>
                 </div>
               </div>
             </div>
-          </header>
+          </div>
           {/* Chat Messages */}
-          <section className="flex-1 overflow-y-auto p-6 space-y-4">
+          <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={chatEndRef}>
             {chatHistory.map((message, index) => (
               <div key={index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[80%] rounded-lg p-4 shadow-lg ${message.role === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-200'}`}>
+                <div className={`max-w-[80%] rounded-lg px-4 py-2 ${message.role === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-200'}`}>
                   <ReactMarkdown
                     remarkPlugins={[remarkMath, remarkGfm]}
                     rehypePlugins={[rehypeKatex]}
                     components={{
                       p: ({ children }) => <p className="mb-2">{children}</p>,
-                      ul: ({ children }) => <ul className="list-disc ml-5 mb-2">{children}</ul>,
-                      ol: ({ children }) => <ol className="list-decimal ml-5 mb-2">{children}</ol>,
+                      ul: ({ children }) => <ul className="list-disc ml-4 mb-2">{children}</ul>,
+                      ol: ({ children }) => <ol className="list-decimal ml-4 mb-2">{children}</ol>,
                       li: ({ children }) => <li className="mb-1">{children}</li>,
                       code: ({ inline, children }) =>
                         inline ? (
                           <code className="bg-gray-800 px-1 rounded">{children}</code>
                         ) : (
-                          <pre className="bg-gray-800 p-3 rounded-lg overflow-x-auto">
+                          <pre className="bg-gray-800 p-2 rounded-lg overflow-x-auto">
                             <code>{children}</code>
                           </pre>
                         ),
@@ -492,20 +482,20 @@ Guidelines:
                     {message.content}
                   </ReactMarkdown>
                   {message.timer && (
-                    <div className="mt-3">
+                    <div className="mt-2">
                       <div className="flex items-center space-x-2 bg-gray-900 rounded-lg px-4 py-2">
-                        <TimerIcon className="w-6 h-6 text-blue-400" />
+                        <TimerIcon className="w-5 h-5 text-blue-400" />
                         <Timer key={message.timer.id} initialDuration={message.timer.duration} onComplete={() => handleTimerComplete(message.timer!.id)} />
                       </div>
                     </div>
                   )}
                   {message.flashcard && (
-                    <div className="mt-3">
+                    <div className="mt-2">
                       <FlashcardsQuestions type="flashcard" data={message.flashcard.data} onComplete={() => {}} />
                     </div>
                   )}
                   {message.question && (
-                    <div className="mt-3">
+                    <div className="mt-2">
                       <FlashcardsQuestions type="question" data={message.question.data} onComplete={() => {}} />
                     </div>
                   )}
@@ -514,32 +504,31 @@ Guidelines:
             ))}
             {isChatLoading && (
               <div className="flex justify-start">
-                <div className="bg-gray-700 text-gray-200 rounded-lg p-4 max-w-[80%]">
+                <div className="bg-gray-700 text-gray-200 rounded-lg px-4 py-2 max-w-[80%]">
                   <div className="flex space-x-2">
-                    <div className="w-3 h-3 bg-gray-400 rounded-full animate-bounce"></div>
-                    <div className="w-3 h-3 bg-gray-400 rounded-full animate-bounce delay-100"></div>
-                    <div className="w-3 h-3 bg-gray-400 rounded-full animate-bounce delay-200"></div>
+                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100"></div>
+                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200"></div>
                   </div>
                 </div>
               </div>
             )}
-            <div ref={chatEndRef} />
-          </section>
+          </div>
           {/* Chat Input */}
-          <footer className="p-6 border-t border-gray-700">
-            <form onSubmit={handleChatSubmit} className="flex gap-4">
+          <form onSubmit={handleChatSubmit} className="p-4 border-t border-gray-800">
+            <div className="flex gap-2">
               <input
                 type="text"
                 value={chatMessage}
                 onChange={(e) => setChatMessage(e.target.value)}
-                placeholder="Ask TaskMaster about your items, study content, or set a timer..."
-                className="flex-1 bg-gray-800 text-gray-100 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Ask TaskMaster about your items or set a timer..."
+                className="flex-1 bg-gray-700 text-gray-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              <button type="submit" disabled={isChatLoading} className="bg-blue-600 text-white px-5 py-3 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                <Send className="w-6 h-6" />
+              <button type="submit" disabled={isChatLoading} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                <Send className="w-5 h-5" />
               </button>
-            </form>
-          </footer>
+            </div>
+          </form>
         </div>
       </main>
     </div>

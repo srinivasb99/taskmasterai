@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Send, Timer as TimerIcon, Bot, AlertTriangle } from 'lucide-react';
+import { Send, Timer as TimerIcon, Bot, AlertTriangle, MoreVertical } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { Timer } from './Timer';
 import { FlashcardsQuestions } from './FlashcardsQuestions';
@@ -14,12 +14,15 @@ import { User, onAuthStateChanged } from 'firebase/auth';
 import { geminiApiKey } from '../lib/dashboard-firebase';
 import { onCollectionSnapshot } from '../lib/dashboard-firebase';
 import { getCurrentUser } from '../lib/settings-firebase';
-// Import Firebase chat functions
+
+// Import Firebase chat functions (including rename/delete/share placeholders)
 import {
   createChatConversation,
   saveChatMessage,
   onChatMessagesSnapshot,
   onChatConversationsSnapshot,
+  updateChatConversationName,
+  deleteChatConversation,
 } from '../lib/ai-chat-firebase';
 
 const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`;
@@ -81,13 +84,13 @@ const fetchWithTimeout = async (url: string, options: RequestInit, timeout = 300
 const streamResponse = async (
   url: string,
   options: RequestInit,
-  onUpdate: (text: string) => void,
+  onStreamUpdate: (textChunk: string) => void,
   timeout = 30000
 ) => {
   const response = await fetchWithTimeout(url, options, timeout);
   if (!response.body) {
     const text = await response.text();
-    onUpdate(text);
+    onStreamUpdate(text);
     return text;
   }
   const reader = response.body.getReader();
@@ -100,7 +103,7 @@ const streamResponse = async (
     if (value) {
       const chunk = decoder.decode(value, { stream: !done });
       accumulatedText += chunk;
-      onUpdate(accumulatedText);
+      onStreamUpdate(accumulatedText);
     }
   }
   return accumulatedText;
@@ -139,7 +142,7 @@ export function AIChat() {
   const [goals, setGoals] = useState<Array<{ id: string; data: any }>>([]);
   const [projects, setProjects] = useState<Array<{ id: string; data: any }>>([]);
   const [plans, setPlans] = useState<Array<{ id: string; data: any }>>([]);
-  
+
   // Conversation state
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [conversationList, setConversationList] = useState<any[]>([]);
@@ -187,7 +190,7 @@ export function AIChat() {
     };
   }, [user]);
 
-  // Listen for conversation list (chat history) for the user.
+  // Listen for conversation list for the user.
   useEffect(() => {
     if (!user) return;
     const unsubscribe = onChatConversationsSnapshot(user.uid, (conversations) => {
@@ -198,21 +201,24 @@ export function AIChat() {
 
   // Listen for messages in the selected conversation.
   useEffect(() => {
-    if (!conversationId) return;
+    if (!conversationId) {
+      setChatHistory([]);
+      return;
+    }
     const unsubscribe = onChatMessagesSnapshot(conversationId, (messages) => {
       setChatHistory(messages);
     });
     return () => unsubscribe();
   }, [conversationId]);
 
-  const handleToggleSidebar = () => setIsSidebarCollapsed(prev => !prev);
-
-  const handleTimerComplete = (timerId: string) => {
-    if (conversationId && user) {
-      const msg = { role: 'assistant', content: "⏰ Time's up! Your timer has finished." };
-      saveChatMessage(conversationId, msg);
+  // Scroll to bottom whenever chatHistory changes.
+  useEffect(() => {
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  };
+  }, [chatHistory]);
+
+  const handleToggleSidebar = () => setIsSidebarCollapsed((prev) => !prev);
 
   const parseTimerRequest = (message: string): number | null => {
     const timeRegex = /(\d+)\s*(minutes?|mins?|hours?|hrs?|seconds?|secs?)/i;
@@ -226,9 +232,13 @@ export function AIChat() {
     return null;
   };
 
-  useEffect(() => {
-    if (chatEndRef.current) chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
-  }, [chatHistory]);
+  const handleTimerComplete = (timerId: string) => {
+    if (!conversationId || !user) return;
+    saveChatMessage(conversationId, {
+      role: 'assistant',
+      content: "⏰ Time's up! Your timer has finished."
+    });
+  };
 
   const formatItemsForChat = () => {
     const lines: string[] = [];
@@ -252,169 +262,12 @@ export function AIChat() {
     return lines.join('\n');
   };
 
-  // Detect educational requests (flashcards/quiz questions) from user message.
-  const detectEducationalRequest = (message: string): { type: 'flashcard' | 'question' | null, count: number } => {
-    const flashcardMatch = message.match(/(?:create|make|generate)\s+(?:a\s+set\s+of\s+)?(\d+)?\s*(?:flashcards?|flash\s+cards?|study\s+cards?)/i);
-    if (flashcardMatch) {
-      const count = flashcardMatch[1] ? parseInt(flashcardMatch[1]) : 5;
-      return { type: 'flashcard', count: Math.min(count, 10) };
-    }
-    const questionMatch = message.match(/(?:create|make|generate)\s+(?:a\s+set\s+of\s+)?(\d+)?\s*(?:questions?|quiz(?:zes)?|test\s+questions?|practice\s+questions?)/i);
-    if (questionMatch) {
-      const count = questionMatch[1] ? parseInt(questionMatch[1]) : 5;
-      return { type: 'question', count: Math.min(count, 30) };
-    }
-    return { type: null, count: 0 };
-  };
+  // Streaming in memory (no placeholder assistant message)
+  const [streamingAssistantContent, setStreamingAssistantContent] = useState('');
 
-  // updateLastAssistantMessage now has access to setChatHistory.
-  const updateLastAssistantMessage = (newContent: string) => {
-    setChatHistory(prev => {
-      const updated = [...prev];
-      if (updated.length > 0) {
-        updated[updated.length - 1] = { ...updated[updated.length - 1], content: newContent };
-      }
-      return updated;
-    });
-  };
-
-  // Combined prompt for educational content.
-  const createEducationalPrompt = (userMessage: string, type: 'flashcard' | 'question', requestedCount: number): string => {
-    const count = requestedCount;
-    return `
-[CONTEXT]
-User's Name: ${userName}
-Current Date: ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-Current Time: ${new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}
-
-${formatItemsForChat()}
-
-[CONVERSATION SO FAR]
-${chatHistory.map(m => `${m.role === 'user' ? userName : 'Assistant'}: ${m.content}`).join('\n')}
-
-[NEW USER MESSAGE]
-${userName}: ${userMessage}
-
-You are TaskMaster, a friendly and versatile AI productivity assistant. Engage in casual conversation, provide productivity advice, and discuss ${userName}'s items only when explicitly asked by ${userName}.
-
-Guidelines:
-
-1. General Conversation:
-   - Respond in a friendly, natural tone matching ${userName}'s style.
-   - Do not include any internal instructions, meta commentary, or explanations of your process.
-   - Do not include phrases such as "Here's my response to continue the conversation:" or similar wording.
-   - Do not include or reference code blocks for languages like Python, Bash, or any other unless explicitly requested by ${userName}.
-   - Only reference ${userName}'s items if ${userName} explicitly asks about them.
-
-2. Educational Content (JSON):
-   - If ${userName} explicitly requests educational content (flashcards or quiz questions), provide exactly one JSON object.
-   - Wrap the JSON object in a single code block using triple backticks and the "json" language identifier.
-   - Use one of the following formats:
-
-     For flashcards:
-     {
-       "type": "flashcard",
-       "data": [
-         {
-           "id": "unique-id-1",
-           "question": "Question 1",
-           "answer": "Answer 1",
-           "topic": "Subject area"
-         },
-         {
-           "id": "unique-id-2",
-           "question": "Question 2",
-           "answer": "Answer 2",
-           "topic": "Subject area"
-         }
-       ]
-     }
-
-     For quiz questions:
-     {
-       "type": "question",
-       "data": [
-         {
-           "id": "unique-id-1",
-           "question": "Question 1",
-           "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
-           "correctAnswer": 0,
-           "explanation": "Explanation 1"
-         },
-         {
-           "id": "unique-id-2",
-           "question": "Question 2",
-           "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
-           "correctAnswer": 1,
-           "explanation": "Explanation 2"
-         }
-       ]
-     }
-
-3. Response Structure:
-   - Provide a direct response to ${userName} without any extraneous openings or meta-text.
-   - Do not mix JSON with regular text. JSON is only for requested educational content.
-   - Always address ${userName} in a friendly, helpful tone.
-`;
-  };
-
-  // Handle sending a message.
-  const handleChatSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!chatMessage.trim() || !user) return;
-
-    // If no conversation is selected, create one.
-    if (!conversationId) {
-      const newConvId = await createChatConversation(user.uid, "New Chat");
-      setConversationId(newConvId);
-    }
-
-    // Save user's message.
-    const userMsg: ChatMessageData = { role: 'user', content: chatMessage };
-    await saveChatMessage(conversationId!, userMsg);
-    setChatMessage('');
-
-    // Check for timer request.
-    const timerDuration = parseTimerRequest(userMsg.content);
-    if (timerDuration) {
-      const timerId = Math.random().toString(36).substr(2, 9);
-      const timerMsg: ChatMessageData = { role: 'assistant', content: `Starting a timer for ${timerDuration} seconds.`, timer: { type: 'timer', duration: timerDuration, id: timerId } };
-      await saveChatMessage(conversationId!, timerMsg);
-      return;
-    }
-
-    // Check if educational content is requested.
-    const educationalRequest = detectEducationalRequest(userMsg.content);
-    if (educationalRequest.type) {
-      // Insert a placeholder assistant message.
-      await saveChatMessage(conversationId!, { role: 'assistant', content: "" });
-      // Build the full prompt.
-      const prompt = createEducationalPrompt(userMsg.content, educationalRequest.type, educationalRequest.count);
-      const options = {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }]
-        })
-      };
-      const rawText = await streamResponse(geminiEndpoint, options, (text) => {
-        updateLastAssistantMessage(text);
-      }, 45000);
-      const finalText = extractCandidateText(rawText);
-      if (finalText) {
-        // Save assistant's response.
-        await saveChatMessage(conversationId!, { role: 'assistant', content: finalText.trim() });
-        setIsChatLoading(false);
-        return;
-      } else {
-        throw new Error('No valid candidate text found.');
-      }
-    }
-
-    // Regular conversation processing.
-    // Insert a placeholder assistant message.
-    await saveChatMessage(conversationId!, { role: 'assistant', content: "" });
-    const conversationText = chatHistory
+  // Single prompt (Gemini is smart enough to handle everything).
+  const createPrompt = (userMessage: string): string => {
+    const conversationSoFar = chatHistory
       .map(m => `${m.role === 'user' ? userName : 'Assistant'}: ${m.content}`)
       .join('\n');
     const itemsText = formatItemsForChat();
@@ -423,7 +276,7 @@ Guidelines:
       date: now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
       time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
     };
-    const prompt = `
+    return `
 [CONTEXT]
 User's Name: ${userName}
 Current Date: ${currentDateTime.date}
@@ -432,48 +285,168 @@ Current Time: ${currentDateTime.time}
 ${itemsText}
 
 [CONVERSATION SO FAR]
-${conversationText}
+${conversationSoFar}
 
 [NEW USER MESSAGE]
-${userName}: ${userMsg.content}
+${userName}: ${userMessage}
 
-You are TaskMaster, a friendly and versatile AI productivity assistant. Engage in casual conversation, provide productivity advice, and discuss ${userName}'s items.
+You are TaskMaster, a friendly and versatile AI productivity assistant. Engage in casual conversation, provide productivity advice, and discuss ${userName}'s items if they ask. Keep responses direct, helpful, and in a natural tone.
 `;
-    const options = {
+  };
+
+  // After ~4 messages, generate a dynamic chat name from Gemini
+  const generateChatName = async (convId: string, conversationSoFar: string) => {
+    try {
+      const namePrompt = `
+Please provide a short 3-5 word title summarizing the conversation so far:
+${conversationSoFar}
+Return ONLY the title, with no extra commentary.
+`;
+      const options = {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: namePrompt }] }]
+        })
+      };
+      const rawText = await fetchWithTimeout(geminiEndpoint, options, 30000);
+      const text = await rawText.text();
+      const finalText = extractCandidateText(text) || 'Untitled Chat';
+      await updateChatConversationName(convId, finalText.trim());
+    } catch (err) {
+      console.error('Error generating chat name:', err);
+    }
+  };
+
+  // Send the user's message to Gemini, get streaming response, save final assistant message to Firestore.
+  const handleChatSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatMessage.trim() || !user) return;
+
+    // If no conversation is selected, create one.
+    let convId = conversationId;
+    if (!convId) {
+      convId = await createChatConversation(user.uid, "New Chat");
+      setConversationId(convId);
+    }
+
+    // Save user's message
+    const userMsg: ChatMessageData = { role: 'user', content: chatMessage };
+    await saveChatMessage(convId!, userMsg);
+    const updatedHistory = [...chatHistory, userMsg];
+
+    // Clear user input
+    setChatMessage('');
+
+    // Check if it's a timer request
+    const timerDuration = parseTimerRequest(userMsg.content);
+    if (timerDuration) {
+      const timerId = Math.random().toString(36).substr(2, 9);
+      const timerMsg: ChatMessageData = {
+        role: 'assistant',
+        content: `Starting a timer for ${timerDuration} seconds.`,
+        timer: { type: 'timer', duration: timerDuration, id: timerId }
+      };
+      await saveChatMessage(convId!, timerMsg);
+      return;
+    }
+
+    setIsChatLoading(true);
+    setStreamingAssistantContent(''); // Start fresh for streaming
+
+    // Build prompt for Gemini
+    const prompt = createPrompt(userMsg.content);
+    const geminiOptions = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }]
       })
     };
-    const rawText = await streamResponse(geminiEndpoint, options, (text) => {
-      updateLastAssistantMessage(text);
-    }, 30000);
-    const finalText = extractCandidateText(rawText);
-    await saveChatMessage(conversationId!, { role: 'assistant', content: finalText.trim() });
+
+    try {
+      // Stream in memory
+      let finalResponse = '';
+      await streamResponse(geminiEndpoint, geminiOptions, (chunk) => {
+        setStreamingAssistantContent(chunk); // show partial content
+        finalResponse = chunk;
+      }, 45000);
+
+      // Extract final text
+      const finalText = extractCandidateText(finalResponse).trim() || '';
+      setStreamingAssistantContent(''); // clear streaming content
+      // Save final assistant message
+      const assistantMsg: ChatMessageData = { role: 'assistant', content: finalText };
+      await saveChatMessage(convId!, assistantMsg);
+
+      // If the user has at least 3 messages, generate a dynamic chat name.
+      // (That means total messages ~4, counting user + assistant.)
+      const totalUserMessages = updatedHistory.filter(m => m.role === 'user').length;
+      if (totalUserMessages >= 3) {
+        const conversationText = updatedHistory
+          .map(m => `${m.role === 'user' ? userName : 'Assistant'}: ${m.content}`)
+          .join('\n');
+        await generateChatName(convId!, conversationText);
+      }
+    } catch (err: any) {
+      console.error('Chat error:', err);
+      // Save error fallback message
+      await saveChatMessage(convId!, {
+        role: 'assistant',
+        content: 'Sorry, I had an issue responding. Please try again in a moment.'
+      });
+    } finally {
+      setIsChatLoading(false);
+    }
   };
 
-  // Handler to create a new conversation.
+  // Create a new conversation
   const handleNewConversation = async () => {
     if (!user) return;
     const newConvId = await createChatConversation(user.uid, "New Chat");
     setConversationId(newConvId);
-    setChatHistory([]); // Reset current conversation messages.
+    setChatHistory([]);
   };
 
-  // Handler to select an existing conversation.
+  // Select an existing conversation
   const handleSelectConversation = (convId: string) => {
     setConversationId(convId);
+  };
+
+  // RENAME conversation
+  const handleRenameConversation = async (conv: any) => {
+    const newName = window.prompt('Enter new chat name:', conv.chatName);
+    if (!newName || !newName.trim()) return;
+    await updateChatConversationName(conv.id, newName.trim());
+  };
+
+  // DELETE conversation
+  const handleDeleteConversationClick = async (conv: any) => {
+    const confirmed = window.confirm(`Are you sure you want to delete "${conv.chatName}"?`);
+    if (!confirmed) return;
+    await deleteChatConversation(conv.id);
+    if (conversationId === conv.id) {
+      setConversationId(null);
+      setChatHistory([]);
+    }
+  };
+
+  // SHARE conversation
+  const handleShareConversation = async (conv: any) => {
+    // For demonstration, just copy the ID or show an alert. 
+    // In a real app, you might generate a shareable link or set permissions.
+    alert(`Sharing conversation ID: ${conv.id}`);
   };
 
   return (
     <div className="flex h-screen bg-gray-900">
       {/* Left Sidebar */}
-      <Sidebar 
-        isCollapsed={isSidebarCollapsed} 
+      <Sidebar
+        isCollapsed={isSidebarCollapsed}
         onToggle={handleToggleSidebar}
         userName={userName}
       />
+
       {/* Main Chat Area */}
       <main className={`flex-1 overflow-hidden transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'}`}>
         <div className="h-full flex flex-col">
@@ -499,11 +472,21 @@ You are TaskMaster, a friendly and versatile AI productivity assistant. Engage i
               </div>
             </div>
           </div>
+
           {/* Chat Messages */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={chatEndRef}>
             {chatHistory.map((message, index) => (
-              <div key={index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[80%] rounded-lg px-4 py-2 ${message.role === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-200'}`}>
+              <div
+                key={index}
+                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              >
+                <div
+                  className={`max-w-[80%] rounded-lg px-4 py-2 ${
+                    message.role === 'user'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-700 text-gray-200'
+                  }`}
+                >
                   <ReactMarkdown
                     remarkPlugins={[remarkMath, remarkGfm]}
                     rehypePlugins={[rehypeKatex]}
@@ -528,24 +511,46 @@ You are TaskMaster, a friendly and versatile AI productivity assistant. Engage i
                     <div className="mt-2">
                       <div className="flex items-center space-x-2 bg-gray-900 rounded-lg px-4 py-2">
                         <TimerIcon className="w-5 h-5 text-blue-400" />
-                        <Timer key={message.timer.id} initialDuration={message.timer.duration} onComplete={() => handleTimerComplete(message.timer!.id)} />
+                        <Timer
+                          key={message.timer.id}
+                          initialDuration={message.timer.duration}
+                          onComplete={() => handleTimerComplete(message.timer!.id)}
+                        />
                       </div>
                     </div>
                   )}
                   {message.flashcard && (
                     <div className="mt-2">
-                      <FlashcardsQuestions type="flashcard" data={message.flashcard.data} onComplete={() => {}} />
+                      <FlashcardsQuestions
+                        type="flashcard"
+                        data={message.flashcard.data}
+                        onComplete={() => {}}
+                      />
                     </div>
                   )}
                   {message.question && (
                     <div className="mt-2">
-                      <FlashcardsQuestions type="question" data={message.question.data} onComplete={() => {}} />
+                      <FlashcardsQuestions
+                        type="question"
+                        data={message.question.data}
+                        onComplete={() => {}}
+                      />
                     </div>
                   )}
                 </div>
               </div>
             ))}
-            {isChatLoading && (
+
+            {/* If streaming in memory, show partial content as an assistant bubble */}
+            {streamingAssistantContent && (
+              <div className="flex justify-start">
+                <div className="max-w-[80%] rounded-lg px-4 py-2 bg-gray-700 text-gray-200">
+                  <ReactMarkdown>{streamingAssistantContent}</ReactMarkdown>
+                </div>
+              </div>
+            )}
+
+            {isChatLoading && !streamingAssistantContent && (
               <div className="flex justify-start">
                 <div className="bg-gray-700 text-gray-200 rounded-lg px-4 py-2 max-w-[80%]">
                   <div className="flex space-x-2">
@@ -556,7 +561,10 @@ You are TaskMaster, a friendly and versatile AI productivity assistant. Engage i
                 </div>
               </div>
             )}
+
+            <div ref={chatEndRef} />
           </div>
+
           {/* Chat Input */}
           <form onSubmit={handleChatSubmit} className="p-4 border-t border-gray-800">
             <div className="flex gap-2">
@@ -567,13 +575,18 @@ You are TaskMaster, a friendly and versatile AI productivity assistant. Engage i
                 placeholder="Ask TaskMaster about your items or set a timer..."
                 className="flex-1 bg-gray-700 text-gray-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              <button type="submit" disabled={isChatLoading} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+              <button
+                type="submit"
+                disabled={isChatLoading}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
                 <Send className="w-5 h-5" />
               </button>
             </div>
           </form>
         </div>
       </main>
+
       {/* Right Sidebar: Chat Conversations */}
       <aside className="w-64 border-l border-gray-800 bg-gray-800">
         <div className="p-4">
@@ -581,10 +594,70 @@ You are TaskMaster, a friendly and versatile AI productivity assistant. Engage i
           {conversationList.map((conv) => (
             <div
               key={conv.id}
-              onClick={() => handleSelectConversation(conv.id)}
-              className={`cursor-pointer p-2 rounded mb-2 ${conversationId === conv.id ? "bg-blue-600 text-white" : "bg-gray-700 text-gray-200 hover:bg-gray-600"}`}
+              className={`flex items-center justify-between cursor-pointer p-2 rounded mb-2 ${
+                conversationId === conv.id
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-700 text-gray-200 hover:bg-gray-600'
+              }`}
             >
-              {conv.chatName}
+              <div
+                className="flex-1"
+                onClick={() => handleSelectConversation(conv.id)}
+              >
+                {conv.chatName}
+              </div>
+              {/* 3-dot menu for rename, delete, share */}
+              <div className="relative flex items-center">
+                <MoreVertical
+                  className="w-5 h-5 cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const menu = document.getElementById(`conv-menu-${conv.id}`);
+                    if (menu) {
+                      menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+                    }
+                  }}
+                />
+                <div
+                  id={`conv-menu-${conv.id}`}
+                  className="hidden absolute top-6 right-0 bg-gray-700 text-gray-200 rounded shadow-lg z-50"
+                  style={{ minWidth: '120px' }}
+                >
+                  <button
+                    className="block w-full text-left px-4 py-2 hover:bg-gray-600"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const menu = document.getElementById(`conv-menu-${conv.id}`);
+                      if (menu) menu.style.display = 'none';
+                      handleRenameConversation(conv);
+                    }}
+                  >
+                    Rename
+                  </button>
+                  <button
+                    className="block w-full text-left px-4 py-2 hover:bg-gray-600"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const menu = document.getElementById(`conv-menu-${conv.id}`);
+                      if (menu) menu.style.display = 'none';
+                      handleDeleteConversationClick(conv);
+                    }}
+                  >
+                    Delete
+                  </button>
+                  <button
+                    className="block w-full text-left px-4 py-2 hover:bg-gray-600"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const menu = document.getElementById(`conv-menu-${conv.id}`);
+                      if (menu) menu.style.display = 'none';
+                      handleShareConversation(conv);
+                    }}
+                  >
+                    Share
+                  </button>
+                </div>
+              </div>
             </div>
           ))}
           <button

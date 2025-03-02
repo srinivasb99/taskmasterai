@@ -238,76 +238,25 @@ export function AIChat() {
     return lines.join('\n');
   };
 
-  // Improved detection for educational content requests
-  const detectEducationalRequest = (message: string): { type: 'flashcard' | 'question' | null, count: number } => {
-    // Check for flashcard requests
-    const flashcardMatch = message.match(/(?:create|make|generate)\s+(?:a\s+set\s+of\s+)?(\d+)?\s*(?:flashcards?|flash\s+cards?|study\s+cards?)/i);
-    if (flashcardMatch) {
-      const count = flashcardMatch[1] ? parseInt(flashcardMatch[1]) : 5; // Default to 5 if no number specified
-      return { type: 'flashcard', count };
+  // Check if it's a large question or flashcard set request
+  const isLargeEducationalContentRequest = (message: string): boolean => {
+    const largeQuestionMatch = message.match(/create\s+(\d+)\s+questions/i);
+    const largeFlashcardMatch = message.match(/create\s+(\d+)\s+flashcards/i);
+    
+    if (largeQuestionMatch && parseInt(largeQuestionMatch[1]) > 10) {
+      return true;
     }
     
-    // Check for question requests
-    const questionMatch = message.match(/(?:create|make|generate)\s+(?:a\s+set\s+of\s+)?(\d+)?\s*(?:questions?|quiz(?:zes)?|test\s+questions?|practice\s+questions?)/i);
-    if (questionMatch) {
-      const count = questionMatch[1] ? parseInt(questionMatch[1]) : 5; // Default to 5 if no number specified
-      return { type: 'question', count };
+    if (largeFlashcardMatch && parseInt(largeFlashcardMatch[1]) > 10) {
+      return true;
     }
     
-    return { type: null, count: 0 };
+    return false;
   };
 
-  // Create optimized prompt for educational content
-  const createEducationalPrompt = (userMessage: string, type: 'flashcard' | 'question', requestedCount: number): string => {
-    // Limit the count to a reasonable number
-    const count = Math.min(requestedCount, 10);
-    
-    let promptPrefix = '';
-    if (type === 'flashcard') {
-      promptPrefix = `Please create ${count} high-quality flashcards based on the following request. 
-Respond ONLY with a valid JSON object inside a code block with no additional text.
-
-The JSON object should have this structure:
-{
-  "type": "flashcard",
-  "data": [
-    {
-      "id": "1",
-      "question": "Front side of flashcard",
-      "answer": "Back side with answer (keep concise, < 50 words)",
-      "topic": "Relevant topic"
-    }
-  ]
-}`;
-    } else {
-      promptPrefix = `Please create ${count} high-quality quiz questions based on the following request.
-Respond ONLY with a valid JSON object inside a code block with no additional text.
-
-The JSON object should have this structure:
-{
-  "type": "question",
-  "data": [
-    {
-      "id": "1",
-      "question": "The question text",
-      "options": ["Option A", "Option B", "Option C", "Option D"],
-      "correctAnswer": 0,
-      "explanation": "Brief explanation of why this answer is correct (< 30 words)"
-    }
-  ]
-}`;
-    }
-    
-    return `${promptPrefix}
-
-Request: ${userMessage}
-
-IMPORTANT: 
-1. Generate exactly ${count} high-quality items
-2. Ensure the JSON is valid and properly formatted
-3. Keep answers and explanations concise
-4. Provide only the JSON in your response, no other text
-5. Use simple numeric IDs (1, 2, 3, etc.)`;
+  // Split large educational content requests into batches
+  const generateBatchPrompt = (originalPrompt: string, batchNumber: number, totalBatches: number): string => {
+    return `${originalPrompt}\n\nPlease provide ONLY batch ${batchNumber} of ${totalBatches} of the requested educational content. Make sure each item has a unique ID and is properly formatted as JSON. Focus on quality and ensure the response is concise.`;
   };
 
   const handleChatSubmit = async (e: React.FormEvent) => {
@@ -342,252 +291,28 @@ IMPORTANT:
       return;
     }
 
-    // Check for educational content request
-    const educationalRequest = detectEducationalRequest(userMsg.content);
-    
-    setIsChatLoading(true);
+    // Regular chat processing
+    const conversation = chatHistory
+      .map((m) => `${m.role === 'user' ? userName : 'Assistant'}: ${m.content}`)
+      .join('\n');
+    const itemsText = formatItemsForChat();
 
-    try {
-      // For educational content, use optimized approach
-      if (educationalRequest.type) {
-        try {
-          // Show intermediate response for better UX
-          if (educationalRequest.count > 3) {
-            setChatHistory(prev => [
-              ...prev,
-              { 
-                role: 'assistant', 
-                content: `I'm generating ${educationalRequest.count} ${educationalRequest.type === 'flashcard' ? 'flashcards' : 'questions'} for you. This will take just a moment...` 
-              }
-            ]);
-          }
-          
-          // Create optimized prompt for educational content
-          const educationalPrompt = createEducationalPrompt(
-            userMsg.content, 
-            educationalRequest.type, 
-            educationalRequest.count
-          );
-          
-          // Use specialized parameters for educational content
-          const response = await fetchWithTimeout(
-            'https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct',
-            {
-              method: 'POST',
-              headers: {
-                Authorization: `Bearer ${hfApiKey}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                inputs: educationalPrompt,
-                parameters: {
-                  max_new_tokens: 2000,
-                  temperature: 0.2, // Lower temperature for more predictable output
-                  top_p: 0.95,
-                  return_full_text: false,
-                  repetition_penalty: 1.05,
-                  do_sample: true,
-                },
-              }),
-            },
-            45000 // 45 second timeout for educational content
-          );
-          
-          if (!response.ok) throw new Error('Educational content API request failed');
-          
-          const result = await response.json();
-          let content = result[0]?.generated_text as string || '';
-          
-          // Extract JSON content - improved regex pattern
-          const jsonMatches = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-          
-          if (jsonMatches && jsonMatches[1]) {
-            try {
-              // Clean the JSON string
-              const jsonText = jsonMatches[1].trim();
-              const jsonContent = JSON.parse(jsonText);
-              
-              // Validate structure
-              if (
-                jsonContent.type === educationalRequest.type &&
-                jsonContent.data &&
-                Array.isArray(jsonContent.data) &&
-                jsonContent.data.length > 0
-              ) {
-                // Generate a friendly response based on content type
-                let responseText = '';
-                if (educationalRequest.type === 'flashcard') {
-                  responseText = `Here are ${jsonContent.data.length} flashcards about ${
-                    jsonContent.data[0].topic || 'the requested topic'
-                  }. You can flip each card to see the answer.`;
-                } else {
-                  responseText = `Here are ${jsonContent.data.length} quiz questions for you to practice with. Select an answer to see if you're correct.`;
-                }
-                
-                // Update chat with successful response
-                setChatHistory(prev => {
-                  // Remove the intermediate "generating" message if it exists
-                  const filteredPrev = prev.filter(
-                    msg => msg.role !== 'assistant' || 
-                    !msg.content.includes(`I'm generating ${educationalRequest.count}`)
-                  );
-                  
-                  return [
-                    ...filteredPrev,
-                    {
-                      role: 'assistant',
-                      content: responseText,
-                      ...(educationalRequest.type === 'flashcard' && { 
-                        flashcard: jsonContent as FlashcardMessage 
-                      }),
-                      ...(educationalRequest.type === 'question' && { 
-                        question: jsonContent as QuestionMessage 
-                      })
-                    }
-                  ];
-                });
-                
-                setIsChatLoading(false);
-                return; // Exit early on success
-              } else {
-                throw new Error('Invalid educational content structure');
-              }
-            } catch (jsonError) {
-              console.error('Failed to parse educational content JSON:', jsonError);
-              throw new Error('Invalid JSON format in educational content');
-            }
-          } else {
-            throw new Error('No JSON found in educational content response');
-          }
-        } catch (educationalError) {
-          console.error('Educational content error:', educationalError);
-          
-          // Fallback to simpler request with fewer items
-          try {
-            const fallbackCount = Math.min(3, educationalRequest.count);
-            const fallbackPrompt = createEducationalPrompt(
-              userMsg.content, 
-              educationalRequest.type, 
-              fallbackCount
-            );
-            
-            const fallbackResponse = await fetchWithTimeout(
-              'https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct',
-              {
-                method: 'POST',
-                headers: {
-                  Authorization: `Bearer ${hfApiKey}`,
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  inputs: fallbackPrompt,
-                  parameters: {
-                    max_new_tokens: 1000,
-                    temperature: 0.1,
-                    top_p: 0.9,
-                    return_full_text: false,
-                  },
-                }),
-              },
-              30000
-            );
-            
-            if (!fallbackResponse.ok) throw new Error('Fallback educational request failed');
-            
-            const fallbackResult = await fallbackResponse.json();
-            let fallbackContent = fallbackResult[0]?.generated_text as string || '';
-            
-            const fallbackJsonMatches = fallbackContent.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-            
-            if (fallbackJsonMatches && fallbackJsonMatches[1]) {
-              const fallbackJsonContent = JSON.parse(fallbackJsonMatches[1].trim());
-              
-              if (
-                fallbackJsonContent.type === educationalRequest.type &&
-                fallbackJsonContent.data &&
-                Array.isArray(fallbackJsonContent.data)
-              ) {
-                // Update chat with fallback response
-                setChatHistory(prev => {
-                  // Remove the intermediate "generating" message if it exists
-                  const filteredPrev = prev.filter(
-                    msg => msg.role !== 'assistant' || 
-                    !msg.content.includes(`I'm generating ${educationalRequest.count}`)
-                  );
-                  
-                  return [
-                    ...filteredPrev,
-                    {
-                      role: 'assistant',
-                      content: `Here are ${fallbackJsonContent.data.length} ${
-                        educationalRequest.type === 'flashcard' ? 'flashcards' : 'questions'
-                      } for you. I've provided a smaller set for better performance.`,
-                      ...(educationalRequest.type === 'flashcard' && { 
-                        flashcard: fallbackJsonContent as FlashcardMessage 
-                      }),
-                      ...(educationalRequest.type === 'question' && { 
-                        question: fallbackJsonContent as QuestionMessage 
-                      })
-                    }
-                  ];
-                });
-                
-                setIsChatLoading(false);
-                return; // Exit early on success
-              }
-            }
-            
-            throw new Error('Fallback educational request processing failed');
-          } catch (fallbackError) {
-            console.error('Fallback educational content error:', fallbackError);
-            
-            // Final fallback message
-            setChatHistory(prev => {
-              // Remove the intermediate "generating" message if it exists
-              const filteredPrev = prev.filter(
-                msg => msg.role !== 'assistant' || 
-                !msg.content.includes(`I'm generating ${educationalRequest.count}`)
-              );
-              
-              return [
-                ...filteredPrev,
-                { 
-                  role: 'assistant', 
-                  content: `I apologize, but I'm having trouble generating the ${
-                    educationalRequest.type === 'flashcard' ? 'flashcards' : 'questions'
-                  } right now. Could you try again with a more specific topic or request a smaller number (2-3 items)?` 
-                }
-              ];
-            });
-            
-            setIsChatLoading(false);
-            return; // Exit after all fallbacks fail
-          }
-        }
-      }
-      
-      // Regular chat processing for non-educational requests
-      const conversation = chatHistory
-        .map((m) => `${m.role === 'user' ? userName : 'Assistant'}: ${m.content}`)
-        .join('\n');
-      const itemsText = formatItemsForChat();
+    const now = new Date();
+    const currentDateTime = {
+      date: now.toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      }),
+      time: now.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      })
+    };
 
-      const now = new Date();
-      const currentDateTime = {
-        date: now.toLocaleDateString('en-US', {
-          weekday: 'long',
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric'
-        }),
-        time: now.toLocaleTimeString('en-US', {
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: true
-        })
-      };
-
-      const prompt = `
+    const prompt = `
 [CONTEXT]
 User's Name: ${userName}
 Current Date: ${currentDateTime.date}
@@ -616,12 +341,65 @@ Guidelines:
    - Do not include phrases such as "Here's my response to continue the conversation:" or similar wording that introduces your reply.
    - Do not include or reference code blocks for languages like Python, Bash, or any other unless explicitly requested by ${userName}.
 
-3. Response Structure:
+3. Educational Content (JSON):
+   - If ${userName} explicitly requests educational content (flashcards or quiz questions), provide exactly one JSON object.
+   - Wrap the JSON object in a single code block using triple backticks and the "json" language identifier.
+   - Keep each question/flashcard concise to improve response speed.
+   - For large sets (>10 items), focus on quality over quantity to ensure faster response.
+   - Use one of the following formats:
+
+     For flashcards:
+     {
+       "type": "flashcard",
+       "data": [
+         {
+           "id": "unique-id-1",
+           "question": "Question 1",
+           "answer": "Answer 1",
+           "topic": "Subject area"
+         }
+       ]
+     }
+
+     For quiz questions:
+     {
+       "type": "question",
+       "data": [
+         {
+           "id": "unique-id-1",
+           "question": "Question 1",
+           "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
+           "correctAnswer": 0,
+           "explanation": "Explanation 1"
+         }
+       ]
+     }
+
+4. Response Structure:
    - Provide a direct response to ${userName} without any extraneous openings or meta-text.
+   - Do not mix JSON with regular text. JSON is only for requested educational content.
    - Always address ${userName} in a friendly, helpful tone.
 
 Follow these instructions strictly.
 `;
+
+    setIsChatLoading(true);
+
+    const isLargeRequest = isLargeEducationalContentRequest(userMsg.content);
+    
+    try {
+      let assistantReply = '';
+      let jsonContent = null;
+      
+      // For large educational content requests, use optimized parameters
+      const requestParams = {
+        max_new_tokens: isLargeRequest ? 2000 : 3000,
+        temperature: isLargeRequest ? 0.4 : 0.5,
+        top_p: 0.9,
+        return_full_text: false,
+        repetition_penalty: isLargeRequest ? 1.1 : 1.2,
+        do_sample: true,
+      };
 
       const response = await fetchWithTimeout(
         'https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct',
@@ -633,55 +411,142 @@ Follow these instructions strictly.
           },
           body: JSON.stringify({
             inputs: prompt,
-            parameters: {
-              max_new_tokens: 1500,
-              temperature: 0.7,
-              top_p: 0.9,
-              return_full_text: false,
-              repetition_penalty: 1.1,
-              do_sample: true,
-            },
+            parameters: requestParams,
           }),
         },
-        30000 // 30 second timeout for regular chat
+        60000 // 60 second timeout for large requests
       );
 
       if (!response.ok) throw new Error('Chat API request failed');
       const result = await response.json();
 
-      const assistantReply = (result[0]?.generated_text as string || '')
+      assistantReply = (result[0]?.generated_text as string || '')
         .replace(/\[\/?INST\]|<</g, '')
         .split('\n')
         .filter(line => !/^(print|python)/i.test(line.trim()))
         .join('\n')
         .trim();
 
-      setChatHistory((prev) => [
-        ...prev,
-        { role: 'assistant', content: assistantReply },
-      ]);
+      // Parse any JSON content in the response - improved regex for more reliable extraction
+      const jsonPattern = /```json\n([\s\S]*?)\n```/;
+      const jsonMatch = assistantReply.match(jsonPattern);
+      
+      if (jsonMatch) {
+        try {
+          // Sanitize the JSON to handle potential formatting issues
+          const jsonText = jsonMatch[1].trim();
+          const sanitizedJson = jsonText
+            .replace(/\\n/g, '\\n')
+            .replace(/\\'/g, "\\'")
+            .replace(/\\"/g, '\\"')
+            .replace(/\\&/g, '\\&')
+            .replace(/\\r/g, '\\r')
+            .replace(/\\t/g, '\\t')
+            .replace(/\\b/g, '\\b')
+            .replace(/\\f/g, '\\f');
+          
+          jsonContent = JSON.parse(sanitizedJson);
+          
+          // Remove the JSON block from the text response
+          assistantReply = assistantReply.replace(/```json\n[\s\S]*?\n```/, '').trim();
+          
+          // Validate JSON structure
+          if (
+            jsonContent.type &&
+            jsonContent.data &&
+            Array.isArray(jsonContent.data) &&
+            (jsonContent.type === 'flashcard' || jsonContent.type === 'question')
+          ) {
+            setChatHistory((prev) => [
+              ...prev,
+              {
+                role: 'assistant',
+                content: assistantReply,
+                ...(jsonContent.type === 'flashcard' && { flashcard: jsonContent as FlashcardMessage }),
+                ...(jsonContent.type === 'question' && { question: jsonContent as QuestionMessage })
+              },
+            ]);
+          } else {
+            throw new Error('Invalid JSON structure');
+          }
+        } catch (e) {
+          console.error('Failed to parse JSON content:', e);
+          // On JSON parse error, still show the text response
+          setChatHistory((prev) => [
+            ...prev,
+            { 
+              role: 'assistant', 
+              content: `${assistantReply}` 
+            },
+          ]);
+        }
+      } else {
+        // No JSON content detected
+        setChatHistory((prev) => [
+          ...prev,
+          { role: 'assistant', content: assistantReply },
+        ]);
+      }
     } catch (err: any) {
       console.error('Chat error:', err);
       
       // Handle different error types
       if (err.name === 'AbortError') {
-        // Timeout error
+        // This was a timeout
         setChatHistory((prev) => [
           ...prev,
           {
             role: 'assistant',
-            content: "I'm sorry, that request is taking longer than expected. If you're asking for educational content, try being more specific about the topic or request fewer items."
+            content: "I'm sorry, that request is taking longer than expected. For large sets of questions or flashcards, try asking for a smaller number (like 5-10) for faster results."
           },
         ]);
       } else {
-        // Generic error
-        setChatHistory((prev) => [
-          ...prev,
-          {
-            role: 'assistant',
-            content: 'Sorry, I had an issue responding. Please try again in a moment.',
-          },
-        ]);
+        // Try one more time with simplified parameters for reliability
+        try {
+          const fallbackResponse = await fetchWithTimeout(
+            'https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct',
+            {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${hfApiKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                inputs: `${prompt}\n\nPlease provide a concise response. If this is an educational content request, limit to 5 high-quality items.`,
+                parameters: {
+                  max_new_tokens: 1500,
+                  temperature: 0.3,
+                  top_p: 0.85,
+                  return_full_text: false,
+                  repetition_penalty: 1.0,
+                  do_sample: true,
+                },
+              }),
+            },
+            30000
+          );
+          
+          if (fallbackResponse.ok) {
+            const fallbackResult = await fallbackResponse.json();
+            const fallbackReply = (fallbackResult[0]?.generated_text as string || '').trim();
+            
+            setChatHistory((prev) => [
+              ...prev,
+              { role: 'assistant', content: fallbackReply },
+            ]);
+          } else {
+            throw new Error('Fallback request failed');
+          }
+        } catch (fallbackErr) {
+          // Both attempts failed
+          setChatHistory((prev) => [
+            ...prev,
+            {
+              role: 'assistant',
+              content: 'Sorry, I had an issue responding. Please try again in a moment.',
+            },
+          ]);
+        }
       }
     } finally {
       setIsChatLoading(false);

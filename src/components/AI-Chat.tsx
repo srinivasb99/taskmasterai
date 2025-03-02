@@ -285,10 +285,10 @@ Current Time: ${currentDateTime.time}
 ${itemsText}
 
 [CONVERSATION SO FAR]
-${conversation}
+${conversationSoFar}
 
 [NEW USER MESSAGE]
-${userName}: ${userMsg.content}
+${userName}: ${userMessage}
 
 You are TaskMaster, a friendly and versatile AI productivity assistant. Engage in casual conversation, provide productivity advice, and discuss ${userName}'s items only when explicitly asked by ${userName}.
 
@@ -616,17 +616,22 @@ Return ONLY the title, with no extra commentary.
               </div>
             )}
 
-            {isChatLoading && !streamingAssistantContent && (
-              <div className="flex justify-start">
-                <div className="bg-gray-700 text-gray-200 rounded-lg px-4 py-2 max-w-[80%]">
-                  <div className="flex space-x-2">
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100"></div>
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200"></div>
-                  </div>
-                </div>
-              </div>
-            )}
+{isChatLoading && (
+  <div className="flex justify-start">
+    <div className="max-w-[80%] rounded-lg px-4 py-2 bg-gray-700 text-gray-200">
+      {streamingAssistantContent ? (
+        <ReactMarkdown>{streamingAssistantContent}</ReactMarkdown>
+      ) : (
+        <div className="flex space-x-2">
+          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100"></div>
+          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200"></div>
+        </div>
+      )}
+    </div>
+  </div>
+)}
+
 
             <div ref={chatEndRef} />
           </div>

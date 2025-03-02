@@ -159,6 +159,10 @@ export function AIChat() {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [conversationList, setConversationList] = useState<any[]>([]);
 
+  // New state for conversation sidebar visibility
+  const [showConvoSidebar, setShowConvoSidebar] = useState(true);
+  const toggleConvoSidebar = () => setShowConvoSidebar(prev => !prev);
+
   // Sidebar state (left) from localStorage remains as before.
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     const stored = localStorage.getItem('isSidebarCollapsed');
@@ -547,262 +551,291 @@ if (jsonMatch) {
   };
 
 return (
-  <div className="flex h-screen bg-gray-900">
-    {/* Left Sidebar */}
-    <Sidebar
-      isCollapsed={isSidebarCollapsed}
-      onToggle={handleToggleSidebar}
-      userName={userName}
-    />
+    <div className="flex h-screen bg-gray-900">
+      {/* Left Sidebar */}
+      <Sidebar
+        isCollapsed={isSidebarCollapsed}
+        onToggle={handleToggleSidebar}
+        userName={userName}
+      />
 
-    {/* Main Chat Area */}
-    <main className={`flex-1 overflow-hidden transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'}`}>
-      <div className="h-full flex flex-col">
-        {/* Header */}
-        <div className="p-4 border-b border-gray-800">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+      {/* Main Chat Area */}
+      <main className={`flex-1 overflow-hidden transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'}`}>
+        <div className="h-full flex flex-col">
+          {/* Header */}
+          <div className="p-4 border-b border-gray-800 flex items-center justify-between">
+            {/* Header left: shifted to the right */}
+            <div className="flex items-center gap-3 ml-auto">
               <Bot className="w-6 h-6 text-blue-400" />
-              <div>
+              <div className="flex items-center gap-1">
                 <h1 className="text-xl font-semibold text-white">AI Assistant</h1>
-                <p className="text-sm text-gray-400">Chat with TaskMaster</p>
+                {/* Added BETA tag */}
+                <span className="bg-blue-600 text-white text-xs font-bold px-2 py-0.5 rounded">BETA</span>
               </div>
+              <p className="text-sm text-gray-400 hidden sm:block">Chat with TaskMaster</p>
             </div>
+            {/* Header right: includes convo toggle & alert */}
             <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 text-xs text-gray-400">
-              </div>
+              <button
+                onClick={toggleConvoSidebar}
+                className="flex items-center gap-1 bg-gray-700 text-gray-200 px-2 py-1 rounded hover:bg-gray-600 transition"
+              >
+                <MessageSquare className="w-4 h-4" />
+                {/* Label appears on sm and up */}
+                <span className="hidden sm:inline">Conversations</span>
+              </button>
               <div className="flex items-center gap-2 text-xs text-gray-400">
                 <AlertTriangle className="w-4 h-4 text-yellow-400" />
-                <span>TaskMaster can make mistakes. Verify details. </span>
+                <span>TaskMaster can make mistakes. Verify details.</span>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Chat Messages */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={chatEndRef}>
-          {chatHistory.map((message, index) => (
-            <div
-              key={index}
-              className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
+          {/* Chat Messages */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={chatEndRef}>
+            {chatHistory.map((message, index) => (
               <div
-                className={`max-w-[80%] rounded-lg px-4 py-2 ${
-                  message.role === 'user'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-700 text-gray-200'
-                }`}
+                key={index}
+                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
-                <ReactMarkdown
-                  remarkPlugins={[remarkMath, remarkGfm]}
-                  rehypePlugins={[rehypeKatex]}
-                  components={{
-                    p: ({ children }) => <p className="mb-2">{children}</p>,
-                    ul: ({ children }) => <ul className="list-disc ml-4 mb-2">{children}</ul>,
-                    ol: ({ children }) => <ol className="list-decimal ml-4 mb-2">{children}</ol>,
-                    li: ({ children }) => <li className="mb-1">{children}</li>,
-                    code: ({ inline, children }) =>
-                      inline ? (
-                        <code className="bg-gray-800 px-1 rounded">{children}</code>
-                      ) : (
-                        <pre className="bg-gray-800 p-2 rounded-lg overflow-x-auto">
-                          <code>{children}</code>
-                        </pre>
-                      ),
-                  }}
+                <div
+                  className={`max-w-[80%] rounded-lg px-4 py-2 ${
+                    message.role === 'user'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-700 text-gray-200'
+                  }`}
                 >
-                  {message.content}
-                </ReactMarkdown>
-                {message.timer && (
-                  <div className="mt-2">
-                    <div className="flex items-center space-x-2 bg-gray-900 rounded-lg px-4 py-2">
-                      <TimerIcon className="w-5 h-5 text-blue-400" />
-                      <Timer
-                        key={message.timer.id}
-                        initialDuration={message.timer.duration}
-                        onComplete={() => handleTimerComplete(message.timer!.id)}
+                  <ReactMarkdown
+                    remarkPlugins={[remarkMath, remarkGfm]}
+                    rehypePlugins={[rehypeKatex]}
+                    components={{
+                      p: ({ children }) => <p className="mb-2">{children}</p>,
+                      ul: ({ children }) => <ul className="list-disc ml-4 mb-2">{children}</ul>,
+                      ol: ({ children }) => <ol className="list-decimal ml-4 mb-2">{children}</ol>,
+                      li: ({ children }) => <li className="mb-1">{children}</li>,
+                      code: ({ inline, children }) =>
+                        inline ? (
+                          <code className="bg-gray-800 px-1 rounded">{children}</code>
+                        ) : (
+                          <pre className="bg-gray-800 p-2 rounded-lg overflow-x-auto">
+                            <code>{children}</code>
+                          </pre>
+                        ),
+                    }}
+                  >
+                    {message.content}
+                  </ReactMarkdown>
+                  {message.timer && (
+                    <div className="mt-2">
+                      <div className="flex items-center space-x-2 bg-gray-900 rounded-lg px-4 py-2">
+                        <TimerIcon className="w-5 h-5 text-blue-400" />
+                        <Timer
+                          key={message.timer.id}
+                          initialDuration={message.timer.duration}
+                          onComplete={() => handleTimerComplete(message.timer.id)}
+                        />
+                      </div>
+                    </div>
+                  )}
+                  {message.flashcard && (
+                    <div className="mt-2">
+                      <FlashcardsQuestions
+                        type="flashcard"
+                        data={message.flashcard.data}
+                        onComplete={() => {}}
                       />
                     </div>
-                  </div>
-                )}
-                {message.flashcard && (
-                  <div className="mt-2">
-                    <FlashcardsQuestions
-                      type="flashcard"
-                      data={message.flashcard.data}
-                      onComplete={() => {}}
-                    />
-                  </div>
-                )}
-                {message.question && (
-                  <div className="mt-2">
-                    <FlashcardsQuestions
-                      type="question"
-                      data={message.question.data}
-                      onComplete={() => {}}
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
-
-          {/* If streaming in memory, show partial content as an assistant bubble */}
-          {streamingAssistantContent && (
-            <div className="flex justify-start">
-              <div className="max-w-[80%] rounded-lg px-4 py-2 bg-gray-700 text-gray-200">
-                <ReactMarkdown>{streamingAssistantContent}</ReactMarkdown>
-              </div>
-            </div>
-          )}
-
-          {isChatLoading && (
-            <div className="flex justify-start">
-              <div className="max-w-[80%] rounded-lg px-4 py-2 bg-gray-700 text-gray-200">
-                {streamingAssistantContent ? (
-                  <ReactMarkdown>{streamingAssistantContent}</ReactMarkdown>
-                ) : (
-                  <div className="flex space-x-2">
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100"></div>
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200"></div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          <div ref={chatEndRef} />
-        </div>
-
-        {/* Chat Input */}
-        <form onSubmit={handleChatSubmit} className="p-4 border-t border-gray-800">
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={chatMessage}
-              onChange={(e) => setChatMessage(e.target.value)}
-              placeholder="Ask TaskMaster about your items or set a timer..."
-              className="flex-1 bg-gray-700 text-gray-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <button
-              type="submit"
-              disabled={isChatLoading}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Send className="w-5 h-5" />
-            </button>
-          </div>
-        </form>
-      </div>
-    </main>
-
-    {/* Right Sidebar: Chat Conversations (increased width for improved visibility) */}
-    <aside className="w-82 border-l border-gray-800 bg-gray-800">
-      <div className="p-4">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-white text-lg font-bold">Conversations</h2>
-          <button
-            onClick={handleNewConversation}
-            className="flex items-center justify-center p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-          </button>
-        </div>
-        
-        <div className="space-y-2">
-          {conversationList.map((conv) => (
-            <div
-              key={conv.id}
-              className={`flex items-center justify-between cursor-pointer p-3 rounded-lg transition-all ${
-                conversationId === conv.id
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-700 text-gray-200 hover:bg-gray-600'
-              }`}
-            >
-              <div
-                className="flex items-center gap-2 flex-1 min-w-0" // Added min-width: 0
-                onClick={() => handleSelectConversation(conv.id)}
-              >
-                <MessageSquare className="w-4 h-4 flex-shrink-0" /> {/* Added flex-shrink-0 */}
-                <span className="truncate overflow-hidden text-ellipsis w-full">{conv.chatName}</span>
-              </div>
-              
-              {/* More actions dropdown */}
-              <div className="relative flex-shrink-0"> {/* Added flex-shrink-0 */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    const menu = document.getElementById(`conv-menu-${conv.id}`);
-                    if (menu) {
-                      menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
-                    }
-                  }}
-                  className="p-1 rounded-full hover:bg-gray-600 transition-colors"
-                >
-                  <MoreHorizontal className="w-4 h-4" />
-                </button>
-                        
-                <div
-                  id={`conv-menu-${conv.id}`}
-                  className="hidden absolute top-8 right-0 bg-gray-700 text-gray-200 rounded-lg shadow-lg z-50"
-                  style={{ minWidth: '160px' }}
-                >
-                  <button
-                    className="flex items-center w-full text-left px-4 py-2 hover:bg-gray-600 rounded-t-lg"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const menu = document.getElementById(`conv-menu-${conv.id}`);
-                      if (menu) menu.style.display = 'none';
-                      handleRenameConversation(conv);
-                    }}
-                  >
-                    <Edit2 className="w-4 h-4 mr-2" />
-                    Rename
-                  </button>
-                  
-                  <button
-                    className="flex items-center w-full text-left px-4 py-2 hover:bg-gray-600"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const menu = document.getElementById(`conv-menu-${conv.id}`);
-                      if (menu) menu.style.display = 'none';
-                      handleShareConversation(conv);
-                    }}
-                  >
-                    <Share className="w-4 h-4 mr-2" />
-                    Share
-                  </button>
-                  
-                  <button
-                    className="flex items-center w-full text-left px-4 py-2 hover:bg-gray-600 text-red-400 rounded-b-lg"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const menu = document.getElementById(`conv-menu-${conv.id}`);
-                      if (menu) menu.style.display = 'none';
-                      handleDeleteConversationClick(conv);
-                    }}
-                  >
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Delete
-                  </button>
+                  )}
+                  {message.question && (
+                    <div className="mt-2">
+                      <FlashcardsQuestions
+                        type="question"
+                        data={message.question.data}
+                        onComplete={() => {}}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
+            ))}
+
+            {/* Streaming Assistant Content */}
+            {streamingAssistantContent && (
+              <div className="flex justify-start">
+                <div className="max-w-[80%] rounded-lg px-4 py-2 bg-gray-700 text-gray-200">
+                  <ReactMarkdown>{streamingAssistantContent}</ReactMarkdown>
+                </div>
+              </div>
+            )}
+
+            {isChatLoading && (
+              <div className="flex justify-start">
+                <div className="max-w-[80%] rounded-lg px-4 py-2 bg-gray-700 text-gray-200">
+                  {streamingAssistantContent ? (
+                    <ReactMarkdown>{streamingAssistantContent}</ReactMarkdown>
+                  ) : (
+                    <div className="flex space-x-2">
+                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100"></div>
+                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200"></div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div ref={chatEndRef} />
+          </div>
+
+          {/* Chat Input */}
+          <form onSubmit={handleChatSubmit} className="p-4 border-t border-gray-800">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={chatMessage}
+                onChange={(e) => setChatMessage(e.target.value)}
+                placeholder="Ask TaskMaster about your items or set a timer..."
+                className="flex-1 bg-gray-700 text-gray-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                type="submit"
+                disabled={isChatLoading}
+                className="flex items-center bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Send className="w-5 h-5" />
+                {/* Send button label for larger screens */}
+                <span className="hidden sm:inline ml-1">Send</span>
+              </button>
             </div>
-          ))}
+          </form>
         </div>
-        
-        <button
-          onClick={handleNewConversation}
-          className="mt-4 w-full flex items-center justify-center gap-2 bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <PlusCircle className="w-5 h-5" />
-          <span>New Conversation</span>
-        </button>
-      </div>
-    </aside>
-  </div>
-);
+      </main>
+
+      {/* Mobile overlay for conversation sidebar */}
+      {showConvoSidebar && (
+        <div
+          className="fixed inset-0 bg-black opacity-50 z-40 md:hidden"
+          onClick={toggleConvoSidebar}
+        ></div>
+      )}
+
+      {/* Right Sidebar: Chat Conversations with slide-in/out for mobile */}
+      <aside
+        className={`w-82 border-l border-gray-800 bg-gray-800 fixed top-0 right-0 h-full z-50 transform transition-transform duration-300 ${
+          showConvoSidebar ? 'translate-x-0' : 'translate-x-full'
+        } md:relative md:translate-x-0`}
+      >
+        <div className="p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-white text-lg font-bold">Conversations</h2>
+            <button
+              onClick={handleNewConversation}
+              className="flex items-center justify-center p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              {/* New conversation button label */}
+              <span className="hidden sm:inline ml-1">New</span>
+            </button>
+          </div>
+
+          <div className="space-y-2">
+            {conversationList.map((conv) => (
+              <div
+                key={conv.id}
+                className={`flex items-center justify-between cursor-pointer p-3 rounded-lg transition-all ${
+                  conversationId === conv.id
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-700 text-gray-200 hover:bg-gray-600'
+                }`}
+              >
+                <div
+                  className="flex items-center gap-2 flex-1 min-w-0"
+                  onClick={() => handleSelectConversation(conv.id)}
+                >
+                  <MessageSquare className="w-4 h-4 flex-shrink-0" />
+                  <span className="truncate overflow-hidden text-ellipsis w-full">
+                    {conv.chatName}
+                  </span>
+                </div>
+
+                {/* More actions dropdown */}
+                <div className="relative flex-shrink-0">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const menu = document.getElementById(`conv-menu-${conv.id}`);
+                      if (menu) {
+                        menu.style.display =
+                          menu.style.display === 'block' ? 'none' : 'block';
+                      }
+                    }}
+                    className="p-1 rounded-full hover:bg-gray-600 transition-colors"
+                  >
+                    <MoreHorizontal className="w-4 h-4" />
+                    {/* Menu button label */}
+                    <span className="hidden sm:inline ml-1">Menu</span>
+                  </button>
+
+                  <div
+                    id={`conv-menu-${conv.id}`}
+                    className="hidden absolute top-8 right-0 bg-gray-700 text-gray-200 rounded-lg shadow-lg z-50"
+                    style={{ minWidth: '160px' }}
+                  >
+                    <button
+                      className="flex items-center w-full text-left px-4 py-2 hover:bg-gray-600 rounded-t-lg"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const menu = document.getElementById(`conv-menu-${conv.id}`);
+                        if (menu) menu.style.display = 'none';
+                        handleRenameConversation(conv);
+                      }}
+                    >
+                      <Edit2 className="w-4 h-4 mr-2" />
+                      <span>Rename</span>
+                    </button>
+
+                    <button
+                      className="flex items-center w-full text-left px-4 py-2 hover:bg-gray-600"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const menu = document.getElementById(`conv-menu-${conv.id}`);
+                        if (menu) menu.style.display = 'none';
+                        handleShareConversation(conv);
+                      }}
+                    >
+                      <Share className="w-4 h-4 mr-2" />
+                      <span>Share</span>
+                    </button>
+
+                    <button
+                      className="flex items-center w-full text-left px-4 py-2 hover:bg-gray-600 text-red-400 rounded-b-lg"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const menu = document.getElementById(`conv-menu-${conv.id}`);
+                        if (menu) menu.style.display = 'none';
+                        handleDeleteConversationClick(conv);
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      <span>Delete</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <button
+            onClick={handleNewConversation}
+            className="mt-4 w-full flex items-center justify-center gap-2 bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <PlusCircle className="w-5 h-5" />
+            <span>New Conversation</span>
+          </button>
+        </div>
+      </aside>
+    </div>
+  );
 }
 
 export default AIChat;

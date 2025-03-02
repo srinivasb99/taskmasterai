@@ -1,11 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import {
-  MessageCircle,
   Send,
   Timer as TimerIcon,
   Bot,
-  X,
   AlertTriangle,
 } from 'lucide-react';
 import { Sidebar } from './Sidebar';
@@ -19,10 +17,11 @@ import 'katex/dist/katex.min.css';
 import { auth } from '../lib/firebase';
 import { User, onAuthStateChanged } from 'firebase/auth';
 import { geminiApiKey } from '../lib/dashboard-firebase';
-import { onCollectionSnapshot, /* hfApiKey, */ } from '../lib/dashboard-firebase';
+import { onCollectionSnapshot } from '../lib/dashboard-firebase';
 import { getCurrentUser } from '../lib/settings-firebase';
 
-// Types for messages
+const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`;
+
 interface TimerMessage {
   type: 'timer';
   duration: number;
@@ -62,15 +61,10 @@ interface ChatMessage {
   question?: QuestionMessage;
 }
 
-// Gemini API endpoint using your API key from lib/dashboard-firebase
-const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`;
-
-// Fetch with timeout utility function
 const fetchWithTimeout = async (url: string, options: RequestInit, timeout = 30000) => {
   const controller = new AbortController();
   const { signal } = controller;
   const timeoutId = setTimeout(() => controller.abort(), timeout);
-  
   try {
     const response = await fetch(url, { ...options, signal });
     clearTimeout(timeoutId);
@@ -81,7 +75,6 @@ const fetchWithTimeout = async (url: string, options: RequestInit, timeout = 300
   }
 };
 
-// Streaming helper that reads the response and updates text in real time
 const streamResponse = async (
   url: string,
   options: RequestInit,
@@ -119,7 +112,7 @@ export function AIChat() {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([
     {
       role: 'assistant',
-      content: "👋 Hi I'm TaskMaster, How can I help you today? Need help with your items? Simply ask me!"
+      content: "👋 Hi, I'm TaskMaster. How can I help you today? Need assistance with your items or study content? Just ask!"
     }
   ]);
   const [isChatLoading, setIsChatLoading] = useState(false);
@@ -129,7 +122,7 @@ export function AIChat() {
   const [projects, setProjects] = useState<Array<{ id: string; data: any }>>([]);
   const [plans, setPlans] = useState<Array<{ id: string; data: any }>>([]);
 
-  // Initialize state from localStorage
+  // Sidebar state persisted in localStorage
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     const stored = localStorage.getItem('isSidebarCollapsed');
     return stored ? JSON.parse(stored) : false;
@@ -138,13 +131,10 @@ export function AIChat() {
     localStorage.setItem('isSidebarCollapsed', JSON.stringify(isSidebarCollapsed));
   }, [isSidebarCollapsed]);
 
-  // Auth state listener
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
-      if (firebaseUser) {
-        setUserName(firebaseUser.displayName || "User");
-      }
+      if (firebaseUser) setUserName(firebaseUser.displayName || "User");
       setLoading(false);
     });
     return () => unsubscribe();
@@ -160,8 +150,7 @@ export function AIChat() {
     }
     setLoading(false);
   }, [navigate]);
-  
-  // Collection snapshots
+
   useEffect(() => {
     if (!user) return;
     const unsubTasks = onCollectionSnapshot('tasks', user.uid, (items) => setTasks(items));
@@ -176,11 +165,8 @@ export function AIChat() {
     };
   }, [user]);
 
-  const handleToggleSidebar = () => {
-    setIsSidebarCollapsed((prev) => !prev);
-  };
+  const handleToggleSidebar = () => setIsSidebarCollapsed(prev => !prev);
 
-  // Timer handling functions
   const handleTimerComplete = (timerId: string) => {
     setChatHistory(prev => [
       ...prev,
@@ -200,12 +186,10 @@ export function AIChat() {
     return null;
   };
 
-  // Scroll to bottom when chat history changes
   useEffect(() => {
     if (chatEndRef.current) chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
   }, [chatHistory]);
 
-  // Format items for chat
   const formatItemsForChat = () => {
     const lines: string[] = [];
     lines.push(`${userName}'s items:\n`);
@@ -228,7 +212,6 @@ export function AIChat() {
     return lines.join('\n');
   };
 
-  // Detect educational requests and extract count if provided
   const detectEducationalRequest = (message: string): { type: 'flashcard' | 'question' | null, count: number } => {
     const flashcardMatch = message.match(/(?:create|make|generate)\s+(?:a\s+set\s+of\s+)?(\d+)?\s*(?:flashcards?|flash\s+cards?|study\s+cards?)/i);
     if (flashcardMatch) {
@@ -243,13 +226,12 @@ export function AIChat() {
     return { type: null, count: 0 };
   };
 
-  // Create an optimized prompt for educational content with explicit JSON instructions
   const createEducationalPrompt = (userMessage: string, type: 'flashcard' | 'question', requestedCount: number): string => {
     const count = requestedCount;
     let promptPrefix = '';
     if (type === 'flashcard') {
       promptPrefix = `Please create ${count} high-quality flashcards based on the following request.
-Respond ONLY with a valid JSON object wrapped in a single code block (using triple backticks with "json") with no additional text.
+Respond ONLY with a valid JSON object wrapped in a single code block (using triple backticks with "json") and no additional text.
 
 The JSON object must have the structure:
 {
@@ -266,7 +248,7 @@ The JSON object must have the structure:
 }`;
     } else {
       promptPrefix = `Please create ${count} high-quality quiz questions based on the following request.
-Respond ONLY with a valid JSON object wrapped in a single code block (using triple backticks with "json") with no additional text.
+Respond ONLY with a valid JSON object wrapped in a single code block (using triple backticks with "json") and no additional text.
 
 The JSON object must have the structure:
 {
@@ -293,7 +275,6 @@ IMPORTANT:
 3. Provide only the JSON in your response, with no extra text.`;
   };
 
-  // Helper to update the last assistant message (for streaming)
   const updateLastAssistantMessage = (newContent: string) => {
     setChatHistory(prev => {
       const updated = [...prev];
@@ -309,50 +290,42 @@ IMPORTANT:
     e.preventDefault();
     if (!chatMessage.trim()) return;
 
-    // Check for timer request
     const timerDuration = parseTimerRequest(chatMessage);
     const userMsg: ChatMessage = { role: 'user', content: chatMessage };
     setChatHistory(prev => [...prev, userMsg]);
     setChatMessage('');
 
-    // If timer, add immediately
     if (timerDuration) {
       const timerId = Math.random().toString(36).substr(2, 9);
       setChatHistory(prev => [
         ...prev,
-        { role: 'assistant', content: `Starting a timer for ${timerDuration} seconds.`, timer: { type: 'timer', duration: timerDuration, id: timerId } }
+        {
+          role: 'assistant',
+          content: `Starting a timer for ${timerDuration} seconds.`,
+          timer: { type: 'timer', duration: timerDuration, id: timerId }
+        }
       ]);
       return;
     }
 
-    // Check for educational content request
     const educationalRequest = detectEducationalRequest(userMsg.content);
     setIsChatLoading(true);
 
     try {
-      // If educational content is requested
       if (educationalRequest.type) {
-        // Insert an empty assistant message for real-time streaming updates
         setChatHistory(prev => [...prev, { role: 'assistant', content: "" }]);
         const educationalPrompt = createEducationalPrompt(userMsg.content, educationalRequest.type, educationalRequest.count);
         const options = {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          // Gemini expects only the "contents" field.
           body: JSON.stringify({
-            contents: [{ parts: [{ text: educationalPrompt }] }],
-            parameters: {
-              temperature: 0.2,
-              maxOutputTokens: 2000,
-              topP: 0.95,
-              stream: true
-            }
+            contents: [{ parts: [{ text: educationalPrompt }] }]
           })
         };
         const finalText = await streamResponse(geminiEndpoint, options, (text) => {
           updateLastAssistantMessage(text);
         }, 45000);
-
-        // Extract JSON from the final response text
         const jsonMatches = finalText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
         if (jsonMatches && jsonMatches[1]) {
           try {
@@ -364,7 +337,7 @@ IMPORTANT:
               Array.isArray(jsonContent.data) &&
               jsonContent.data.length > 0
             ) {
-              let responseText = educationalRequest.type === 'flashcard'
+              const responseText = educationalRequest.type === 'flashcard'
                 ? `Here are ${jsonContent.data.length} flashcards. You can flip each card to see the answer.`
                 : `Here are ${jsonContent.data.length} quiz questions for you to practice with.`;
               setChatHistory(prev => {
@@ -393,7 +366,7 @@ IMPORTANT:
         }
       }
 
-      // Regular chat processing (non-educational)
+      // Regular chat processing
       setChatHistory(prev => [...prev, { role: 'assistant', content: "" }]);
       const conversation = chatHistory
         .map(m => `${m.role === 'user' ? userName : 'Assistant'}: ${m.content}`)
@@ -401,17 +374,8 @@ IMPORTANT:
       const itemsText = formatItemsForChat();
       const now = new Date();
       const currentDateTime = {
-        date: now.toLocaleDateString('en-US', {
-          weekday: 'long',
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric'
-        }),
-        time: now.toLocaleTimeString('en-US', {
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: true
-        })
+        date: now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
+        time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
       };
 
       const prompt = `
@@ -431,28 +395,16 @@ ${userName}: ${userMsg.content}
 You are TaskMaster, a friendly and versatile AI productivity assistant. Engage in casual conversation, provide productivity advice, and discuss ${userName}'s items.
 
 Guidelines:
-
-1. ALWAYS CHECK USER DATA:
-   - If ${userName} asks about tasks, goals, projects, or plans, summarize the items from the [CONTEXT].
-2. General Conversation:
-   - Respond in a friendly, natural tone matching ${userName}'s style.
-   - Do not include internal instructions or meta commentary.
-3. Response Structure:
-   - Provide a direct response without extraneous text.
-   - Always address ${userName} in a friendly, helpful tone.
+1. Always check user data and include relevant context.
+2. Respond in a friendly tone with no extra meta commentary.
+3. Provide a direct, helpful answer.
 `;
-
       const options = {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        // Gemini payload without extra "parameters" field.
         body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          parameters: {
-            temperature: 0.7,
-            maxOutputTokens: 1500,
-            topP: 0.9,
-            stream: true
-          }
+          contents: [{ parts: [{ text: prompt }] }]
         })
       };
 
@@ -470,7 +422,7 @@ Guidelines:
       if (err.name === 'AbortError') {
         setChatHistory(prev => [
           ...prev,
-          { role: 'assistant', content: "I'm sorry, that request is taking longer than expected. If you're asking for educational content, please try a more specific topic or request fewer items." }
+          { role: 'assistant', content: "I'm sorry, that request is taking longer than expected. Please try a more specific topic or fewer items." }
         ]);
       } else {
         setChatHistory(prev => [
@@ -484,7 +436,7 @@ Guidelines:
   };
 
   return (
-    <div className="flex h-screen bg-gray-900">
+    <div className="flex h-screen bg-gradient-to-b from-gray-900 to-gray-800">
       <Sidebar 
         isCollapsed={isSidebarCollapsed} 
         onToggle={handleToggleSidebar}
@@ -493,48 +445,45 @@ Guidelines:
       <main className={`flex-1 overflow-hidden transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'}`}>
         <div className="h-full flex flex-col">
           {/* Header */}
-          <div className="p-4 border-b border-gray-800">
+          <header className="p-6 bg-gray-700 shadow-md">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Bot className="w-6 h-6 text-blue-400" />
+              <div className="flex items-center gap-4">
+                <Bot className="w-8 h-8 text-blue-400" />
                 <div>
-                  <div className="flex items-center gap-2">
-                    <h1 className="text-xl font-semibold text-white">AI Assistant</h1>
-                    <span className="px-2 py-0.5 text-xs font-medium bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-full">BETA</span>
-                  </div>
-                  <p className="text-sm text-gray-400">Chat with TaskMaster</p>
+                  <h1 className="text-2xl font-bold text-white">AI Assistant</h1>
+                  <p className="text-sm text-gray-300">Chat with TaskMaster</p>
                 </div>
               </div>
               <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2 text-xs text-gray-400">
-                  <AlertTriangle className="w-4 h-4 text-yellow-400" />
+                <div className="flex items-center gap-1 text-sm text-gray-300">
+                  <AlertTriangle className="w-5 h-5 text-yellow-400" />
                   <span>Chat history is not saved</span>
                 </div>
-                <div className="flex items-center gap-2 text-xs text-gray-400">
-                  <AlertTriangle className="w-4 h-4 text-yellow-400" />
-                  <span>TaskMaster can make mistakes. Verify details.</span>
+                <div className="flex items-center gap-1 text-sm text-gray-300">
+                  <AlertTriangle className="w-5 h-5 text-yellow-400" />
+                  <span>Verify details carefully</span>
                 </div>
               </div>
             </div>
-          </div>
+          </header>
           {/* Chat Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={chatEndRef}>
+          <section className="flex-1 overflow-y-auto p-6 space-y-4">
             {chatHistory.map((message, index) => (
               <div key={index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[80%] rounded-lg px-4 py-2 ${message.role === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-200'}`}>
+                <div className={`max-w-[80%] rounded-lg p-4 shadow-lg ${message.role === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-200'}`}>
                   <ReactMarkdown
                     remarkPlugins={[remarkMath, remarkGfm]}
                     rehypePlugins={[rehypeKatex]}
                     components={{
                       p: ({ children }) => <p className="mb-2">{children}</p>,
-                      ul: ({ children }) => <ul className="list-disc ml-4 mb-2">{children}</ul>,
-                      ol: ({ children }) => <ol className="list-decimal ml-4 mb-2">{children}</ol>,
+                      ul: ({ children }) => <ul className="list-disc ml-5 mb-2">{children}</ul>,
+                      ol: ({ children }) => <ol className="list-decimal ml-5 mb-2">{children}</ol>,
                       li: ({ children }) => <li className="mb-1">{children}</li>,
                       code: ({ inline, children }) =>
                         inline ? (
                           <code className="bg-gray-800 px-1 rounded">{children}</code>
                         ) : (
-                          <pre className="bg-gray-800 p-2 rounded-lg overflow-x-auto">
+                          <pre className="bg-gray-800 p-3 rounded-lg overflow-x-auto">
                             <code>{children}</code>
                           </pre>
                         ),
@@ -543,20 +492,20 @@ Guidelines:
                     {message.content}
                   </ReactMarkdown>
                   {message.timer && (
-                    <div className="mt-2">
+                    <div className="mt-3">
                       <div className="flex items-center space-x-2 bg-gray-900 rounded-lg px-4 py-2">
-                        <TimerIcon className="w-5 h-5 text-blue-400" />
+                        <TimerIcon className="w-6 h-6 text-blue-400" />
                         <Timer key={message.timer.id} initialDuration={message.timer.duration} onComplete={() => handleTimerComplete(message.timer!.id)} />
                       </div>
                     </div>
                   )}
                   {message.flashcard && (
-                    <div className="mt-2">
+                    <div className="mt-3">
                       <FlashcardsQuestions type="flashcard" data={message.flashcard.data} onComplete={() => {}} />
                     </div>
                   )}
                   {message.question && (
-                    <div className="mt-2">
+                    <div className="mt-3">
                       <FlashcardsQuestions type="question" data={message.question.data} onComplete={() => {}} />
                     </div>
                   )}
@@ -565,31 +514,32 @@ Guidelines:
             ))}
             {isChatLoading && (
               <div className="flex justify-start">
-                <div className="bg-gray-700 text-gray-200 rounded-lg px-4 py-2 max-w-[80%]">
+                <div className="bg-gray-700 text-gray-200 rounded-lg p-4 max-w-[80%]">
                   <div className="flex space-x-2">
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100"></div>
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200"></div>
+                    <div className="w-3 h-3 bg-gray-400 rounded-full animate-bounce"></div>
+                    <div className="w-3 h-3 bg-gray-400 rounded-full animate-bounce delay-100"></div>
+                    <div className="w-3 h-3 bg-gray-400 rounded-full animate-bounce delay-200"></div>
                   </div>
                 </div>
               </div>
             )}
-          </div>
+            <div ref={chatEndRef} />
+          </section>
           {/* Chat Input */}
-          <form onSubmit={handleChatSubmit} className="p-4 border-t border-gray-800">
-            <div className="flex gap-2">
+          <footer className="p-6 border-t border-gray-700">
+            <form onSubmit={handleChatSubmit} className="flex gap-4">
               <input
                 type="text"
                 value={chatMessage}
                 onChange={(e) => setChatMessage(e.target.value)}
-                placeholder="Ask TaskMaster about your items or set a timer..."
-                className="flex-1 bg-gray-700 text-gray-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Ask TaskMaster about your items, study content, or set a timer..."
+                className="flex-1 bg-gray-800 text-gray-100 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              <button type="submit" disabled={isChatLoading} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                <Send className="w-5 h-5" />
+              <button type="submit" disabled={isChatLoading} className="bg-blue-600 text-white px-5 py-3 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                <Send className="w-6 h-6" />
               </button>
-            </div>
-          </form>
+            </form>
+          </footer>
         </div>
       </main>
     </div>

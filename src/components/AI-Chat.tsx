@@ -14,6 +14,8 @@ import { User, onAuthStateChanged } from 'firebase/auth';
 import { geminiApiKey } from '../lib/dashboard-firebase';
 import { onCollectionSnapshot } from '../lib/dashboard-firebase';
 import { getCurrentUser } from '../lib/settings-firebase';
+import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+
 
 // Import Firebase chat functions (including rename/delete/share placeholders)
 import {
@@ -143,6 +145,56 @@ export function AIChat() {
   const [projects, setProjects] = useState<Array<{ id: string; data: any }>>([]);
   const [plans, setPlans] = useState<Array<{ id: string; data: any }>>([]);
 
+  // New state for mobile right-sidebar toggle
+  const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(false);
+  // New ref for file input
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Toggle file upload dialog
+  const handleFileUploadClick = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files && e.target.files[0];
+  if (!file || !conversationId || !user) return;
+  
+  const storage = getStorage();
+  // Create a reference with a unique file name
+  const fileRef = ref(storage, `uploads/${user.uid}/${Date.now()}_${file.name}`);
+  
+  const uploadTask = uploadBytesResumable(fileRef, file);
+  
+  uploadTask.on(
+    'state_changed',
+    (snapshot) => {
+      // Optionally update progress (snapshot.bytesTransferred/snapshot.totalBytes)
+    },
+    (error) => {
+      console.error('File upload error:', error);
+      // Optionally display error message
+    },
+    async () => {
+      // Upload complete, get the download URL
+      const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+      // Save a message to Firestore with the file URL
+      await saveChatMessage(conversationId, {
+        role: 'assistant',
+        content: `File uploaded: ${downloadURL}`
+      });
+      // Reset the file input
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  );
+};
+
+    // Mobile right sidebar toggle
+  const toggleRightSidebar = () => {
+    setIsRightSidebarOpen(prev => !prev);
+  };
+  
   // Conversation state
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [conversationList, setConversationList] = useState<any[]>([]);
@@ -547,25 +599,27 @@ if (jsonMatch) {
       <main className={`flex-1 overflow-hidden transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'}`}>
         <div className="h-full flex flex-col">
           {/* Header */}
-          <div className="p-4 border-b border-gray-800">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Bot className="w-6 h-6 text-blue-400" />
-                <div>
-                  <h1 className="text-xl font-semibold text-white">AI Assistant</h1>
-                  <p className="text-sm text-gray-400">Chat with TaskMaster</p>
-                </div>
+          <div className="p-4 border-b border-gray-800 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Bot className="w-6 h-6 text-blue-400" aria-label="Assistant icon" />
+              <div>
+                <h1 className="text-xl font-semibold text-white">AI Assistant</h1>
+                <p className="text-sm text-gray-400">Chat with TaskMaster</p>
               </div>
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2 text-xs text-gray-400">
-                  <AlertTriangle className="w-4 h-4 text-yellow-400" />
-                  <span>Chat history is saved</span>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-gray-400">
-                  <AlertTriangle className="w-4 h-4 text-yellow-400" />
-                  <span>Verify details carefully</span>
-                </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="hidden md:flex items-center gap-2 text-xs text-gray-400">
+                <AlertTriangle className="w-4 h-4 text-yellow-400" aria-label="Alert" />
+                <span>Chat history is saved</span>
               </div>
+              <button
+                onClick={toggleRightSidebar}
+                className="md:hidden p-2 rounded bg-gray-700 text-gray-200"
+                aria-label="Toggle Conversations"
+                data-testid="toggle-right-sidebar"
+              >
+                <MoreVertical className="w-5 h-5" />
+              </button>
             </div>
           </div>
 
@@ -574,14 +628,15 @@ if (jsonMatch) {
             {chatHistory.map((message, index) => (
               <div
                 key={index}
-                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                className={`flex transition-all duration-300 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 <div
-                  className={`max-w-[80%] rounded-lg px-4 py-2 ${
+                  className={`max-w-[80%] rounded-lg px-4 py-2 shadow animate-fadeIn ${
                     message.role === 'user'
                       ? 'bg-blue-600 text-white'
                       : 'bg-gray-700 text-gray-200'
                   }`}
+                  data-testid={`message-${index}`}
                 >
                   <ReactMarkdown
                     remarkPlugins={[remarkMath, remarkGfm]}
@@ -593,9 +648,9 @@ if (jsonMatch) {
                       li: ({ children }) => <li className="mb-1">{children}</li>,
                       code: ({ inline, children }) =>
                         inline ? (
-                          <code className="bg-gray-800 px-1 rounded">{children}</code>
+                          <code className="bg-gray-800 px-1 rounded" data-testid="inline-code">{children}</code>
                         ) : (
-                          <pre className="bg-gray-800 p-2 rounded-lg overflow-x-auto">
+                          <pre className="bg-gray-800 p-2 rounded-lg overflow-x-auto" data-testid="code-block">
                             <code>{children}</code>
                           </pre>
                         ),
@@ -606,7 +661,7 @@ if (jsonMatch) {
                   {message.timer && (
                     <div className="mt-2">
                       <div className="flex items-center space-x-2 bg-gray-900 rounded-lg px-4 py-2">
-                        <TimerIcon className="w-5 h-5 text-blue-400" />
+                        <TimerIcon className="w-5 h-5 text-blue-400" aria-label="Timer icon" />
                         <Timer
                           key={message.timer.id}
                           initialDuration={message.timer.duration}
@@ -637,59 +692,75 @@ if (jsonMatch) {
               </div>
             ))}
 
-            {/* If streaming in memory, show partial content as an assistant bubble */}
+            {/* If streaming, show the streaming assistant bubble */}
             {streamingAssistantContent && (
-              <div className="flex justify-start">
-                <div className="max-w-[80%] rounded-lg px-4 py-2 bg-gray-700 text-gray-200">
+              <div className="flex justify-start transition-all duration-300">
+                <div className="max-w-[80%] rounded-lg px-4 py-2 bg-gray-700 text-gray-200 shadow animate-fadeIn">
                   <ReactMarkdown>{streamingAssistantContent}</ReactMarkdown>
                 </div>
               </div>
             )}
 
-{isChatLoading && (
-  <div className="flex justify-start">
-    <div className="max-w-[80%] rounded-lg px-4 py-2 bg-gray-700 text-gray-200">
-      {streamingAssistantContent ? (
-        <ReactMarkdown>{streamingAssistantContent}</ReactMarkdown>
-      ) : (
-        <div className="flex space-x-2">
-          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100"></div>
-          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200"></div>
-        </div>
-      )}
-    </div>
-  </div>
-)}
-
+            {/* Single loading indicator */}
+            {isChatLoading && !streamingAssistantContent && (
+              <div className="flex justify-start transition-all duration-300">
+                <div className="max-w-[80%] rounded-lg px-4 py-2 bg-gray-700 text-gray-200 shadow">
+                  <div className="flex space-x-2" data-testid="loading-spinner">
+                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100"></div>
+                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200"></div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div ref={chatEndRef} />
           </div>
 
           {/* Chat Input */}
-          <form onSubmit={handleChatSubmit} className="p-4 border-t border-gray-800">
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={chatMessage}
-                onChange={(e) => setChatMessage(e.target.value)}
-                placeholder="Ask TaskMaster about your items or set a timer..."
-                className="flex-1 bg-gray-700 text-gray-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <button
-                type="submit"
-                disabled={isChatLoading}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Send className="w-5 h-5" />
-              </button>
-            </div>
+          <form onSubmit={handleChatSubmit} className="p-4 border-t border-gray-800 flex items-center gap-2">
+            <input
+              type="text"
+              value={chatMessage}
+              onChange={(e) => setChatMessage(e.target.value)}
+              placeholder="Ask TaskMaster about your items or set a timer..."
+              className="flex-1 bg-gray-700 text-gray-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              aria-label="Chat input"
+              data-testid="chat-input"
+            />
+            {/* File upload button */}
+            <button
+              type="button"
+              onClick={handleFileUploadClick}
+              className="bg-green-600 text-white p-2 rounded-lg hover:bg-green-700 transition-colors"
+              aria-label="Upload File"
+              data-testid="file-upload-button"
+            >
+              Upload
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              onChange={handleFileChange}
+              aria-label="File upload input"
+              data-testid="file-input"
+            />
+            <button
+              type="submit"
+              disabled={isChatLoading}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Send message"
+              data-testid="send-button"
+            >
+              <Send className="w-5 h-5" />
+            </button>
           </form>
         </div>
       </main>
 
       {/* Right Sidebar: Chat Conversations */}
-      <aside className="w-64 border-l border-gray-800 bg-gray-800">
+      <aside className={`w-64 border-l border-gray-800 bg-gray-800 transition-transform duration-300 ${isRightSidebarOpen ? 'translate-x-0' : 'translate-x-full'} md:translate-x-0`}>
         <div className="p-4">
           <h2 className="text-white text-lg font-bold mb-4">Conversations</h2>
           {conversationList.map((conv) => (
@@ -700,14 +771,10 @@ if (jsonMatch) {
                   ? 'bg-blue-600 text-white'
                   : 'bg-gray-700 text-gray-200 hover:bg-gray-600'
               }`}
+              data-testid="conversation-item"
+              onClick={() => handleSelectConversation(conv.id)}
             >
-              <div
-                className="flex-1"
-                onClick={() => handleSelectConversation(conv.id)}
-              >
-                {conv.chatName}
-              </div>
-              {/* 3-dot menu for rename, delete, share */}
+              <div className="flex-1">{conv.chatName}</div>
               <div className="relative flex items-center">
                 <MoreVertical
                   className="w-5 h-5 cursor-pointer"
@@ -718,6 +785,8 @@ if (jsonMatch) {
                       menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
                     }
                   }}
+                  aria-label="Conversation options"
+                  data-testid="conversation-menu-button"
                 />
                 <div
                   id={`conv-menu-${conv.id}`}
@@ -732,6 +801,8 @@ if (jsonMatch) {
                       if (menu) menu.style.display = 'none';
                       handleRenameConversation(conv);
                     }}
+                    aria-label="Rename conversation"
+                    data-testid="rename-conversation-button"
                   >
                     Rename
                   </button>
@@ -743,6 +814,8 @@ if (jsonMatch) {
                       if (menu) menu.style.display = 'none';
                       handleDeleteConversationClick(conv);
                     }}
+                    aria-label="Delete conversation"
+                    data-testid="delete-conversation-button"
                   >
                     Delete
                   </button>
@@ -754,6 +827,8 @@ if (jsonMatch) {
                       if (menu) menu.style.display = 'none';
                       handleShareConversation(conv);
                     }}
+                    aria-label="Share conversation"
+                    data-testid="share-conversation-button"
                   >
                     Share
                   </button>
@@ -764,6 +839,8 @@ if (jsonMatch) {
           <button
             onClick={handleNewConversation}
             className="mt-4 w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700 transition-colors"
+            aria-label="New Conversation"
+            data-testid="new-conversation-button"
           >
             New Conversation
           </button>

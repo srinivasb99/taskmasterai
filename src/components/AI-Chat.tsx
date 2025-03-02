@@ -474,6 +474,26 @@ if (jsonMatch) {
   await saveChatMessage(convId!, { role: 'assistant', content: assistantReply });
 }
 
+
+      // If the user has at least 3 messages, generate a dynamic chat name.
+      // (That means total messages ~4, counting user + assistant.)
+      const totalUserMessages = updatedHistory.filter(m => m.role === 'user').length;
+      if (totalUserMessages >= 3) {
+        const conversationText = updatedHistory
+          .map(m => `${m.role === 'user' ? userName : 'Assistant'}: ${m.content}`)
+          .join('\n');
+        await generateChatName(convId!, conversationText);
+      }
+    } catch (err: any) {
+      console.error('Chat error:', err);
+      // Save error fallback message
+      await saveChatMessage(convId!, {
+        role: 'assistant',
+        content: 'Sorry, I had an issue responding. Please try again in a moment.'
+      });
+    } finally {
+      setIsChatLoading(false);
+    }
   };
 
   // Create a new conversation

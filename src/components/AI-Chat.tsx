@@ -438,32 +438,42 @@ Return ONLY the title, with no extra commentary.
         finalResponse = chunk;
       }, 45000);
 
-      // Extract final text
-      const finalText = extractCandidateText(finalResponse).trim() || '';
-      setStreamingAssistantContent(''); // clear streaming content
-      // Save final assistant message
-      const assistantMsg: ChatMessageData = { role: 'assistant', content: finalText };
-      await saveChatMessage(convId!, assistantMsg);
+// Extract final text from the Gemini response
+const finalText = extractCandidateText(finalResponse).trim() || '';
+setStreamingAssistantContent(''); // clear streaming content
 
-      // If the user has at least 3 messages, generate a dynamic chat name.
-      // (That means total messages ~4, counting user + assistant.)
-      const totalUserMessages = updatedHistory.filter(m => m.role === 'user').length;
-      if (totalUserMessages >= 3) {
-        const conversationText = updatedHistory
-          .map(m => `${m.role === 'user' ? userName : 'Assistant'}: ${m.content}`)
-          .join('\n');
-        await generateChatName(convId!, conversationText);
-      }
-    } catch (err: any) {
-      console.error('Chat error:', err);
-      // Save error fallback message
-      await saveChatMessage(convId!, {
+let assistantReply = finalText;
+const jsonMatch = assistantReply.match(/```json\s*([\s\S]*?)\s*```/);
+if (jsonMatch) {
+  try {
+    const jsonContent = JSON.parse(jsonMatch[1].trim());
+    // Remove the JSON block from the reply text
+    assistantReply = assistantReply.replace(/```json\s*[\s\S]*?\s*```/, '').trim();
+    // Validate the JSON structure and attach to message accordingly
+    if (
+      jsonContent.type &&
+      jsonContent.data &&
+      (jsonContent.type === 'flashcard' || jsonContent.type === 'question')
+    ) {
+      const message = {
         role: 'assistant',
-        content: 'Sorry, I had an issue responding. Please try again in a moment.'
-      });
-    } finally {
-      setIsChatLoading(false);
+        content: assistantReply,
+        ...(jsonContent.type === 'flashcard'
+          ? { flashcard: jsonContent }
+          : { question: jsonContent })
+      };
+      await saveChatMessage(convId!, message);
+    } else {
+      throw new Error('Invalid JSON structure');
     }
+  } catch (e) {
+    console.error('Failed to parse JSON content:', e);
+    await saveChatMessage(convId!, { role: 'assistant', content: assistantReply });
+  }
+} else {
+  await saveChatMessage(convId!, { role: 'assistant', content: assistantReply });
+}
+
   };
 
   // Create a new conversation

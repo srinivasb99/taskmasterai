@@ -5,6 +5,7 @@ import { HeroSection } from './components/HeroSection';
 import { MainFeatures } from './components/MainFeatures';
 import { Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { Analytics } from "@vercel/analytics/react"
 
 function App() {
   const { user, loading } = useAuth();

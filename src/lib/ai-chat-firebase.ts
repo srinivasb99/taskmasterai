@@ -1,21 +1,60 @@
 // src/lib/ai-chat-firebase.ts
 
-import { storage } from './firebase.js';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db } from './firebase';
+import { 
+  collection, addDoc, doc, setDoc, updateDoc, serverTimestamp, onSnapshot, query, orderBy 
+} from "firebase/firestore";
 
-/**
- * Uploads a file (e.g. image or PDF) to Firebase Storage
- * and returns its public download URL.
- *
- * @param file - The file to be uploaded.
- * @returns A promise that resolves with the file's download URL.
- */
-export async function uploadAttachment(file: File): Promise<string> {
-  // Create a reference in the "attachments" folder with a unique filename.
-  const fileRef = ref(storage, `attachments/${Date.now()}_${file.name}`);
-  // Upload the file to Firebase Storage.
-  await uploadBytes(fileRef, file);
-  // Retrieve and return the public download URL.
-  const downloadURL = await getDownloadURL(fileRef);
-  return downloadURL;
+// Type definition for a chat message.
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  createdAt?: any;
+}
+
+// Create a new chat conversation for the user with a given chat name.
+export async function createChatConversation(userId: string, chatName: string): Promise<string> {
+  const conversationRef = await addDoc(collection(db, "chatConversations"), {
+    userId,
+    chatName,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  return conversationRef.id;
+}
+
+// Save a chat message to a conversation's subcollection "messages".
+export async function saveChatMessage(conversationId: string, message: ChatMessage): Promise<string> {
+  const messageRef = await addDoc(collection(db, "chatConversations", conversationId, "messages"), {
+    ...message,
+    createdAt: serverTimestamp(),
+  });
+  // Optionally update the conversation's last updated time.
+  await updateDoc(doc(db, "chatConversations", conversationId), {
+    updatedAt: serverTimestamp(),
+  });
+  return messageRef.id;
+}
+
+// Listen for real-time updates to a conversation's messages.
+export function onChatMessagesSnapshot(conversationId: string, callback: (messages: ChatMessage[]) => void) {
+  const messagesQuery = query(
+    collection(db, "chatConversations", conversationId, "messages"),
+    orderBy("createdAt", "asc")
+  );
+  return onSnapshot(messagesQuery, (snapshot) => {
+    const messages: ChatMessage[] = [];
+    snapshot.forEach(docSnap => {
+      messages.push(docSnap.data() as ChatMessage);
+    });
+    callback(messages);
+  });
+}
+
+// Update the chat conversation name.
+export async function updateChatConversationName(conversationId: string, newName: string): Promise<void> {
+  await updateDoc(doc(db, "chatConversations", conversationId), {
+    chatName: newName,
+    updatedAt: serverTimestamp(),
+  });
 }

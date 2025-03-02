@@ -1,11 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  Send,
-  Timer as TimerIcon,
-  Bot,
-  AlertTriangle,
-} from 'lucide-react';
+import { Send, Timer as TimerIcon, Bot, AlertTriangle } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { Timer } from './Timer';
 import { FlashcardsQuestions } from './FlashcardsQuestions';
@@ -103,6 +98,77 @@ const streamResponse = async (
   return accumulatedText;
 };
 
+// Combined prompt function for educational requests
+const createEducationalPrompt = (userMessage: string, type: 'flashcard' | 'question', requestedCount: number): string => {
+  const count = requestedCount;
+  return `Please generate exactly ${count} items for the following request.
+Respond ONLY with a valid JSON object wrapped in a single code block (using triple backticks with "json") and no additional text or explanation.
+
+If the request is about flashcards, the JSON object must have the following structure:
+{
+  "type": "flashcard",
+  "data": [
+    {
+      "id": "1",
+      "question": "Front side of flashcard",
+      "answer": "Back side (concise, less than 50 words)",
+      "topic": "Relevant topic"
+    },
+    ... (repeat for ${count} items)
+  ]
+}
+
+If the request is about quiz questions, the JSON object must have the following structure:
+{
+  "type": "question",
+  "data": [
+    {
+      "id": "1",
+      "question": "Question text",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "correctAnswer": 0,
+      "explanation": "Brief explanation (less than 30 words)"
+    },
+    ... (repeat for ${count} items)
+  ]
+}
+
+Request: ${userMessage}`;
+};
+
+// Helper to update the last assistant message during streaming
+const updateLastAssistantMessage = (newContent: string) => {
+  setChatHistory(prev => {
+    const updated = [...prev];
+    const lastMsg = updated[updated.length - 1];
+    if (lastMsg && lastMsg.role === 'assistant') {
+      updated[updated.length - 1] = { ...lastMsg, content: newContent };
+    }
+    return updated;
+  });
+};
+
+// Extract candidate text from Gemini JSON response (expects valid JSON output)
+const extractCandidateText = (text: string): string => {
+  let candidateText = text;
+  try {
+    const jsonResponse = JSON.parse(text);
+    if (
+      jsonResponse &&
+      jsonResponse.candidates &&
+      jsonResponse.candidates[0] &&
+      jsonResponse.candidates[0].content &&
+      jsonResponse.candidates[0].content.parts &&
+      jsonResponse.candidates[0].content.parts[0]
+    ) {
+      candidateText = jsonResponse.candidates[0].content.parts[0].text;
+    }
+  } catch (err) {
+    console.error("Error parsing Gemini response:", err);
+  }
+  return candidateText;
+};
+
 export function AIChat() {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
@@ -168,10 +234,10 @@ export function AIChat() {
   const handleToggleSidebar = () => setIsSidebarCollapsed(prev => !prev);
 
   const handleTimerComplete = (timerId: string) => {
-    setChatHistory(prev => [...prev, {
-      role: 'assistant',
-      content: "⏰ Time's up! Your timer has finished."
-    }]);
+    setChatHistory(prev => [
+      ...prev,
+      { role: 'assistant', content: "⏰ Time's up! Your timer has finished." }
+    ]);
   };
 
   const parseTimerRequest = (message: string): number | null => {
@@ -226,88 +292,6 @@ export function AIChat() {
     return { type: null, count: 0 };
   };
 
-  const createEducationalPrompt = (userMessage: string, type: 'flashcard' | 'question', requestedCount: number): string => {
-    const count = requestedCount;
-    let promptPrefix = '';
-    if (type === 'flashcard') {
-      promptPrefix = `Please create ${count} high-quality flashcards based on the following request.
-Respond ONLY with a valid JSON object wrapped in a single code block (using triple backticks with "json") and no additional text.
-
-The JSON object must have the structure:
-{
-  "type": "flashcard",
-  "data": [
-    {
-      "id": "1",
-      "question": "Front side of flashcard",
-      "answer": "Back side (concise, less than 50 words)",
-      "topic": "Relevant topic"
-    },
-    ... (repeat for ${count} items)
-  ]
-}`;
-    } else {
-      promptPrefix = `Please create ${count} high-quality quiz questions based on the following request.
-Respond ONLY with a valid JSON object wrapped in a single code block (using triple backticks with "json") and no additional text.
-
-The JSON object must have the structure:
-{
-  "type": "question",
-  "data": [
-    {
-      "id": "1",
-      "question": "Question text",
-      "options": ["Option A", "Option B", "Option C", "Option D"],
-      "correctAnswer": 0,
-      "explanation": "Brief explanation (less than 30 words)"
-    },
-    ... (repeat for ${count} items)
-  ]
-}`;
-    }
-    return `${promptPrefix}
-
-Request: ${userMessage}
-
-IMPORTANT:
-1. Generate exactly ${count} items.
-2. Ensure the JSON is valid and properly formatted.
-3. Provide only the JSON in your response, with no extra text.`;
-  };
-
-  // Helper to update the last assistant message (used for streaming)
-  const updateLastAssistantMessage = (newContent: string) => {
-    setChatHistory(prev => {
-      const updated = [...prev];
-      const lastMsg = updated[updated.length - 1];
-      if (lastMsg && lastMsg.role === 'assistant') {
-        updated[updated.length - 1] = { ...lastMsg, content: newContent };
-      }
-      return updated;
-    });
-  };
-
-  // Extract candidate text from Gemini JSON response.
-  const extractCandidateText = (text: string): string => {
-    let candidateText = text;
-    try {
-      const jsonResponse = JSON.parse(text);
-      if (
-        jsonResponse &&
-        jsonResponse.candidates &&
-        jsonResponse.candidates[0] &&
-        jsonResponse.candidates[0].content &&
-        jsonResponse.candidates[0].content.parts &&
-        jsonResponse.candidates[0].content.parts[0]
-      ) {
-        candidateText = jsonResponse.candidates[0].content.parts[0].text;
-      }
-    } catch (err) {
-      console.error("Error parsing Gemini response:", err);
-    }
-    return candidateText;
-  };
-
   const handleChatSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatMessage.trim()) return;
@@ -329,7 +313,7 @@ IMPORTANT:
     setIsChatLoading(true);
 
     try {
-      // Educational content branch
+      // Educational branch: use our combined prompt
       if (educationalRequest.type) {
         setChatHistory(prev => [...prev, { role: 'assistant', content: "" }]);
         const educationalPrompt = createEducationalPrompt(userMsg.content, educationalRequest.type, educationalRequest.count);
@@ -345,16 +329,12 @@ IMPORTANT:
         }, 45000);
         const finalText = extractCandidateText(rawText);
         if (finalText) {
-          // Process JSON for educational content if needed (flashcards/questions)
-          // Here you can add extra JSON parsing if required.
-          const responseText = educationalRequest.type === 'flashcard'
-            ? `Here are your ${educationalRequest.count} flashcards.`
-            : `Here are your ${educationalRequest.count} quiz questions.`;
+          // For educational content, we assume the JSON is now valid and properly formatted.
           setChatHistory(prev => {
             const filteredPrev = prev.filter(msg => msg.role !== 'assistant' || msg.content !== "");
             return [
               ...filteredPrev,
-              { role: 'assistant', content: responseText }
+              { role: 'assistant', content: finalText.trim() }
             ];
           });
           setIsChatLoading(false);
@@ -364,7 +344,7 @@ IMPORTANT:
         }
       }
 
-      // Regular chat processing
+      // Regular chat branch
       setChatHistory(prev => [...prev, { role: 'assistant', content: "" }]);
       const conversation = chatHistory
         .map(m => `${m.role === 'user' ? userName : 'Assistant'}: ${m.content}`)

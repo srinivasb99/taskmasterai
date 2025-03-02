@@ -713,36 +713,36 @@ if (jsonMatch) {
     
     <div className="space-y-2">
       {conversationList.map((conv) => (
-        <div
-          key={conv.id}
-          className={`flex items-center justify-between cursor-pointer p-3 rounded-lg transition-all ${
-            conversationId === conv.id
-              ? 'bg-blue-600 text-white'
-              : 'bg-gray-700 text-gray-200 hover:bg-gray-600'
-          }`}
-        >
-          <div
-            className="flex items-center gap-2 flex-1"
-            onClick={() => handleSelectConversation(conv.id)}
-          >
-            <MessageSquare className="w-4 h-4" />
-            <span className="truncate">{conv.chatName}</span>
-          </div>
-          
-          {/* More actions dropdown */}
-          <div className="relative">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                const menu = document.getElementById(`conv-menu-${conv.id}`);
-                if (menu) {
-                  menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
-                }
-              }}
-              className="p-1 rounded-full hover:bg-gray-600 transition-colors"
-            >
-              <MoreHorizontal className="w-4 h-4" />
-            </button>
+<div
+  key={conv.id}
+  className={`flex items-center justify-between cursor-pointer p-3 rounded-lg transition-all ${
+    conversationId === conv.id
+      ? 'bg-blue-600 text-white'
+      : 'bg-gray-700 text-gray-200 hover:bg-gray-600'
+  }`}
+>
+  <div
+    className="flex items-center gap-2 flex-1 min-w-0" // Added min-width: 0
+    onClick={() => handleSelectConversation(conv.id)}
+  >
+    <MessageSquare className="w-4 h-4 flex-shrink-0" /> {/* Added flex-shrink-0 */}
+    <span className="truncate overflow-hidden text-ellipsis w-full">{conv.chatName}</span>
+  </div>
+  
+  {/* More actions dropdown */}
+  <div className="relative flex-shrink-0"> {/* Added flex-shrink-0 */}
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        const menu = document.getElementById(`conv-menu-${conv.id}`);
+        if (menu) {
+          menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+        }
+      }}
+      className="p-1 rounded-full hover:bg-gray-600 transition-colors"
+    >
+      <MoreHorizontal className="w-4 h-4" />
+    </button>
             
             <div
               id={`conv-menu-${conv.id}`}

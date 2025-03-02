@@ -669,59 +669,61 @@ useEffect(() => {
   // ---------------------
   // SMART OVERVIEW GENERATION
   // ---------------------
-  const [smartOverview, setSmartOverview] = useState<string>("");
-  const [overviewLoading, setOverviewLoading] = useState(false);
-  const [lastGeneratedData, setLastGeneratedData] = useState<string>("");
-  const [lastResponse, setLastResponse] = useState<string>("");
+const [smartOverview, setSmartOverview] = useState<string>("");
+const [overviewLoading, setOverviewLoading] = useState(false);
+const [lastGeneratedData, setLastGeneratedData] = useState<string>("");
+const [lastResponse, setLastResponse] = useState<string>("");
 
-  useEffect(() => {
-    if (!user) return;
+useEffect(() => {
+  if (!user) return;
 
-    const generateOverview = async () => {
-      // 1. Format current data with better handling of due dates
-      const formatItem = (item: any, type: string) => {
-        const dueDate = item.data.dueDate?.toDate?.();
-        const title = item.data[type] || item.data.title || 'Untitled';
-        return `• ${title}${dueDate ? ` (Due: ${dueDate.toLocaleDateString()})` : ''}`;
-      };
+  const generateOverview = async () => {
+    // 1. Format current data with better handling of due dates
+    const formatItem = (item: any, type: string) => {
+      const dueDate = item.data.dueDate?.toDate?.();
+      const title = item.data[type] || item.data.title || 'Untitled';
+      return `• ${title}${dueDate ? ` (Due: ${dueDate.toLocaleDateString()})` : ''}`;
+    };
 
-      // Combine all items
-      const allItems = [
-        ...(tasks.map(t => formatItem(t, 'task')) || []),
-        ...(goals.map(g => formatItem(g, 'goal')) || []),
-        ...(projects.map(p => formatItem(p, 'project')) || []),
-        ...(plans.map(p => formatItem(p, 'plan')) || [])
-      ];
+    // Combine all items
+    const allItems = [
+      ...(tasks.map(t => formatItem(t, 'task')) || []),
+      ...(goals.map(g => formatItem(g, 'goal')) || []),
+      ...(projects.map(p => formatItem(p, 'project')) || []),
+      ...(plans.map(p => formatItem(p, 'plan')) || [])
+    ];
 
-      // If there are no items, show the empty state message
-      if (!allItems.length) {
-        setSmartOverview(`
-          <div class="text-gray-400 font-large">
-            Add some items to get started with your Smart Overview!
-          </div>
-        `);
-        return;
-      }
+    // If there are no items, show the empty state message
+    if (!allItems.length) {
+      setSmartOverview(`
+        <div class="text-gray-400 font-large">
+          Add some items to get started with your Smart Overview!
+        </div>
+      `);
+      return;
+    }
 
-      const formattedData = allItems.join('\n');
+    const formattedData = allItems.join('\n');
 
-      // 2. Check if data changed
-      if (formattedData === lastGeneratedData) {
-        return;
-      }
+    // If there are no changes, return early
+    if (formattedData === lastGeneratedData) {
+      return;
+    }
 
-      setOverviewLoading(true);
-      setLastGeneratedData(formattedData);
+    setOverviewLoading(true);
+    setLastGeneratedData(formattedData);
 
-      try {
-       // 3. Construct AI prompt
-        const prompt = `[INST] <<SYS>>
+    try {
+      // 3. Construct AI prompt
+      // Extract only the first name from the full userName
+      const firstName = userName.split(" ")[0];
+      const prompt = `[INST] <<SYS>>
 You are TaskMaster, an advanced AI productivity assistant. Analyze the following items and generate a Smart Overview:
 
 ${formattedData}
 
 Follow these guidelines exactly:
-1. Start with "Hello ${userName}," followed by a VERY brief overview of what exists (1 sentence max)
+1. Start with "Hello ${firstName}," followed by a VERY brief overview of what exists (1 sentence max)
 2. List EXACTLY 3 actionable priorities based ONLY on the actual items shown above
 3. For each priority:
    - Start with a number (1., 2., 3.)
@@ -739,103 +741,103 @@ FORBIDDEN IN YOUR FINAL RESPONSE:
 Remember: Focus on actionable strategies and specific next steps, not just describing the items.
 <</SYS>>[/INST]`;
 
-        // 4. Call Hugging Face API
-        const response = await fetch("https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${hfApiKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            inputs: prompt,
-            parameters: {
-              max_new_tokens: 500,
-              temperature: 0.4,
-              top_p: 0.85,
-              repetition_penalty: 1.1,
-              return_full_text: false,
-              do_sample: true,
-              presence_penalty: 0.1
-            }
-          }),
-        });
+      // 4. Call Hugging Face API
+      const response = await fetch("https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${hfApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          inputs: prompt,
+          parameters: {
+            max_new_tokens: 500,
+            temperature: 0.4,
+            top_p: 0.85,
+            repetition_penalty: 1.1,
+            return_full_text: false,
+            do_sample: true,
+            presence_penalty: 0.1
+          }
+        }),
+      });
 
-if (!response.ok) throw new Error("API request failed");
+      if (!response.ok) throw new Error("API request failed");
 
-// 5. Process and clean response
-const result = await response.json();
-const rawText = result[0]?.generated_text || '';
+      // 5. Process and clean response
+      const result = await response.json();
+      const rawText = result[0]?.generated_text || '';
 
-const cleanAndValidate = (text: string) => {
-  // Additional filters - phrases to trigger text removal
-  const excludePhrases = [
-    "I see I made some minor errors",
-    "Here is the corrected response",
-    "was removed as per request",
-    "since I am forced to put something here",
-    "-> You are TaskMaster",
-    "The is:",
-    "Note:",
-    "You are TaskMaster, an advanced AI productivity assistant. Analyze the following items and generate a Smart Overview:",
-    "Follow these guidelines exactly:",
-    "- Start with a number"
-  ];
+      const cleanAndValidate = (text: string) => {
+        // Additional filters - phrases to trigger text removal
+        const excludePhrases = [
+          "I see I made some minor errors",
+          "Here is the corrected response",
+          "was removed as per request",
+          "since I am forced to put something here",
+          "-> You are TaskMaster",
+          "The is:",
+          "Note:",
+          "You are TaskMaster, an advanced AI productivity assistant. Analyze the following items and generate a Smart Overview:",
+          "Follow these guidelines exactly:",
+          "- Start with a number"
+        ];
 
-  // Remove text after any excluded phrase
-  let cleanedText = text;
-  for (const phrase of excludePhrases) {
-    const index = cleanedText.indexOf(phrase);
-    if (index !== -1) {
-      cleanedText = cleanedText.substring(0, index).trim();
-    }
-  }
-
-  // Basic cleanup
-  cleanedText = cleanedText
-    .replace(/\[\/?(INST|SYS)\]|<\/?s>|\[\/?(FONT|COLOR)\]/gi, '')
-    .replace(/(\*\*|###|boxed|final answer|step \d+:)/gi, '')
-    .replace(/\$\{.*?\}\$/g, '')
-    .replace(/\[\/?[^\]]+\]/g, '')
-    .replace(/\{.*?\}\}/g, '')
-    .replace(/📋|📅|🎯|📊/g, '')
-    .replace(/\b(TASKS?|GOALS?|PROJECTS?|PLANS?)\b:/gi, '')
-    .replace(/\n\s*\n/g, '\n');
-
-  // Split cleaned text into lines and filter out empty or irrelevant lines
-  let lines = cleanedText
-    .split('\n')
-    .map(line => line.trim())
-    .filter(line => line.length > 0 && !/^[^a-zA-Z0-9]+$/.test(line));
-
-  let helloCount = 0;
-  const truncatedLines: string[] = [];
-
-  for (const line of lines) {
-    if (!line.trim()) continue;
-
-    // 1) "The is:" pattern
-    if (line.trim().startsWith("The is:")) {
-      break;
-    }
-
-    // 2) "<|reserved" pattern
-    if (line.trim().startsWith("<|reserved")) {
-      break;
-    }
-
-    // 3) Check if line contains "[/"
-    if (line.indexOf("[/") !== -1) {
-      if (line.trim().startsWith("[/")) {
-        break;
-      } else {
-        // Truncate the line at the occurrence of "[/"
-        const truncatedLine = line.substring(0, line.indexOf("[/")).trim();
-        if (truncatedLine) {
-          truncatedLines.push(truncatedLine);
+        // Remove text after any excluded phrase
+        let cleanedText = text;
+        for (const phrase of excludePhrases) {
+          const index = cleanedText.indexOf(phrase);
+          if (index !== -1) {
+            cleanedText = cleanedText.substring(0, index).trim();
+          }
         }
-        break;
-      }
-    }
+
+        // Basic cleanup
+        cleanedText = cleanedText
+          .replace(/\[\/?(INST|SYS)\]|<\/?s>|\[\/?(FONT|COLOR)\]/gi, '')
+          .replace(/(\*\*|###|boxed|final answer|step \d+:)/gi, '')
+          .replace(/\$\{.*?\}\$/g, '')
+          .replace(/\[\/?[^\]]+\]/g, '')
+          .replace(/\{.*?\}\}/g, '')
+          .replace(/📋|📅|🎯|📊/g, '')
+          .replace(/\b(TASKS?|GOALS?|PROJECTS?|PLANS?)\b:/gi, '')
+          .replace(/\n\s*\n/g, '\n');
+
+        // Split cleaned text into lines and filter out empty or irrelevant lines
+        let lines = cleanedText
+          .split('\n')
+          .map(line => line.trim())
+          .filter(line => line.length > 0 && !/^[^a-zA-Z0-9]+$/.test(line));
+
+        let helloCount = 0;
+        const truncatedLines: string[] = [];
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+
+          // 1) "The is:" pattern
+          if (line.trim().startsWith("The is:")) {
+            break;
+          }
+
+          // 2) "<|reserved" pattern
+          if (line.trim().startsWith("<|reserved")) {
+            break;
+          }
+
+          // 3) Check if line contains "[/"
+          if (line.indexOf("[/") !== -1) {
+            if (line.trim().startsWith("[/")) {
+              break;
+            } else {
+              // Truncate the line at the occurrence of "[/"
+              const truncatedLine = line.substring(0, line.indexOf("[/")).trim();
+              if (truncatedLine) {
+                truncatedLines.push(truncatedLine);
+              }
+              break;
+            }
+          }
 
     // 4) If the line starts with "I", break out of the loop.
     if (line.trim().startsWith("I")) {

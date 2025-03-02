@@ -18,12 +18,9 @@ import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
 import { auth } from '../lib/firebase';
 import { User, onAuthStateChanged } from 'firebase/auth';
-import {
-  onCollectionSnapshot,
-  hfApiKey,
-} from '../lib/dashboard-firebase';
+import { geminiApiKey } from '../lib/dashboard-firebase';
+import { onCollectionSnapshot, /* hfApiKey, */ } from '../lib/dashboard-firebase';
 import { getCurrentUser } from '../lib/settings-firebase';
-
 
 // Types for messages
 interface TimerMessage {
@@ -65,11 +62,13 @@ interface ChatMessage {
   question?: QuestionMessage;
 }
 
+// Gemini API endpoint using your API key from lib/dashboard-firebase
+const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`;
+
 // Fetch with timeout utility function
 const fetchWithTimeout = async (url: string, options: RequestInit, timeout = 30000) => {
   const controller = new AbortController();
   const { signal } = controller;
-  
   const timeoutId = setTimeout(() => controller.abort(), timeout);
   
   try {
@@ -80,6 +79,35 @@ const fetchWithTimeout = async (url: string, options: RequestInit, timeout = 300
     clearTimeout(timeoutId);
     throw error;
   }
+};
+
+// Streaming helper that reads the response and updates text in real time
+const streamResponse = async (
+  url: string,
+  options: RequestInit,
+  onUpdate: (text: string) => void,
+  timeout = 30000
+) => {
+  const response = await fetchWithTimeout(url, options, timeout);
+  if (!response.body) {
+    const text = await response.text();
+    onUpdate(text);
+    return text;
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder("utf-8");
+  let done = false;
+  let accumulatedText = "";
+  while (!done) {
+    const { value, done: doneReading } = await reader.read();
+    done = doneReading;
+    if (value) {
+      const chunk = decoder.decode(value, { stream: !done });
+      accumulatedText += chunk;
+      onUpdate(accumulatedText);
+    }
+  }
+  return accumulatedText;
 };
 
 export function AIChat() {
@@ -106,8 +134,6 @@ export function AIChat() {
     const stored = localStorage.getItem('isSidebarCollapsed');
     return stored ? JSON.parse(stored) : false;
   });
-
-  // Update localStorage whenever the state changes
   useEffect(() => {
     localStorage.setItem('isSidebarCollapsed', JSON.stringify(isSidebarCollapsed));
   }, [isSidebarCollapsed]);
@@ -121,7 +147,6 @@ export function AIChat() {
       }
       setLoading(false);
     });
-
     return () => unsubscribe();
   }, []);
 
@@ -129,7 +154,6 @@ export function AIChat() {
     const firebaseUser = getCurrentUser();
     if (firebaseUser) {
       setUser(firebaseUser);
-      // Set the user's name to displayName if it exists, otherwise default to "User"
       setUserName(firebaseUser.displayName || "User");
     } else {
       navigate('/login');
@@ -140,12 +164,10 @@ export function AIChat() {
   // Collection snapshots
   useEffect(() => {
     if (!user) return;
-    
     const unsubTasks = onCollectionSnapshot('tasks', user.uid, (items) => setTasks(items));
     const unsubGoals = onCollectionSnapshot('goals', user.uid, (items) => setGoals(items));
     const unsubProjects = onCollectionSnapshot('projects', user.uid, (items) => setProjects(items));
     const unsubPlans = onCollectionSnapshot('plans', user.uid, (items) => setPlans(items));
-
     return () => {
       unsubTasks();
       unsubGoals();
@@ -162,101 +184,125 @@ export function AIChat() {
   const handleTimerComplete = (timerId: string) => {
     setChatHistory(prev => [
       ...prev,
-      {
-        role: 'assistant',
-        content: "⏰ Time's up! Your timer has finished."
-      }
+      { role: 'assistant', content: "⏰ Time's up! Your timer has finished." }
     ]);
   };
 
   const parseTimerRequest = (message: string): number | null => {
     const timeRegex = /(\d+)\s*(minutes?|mins?|hours?|hrs?|seconds?|secs?)/i;
     const match = message.match(timeRegex);
-    
     if (!match) return null;
-    
     const amount = parseInt(match[1]);
     const unit = match[2].toLowerCase();
-    
-    if (unit.startsWith('hour') || unit.startsWith('hr')) {
-      return amount * 3600;
-    } else if (unit.startsWith('min')) {
-      return amount * 60;
-    } else if (unit.startsWith('sec')) {
-      return amount;
-    }
-    
+    if (unit.startsWith('hour') || unit.startsWith('hr')) return amount * 3600;
+    if (unit.startsWith('min')) return amount * 60;
+    if (unit.startsWith('sec')) return amount;
     return null;
   };
 
   // Scroll to bottom when chat history changes
   useEffect(() => {
-    if (chatEndRef.current) {
-      chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
+    if (chatEndRef.current) chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
   }, [chatHistory]);
 
   // Format items for chat
   const formatItemsForChat = () => {
     const lines: string[] = [];
-
     lines.push(`${userName}'s items:\n`);
-
     tasks.forEach((t) => {
       const due = t.data.dueDate?.toDate?.();
-      lines.push(
-        `Task: ${t.data.task || 'Untitled'}${
-          due ? ` (Due: ${due.toLocaleDateString()})` : ''
-        }`
-      );
+      lines.push(`Task: ${t.data.task || 'Untitled'}${due ? ` (Due: ${due.toLocaleDateString()})` : ''}`);
     });
     goals.forEach((g) => {
       const due = g.data.dueDate?.toDate?.();
-      lines.push(
-        `Goal: ${g.data.goal || 'Untitled'}${
-          due ? ` (Due: ${due.toLocaleDateString()})` : ''
-        }`
-      );
+      lines.push(`Goal: ${g.data.goal || 'Untitled'}${due ? ` (Due: ${due.toLocaleDateString()})` : ''}`);
     });
     projects.forEach((p) => {
       const due = p.data.dueDate?.toDate?.();
-      lines.push(
-        `Project: ${p.data.project || 'Untitled'}${
-          due ? ` (Due: ${due.toLocaleDateString()})` : ''
-        }`
-      );
+      lines.push(`Project: ${p.data.project || 'Untitled'}${due ? ` (Due: ${due.toLocaleDateString()})` : ''}`);
     });
     plans.forEach((p) => {
       const due = p.data.dueDate?.toDate?.();
-      lines.push(
-        `Plan: ${p.data.plan || 'Untitled'}${
-          due ? ` (Due: ${due.toLocaleDateString()})` : ''
-        }`
-      );
+      lines.push(`Plan: ${p.data.plan || 'Untitled'}${due ? ` (Due: ${due.toLocaleDateString()})` : ''}`);
     });
-
     return lines.join('\n');
   };
 
-  // Check if it's a large question or flashcard set request
-  const isLargeEducationalContentRequest = (message: string): boolean => {
-    const largeQuestionMatch = message.match(/create\s+(\d+)\s+questions/i);
-    const largeFlashcardMatch = message.match(/create\s+(\d+)\s+flashcards/i);
-    
-    if (largeQuestionMatch && parseInt(largeQuestionMatch[1]) > 10) {
-      return true;
+  // Detect educational requests and extract count if provided
+  const detectEducationalRequest = (message: string): { type: 'flashcard' | 'question' | null, count: number } => {
+    const flashcardMatch = message.match(/(?:create|make|generate)\s+(?:a\s+set\s+of\s+)?(\d+)?\s*(?:flashcards?|flash\s+cards?|study\s+cards?)/i);
+    if (flashcardMatch) {
+      const count = flashcardMatch[1] ? parseInt(flashcardMatch[1]) : 5;
+      return { type: 'flashcard', count: Math.min(count, 10) };
     }
-    
-    if (largeFlashcardMatch && parseInt(largeFlashcardMatch[1]) > 10) {
-      return true;
+    const questionMatch = message.match(/(?:create|make|generate)\s+(?:a\s+set\s+of\s+)?(\d+)?\s*(?:questions?|quiz(?:zes)?|test\s+questions?|practice\s+questions?)/i);
+    if (questionMatch) {
+      const count = questionMatch[1] ? parseInt(questionMatch[1]) : 5;
+      return { type: 'question', count: Math.min(count, 30) };
     }
-    
-    return false;
+    return { type: null, count: 0 };
   };
 
-  // Split large educational content requests into batches
-  const generateBatchPrompt = (originalPrompt: string, batchNumber: number, totalBatches: number): string => {
-    return `${originalPrompt}\n\nPlease provide ONLY batch ${batchNumber} of ${totalBatches} of the requested educational content. Make sure each item has a unique ID and is properly formatted as JSON. Focus on quality and ensure the response is concise.`;
+  // Create an optimized prompt for educational content with explicit JSON instructions
+  const createEducationalPrompt = (userMessage: string, type: 'flashcard' | 'question', requestedCount: number): string => {
+    const count = requestedCount;
+    let promptPrefix = '';
+    if (type === 'flashcard') {
+      promptPrefix = `Please create ${count} high-quality flashcards based on the following request.
+Respond ONLY with a valid JSON object wrapped in a single code block (using triple backticks with "json") with no additional text.
+
+The JSON object must have the structure:
+{
+  "type": "flashcard",
+  "data": [
+    {
+      "id": "1",
+      "question": "Front side of flashcard",
+      "answer": "Back side (concise, less than 50 words)",
+      "topic": "Relevant topic"
+    },
+    ... (repeat for ${count} items)
+  ]
+}`;
+    } else {
+      promptPrefix = `Please create ${count} high-quality quiz questions based on the following request.
+Respond ONLY with a valid JSON object wrapped in a single code block (using triple backticks with "json") with no additional text.
+
+The JSON object must have the structure:
+{
+  "type": "question",
+  "data": [
+    {
+      "id": "1",
+      "question": "Question text",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "correctAnswer": 0,
+      "explanation": "Brief explanation (less than 30 words)"
+    },
+    ... (repeat for ${count} items)
+  ]
+}`;
+    }
+    return `${promptPrefix}
+
+Request: ${userMessage}
+
+IMPORTANT:
+1. Generate exactly ${count} items.
+2. Ensure the JSON is valid and properly formatted.
+3. Provide only the JSON in your response, with no extra text.`;
+  };
+
+  // Helper to update the last assistant message (for streaming)
+  const updateLastAssistantMessage = (newContent: string) => {
+    setChatHistory(prev => {
+      const updated = [...prev];
+      const lastMsg = updated[updated.length - 1];
+      if (lastMsg && lastMsg.role === 'assistant') {
+        updated[updated.length - 1] = { ...lastMsg, content: newContent };
+      }
+      return updated;
+    });
   };
 
   const handleChatSubmit = async (e: React.FormEvent) => {
@@ -265,54 +311,110 @@ export function AIChat() {
 
     // Check for timer request
     const timerDuration = parseTimerRequest(chatMessage);
-    const userMsg: ChatMessage = { 
-      role: 'user',
-      content: chatMessage
-    };
-    
+    const userMsg: ChatMessage = { role: 'user', content: chatMessage };
     setChatHistory(prev => [...prev, userMsg]);
     setChatMessage('');
 
-    // If it's a timer request, add timer immediately
+    // If timer, add immediately
     if (timerDuration) {
       const timerId = Math.random().toString(36).substr(2, 9);
       setChatHistory(prev => [
         ...prev,
-        {
-          role: 'assistant',
-          content: `Starting a timer for ${timerDuration} seconds.`,
-          timer: {
-            type: 'timer',
-            duration: timerDuration,
-            id: timerId
-          }
-        }
+        { role: 'assistant', content: `Starting a timer for ${timerDuration} seconds.`, timer: { type: 'timer', duration: timerDuration, id: timerId } }
       ]);
       return;
     }
 
-    // Regular chat processing
-    const conversation = chatHistory
-      .map((m) => `${m.role === 'user' ? userName : 'Assistant'}: ${m.content}`)
-      .join('\n');
-    const itemsText = formatItemsForChat();
+    // Check for educational content request
+    const educationalRequest = detectEducationalRequest(userMsg.content);
+    setIsChatLoading(true);
 
-    const now = new Date();
-    const currentDateTime = {
-      date: now.toLocaleDateString('en-US', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-      }),
-      time: now.toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true
-      })
-    };
+    try {
+      // If educational content is requested
+      if (educationalRequest.type) {
+        // Insert an empty assistant message for real-time streaming updates
+        setChatHistory(prev => [...prev, { role: 'assistant', content: "" }]);
+        const educationalPrompt = createEducationalPrompt(userMsg.content, educationalRequest.type, educationalRequest.count);
+        const options = {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: educationalPrompt }] }],
+            parameters: {
+              temperature: 0.2,
+              maxOutputTokens: 2000,
+              topP: 0.95,
+              stream: true
+            }
+          })
+        };
+        const finalText = await streamResponse(geminiEndpoint, options, (text) => {
+          updateLastAssistantMessage(text);
+        }, 45000);
 
-    const prompt = `
+        // Extract JSON from the final response text
+        const jsonMatches = finalText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+        if (jsonMatches && jsonMatches[1]) {
+          try {
+            const jsonText = jsonMatches[1].trim();
+            const jsonContent = JSON.parse(jsonText);
+            if (
+              jsonContent.type === educationalRequest.type &&
+              jsonContent.data &&
+              Array.isArray(jsonContent.data) &&
+              jsonContent.data.length > 0
+            ) {
+              let responseText = educationalRequest.type === 'flashcard'
+                ? `Here are ${jsonContent.data.length} flashcards. You can flip each card to see the answer.`
+                : `Here are ${jsonContent.data.length} quiz questions for you to practice with.`;
+              setChatHistory(prev => {
+                const filteredPrev = prev.filter(msg => msg.role !== 'assistant' || msg.content !== "");
+                return [
+                  ...filteredPrev,
+                  {
+                    role: 'assistant',
+                    content: responseText,
+                    ...(educationalRequest.type === 'flashcard' && { flashcard: jsonContent as FlashcardMessage }),
+                    ...(educationalRequest.type === 'question' && { question: jsonContent as QuestionMessage })
+                  }
+                ];
+              });
+              setIsChatLoading(false);
+              return;
+            } else {
+              throw new Error('Invalid JSON structure');
+            }
+          } catch (jsonError) {
+            console.error('Failed to parse educational JSON:', jsonError);
+            throw new Error('JSON parsing error');
+          }
+        } else {
+          throw new Error('No JSON found in educational response');
+        }
+      }
+
+      // Regular chat processing (non-educational)
+      setChatHistory(prev => [...prev, { role: 'assistant', content: "" }]);
+      const conversation = chatHistory
+        .map(m => `${m.role === 'user' ? userName : 'Assistant'}: ${m.content}`)
+        .join('\n');
+      const itemsText = formatItemsForChat();
+      const now = new Date();
+      const currentDateTime = {
+        date: now.toLocaleDateString('en-US', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        }),
+        time: now.toLocaleTimeString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true
+        })
+      };
+
+      const prompt = `
 [CONTEXT]
 User's Name: ${userName}
 Current Date: ${currentDateTime.date}
@@ -331,222 +433,50 @@ You are TaskMaster, a friendly and versatile AI productivity assistant. Engage i
 Guidelines:
 
 1. ALWAYS CHECK USER DATA:
-   - IMPORTANT: If ${userName} asks about their tasks, goals, projects, or plans using ANY phrasing (such as "what are my tasks", "show me my goals", "my current projects", etc.), IMMEDIATELY check and summarize the items from their data.
-   - When responding about user data, ALWAYS use the information provided in the [CONTEXT] section.
-   - Be proactive in analyzing user data when any question implies they want to know about their items.
-
+   - If ${userName} asks about tasks, goals, projects, or plans, summarize the items from the [CONTEXT].
 2. General Conversation:
    - Respond in a friendly, natural tone matching ${userName}'s style.
-   - Do not include any internal instructions, meta commentary, or explanations of your process.
-   - Do not include phrases such as "Here's my response to continue the conversation:" or similar wording that introduces your reply.
-   - Do not include or reference code blocks for languages like Python, Bash, or any other unless explicitly requested by ${userName}.
-
-3. Educational Content (JSON):
-   - If ${userName} explicitly requests educational content (flashcards or quiz questions), provide exactly one JSON object.
-   - Wrap the JSON object in a single code block using triple backticks and the "json" language identifier.
-   - Keep each question/flashcard concise to improve response speed.
-   - For large sets (>10 items), focus on quality over quantity to ensure faster response.
-   - Use one of the following formats:
-
-     For flashcards:
-     {
-       "type": "flashcard",
-       "data": [
-         {
-           "id": "unique-id-1",
-           "question": "Question 1",
-           "answer": "Answer 1",
-           "topic": "Subject area"
-         }
-       ]
-     }
-
-     For quiz questions:
-     {
-       "type": "question",
-       "data": [
-         {
-           "id": "unique-id-1",
-           "question": "Question 1",
-           "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
-           "correctAnswer": 0,
-           "explanation": "Explanation 1"
-         }
-       ]
-     }
-
-4. Response Structure:
-   - Provide a direct response to ${userName} without any extraneous openings or meta-text.
-   - Do not mix JSON with regular text. JSON is only for requested educational content.
+   - Do not include internal instructions or meta commentary.
+3. Response Structure:
+   - Provide a direct response without extraneous text.
    - Always address ${userName} in a friendly, helpful tone.
-
-Follow these instructions strictly.
 `;
 
-    setIsChatLoading(true);
-
-    const isLargeRequest = isLargeEducationalContentRequest(userMsg.content);
-    
-    try {
-      let assistantReply = '';
-      let jsonContent = null;
-      
-      // For large educational content requests, use optimized parameters
-      const requestParams = {
-        max_new_tokens: isLargeRequest ? 2000 : 3000,
-        temperature: isLargeRequest ? 0.4 : 0.5,
-        top_p: 0.9,
-        return_full_text: false,
-        repetition_penalty: isLargeRequest ? 1.1 : 1.2,
-        do_sample: true,
+      const options = {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          parameters: {
+            temperature: 0.7,
+            maxOutputTokens: 1500,
+            topP: 0.9,
+            stream: true
+          }
+        })
       };
 
-      const response = await fetchWithTimeout(
-        'https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct',
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${hfApiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            inputs: prompt,
-            parameters: requestParams,
-          }),
-        },
-        60000 // 60 second timeout for large requests
-      );
+      const finalText = await streamResponse(geminiEndpoint, options, (text) => {
+        updateLastAssistantMessage(text);
+      }, 30000);
 
-      if (!response.ok) throw new Error('Chat API request failed');
-      const result = await response.json();
-
-      assistantReply = (result[0]?.generated_text as string || '')
-        .replace(/\[\/?INST\]|<</g, '')
-        .split('\n')
-        .filter(line => !/^(print|python)/i.test(line.trim()))
-        .join('\n')
-        .trim();
-
-      // Parse any JSON content in the response - improved regex for more reliable extraction
-      const jsonPattern = /```json\n([\s\S]*?)\n```/;
-      const jsonMatch = assistantReply.match(jsonPattern);
-      
-      if (jsonMatch) {
-        try {
-          // Sanitize the JSON to handle potential formatting issues
-          const jsonText = jsonMatch[1].trim();
-          const sanitizedJson = jsonText
-            .replace(/\\n/g, '\\n')
-            .replace(/\\'/g, "\\'")
-            .replace(/\\"/g, '\\"')
-            .replace(/\\&/g, '\\&')
-            .replace(/\\r/g, '\\r')
-            .replace(/\\t/g, '\\t')
-            .replace(/\\b/g, '\\b')
-            .replace(/\\f/g, '\\f');
-          
-          jsonContent = JSON.parse(sanitizedJson);
-          
-          // Remove the JSON block from the text response
-          assistantReply = assistantReply.replace(/```json\n[\s\S]*?\n```/, '').trim();
-          
-          // Validate JSON structure
-          if (
-            jsonContent.type &&
-            jsonContent.data &&
-            Array.isArray(jsonContent.data) &&
-            (jsonContent.type === 'flashcard' || jsonContent.type === 'question')
-          ) {
-            setChatHistory((prev) => [
-              ...prev,
-              {
-                role: 'assistant',
-                content: assistantReply,
-                ...(jsonContent.type === 'flashcard' && { flashcard: jsonContent as FlashcardMessage }),
-                ...(jsonContent.type === 'question' && { question: jsonContent as QuestionMessage })
-              },
-            ]);
-          } else {
-            throw new Error('Invalid JSON structure');
-          }
-        } catch (e) {
-          console.error('Failed to parse JSON content:', e);
-          // On JSON parse error, still show the text response
-          setChatHistory((prev) => [
-            ...prev,
-            { 
-              role: 'assistant', 
-              content: `${assistantReply}` 
-            },
-          ]);
-        }
-      } else {
-        // No JSON content detected
-        setChatHistory((prev) => [
-          ...prev,
-          { role: 'assistant', content: assistantReply },
-        ]);
-      }
+      setChatHistory(prev => {
+        const updated = [...prev];
+        updated[updated.length - 1] = { ...updated[updated.length - 1], content: finalText.trim() };
+        return updated;
+      });
     } catch (err: any) {
       console.error('Chat error:', err);
-      
-      // Handle different error types
       if (err.name === 'AbortError') {
-        // This was a timeout
-        setChatHistory((prev) => [
+        setChatHistory(prev => [
           ...prev,
-          {
-            role: 'assistant',
-            content: "I'm sorry, that request is taking longer than expected. For large sets of questions or flashcards, try asking for a smaller number (like 5-10) for faster results."
-          },
+          { role: 'assistant', content: "I'm sorry, that request is taking longer than expected. If you're asking for educational content, please try a more specific topic or request fewer items." }
         ]);
       } else {
-        // Try one more time with simplified parameters for reliability
-        try {
-          const fallbackResponse = await fetchWithTimeout(
-            'https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct',
-            {
-              method: 'POST',
-              headers: {
-                Authorization: `Bearer ${hfApiKey}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                inputs: `${prompt}\n\nPlease provide a concise response. If this is an educational content request, limit to 5 high-quality items.`,
-                parameters: {
-                  max_new_tokens: 1500,
-                  temperature: 0.3,
-                  top_p: 0.85,
-                  return_full_text: false,
-                  repetition_penalty: 1.0,
-                  do_sample: true,
-                },
-              }),
-            },
-            30000
-          );
-          
-          if (fallbackResponse.ok) {
-            const fallbackResult = await fallbackResponse.json();
-            const fallbackReply = (fallbackResult[0]?.generated_text as string || '').trim();
-            
-            setChatHistory((prev) => [
-              ...prev,
-              { role: 'assistant', content: fallbackReply },
-            ]);
-          } else {
-            throw new Error('Fallback request failed');
-          }
-        } catch (fallbackErr) {
-          // Both attempts failed
-          setChatHistory((prev) => [
-            ...prev,
-            {
-              role: 'assistant',
-              content: 'Sorry, I had an issue responding. Please try again in a moment.',
-            },
-          ]);
-        }
+        setChatHistory(prev => [
+          ...prev,
+          { role: 'assistant', content: 'Sorry, I had an issue responding. Please try again in a moment.' }
+        ]);
       }
     } finally {
       setIsChatLoading(false);
@@ -560,10 +490,7 @@ Follow these instructions strictly.
         onToggle={handleToggleSidebar}
         userName={userName}
       />
-      
-      <main className={`flex-1 overflow-hidden transition-all duration-300 ${
-        isSidebarCollapsed ? 'ml-16' : 'ml-64'
-      }`}>
+      <main className={`flex-1 overflow-hidden transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'}`}>
         <div className="h-full flex flex-col">
           {/* Header */}
           <div className="p-4 border-b border-gray-800">
@@ -573,9 +500,7 @@ Follow these instructions strictly.
                 <div>
                   <div className="flex items-center gap-2">
                     <h1 className="text-xl font-semibold text-white">AI Assistant</h1>
-                    <span className="px-2 py-0.5 text-xs font-medium bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-full">
-                      BETA
-                    </span>
+                    <span className="px-2 py-0.5 text-xs font-medium bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-full">BETA</span>
                   </div>
                   <p className="text-sm text-gray-400">Chat with TaskMaster</p>
                 </div>
@@ -592,21 +517,11 @@ Follow these instructions strictly.
               </div>
             </div>
           </div>
-
           {/* Chat Messages */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={chatEndRef}>
             {chatHistory.map((message, index) => (
-              <div
-                key={index}
-                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                <div
-                  className={`max-w-[80%] rounded-lg px-4 py-2 ${
-                    message.role === 'user'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-700 text-gray-200'
-                  }`}
-                >
+              <div key={index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[80%] rounded-lg px-4 py-2 ${message.role === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-200'}`}>
                   <ReactMarkdown
                     remarkPlugins={[remarkMath, remarkGfm]}
                     rehypePlugins={[rehypeKatex]}
@@ -631,30 +546,18 @@ Follow these instructions strictly.
                     <div className="mt-2">
                       <div className="flex items-center space-x-2 bg-gray-900 rounded-lg px-4 py-2">
                         <TimerIcon className="w-5 h-5 text-blue-400" />
-                        <Timer
-                          key={message.timer.id}
-                          initialDuration={message.timer.duration}
-                          onComplete={() => handleTimerComplete(message.timer!.id)}
-                        />
+                        <Timer key={message.timer.id} initialDuration={message.timer.duration} onComplete={() => handleTimerComplete(message.timer!.id)} />
                       </div>
                     </div>
                   )}
                   {message.flashcard && (
                     <div className="mt-2">
-                      <FlashcardsQuestions
-                        type="flashcard"
-                        data={message.flashcard.data}
-                        onComplete={() => {}}
-                      />
+                      <FlashcardsQuestions type="flashcard" data={message.flashcard.data} onComplete={() => {}} />
                     </div>
                   )}
                   {message.question && (
                     <div className="mt-2">
-                      <FlashcardsQuestions
-                        type="question"
-                        data={message.question.data}
-                        onComplete={() => {}}
-                      />
+                      <FlashcardsQuestions type="question" data={message.question.data} onComplete={() => {}} />
                     </div>
                   )}
                 </div>
@@ -672,7 +575,6 @@ Follow these instructions strictly.
               </div>
             )}
           </div>
-
           {/* Chat Input */}
           <form onSubmit={handleChatSubmit} className="p-4 border-t border-gray-800">
             <div className="flex gap-2">
@@ -683,11 +585,7 @@ Follow these instructions strictly.
                 placeholder="Ask TaskMaster about your items or set a timer..."
                 className="flex-1 bg-gray-700 text-gray-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              <button
-                type="submit"
-                disabled={isChatLoading}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
+              <button type="submit" disabled={isChatLoading} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
                 <Send className="w-5 h-5" />
               </button>
             </div>

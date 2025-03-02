@@ -1,4 +1,3 @@
-
 /* ------------------------------------------------------------------
    dashboard-firebase.ts
    ------------------------------------------------------------------ */
@@ -8,8 +7,8 @@ import { auth, db } from './firebase';
 
 export const weatherApiKey = 'e3f77d4d29e24862b4f190231241611';
 export const hfApiKey = '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';
-
-
+// Gemini API key added below:
+export const geminiApiKey = 'AIzaSyB2AxMlMJVd8SqJo-6q0UlvkoAW7vYPWfk';
 
 import {
   User,
@@ -38,11 +37,6 @@ import {
    2. AUTH LISTENERS
    ------------------------------------------------------------------ */
 
-/**
- * Subscribes to Firebase Auth state changes.
- * @param callback A function that receives the current user or null.
- * @returns An unsubscribe function you can call if needed.
- */
 export function onFirebaseAuthStateChanged(
   callback: (user: User | null) => void
 ) {
@@ -51,25 +45,15 @@ export function onFirebaseAuthStateChanged(
   });
 }
 
-/**
- * Create a new user with email & password.
- * If the user is truly new, we set `splashScreenShown` to false.
- */
 export async function signUp(email: string, password: string) {
   const userCredential = await createUserWithEmailAndPassword(auth, email, password);
   const user = userCredential.user;
-
-  // If brand-new user, mark that in Firestore:
   await setDoc(doc(db, 'users', user.uid), {
     splashScreenShown: false,
     createdAt: serverTimestamp(),
   });
 }
 
-/**
- * Update a user’s displayName in Firebase Auth
- * (useful for changing "Anonymous" to "FirstName LastName").
- */
 export async function updateUserDisplayName(newDisplayName: string) {
   if (!auth.currentUser) return;
   await updateProfile(auth.currentUser, { displayName: newDisplayName });
@@ -82,9 +66,6 @@ export async function updateUserDisplayName(newDisplayName: string) {
    3. USER STATUS (ONLINE/OFFLINE) + LAST SEEN
    ------------------------------------------------------------------ */
 
-/**
- * Sets the user's `online` field to true and updates `lastSeen` to server time.
- */
 export async function setUserOnline(userId: string) {
   await setDoc(
     doc(db, 'users', userId),
@@ -96,10 +77,6 @@ export async function setUserOnline(userId: string) {
   );
 }
 
-/**
- * Example: track user’s visibility changes (in a React effect or similar).
- * If `excludedPages` logic is needed, pass that in or handle in your component.
- */
 export async function handleVisibilityChange(
   userId: string,
   excludedPages: string[] = []
@@ -113,7 +90,6 @@ export async function handleVisibilityChange(
    4. CUSTOM TIMERS (CRUD)
    ------------------------------------------------------------------ */
 
-/** Creates a timer in the 'timers' collection. */
 export async function addCustomTimer(
   name: string,
   timeInSeconds: number,
@@ -128,46 +104,25 @@ export async function addCustomTimer(
   return docRef.id;
 }
 
-/**
- * Updates an existing custom timer (by docId).
- * This version optionally updates the name or the time (or both).
- *
- * Usage Examples:
- *   - updateCustomTimer('xyz123', 'New Timer Name', undefined)
- *   - updateCustomTimer('xyz123', undefined, 3600)
- *   - updateCustomTimer('xyz123', 'My Timer', 900)
- */
 export async function updateCustomTimer(
   timerId: string,
   newName?: string,
   newTimeInSeconds?: number
 ) {
-  const updates: any = {
-    updatedAt: serverTimestamp(),
-  };
+  const updates: any = { updatedAt: serverTimestamp() };
   if (newName !== undefined) {
     updates.name = newName;
   }
   if (newTimeInSeconds !== undefined) {
     updates.time = newTimeInSeconds;
   }
-
   await updateDoc(doc(db, 'timers', timerId), updates);
 }
 
-/** Deletes an existing custom timer. */
 export async function deleteCustomTimer(timerId: string) {
   await deleteDoc(doc(db, 'timers', timerId));
 }
 
-/**
- * Real-time listener for all timers belonging to a user.
- * Usage (in React):
- *   useEffect(() => {
- *     const unsub = onCustomTimersSnapshot(user.uid, (timers) => setMyTimers(timers));
- *     return () => unsub();
- *   }, [user.uid]);
- */
 export function onCustomTimersSnapshot(
   userId: string,
   callback: (timers: Array<{ id: string; data: DocumentData }>) => void
@@ -177,7 +132,6 @@ export function onCustomTimersSnapshot(
     where('userId', '==', userId),
     orderBy('createdAt', 'asc')
   );
-
   return onSnapshot(
     q,
     (snapshot) => {
@@ -197,9 +151,6 @@ export function onCustomTimersSnapshot(
    5. TASKS / GOALS / PROJECTS / PLANS (CRUD + LISTENERS)
    ------------------------------------------------------------------ */
 
-/**
- * Creates a new task (with optional dueDate).
- */
 export async function createTask(
   userId: string,
   taskText: string,
@@ -213,9 +164,6 @@ export async function createTask(
   });
 }
 
-/**
- * Creates a new goal (with optional dueDate).
- */
 export async function createGoal(
   userId: string,
   goalText: string,
@@ -229,9 +177,6 @@ export async function createGoal(
   });
 }
 
-/**
- * Creates a new project (with optional dueDate).
- */
 export async function createProject(
   userId: string,
   projectText: string,
@@ -245,9 +190,6 @@ export async function createProject(
   });
 }
 
-/**
- * Creates a new plan (with optional dueDate).
- */
 export async function createPlan(
   userId: string,
   planText: string,
@@ -261,9 +203,6 @@ export async function createPlan(
   });
 }
 
-/**
- * Generic function to mark a document in [tasks, goals, projects, plans] as completed.
- */
 export async function markItemComplete(
   collectionName: string,
   docId: string
@@ -273,32 +212,19 @@ export async function markItemComplete(
   });
 }
 
-/**
- * Generic function to update an item in [tasks, goals, projects, plans].
- * Pass in an object of fields to update (e.g. { task: "New Name", dueDate: ... }).
- */
 export async function updateItem(
   collectionName: string,
   docId: string,
   updates: Record<string, any>
 ) {
-  // You can also add serverTimestamp() if desired:
   updates.updatedAt = serverTimestamp();
-
   await updateDoc(doc(db, collectionName, docId), updates);
 }
 
-/**
- * Generic function to delete an item from the specified collection by docId.
- */
 export async function deleteItem(collectionName: string, docId: string) {
   await deleteDoc(doc(db, collectionName, docId));
 }
 
-/**
- * Listen for real-time snapshot changes in a specific collection
- * (e.g., "tasks", "goals", "projects", "plans").
- */
 export function onCollectionSnapshot(
   collectionName: string,
   userId: string,
@@ -307,12 +233,9 @@ export function onCollectionSnapshot(
   const q = query(
     collection(db, collectionName),
     where('userId', '==', userId),
-    // Potential note: If you do NOT always have `dueDate`, you may need
-    // a different approach or a Firestore index that can handle `null`.
     orderBy('dueDate', 'asc'),
     orderBy('createdAt', 'asc')
   );
-
   return onSnapshot(q, (snapshot) => {
     const results: Array<{ id: string; data: DocumentData }> = [];
     snapshot.forEach((docSnap) => {
@@ -326,14 +249,10 @@ export function onCollectionSnapshot(
    6. EVENTS (LINKED TO TASKS, GOALS, PROJECTS, PLANS)
    ------------------------------------------------------------------ */
 
-/** 
- * Example: create an event linked to a task, project, goal, or plan docId.
- * For example, `linkedFieldName` could be "linkedTaskId".
- */
 export async function createLinkedEvent(
   userId: string,
   linkedId: string,
-  linkedFieldName: string, // e.g. "linkedTaskId"
+  linkedFieldName: string,
   title: string,
   dueDate: Date
 ) {
@@ -341,26 +260,21 @@ export async function createLinkedEvent(
     title,
     description: `${linkedFieldName.replace('linked', '').toLowerCase()} converted to event`,
     day: dueDate.getDate(),
-    month: dueDate.getMonth(), // 0-based in JS
+    month: dueDate.getMonth(),
     year: dueDate.getFullYear(),
     uid: userId,
     [linkedFieldName]: linkedId,
     startTime: '',
     endTime: '',
   };
-
   await addDoc(collection(db, 'events'), eventData);
 }
 
-/**
- * Example: Real-time snapshot for events that belong to `userId`.
- */
 export function onEventsSnapshot(
   userId: string,
   callback: (events: Array<{ id: string; data: DocumentData }>) => void
 ) {
   const q = query(collection(db, 'events'), where('uid', '==', userId));
-  
   return onSnapshot(q, (snapshot) => {
     const results: Array<{ id: string; data: DocumentData }> = [];
     snapshot.forEach((docSnap) => {
@@ -374,7 +288,6 @@ export function onEventsSnapshot(
    7. NIGHT MODE & THEME PREFERENCES
    ------------------------------------------------------------------ */
 
-/** Save night mode preference (enabled/disabled) to the user’s doc. */
 export async function setNightMode(
   userId: string,
   isEnabled: boolean
@@ -390,30 +303,20 @@ export async function setNightMode(
    8. SPLASH SCREEN CHECK
    ------------------------------------------------------------------ */
 
-/**
- * Checks if a user has seen the splash screen. If not, sets `splashScreenShown = true`.
- * @returns `true` if the splash screen was already shown, `false` if newly set.
- */
 export async function checkSplashScreen(userId: string) {
   const userRef = doc(db, 'users', userId);
   const snapshot = await getDoc(userRef);
-
   if (!snapshot.exists()) {
-    // Create if user doc doesn’t exist
     await setDoc(userRef, { splashScreenShown: false });
     return false;
   }
-
   const userData = snapshot.data();
   if (!userData.splashScreenShown) {
-    // They have NOT seen the splash screen yet, so set it:
     await updateDoc(userRef, { splashScreenShown: true });
     return false;
   }
-
   return true;
 }
-
 
 export async function updateDashboardLastSeen(userId: string) {
   await updateDoc(doc(db, 'users', userId), {

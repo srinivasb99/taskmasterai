@@ -813,8 +813,8 @@ const cleanAndValidate = (text: string) => {
   for (const line of lines) {
     if (!line.trim()) continue;
 
-    // 1) "This is:" pattern
-    if (line.trim().startsWith("This is:")) {
+    // 1) "The is:" pattern
+    if (line.trim().startsWith("The is:")) {
       break;
     }
 

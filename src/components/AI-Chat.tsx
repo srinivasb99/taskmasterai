@@ -1,6 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Send, Timer as TimerIcon, Bot, AlertTriangle, MoreVertical } from 'lucide-react';
+import { 
+  Send, 
+  Timer as TimerIcon, 
+  Bot, 
+  AlertTriangle, 
+  MoreHorizontal, 
+  Plus, 
+  PlusCircle, 
+  MessageSquare, 
+  Edit2, 
+  Share, 
+  Trash2 
+} from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { Timer } from './Timer';
 import { FlashcardsQuestions } from './FlashcardsQuestions';
@@ -558,12 +570,10 @@ if (jsonMatch) {
               </div>
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2 text-xs text-gray-400">
-                  <AlertTriangle className="w-4 h-4 text-yellow-400" />
-                  <span>Chat history is saved</span>
                 </div>
                 <div className="flex items-center gap-2 text-xs text-gray-400">
                   <AlertTriangle className="w-4 h-4 text-yellow-400" />
-                  <span>Verify details carefully</span>
+                  <span>TaskMaster can make mistakes. Verify details. </span>
                 </div>
               </div>
             </div>
@@ -688,87 +698,110 @@ if (jsonMatch) {
         </div>
       </main>
 
-      {/* Right Sidebar: Chat Conversations */}
-      <aside className="w-64 border-l border-gray-800 bg-gray-800">
-        <div className="p-4">
-          <h2 className="text-white text-lg font-bold mb-4">Conversations</h2>
-          {conversationList.map((conv) => (
-            <div
-              key={conv.id}
-              className={`flex items-center justify-between cursor-pointer p-2 rounded mb-2 ${
-                conversationId === conv.id
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-700 text-gray-200 hover:bg-gray-600'
-              }`}
-            >
-              <div
-                className="flex-1"
-                onClick={() => handleSelectConversation(conv.id)}
-              >
-                {conv.chatName}
-              </div>
-              {/* 3-dot menu for rename, delete, share */}
-              <div className="relative flex items-center">
-                <MoreVertical
-                  className="w-5 h-5 cursor-pointer"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    const menu = document.getElementById(`conv-menu-${conv.id}`);
-                    if (menu) {
-                      menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
-                    }
-                  }}
-                />
-                <div
-                  id={`conv-menu-${conv.id}`}
-                  className="hidden absolute top-6 right-0 bg-gray-700 text-gray-200 rounded shadow-lg z-50"
-                  style={{ minWidth: '120px' }}
-                >
-                  <button
-                    className="block w-full text-left px-4 py-2 hover:bg-gray-600"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const menu = document.getElementById(`conv-menu-${conv.id}`);
-                      if (menu) menu.style.display = 'none';
-                      handleRenameConversation(conv);
-                    }}
-                  >
-                    Rename
-                  </button>
-                  <button
-                    className="block w-full text-left px-4 py-2 hover:bg-gray-600"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const menu = document.getElementById(`conv-menu-${conv.id}`);
-                      if (menu) menu.style.display = 'none';
-                      handleDeleteConversationClick(conv);
-                    }}
-                  >
-                    Delete
-                  </button>
-                  <button
-                    className="block w-full text-left px-4 py-2 hover:bg-gray-600"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const menu = document.getElementById(`conv-menu-${conv.id}`);
-                      if (menu) menu.style.display = 'none';
-                      handleShareConversation(conv);
-                    }}
-                  >
-                    Share
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
-          <button
-            onClick={handleNewConversation}
-            className="mt-4 w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700 transition-colors"
+{/* Right Sidebar: Chat Conversations */}
+<aside className="w-64 border-l border-gray-800 bg-gray-800">
+  <div className="p-4">
+    <div className="flex items-center justify-between mb-4">
+      <h2 className="text-white text-lg font-bold">Conversations</h2>
+      <button
+        onClick={handleNewConversation}
+        className="flex items-center justify-center p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors"
+      >
+        <Plus className="w-4 h-4" />
+      </button>
+    </div>
+    
+    <div className="space-y-2">
+      {conversationList.map((conv) => (
+        <div
+          key={conv.id}
+          className={`flex items-center justify-between cursor-pointer p-3 rounded-lg transition-all ${
+            conversationId === conv.id
+              ? 'bg-blue-600 text-white'
+              : 'bg-gray-700 text-gray-200 hover:bg-gray-600'
+          }`}
+        >
+          <div
+            className="flex items-center gap-2 flex-1"
+            onClick={() => handleSelectConversation(conv.id)}
           >
-            New Conversation
-          </button>
+            <MessageSquare className="w-4 h-4" />
+            <span className="truncate">{conv.chatName}</span>
+          </div>
+          
+          {/* More actions dropdown */}
+          <div className="relative">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                const menu = document.getElementById(`conv-menu-${conv.id}`);
+                if (menu) {
+                  menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+                }
+              }}
+              className="p-1 rounded-full hover:bg-gray-600 transition-colors"
+            >
+              <MoreHorizontal className="w-4 h-4" />
+            </button>
+            
+            <div
+              id={`conv-menu-${conv.id}`}
+              className="hidden absolute top-8 right-0 bg-gray-700 text-gray-200 rounded-lg shadow-lg z-50"
+              style={{ minWidth: '160px' }}
+            >
+              <button
+                className="flex items-center w-full text-left px-4 py-2 hover:bg-gray-600 rounded-t-lg"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const menu = document.getElementById(`conv-menu-${conv.id}`);
+                  if (menu) menu.style.display = 'none';
+                  handleRenameConversation(conv);
+                }}
+              >
+                <Edit2 className="w-4 h-4 mr-2" />
+                Rename
+              </button>
+              
+              <button
+                className="flex items-center w-full text-left px-4 py-2 hover:bg-gray-600"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const menu = document.getElementById(`conv-menu-${conv.id}`);
+                  if (menu) menu.style.display = 'none';
+                  handleShareConversation(conv);
+                }}
+              >
+                <Share className="w-4 h-4 mr-2" />
+                Share
+              </button>
+              
+              <button
+                className="flex items-center w-full text-left px-4 py-2 hover:bg-gray-600 text-red-400 rounded-b-lg"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const menu = document.getElementById(`conv-menu-${conv.id}`);
+                  if (menu) menu.style.display = 'none';
+                  handleDeleteConversationClick(conv);
+                }}
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete
+              </button>
+            </div>
+          </div>
         </div>
-      </aside>
+      ))}
+    </div>
+    
+    <button
+      onClick={handleNewConversation}
+      className="mt-4 w-full flex items-center justify-center gap-2 bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 transition-colors"
+    >
+      <PlusCircle className="w-5 h-5" />
+      <span>New Conversation</span>
+    </button>
+  </div>
+</aside>
     </div>
   );
 }

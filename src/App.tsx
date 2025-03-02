@@ -6,6 +6,7 @@ import { MainFeatures } from './components/MainFeatures';
 import { Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Analytics } from "@vercel/analytics/react"
+import { SpeedInsights } from "@vercel/speed-insights/react"
 
 function App() {
   const { user, loading } = useAuth();

@@ -1178,40 +1178,43 @@ const resetCustomTimer = (timerId: string, defaultTime?: number) => {
 
 
 
- return (
-    <div className="bg-gray-900 text-white min-h-screen w-full overflow-hidden">
-      {/* Pass collapse state & toggle handler to Sidebar */}
-      <Sidebar 
-        userName={userName}
-        isCollapsed={isSidebarCollapsed}
-        onToggle={handleToggleSidebar}
-      />
+return (
+  <div className="bg-gray-900 text-white min-h-screen w-full overflow-hidden">
+    {/* Pass collapse state & toggle handler to Sidebar */}
+    <Sidebar
+      userName={userName}
+      isCollapsed={isSidebarCollapsed}
+      onToggle={handleToggleSidebar}
+    />
 
-      {/* Adjust the main content's left margin depending on sidebar width */}
-      <main
-        className={`transition-all duration-300 ease-in-out min-h-screen
-          ${isSidebarCollapsed ? 'ml-20' : 'ml-64'} 
-          p-4 lg:p-8 overflow-auto`}
-      >
-{/* Header Section with Calendar */}
-<div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6 mb-6">
-  {/* Greeting Section */}
-  <header className="dashboard-header transform transition-all duration-500 ease-out translate-y-0 opacity-100 pt-16 lg:pt-0">
-  <h1 className="text-2xl lg:text-4xl font-bold mb-2 text-white break-words">
-    {React.cloneElement(greeting.icon, {
-      className:
-        "w-5 h-5 lg:w-6 lg:h-6 inline-block align-middle mr-2 -translate-y-0.5 " +
-        (greeting.icon.props.className ?? "")
-    })}
-    {greeting.greeting}, <span className="font-bold">{userName || "Loading..."}</span>
-  </h1>
-  <p className="text-gray-400 italic text-base lg:text-lg">
-    "{quote.text}" - <span className="text-purple-400">{quote.author}</span>
-  </p>
-</header>
-
-
-
+    {/* Adjust the main content's left margin depending on sidebar width */}
+    <main
+      className={`transition-all duration-300 ease-in-out min-h-screen
+        ${isSidebarCollapsed ? 'ml-20' : 'ml-64'}
+        p-4 lg:p-8 overflow-auto`}
+    >
+      {/* Header Section with Calendar */}
+      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6 mb-6">
+        {/* Greeting Section */}
+        <header className="dashboard-header transform transition-all duration-500 ease-out translate-y-0 opacity-100 pt-16 lg:pt-0">
+          <h1 className="text-2xl lg:text-4xl font-bold mb-2 text-white break-words">
+            {React.cloneElement(greeting.icon, {
+              className:
+                "w-5 h-5 lg:w-6 lg:h-6 inline-block align-middle mr-2 -translate-y-0.5 " +
+                (greeting.icon.props.className ?? "")
+            })}
+            {/* Only display the first name */}
+            {greeting.greeting},{" "}
+            <span className="font-bold">
+              {userName
+                ? userName.split(" ")[0] // Grab only the first part
+                : "Loading..."}
+            </span>
+          </h1>
+          <p className="text-gray-400 italic text-base lg:text-lg">
+            "{quote.text}" - <span className="text-purple-400">{quote.author}</span>
+          </p>
+        </header>
 
   {/* Calendar Card */}
   <div className="bg-gray-800 rounded-xl p-2 min-w-[100px] max-w-[550px] w-full h-[80px] transform hover:scale-[1.02] transition-all duration-300 flex-shrink-0 lg:flex-shrink">

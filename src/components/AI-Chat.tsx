@@ -14,6 +14,13 @@ import { User, onAuthStateChanged } from 'firebase/auth';
 import { geminiApiKey } from '../lib/dashboard-firebase';
 import { onCollectionSnapshot } from '../lib/dashboard-firebase';
 import { getCurrentUser } from '../lib/settings-firebase';
+// Import Firebase chat functions
+import {
+  createChatConversation,
+  saveChatMessage,
+  onChatMessagesSnapshot,
+  onChatConversationsSnapshot,
+} from '../lib/ai-chat-firebase';
 
 const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`;
 
@@ -48,9 +55,10 @@ interface QuestionMessage {
   data: QuestionData[];
 }
 
-interface ChatMessage {
+export interface ChatMessageData {
   role: 'user' | 'assistant';
   content: string;
+  createdAt?: any;
   timer?: TimerMessage;
   flashcard?: FlashcardMessage;
   question?: QuestionMessage;
@@ -98,57 +106,7 @@ const streamResponse = async (
   return accumulatedText;
 };
 
-// Combined prompt function for educational requests
-const createEducationalPrompt = (userMessage: string, type: 'flashcard' | 'question', requestedCount: number): string => {
-  const count = requestedCount;
-  return `Please generate exactly ${count} items for the following request.
-Respond ONLY with a valid JSON object wrapped in a single code block (using triple backticks with "json") and no additional text or explanation.
-
-If the request is about flashcards, the JSON object must have the following structure:
-{
-  "type": "flashcard",
-  "data": [
-    {
-      "id": "1",
-      "question": "Front side of flashcard",
-      "answer": "Back side (concise, less than 50 words)",
-      "topic": "Relevant topic"
-    },
-    ... (repeat for ${count} items)
-  ]
-}
-
-If the request is about quiz questions, the JSON object must have the following structure:
-{
-  "type": "question",
-  "data": [
-    {
-      "id": "1",
-      "question": "Question text",
-      "options": ["Option A", "Option B", "Option C", "Option D"],
-      "correctAnswer": 0,
-      "explanation": "Brief explanation (less than 30 words)"
-    },
-    ... (repeat for ${count} items)
-  ]
-}
-
-Request: ${userMessage}`;
-};
-
-// Helper to update the last assistant message during streaming
-const updateLastAssistantMessage = (newContent: string) => {
-  setChatHistory(prev => {
-    const updated = [...prev];
-    const lastMsg = updated[updated.length - 1];
-    if (lastMsg && lastMsg.role === 'assistant') {
-      updated[updated.length - 1] = { ...lastMsg, content: newContent };
-    }
-    return updated;
-  });
-};
-
-// Extract candidate text from Gemini JSON response (expects valid JSON output)
+// Extract the candidate text from the Gemini JSON response.
 const extractCandidateText = (text: string): string => {
   let candidateText = text;
   try {
@@ -172,23 +130,21 @@ const extractCandidateText = (text: string): string => {
 export function AIChat() {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
   const [userName, setUserName] = useState<string>("Loading...");
   const [chatMessage, setChatMessage] = useState('');
-  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([
-    {
-      role: 'assistant',
-      content: "👋 Hi I'm TaskMaster, How can I help you today? Need help with your items? Simply ask me!"
-    }
-  ]);
+  const [chatHistory, setChatHistory] = useState<ChatMessageData[]>([]);
   const [isChatLoading, setIsChatLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const [tasks, setTasks] = useState<Array<{ id: string; data: any }>>([]);
   const [goals, setGoals] = useState<Array<{ id: string; data: any }>>([]);
   const [projects, setProjects] = useState<Array<{ id: string; data: any }>>([]);
   const [plans, setPlans] = useState<Array<{ id: string; data: any }>>([]);
+  
+  // Conversation state
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [conversationList, setConversationList] = useState<any[]>([]);
 
-  // Sidebar state from localStorage
+  // Sidebar state (left) from localStorage remains as before.
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     const stored = localStorage.getItem('isSidebarCollapsed');
     return stored ? JSON.parse(stored) : false;
@@ -197,11 +153,11 @@ export function AIChat() {
     localStorage.setItem('isSidebarCollapsed', JSON.stringify(isSidebarCollapsed));
   }, [isSidebarCollapsed]);
 
+  // Auth listeners.
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
       if (firebaseUser) setUserName(firebaseUser.displayName || "User");
-      setLoading(false);
     });
     return () => unsubscribe();
   }, []);
@@ -214,9 +170,9 @@ export function AIChat() {
     } else {
       navigate('/login');
     }
-    setLoading(false);
   }, [navigate]);
 
+  // Collection listeners for user items.
   useEffect(() => {
     if (!user) return;
     const unsubTasks = onCollectionSnapshot('tasks', user.uid, (items) => setTasks(items));
@@ -231,13 +187,31 @@ export function AIChat() {
     };
   }, [user]);
 
+  // Listen for conversation list (chat history) for the user.
+  useEffect(() => {
+    if (!user) return;
+    const unsubscribe = onChatConversationsSnapshot(user.uid, (conversations) => {
+      setConversationList(conversations);
+    });
+    return () => unsubscribe();
+  }, [user]);
+
+  // Listen for messages in the selected conversation.
+  useEffect(() => {
+    if (!conversationId) return;
+    const unsubscribe = onChatMessagesSnapshot(conversationId, (messages) => {
+      setChatHistory(messages);
+    });
+    return () => unsubscribe();
+  }, [conversationId]);
+
   const handleToggleSidebar = () => setIsSidebarCollapsed(prev => !prev);
 
   const handleTimerComplete = (timerId: string) => {
-    setChatHistory(prev => [
-      ...prev,
-      { role: 'assistant', content: "⏰ Time's up! Your timer has finished." }
-    ]);
+    if (conversationId && user) {
+      const msg = { role: 'assistant', content: "⏰ Time's up! Your timer has finished." };
+      saveChatMessage(conversationId, msg);
+    }
   };
 
   const parseTimerRequest = (message: string): number | null => {
@@ -278,6 +252,7 @@ export function AIChat() {
     return lines.join('\n');
   };
 
+  // Detect educational requests (flashcards/quiz questions) from user message.
   const detectEducationalRequest = (message: string): { type: 'flashcard' | 'question' | null, count: number } => {
     const flashcardMatch = message.match(/(?:create|make|generate)\s+(?:a\s+set\s+of\s+)?(\d+)?\s*(?:flashcards?|flash\s+cards?|study\s+cards?)/i);
     if (flashcardMatch) {
@@ -292,85 +267,129 @@ export function AIChat() {
     return { type: null, count: 0 };
   };
 
+  // updateLastAssistantMessage now has access to setChatHistory.
+  const updateLastAssistantMessage = (newContent: string) => {
+    setChatHistory(prev => {
+      const updated = [...prev];
+      if (updated.length > 0) {
+        updated[updated.length - 1] = { ...updated[updated.length - 1], content: newContent };
+      }
+      return updated;
+    });
+  };
+
+  // Combined prompt for educational content.
+  const createEducationalPrompt = (userMessage: string, type: 'flashcard' | 'question', requestedCount: number): string => {
+    const count = requestedCount;
+    return `
+[CONTEXT]
+User's Name: ${userName}
+Current Date: ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+Current Time: ${new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}
+
+${formatItemsForChat()}
+
+[CONVERSATION SO FAR]
+${chatHistory.map(m => `${m.role === 'user' ? userName : 'Assistant'}: ${m.content}`).join('\n')}
+
+[NEW USER MESSAGE]
+${userName}: ${userMessage}
+
+You are TaskMaster, a friendly and versatile AI productivity assistant. Engage in casual conversation, provide productivity advice, and discuss ${userName}'s items only when explicitly asked by ${userName}.
+
+Guidelines:
+
+1. General Conversation:
+   - Respond in a friendly, natural tone matching ${userName}'s style.
+   - Do not include any internal instructions, meta commentary, or explanations of your process.
+   - Do not include phrases such as "Here's my response to continue the conversation:" or similar wording.
+   - Do not include or reference code blocks for languages like Python, Bash, or any other unless explicitly requested by ${userName}.
+   - Only reference ${userName}'s items if ${userName} explicitly asks about them.
+
+2. Educational Content (JSON):
+   - If ${userName} explicitly requests educational content (flashcards or quiz questions), provide exactly one JSON object.
+   - Wrap the JSON object in a single code block using triple backticks and the "json" language identifier.
+   - Use one of the following formats:
+
+     For flashcards:
+     {
+       "type": "flashcard",
+       "data": [
+         {
+           "id": "unique-id-1",
+           "question": "Question 1",
+           "answer": "Answer 1",
+           "topic": "Subject area"
+         },
+         {
+           "id": "unique-id-2",
+           "question": "Question 2",
+           "answer": "Answer 2",
+           "topic": "Subject area"
+         }
+       ]
+     }
+
+     For quiz questions:
+     {
+       "type": "question",
+       "data": [
+         {
+           "id": "unique-id-1",
+           "question": "Question 1",
+           "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
+           "correctAnswer": 0,
+           "explanation": "Explanation 1"
+         },
+         {
+           "id": "unique-id-2",
+           "question": "Question 2",
+           "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
+           "correctAnswer": 1,
+           "explanation": "Explanation 2"
+         }
+       ]
+     }
+
+3. Response Structure:
+   - Provide a direct response to ${userName} without any extraneous openings or meta-text.
+   - Do not mix JSON with regular text. JSON is only for requested educational content.
+   - Always address ${userName} in a friendly, helpful tone.
+`;
+  };
+
+  // Handle sending a message.
   const handleChatSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!chatMessage.trim()) return;
-    const timerDuration = parseTimerRequest(chatMessage);
-    const userMsg: ChatMessage = { role: 'user', content: chatMessage };
-    setChatHistory(prev => [...prev, userMsg]);
+    if (!chatMessage.trim() || !user) return;
+
+    // If no conversation is selected, create one.
+    if (!conversationId) {
+      const newConvId = await createChatConversation(user.uid, "New Chat");
+      setConversationId(newConvId);
+    }
+
+    // Save user's message.
+    const userMsg: ChatMessageData = { role: 'user', content: chatMessage };
+    await saveChatMessage(conversationId!, userMsg);
     setChatMessage('');
 
+    // Check for timer request.
+    const timerDuration = parseTimerRequest(userMsg.content);
     if (timerDuration) {
       const timerId = Math.random().toString(36).substr(2, 9);
-      setChatHistory(prev => [
-        ...prev,
-        { role: 'assistant', content: `Starting a timer for ${timerDuration} seconds.`, timer: { type: 'timer', duration: timerDuration, id: timerId } }
-      ]);
+      const timerMsg: ChatMessageData = { role: 'assistant', content: `Starting a timer for ${timerDuration} seconds.`, timer: { type: 'timer', duration: timerDuration, id: timerId } };
+      await saveChatMessage(conversationId!, timerMsg);
       return;
     }
 
+    // Check if educational content is requested.
     const educationalRequest = detectEducationalRequest(userMsg.content);
-    setIsChatLoading(true);
-
-    try {
-      // Educational branch: use our combined prompt
-      if (educationalRequest.type) {
-        setChatHistory(prev => [...prev, { role: 'assistant', content: "" }]);
-        const educationalPrompt = createEducationalPrompt(userMsg.content, educationalRequest.type, educationalRequest.count);
-        const options = {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: educationalPrompt }] }]
-          })
-        };
-        const rawText = await streamResponse(geminiEndpoint, options, (text) => {
-          updateLastAssistantMessage(text);
-        }, 45000);
-        const finalText = extractCandidateText(rawText);
-        if (finalText) {
-          // For educational content, we assume the JSON is now valid and properly formatted.
-          setChatHistory(prev => {
-            const filteredPrev = prev.filter(msg => msg.role !== 'assistant' || msg.content !== "");
-            return [
-              ...filteredPrev,
-              { role: 'assistant', content: finalText.trim() }
-            ];
-          });
-          setIsChatLoading(false);
-          return;
-        } else {
-          throw new Error('No valid candidate text found.');
-        }
-      }
-
-      // Regular chat branch
-      setChatHistory(prev => [...prev, { role: 'assistant', content: "" }]);
-      const conversation = chatHistory
-        .map(m => `${m.role === 'user' ? userName : 'Assistant'}: ${m.content}`)
-        .join('\n');
-      const itemsText = formatItemsForChat();
-      const now = new Date();
-      const currentDateTime = {
-        date: now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
-        time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
-      };
-      const prompt = `
-[CONTEXT]
-User's Name: ${userName}
-Current Date: ${currentDateTime.date}
-Current Time: ${currentDateTime.time}
-
-${itemsText}
-
-[CONVERSATION SO FAR]
-${conversation}
-
-[NEW USER MESSAGE]
-${userName}: ${userMsg.content}
-
-You are TaskMaster, a friendly and versatile AI productivity assistant. Engage in casual conversation, provide productivity advice, and discuss ${userName}'s items.
-`;
+    if (educationalRequest.type) {
+      // Insert a placeholder assistant message.
+      await saveChatMessage(conversationId!, { role: 'assistant', content: "" });
+      // Build the full prompt.
+      const prompt = createEducationalPrompt(userMsg.content, educationalRequest.type, educationalRequest.count);
       const options = {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -380,38 +399,82 @@ You are TaskMaster, a friendly and versatile AI productivity assistant. Engage i
       };
       const rawText = await streamResponse(geminiEndpoint, options, (text) => {
         updateLastAssistantMessage(text);
-      }, 30000);
+      }, 45000);
       const finalText = extractCandidateText(rawText);
-      setChatHistory(prev => {
-        const updated = [...prev];
-        updated[updated.length - 1] = { ...updated[updated.length - 1], content: finalText.trim() };
-        return updated;
-      });
-    } catch (err: any) {
-      console.error('Chat error:', err);
-      if (err.name === 'AbortError') {
-        setChatHistory(prev => [
-          ...prev,
-          { role: 'assistant', content: "I'm sorry, that request is taking longer than expected. Please try a more specific topic or fewer items." }
-        ]);
+      if (finalText) {
+        // Save assistant's response.
+        await saveChatMessage(conversationId!, { role: 'assistant', content: finalText.trim() });
+        setIsChatLoading(false);
+        return;
       } else {
-        setChatHistory(prev => [
-          ...prev,
-          { role: 'assistant', content: 'Sorry, I had an issue responding. Please try again in a moment.' }
-        ]);
+        throw new Error('No valid candidate text found.');
       }
-    } finally {
-      setIsChatLoading(false);
     }
+
+    // Regular conversation processing.
+    // Insert a placeholder assistant message.
+    await saveChatMessage(conversationId!, { role: 'assistant', content: "" });
+    const conversationText = chatHistory
+      .map(m => `${m.role === 'user' ? userName : 'Assistant'}: ${m.content}`)
+      .join('\n');
+    const itemsText = formatItemsForChat();
+    const now = new Date();
+    const currentDateTime = {
+      date: now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
+      time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
+    };
+    const prompt = `
+[CONTEXT]
+User's Name: ${userName}
+Current Date: ${currentDateTime.date}
+Current Time: ${currentDateTime.time}
+
+${itemsText}
+
+[CONVERSATION SO FAR]
+${conversationText}
+
+[NEW USER MESSAGE]
+${userName}: ${userMsg.content}
+
+You are TaskMaster, a friendly and versatile AI productivity assistant. Engage in casual conversation, provide productivity advice, and discuss ${userName}'s items.
+`;
+    const options = {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }]
+      })
+    };
+    const rawText = await streamResponse(geminiEndpoint, options, (text) => {
+      updateLastAssistantMessage(text);
+    }, 30000);
+    const finalText = extractCandidateText(rawText);
+    await saveChatMessage(conversationId!, { role: 'assistant', content: finalText.trim() });
+  };
+
+  // Handler to create a new conversation.
+  const handleNewConversation = async () => {
+    if (!user) return;
+    const newConvId = await createChatConversation(user.uid, "New Chat");
+    setConversationId(newConvId);
+    setChatHistory([]); // Reset current conversation messages.
+  };
+
+  // Handler to select an existing conversation.
+  const handleSelectConversation = (convId: string) => {
+    setConversationId(convId);
   };
 
   return (
     <div className="flex h-screen bg-gray-900">
+      {/* Left Sidebar */}
       <Sidebar 
         isCollapsed={isSidebarCollapsed} 
         onToggle={handleToggleSidebar}
         userName={userName}
       />
+      {/* Main Chat Area */}
       <main className={`flex-1 overflow-hidden transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'}`}>
         <div className="h-full flex flex-col">
           {/* Header */}
@@ -427,11 +490,11 @@ You are TaskMaster, a friendly and versatile AI productivity assistant. Engage i
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2 text-xs text-gray-400">
                   <AlertTriangle className="w-4 h-4 text-yellow-400" />
-                  <span>Chat history is not saved</span>
+                  <span>Chat history is saved</span>
                 </div>
                 <div className="flex items-center gap-2 text-xs text-gray-400">
                   <AlertTriangle className="w-4 h-4 text-yellow-400" />
-                  <span>TaskMaster can make mistakes. Verify details.</span>
+                  <span>Verify details carefully</span>
                 </div>
               </div>
             </div>
@@ -511,6 +574,27 @@ You are TaskMaster, a friendly and versatile AI productivity assistant. Engage i
           </form>
         </div>
       </main>
+      {/* Right Sidebar: Chat Conversations */}
+      <aside className="w-64 border-l border-gray-800 bg-gray-800">
+        <div className="p-4">
+          <h2 className="text-white text-lg font-bold mb-4">Conversations</h2>
+          {conversationList.map((conv) => (
+            <div
+              key={conv.id}
+              onClick={() => handleSelectConversation(conv.id)}
+              className={`cursor-pointer p-2 rounded mb-2 ${conversationId === conv.id ? "bg-blue-600 text-white" : "bg-gray-700 text-gray-200 hover:bg-gray-600"}`}
+            >
+              {conv.chatName}
+            </div>
+          ))}
+          <button
+            onClick={handleNewConversation}
+            className="mt-4 w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700 transition-colors"
+          >
+            New Conversation
+          </button>
+        </div>
+      </aside>
     </div>
   );
 }

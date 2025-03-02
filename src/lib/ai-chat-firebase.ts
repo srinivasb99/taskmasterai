@@ -2,7 +2,7 @@
 
 import { db } from './firebase';
 import { 
-  collection, addDoc, doc, setDoc, updateDoc, serverTimestamp, onSnapshot, query, orderBy 
+  collection, addDoc, doc, setDoc, updateDoc, serverTimestamp, onSnapshot, query, where, orderBy 
 } from "firebase/firestore";
 
 // Type definition for a chat message.
@@ -48,6 +48,22 @@ export function onChatMessagesSnapshot(conversationId: string, callback: (messag
       messages.push(docSnap.data() as ChatMessage);
     });
     callback(messages);
+  });
+}
+
+// Listen for real-time updates to the list of chat conversations for a user.
+export function onChatConversationsSnapshot(userId: string, callback: (conversations: any[]) => void) {
+  const conversationsQuery = query(
+    collection(db, "chatConversations"),
+    where("userId", "==", userId),
+    orderBy("updatedAt", "desc")
+  );
+  return onSnapshot(conversationsQuery, (snapshot) => {
+    const conversations: any[] = [];
+    snapshot.forEach(docSnap => {
+      conversations.push({ id: docSnap.id, ...docSnap.data() });
+    });
+    callback(conversations);
   });
 }
 

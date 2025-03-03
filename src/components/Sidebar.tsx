@@ -64,7 +64,7 @@ export function Sidebar({
   return (
     <div
       className={`
-        fixed top-0 left-0 h-full bg-gray-950 flex flex-col
+        fixed top-0 left-0 h-full bg-[#111827] flex flex-col
         py-6 px-3 font-poppins border-r border-gray-800/50
         transition-all duration-300 ease-in-out
         ${isCollapsed ? 'w-20' : 'w-64'}
@@ -106,8 +106,8 @@ export function Sidebar({
               className={`flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 rounded-lg transition-all duration-200
                 ${
                   isActive
-                    ? 'bg-gray-900 text-white font-medium'
-                    : 'hover:bg-gray-900/80 hover:text-white'
+                    ? 'bg-gray-800 text-white font-medium'
+                    : 'hover:bg-gray-800/70 hover:text-white'
                 }
               `}
             >
@@ -120,7 +120,7 @@ export function Sidebar({
         {/* Toggle Button */}
         <button
           onClick={onToggle}
-          className="absolute -right-4 top-6 bg-gray-950 p-1.5 rounded-full border border-gray-800/50 text-gray-400 hover:text-white transition-colors z-50"
+          className="absolute -right-4 top-6 bg-[#111827] p-1.5 rounded-full border border-gray-800/50 text-gray-400 hover:text-white transition-colors z-50"
         >
           {isCollapsed ? (
             <PanelLeftOpen className="w-4 h-4 min-w-[1rem]" strokeWidth={2} />
@@ -158,7 +158,7 @@ export function Sidebar({
             onClick={() => navigate('/settings')}
             className={`
               mx-3 flex items-center gap-3 text-gray-300
-              rounded-lg hover:bg-gray-900/50 transition-colors
+              rounded-lg hover:bg-gray-800/50 transition-colors
               ${isCollapsed ? 'justify-center aspect-square' : 'px-4 py-2.5'}
             `}
           >

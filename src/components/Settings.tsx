@@ -12,7 +12,9 @@ import {
   AlertCircle, 
   Crown,
   Upload,
-  Camera
+  Camera,
+  Moon,
+  Sun
 } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { 
@@ -45,6 +47,12 @@ export function Settings() {
   // Sidebar state
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     const stored = localStorage.getItem('isSidebarCollapsed');
+    return stored ? JSON.parse(stored) : false;
+  });
+
+  // Blackout mode state
+  const [isBlackoutEnabled, setIsBlackoutEnabled] = useState(() => {
+    const stored = localStorage.getItem('isBlackoutEnabled');
     return stored ? JSON.parse(stored) : false;
   });
 
@@ -103,8 +111,19 @@ export function Settings() {
     localStorage.setItem('isSidebarCollapsed', JSON.stringify(isSidebarCollapsed));
   }, [isSidebarCollapsed]);
 
+  // Update localStorage whenever the blackout mode changes
+  useEffect(() => {
+    localStorage.setItem('isBlackoutEnabled', JSON.stringify(isBlackoutEnabled));
+    // Apply blackout mode to the document body
+    document.body.classList.toggle('blackout-mode', isBlackoutEnabled);
+  }, [isBlackoutEnabled]);
+
   const handleToggleSidebar = () => {
     setIsSidebarCollapsed(prev => !prev);
+  };
+
+  const handleToggleBlackout = () => {
+    setIsBlackoutEnabled(prev => !prev);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -253,8 +272,11 @@ export function Settings() {
     }
   };
 
+  // Determine the background color based on blackout mode
+  const bgColor = isBlackoutEnabled ? 'bg-gray-950' : 'bg-gray-900';
+
   return (
-    <div className="flex h-screen bg-gray-900">
+    <div className={`flex h-screen ${bgColor}`}>
       <Sidebar 
         isCollapsed={isSidebarCollapsed} 
         onToggle={() => setIsSidebarCollapsed(prev => {
@@ -299,6 +321,35 @@ export function Settings() {
             <p className="text-gray-400 mt-2">
               Manage your account settings and preferences
             </p>
+          </div>
+
+          {/* Appearance Settings Card */}
+          <div className="bg-gray-800 rounded-xl p-6 mb-6">
+            <h2 className="text-xl font-semibold text-white mb-4">Appearance</h2>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <div className="mr-4">
+                  {isBlackoutEnabled ? (
+                    <Moon className="w-6 h-6 text-blue-400" />
+                  ) : (
+                    <Sun className="w-6 h-6 text-yellow-400" />
+                  )}
+                </div>
+                <div>
+                  <p className="text-white font-medium">Blackout Mode</p>
+                  <p className="text-gray-400 text-sm">Use darker background for reduced eye strain</p>
+                </div>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isBlackoutEnabled}
+                  onChange={handleToggleBlackout}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+              </label>
+            </div>
           </div>
 
           {/* Profile Picture Section */}

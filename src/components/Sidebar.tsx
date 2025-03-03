@@ -12,8 +12,6 @@ import {
   CircleUserRound,
   PanelLeftClose,
   PanelLeftOpen,
-  Moon,
-  Sun,
 } from 'lucide-react';
 import { Logo } from './Logo';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -124,23 +122,48 @@ export function Sidebar({
           );
         })}
 
-        {/* Blackout Mode Toggle Button */}
-        <button
-          onClick={onBlackoutToggle}
-          className={`
-            flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 rounded-lg transition-all duration-200
-            hover:bg-gray-800/70 hover:text-white
-          `}
-        >
-          <div className="relative w-5 h-5 min-w-[1.25rem] flex items-center justify-center">
-            {blackoutMode ? (
-              <Moon className="w-5 h-5 text-white" strokeWidth={2} />
-            ) : (
-              <Sun className="w-5 h-5 text-yellow-400" strokeWidth={2} />
-            )}
+        {/* Blackout Mode Toggle */}
+        <div className={`flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 rounded-lg transition-all duration-200`}>
+          <div className="min-w-[1.25rem]">
+            <button 
+              onClick={onBlackoutToggle} 
+              className={`relative inline-flex h-6 w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${blackoutMode ? 'bg-gray-800' : 'bg-gray-700'}`}
+              aria-checked={blackoutMode}
+              role="switch"
+            >
+              <span className="sr-only">Toggle Blackout Mode</span>
+              
+              {/* Sun icon - Light mode */}
+              <span 
+                className={`absolute left-1 top-1/2 -translate-y-1/2 text-yellow-400 transition-opacity ${blackoutMode ? 'opacity-0' : 'opacity-100'}`}
+                aria-hidden="true"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="12" cy="12" r="5" fill="currentColor" />
+                </svg>
+              </span>
+              
+              {/* Moon icon - Dark mode */}
+              <span 
+                className={`absolute right-1 top-1/2 -translate-y-1/2 text-gray-200 transition-opacity ${blackoutMode ? 'opacity-100' : 'opacity-0'}`}
+                aria-hidden="true"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M17.5 12C17.5 15.0376 15.0376 17.5 12 17.5C8.96243 17.5 6.5 15.0376 6.5 12C6.5 8.96243 8.96243 6.5 12 6.5C15.0376 6.5 17.5 8.96243 17.5 12Z" fill="transparent" stroke="currentColor" />
+                  <path d="M15 10C15 8.34315 13.6569 7 12 7C10.3431 7 9 8.34315 9 10C9 8.34315 10.3431 7 12 7C13.6569 7 15 8.34315 15 10Z" fill="currentColor" />
+                </svg>
+              </span>
+              
+              {/* Toggle knob */}
+              <span 
+                className={`absolute top-0.5 left-0.5 h-5 w-5 transform rounded-full bg-white transition-transform ${blackoutMode ? 'translate-x-6' : 'translate-x-0'}`}
+                aria-hidden="true"
+              />
+            </button>
           </div>
-          {!isCollapsed && <span>Blackout</span>}
-        </button>
+          
+          {!isCollapsed && <span>Blackout Mode</span>}
+        </div>
 
         {/* Toggle Button */}
         <button

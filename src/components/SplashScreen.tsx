@@ -45,14 +45,14 @@ function SplashScreen() {
     {
       icon: Users2,
       title: 'Community',
-      description: 'A collaborative space where knowledge meets AI. Share and discover files, notes, and resources with fellow users. Features include: AI-powered content analysis for shared files, smart file categorization, secure file sharing with granular privacy controls, real-time collaboration tools, community ratings and reviews, personalized content recommendations, and the ability to ask AI questions about any public content. Build your network, learn from others, and contribute to a growing knowledge base.',
+      description: 'A collaborative space where knowledge meets AI. Share files, notes, and resources, with smart categorization, secure sharing, real-time collaboration, and AI-powered insights. Connect, learn, and contribute to a growing knowledge base.',
       isNew: true,
       link: '/community'
     },
     {
       icon: Bot,
       title: 'AI Assistant',
-      description: 'Your personal productivity assistant powered by advanced AI. Get instant answers to complex questions, receive suggestions for task optimization, and get help with time management. The AI learns from your work patterns to provide personalized productivity tips, helps break down large projects into manageable tasks, and can even draft responses or summarize long content for you. With access to your notes, it can answer your questions, help you organize and retrieve information, and assist with your tasks, goals, projects, plans, and events—anything you need to stay on top of your life. Available 24/7 for everything from quick queries to deep problem-solving,  it\'s your ultimate tool for productivity and organization.',
+      description: 'Your AI-powered productivity partner. Get instant answers to complex questions and optimize tasks. TaskMaster learns from your workflow to provide personalized tips, break down big projects, and summarize content. With access to your notes, it helps you stay organized with tasks and goals. It’s always there from all quick queries to in-depth projects.',
       isNew: true,
       link: '/ai',
       image: 'https://firebasestorage.googleapis.com/v0/b/deepworkai-c3419.appspot.com/o/Screenshot%202025-03-02%20at%207.50.48%E2%80%AFPM.png?alt=media&token=6f761a6b-1000-4f4a-a2a5-172f5af6df44'

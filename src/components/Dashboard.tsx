@@ -39,13 +39,82 @@ import {
   deleteCustomTimer,
   weatherApiKey,
   hfApiKey,
+  geminiApiKey, // Added for Gemini integration
 } from '../lib/dashboard-firebase';
 import { auth } from '../lib/firebase'
 import { User, onAuthStateChanged } from 'firebase/auth'
 import { updateUserProfile, signOutUser, deleteUserAccount, AuthError, getCurrentUser } from '../lib/settings-firebase';
 
+// ---------------------
+// Helper functions for Gemini integration
+// ---------------------
+const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`;
 
+const fetchWithTimeout = async (url: string, options: RequestInit, timeout = 30000) => {
+  const controller = new AbortController();
+  const { signal } = controller;
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+  try {
+    const response = await fetch(url, { ...options, signal });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    throw error;
+  }
+};
+
+const streamResponse = async (
+  url: string,
+  options: RequestInit,
+  onStreamUpdate: (textChunk: string) => void,
+  timeout = 30000
+) => {
+  const response = await fetchWithTimeout(url, options, timeout);
+  if (!response.body) {
+    const text = await response.text();
+    onStreamUpdate(text);
+    return text;
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder("utf-8");
+  let done = false;
+  let accumulatedText = "";
+  while (!done) {
+    const { value, done: doneReading } = await reader.read();
+    done = doneReading;
+    if (value) {
+      const chunk = decoder.decode(value, { stream: !done });
+      accumulatedText += chunk;
+      onStreamUpdate(accumulatedText);
+    }
+  }
+  return accumulatedText;
+};
+
+const extractCandidateText = (text: string): string => {
+  let candidateText = text;
+  try {
+    const jsonResponse = JSON.parse(text);
+    if (
+      jsonResponse &&
+      jsonResponse.candidates &&
+      jsonResponse.candidates[0] &&
+      jsonResponse.candidates[0].content &&
+      jsonResponse.candidates[0].content.parts &&
+      jsonResponse.candidates[0].content.parts[0]
+    ) {
+      candidateText = jsonResponse.candidates[0].content.parts[0].text;
+    }
+  } catch (err) {
+    console.error("Error parsing Gemini response:", err);
+  }
+  return candidateText;
+};
+
+// ---------------------
 // Helper functions (place these OUTSIDE and BEFORE your component)
+// ---------------------
 const getWeekDates = (date: Date): Date[] => {
   const sunday = new Date(date);
   sunday.setDate(date.getDate() - date.getDay());
@@ -100,205 +169,200 @@ export function Dashboard() {
     setIsSidebarCollapsed((prev) => !prev);
   };
   
-const [currentWeek, setCurrentWeek] = useState<Date[]>(getWeekDates(new Date()));
-const today = new Date();
+  const [currentWeek, setCurrentWeek] = useState<Date[]>(getWeekDates(new Date()));
+  const today = new Date();
 
-
-// ---------------------
-// Types for timer messages
-interface TimerMessage {
-  type: 'timer';
-  duration: number;
-  id: string;
-}
-
-// Types for flashcard and question messages
-interface FlashcardData {
-  id: string;
-  question: string;
-  answer: string;
-  topic: string;
-}
-
-interface QuestionData {
-  id: string;
-  question: string;
-  options: string[];
-  correctAnswer: number;
-  explanation: string;
-}
-
-interface FlashcardMessage {
-  type: 'flashcard';
-  data: FlashcardData[];  // Changed to array
-}
-
-interface QuestionMessage {
-  type: 'question';
-  data: QuestionData[];   // Changed to array
-}
-
-interface ChatMessage {
-  role: 'user' | 'assistant';
-  content: string;
-  timer?: TimerMessage;
-  flashcard?: FlashcardMessage;
-  question?: QuestionMessage;
-}
-
-// ---------------------
-// CHAT MODAL (NEW AI CHAT FUNCTIONALITY)
-// ---------------------
-const [isChatModalOpen, setIsChatModalOpen] = useState(false);
-const [chatMessage, setChatMessage] = useState('');
-const [chatHistory, setChatHistory] = useState<ChatMessage[]>([
-  {
-    role: 'assistant',
-    content: "👋 Hi I'm TaskMaster, How can I help you today? Need help with your items? Simply ask me!"
+  // ---------------------
+  // Types for timer messages
+  interface TimerMessage {
+    type: 'timer';
+    duration: number;
+    id: string;
   }
-]);
-const [isChatLoading, setIsChatLoading] = useState(false);
-const chatEndRef = useRef<HTMLDivElement>(null);
 
+  // Types for flashcard and question messages
+  interface FlashcardData {
+    id: string;
+    question: string;
+    answer: string;
+    topic: string;
+  }
 
+  interface QuestionData {
+    id: string;
+    question: string;
+    options: string[];
+    correctAnswer: number;
+    explanation: string;
+  }
 
+  interface FlashcardMessage {
+    type: 'flashcard';
+    data: FlashcardData[];  // Changed to array
+  }
 
+  interface QuestionMessage {
+    type: 'question';
+    data: QuestionData[];   // Changed to array
+  }
 
-// Timer handling functions
-const handleTimerComplete = (timerId: string) => {
-  setChatHistory(prev => [
-    ...prev,
+  interface ChatMessage {
+    role: 'user' | 'assistant';
+    content: string;
+    timer?: TimerMessage;
+    flashcard?: FlashcardMessage;
+    question?: QuestionMessage;
+  }
+
+  // ---------------------
+  // CHAT MODAL (NEW AI CHAT FUNCTIONALITY)
+  // ---------------------
+  const [isChatModalOpen, setIsChatModalOpen] = useState(false);
+  const [chatMessage, setChatMessage] = useState('');
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([
     {
       role: 'assistant',
-      content: "⏰ Time's up! Your timer has finished."
+      content: "👋 Hi I'm TaskMaster, How can I help you today? Need help with your items? Simply ask me!"
     }
   ]);
-};
+  const [isChatLoading, setIsChatLoading] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
-const parseTimerRequest = (message: string): number | null => {
-  const timeRegex = /(\d+)\s*(minutes?|mins?|hours?|hrs?|seconds?|secs?)/i;
-  const match = message.match(timeRegex);
-  
-  if (!match) return null;
-  
-  const amount = parseInt(match[1]);
-  const unit = match[2].toLowerCase();
-  
-  if (unit.startsWith('hour') || unit.startsWith('hr')) {
-    return amount * 3600;
-  } else if (unit.startsWith('min')) {
-    return amount * 60;
-  } else if (unit.startsWith('sec')) {
-    return amount;
-  }
-  
-  return null;
-};
-
-// Whenever chatHistory changes, scroll to the bottom of the chat
-useEffect(() => {
-  if (chatEndRef.current) {
-    chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
-  }
-}, [chatHistory]);
-
-// Utility: Format the user's tasks/goals/projects/plans as text
-const formatItemsForChat = () => {
-  const lines: string[] = [];
-
-  lines.push(`${userName}'s items:\n`);
-
-  tasks.forEach((t) => {
-    const due = t.data.dueDate?.toDate?.();
-    lines.push(
-      `Task: ${t.data.task || 'Untitled'}${
-        due ? ` (Due: ${due.toLocaleDateString()})` : ''
-      }`
-    );
-  });
-  goals.forEach((g) => {
-    const due = g.data.dueDate?.toDate?.();
-    lines.push(
-      `Goal: ${g.data.goal || 'Untitled'}${
-        due ? ` (Due: ${due.toLocaleDateString()})` : ''
-      }`
-    );
-  });
-  projects.forEach((p) => {
-    const due = p.data.dueDate?.toDate?.();
-    lines.push(
-      `Project: ${p.data.project || 'Untitled'}${
-        due ? ` (Due: ${due.toLocaleDateString()})` : ''
-      }`
-    );
-  });
-  plans.forEach((p) => {
-    const due = p.data.dueDate?.toDate?.();
-    lines.push(
-      `Plan: ${p.data.plan || 'Untitled'}${
-        due ? ` (Due: ${due.toLocaleDateString()})` : ''
-      }`
-    );
-  });
-
-  return lines.join('\n');
-};
-
-// NEW handleChatSubmit with updated prompt
-const handleChatSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  if (!chatMessage.trim()) return;
-
-  // Check for timer request
-  const timerDuration = parseTimerRequest(chatMessage);
-  const userMsg: ChatMessage = { 
-    role: 'user',
-    content: chatMessage
-  };
-  
-  setChatHistory(prev => [...prev, userMsg]);
-  setChatMessage('');
-
-  // If it's a timer request, add timer immediately
-  if (timerDuration) {
-    const timerId = Math.random().toString(36).substr(2, 9);
+  // Timer handling functions
+  const handleTimerComplete = (timerId: string) => {
     setChatHistory(prev => [
       ...prev,
       {
         role: 'assistant',
-        content: `Starting a timer for ${timerDuration} seconds.`,
-        timer: {
-          type: 'timer',
-          duration: timerDuration,
-          id: timerId
-        }
+        content: "⏰ Time's up! Your timer has finished."
       }
     ]);
-    return;
-  }
-
-  // Regular chat processing
-  const conversation = chatHistory
-    .map((m) => `${m.role === 'user' ? userName : 'Assistant'}: ${m.content}`)
-    .join('\n');
-  const itemsText = formatItemsForChat();
-
-  const now = new Date();
-  const currentDateTime = {
-    date: now.toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    }),
-    time: now.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
-    })
   };
 
-const prompt = `
+  const parseTimerRequest = (message: string): number | null => {
+    const timeRegex = /(\d+)\s*(minutes?|mins?|hours?|hrs?|seconds?|secs?)/i;
+    const match = message.match(timeRegex);
+    
+    if (!match) return null;
+    
+    const amount = parseInt(match[1]);
+    const unit = match[2].toLowerCase();
+    
+    if (unit.startsWith('hour') || unit.startsWith('hr')) {
+      return amount * 3600;
+    } else if (unit.startsWith('min')) {
+      return amount * 60;
+    } else if (unit.startsWith('sec')) {
+      return amount;
+    }
+    
+    return null;
+  };
+
+  // Whenever chatHistory changes, scroll to the bottom of the chat
+  useEffect(() => {
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [chatHistory]);
+
+  // Utility: Format the user's tasks/goals/projects/plans as text
+  const formatItemsForChat = () => {
+    const lines: string[] = [];
+
+    lines.push(`${userName}'s items:\n`);
+
+    tasks.forEach((t) => {
+      const due = t.data.dueDate?.toDate?.();
+      lines.push(
+        `Task: ${t.data.task || 'Untitled'}${
+          due ? ` (Due: ${due.toLocaleDateString()})` : ''
+        }`
+      );
+    });
+    goals.forEach((g) => {
+      const due = g.data.dueDate?.toDate?.();
+      lines.push(
+        `Goal: ${g.data.goal || 'Untitled'}${
+          due ? ` (Due: ${due.toLocaleDateString()})` : ''
+        }`
+      );
+    });
+    projects.forEach((p) => {
+      const due = p.data.dueDate?.toDate?.();
+      lines.push(
+        `Project: ${p.data.project || 'Untitled'}${
+          due ? ` (Due: ${due.toLocaleDateString()})` : ''
+        }`
+      );
+    });
+    plans.forEach((p) => {
+      const due = p.data.dueDate?.toDate?.();
+      lines.push(
+        `Plan: ${p.data.plan || 'Untitled'}${
+          due ? ` (Due: ${due.toLocaleDateString()})` : ''
+        }`
+      );
+    });
+
+    return lines.join('\n');
+  };
+
+  // NEW handleChatSubmit with Gemini integration
+  const handleChatSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatMessage.trim()) return;
+
+    // Check for timer request
+    const timerDuration = parseTimerRequest(chatMessage);
+    const userMsg: ChatMessage = { 
+      role: 'user',
+      content: chatMessage
+    };
+    
+    setChatHistory(prev => [...prev, userMsg]);
+    setChatMessage('');
+
+    // If it's a timer request, add timer immediately
+    if (timerDuration) {
+      const timerId = Math.random().toString(36).substr(2, 9);
+      setChatHistory(prev => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: `Starting a timer for ${timerDuration} seconds.`,
+          timer: {
+            type: 'timer',
+            duration: timerDuration,
+            id: timerId
+          }
+        }
+      ]);
+      return;
+    }
+
+    // Regular chat processing
+    const conversation = chatHistory
+      .map((m) => `${m.role === 'user' ? userName : 'Assistant'}: ${m.content}`)
+      .join('\n');
+    const itemsText = formatItemsForChat();
+
+    const now = new Date();
+    const currentDateTime = {
+      date: now.toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      }),
+      time: now.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      })
+    };
+
+    const prompt = `
 [CONTEXT]
 User's Name: ${userName}
 Current Date: ${currentDateTime.date}
@@ -381,98 +445,80 @@ Guidelines:
 Follow these instructions strictly.
 `;
 
-
-  setIsChatLoading(true);
-  try {
-    const response = await fetch(
-      'https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct',
-      {
+    setIsChatLoading(true);
+    try {
+      const geminiOptions = {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${hfApiKey}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          inputs: prompt,
-          parameters: {
-            max_new_tokens: 3000,
-            temperature: 0.5,
-            top_p: 0.9,
-            return_full_text: false,
-            repetition_penalty: 1.2,
-            do_sample: true,
-          },
-        }),
-      }
-    );
+          contents: [{ parts: [{ text: prompt }] }]
+        })
+      };
 
-    if (!response.ok) throw new Error('Chat API request failed');
-    const result = await response.json();
+      let finalResponse = '';
+      await streamResponse(geminiEndpoint, geminiOptions, (chunk) => {
+        finalResponse = chunk;
+      }, 45000);
 
-let assistantReply = (result[0]?.generated_text as string || '')
-  .replace(/\[\/?INST\]|<</g, '')
-  .split('\n')
-  .filter(line => !/^(print|python)/i.test(line.trim()))
-  .join('\n')
-  .trim();
+      const finalText = extractCandidateText(finalResponse).trim() || '';
+      let assistantReply = finalText;
 
-
-    // Parse any JSON content in the response
-    const jsonMatch = assistantReply.match(/```json\n([\s\S]*?)\n```/);
-    if (jsonMatch) {
-      try {
-        const jsonContent = JSON.parse(jsonMatch[1].trim());
-        // Remove the JSON block from the text response
-        assistantReply = assistantReply.replace(/```json\n[\s\S]*?\n```/, '').trim();
-        
-        // Validate JSON structure
-        if (
-          jsonContent.type &&
-          jsonContent.data &&
-          (jsonContent.type === 'flashcard' || jsonContent.type === 'question')
-        ) {
+      // Parse any JSON content in the response
+      const jsonMatch = assistantReply.match(/```json\n([\s\S]*?)\n```/);
+      if (jsonMatch) {
+        try {
+          const jsonContent = JSON.parse(jsonMatch[1].trim());
+          // Remove the JSON block from the text response
+          assistantReply = assistantReply.replace(/```json\n[\s\S]*?\n```/, '').trim();
+          
+          // Validate JSON structure
+          if (
+            jsonContent.type &&
+            jsonContent.data &&
+            (jsonContent.type === 'flashcard' || jsonContent.type === 'question')
+          ) {
+            setChatHistory((prev) => [
+              ...prev,
+              {
+                role: 'assistant',
+                content: assistantReply,
+                ...(jsonContent.type === 'flashcard' && { flashcard: jsonContent }),
+                ...(jsonContent.type === 'question' && { question: jsonContent })
+              },
+            ]);
+          } else {
+            throw new Error('Invalid JSON structure');
+          }
+        } catch (e) {
+          console.error('Failed to parse JSON content:', e);
           setChatHistory((prev) => [
             ...prev,
-            {
-              role: 'assistant',
-              content: assistantReply,
-              ...(jsonContent.type === 'flashcard' && { flashcard: jsonContent }),
-              ...(jsonContent.type === 'question' && { question: jsonContent })
+            { 
+              role: 'assistant', 
+              content: '' + assistantReply 
             },
           ]);
-        } else {
-          throw new Error('Invalid JSON structure');
         }
-      } catch (e) {
-        console.error('Failed to parse JSON content:', e);
+      } else {
         setChatHistory((prev) => [
           ...prev,
-          { 
-            role: 'assistant', 
-            content: '' + assistantReply 
-          },
+          { role: 'assistant', content: assistantReply },
         ]);
       }
-    } else {
+    } catch (err) {
+      console.error('Chat error:', err);
       setChatHistory((prev) => [
         ...prev,
-        { role: 'assistant', content: assistantReply },
+        {
+          role: 'assistant',
+          content:
+            'Sorry, I had an issue responding. Please try again in a moment.',
+        },
       ]);
+    } finally {
+      setIsChatLoading(false);
     }
-  } catch (err) {
-    console.error('Chat error:', err);
-    setChatHistory((prev) => [
-      ...prev,
-      {
-        role: 'assistant',
-        content:
-          'Sorry, I had an issue responding. Please try again in a moment.',
-      },
-    ]);
-  } finally {
-    setIsChatLoading(false);
-  }
-};
+  };
 
   // ---------------------
   // 2. COLLECTION STATES
@@ -537,46 +583,43 @@ let assistantReply = (result[0]?.generated_text as string || '')
   const pomodoroRef = useRef<NodeJS.Timer | null>(null);
   const pomodoroAudioRef = useRef<HTMLAudioElement | null>(null);
 
-const handlePomodoroStart = () => {
-  if (pomodoroRunning) return;
-  setPomodoroRunning(true);
-  pomodoroRef.current = setInterval(() => {
-    setPomodoroTimeLeft((prev) => {
-      if (prev <= 1) {
-        clearInterval(pomodoroRef.current as NodeJS.Timer);
-        setPomodoroRunning(false);
-        // Play the alarm sound (if not already playing)
-        if (!pomodoroAudioRef.current) {
-          const alarmAudio = new Audio('https://firebasestorage.googleapis.com/v0/b/deepworkai-c3419.appspot.com/o/ios-17-ringtone-tilt-gg8jzmiv_pUhS32fz.mp3?alt=media&token=a0a522e0-8a49-408a-9dfe-17e41d3bc801');
-          alarmAudio.loop = true;
-          alarmAudio.play();
-          pomodoroAudioRef.current = alarmAudio;
+  const handlePomodoroStart = () => {
+    if (pomodoroRunning) return;
+    setPomodoroRunning(true);
+    pomodoroRef.current = setInterval(() => {
+      setPomodoroTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(pomodoroRef.current as NodeJS.Timer);
+          setPomodoroRunning(false);
+          // Play the alarm sound (if not already playing)
+          if (!pomodoroAudioRef.current) {
+            const alarmAudio = new Audio('https://firebasestorage.googleapis.com/v0/b/deepworkai-c3419.appspot.com/o/ios-17-ringtone-tilt-gg8jzmiv_pUhS32fz.mp3?alt=media&token=a0a522e0-8a49-408a-9dfe-17e41d3bc801');
+            alarmAudio.loop = true;
+            alarmAudio.play();
+            pomodoroAudioRef.current = alarmAudio;
+          }
+          return 0;
         }
-        return 0;
-      }
-      return prev - 1;
-    });
-  }, 1000);
-};
+        return prev - 1;
+      });
+    }, 1000);
+  };
 
-const handlePomodoroPause = () => {
-  setPomodoroRunning(false);
-  if (pomodoroRef.current) clearInterval(pomodoroRef.current);
-  // (Optional: you might choose not to pause the alarm sound if it's playing,
-  // since the sound should keep looping until reset.)
-};
+  const handlePomodoroPause = () => {
+    setPomodoroRunning(false);
+    if (pomodoroRef.current) clearInterval(pomodoroRef.current);
+  };
 
-const handlePomodoroReset = () => {
-  setPomodoroRunning(false);
-  if (pomodoroRef.current) clearInterval(pomodoroRef.current);
-  setPomodoroTimeLeft(25 * 60);
-  // Stop the alarm sound if it's playing
-  if (pomodoroAudioRef.current) {
-    pomodoroAudioRef.current.pause();
-    pomodoroAudioRef.current.currentTime = 0;
-    pomodoroAudioRef.current = null;
-  }
-};
+  const handlePomodoroReset = () => {
+    setPomodoroRunning(false);
+    if (pomodoroRef.current) clearInterval(pomodoroRef.current);
+    setPomodoroTimeLeft(25 * 60);
+    if (pomodoroAudioRef.current) {
+      pomodoroAudioRef.current.pause();
+      pomodoroAudioRef.current.currentTime = 0;
+      pomodoroAudioRef.current = null;
+    }
+  };
 
   const formatPomodoroTime = (timeInSeconds: number) => {
     const mins = Math.floor(timeInSeconds / 60);
@@ -587,33 +630,33 @@ const handlePomodoroReset = () => {
   // ---------------------
   // 7. AUTH LISTENER
   // ---------------------
-useEffect(() => {
-  const unsubscribe = onFirebaseAuthStateChanged((firebaseUser) => {
-    setUser(firebaseUser);
-    if (firebaseUser) {
-      if (firebaseUser.displayName) {
-        setUserName(firebaseUser.displayName);
-      } else {
-        // If displayName is not set, fetch the "name" field from Firestore.
-        getDoc(doc(db, "users", firebaseUser.uid))
-          .then((docSnap) => {
-            if (docSnap.exists() && docSnap.data().name) {
-              setUserName(docSnap.data().name);
-            } else {
+  useEffect(() => {
+    const unsubscribe = onFirebaseAuthStateChanged((firebaseUser) => {
+      setUser(firebaseUser);
+      if (firebaseUser) {
+        if (firebaseUser.displayName) {
+          setUserName(firebaseUser.displayName);
+        } else {
+          // If displayName is not set, fetch the "name" field from Firestore.
+          getDoc(doc(db, "users", firebaseUser.uid))
+            .then((docSnap) => {
+              if (docSnap.exists() && docSnap.data().name) {
+                setUserName(docSnap.data().name);
+              } else {
+                setUserName("User");
+              }
+            })
+            .catch((error) => {
+              console.error("Error fetching user data:", error);
               setUserName("User");
-            }
-          })
-          .catch((error) => {
-            console.error("Error fetching user data:", error);
-            setUserName("User");
-          });
+            });
+        }
+      } else {
+        setUserName("Loading...");
       }
-    } else {
-      setUserName("Loading...");
-    }
-  });
-  return () => unsubscribe();
-}, []);
+    });
+    return () => unsubscribe();
+  }, []);
 
   // ---------------------
   // 8. COLLECTION SNAPSHOTS
@@ -667,57 +710,57 @@ useEffect(() => {
   }, [user]);
 
   // ---------------------
-  // SMART OVERVIEW GENERATION
+  // SMART OVERVIEW GENERATION (Gemini integration)
   // ---------------------
-const [smartOverview, setSmartOverview] = useState<string>("");
-const [overviewLoading, setOverviewLoading] = useState(false);
-const [lastGeneratedData, setLastGeneratedData] = useState<string>("");
-const [lastResponse, setLastResponse] = useState<string>("");
+  const [smartOverview, setSmartOverview] = useState<string>("");
+  const [overviewLoading, setOverviewLoading] = useState(false);
+  const [lastGeneratedData, setLastGeneratedData] = useState<string>("");
+  const [lastResponse, setLastResponse] = useState<string>("");
 
-useEffect(() => {
-  if (!user) return;
+  useEffect(() => {
+    if (!user) return;
 
-  const generateOverview = async () => {
-    // 1. Format current data with better handling of due dates
-    const formatItem = (item: any, type: string) => {
-      const dueDate = item.data.dueDate?.toDate?.();
-      const title = item.data[type] || item.data.title || 'Untitled';
-      return `• ${title}${dueDate ? ` (Due: ${dueDate.toLocaleDateString()})` : ''}`;
-    };
+    const generateOverview = async () => {
+      // 1. Format current data with better handling of due dates
+      const formatItem = (item: any, type: string) => {
+        const dueDate = item.data.dueDate?.toDate?.();
+        const title = item.data[type] || item.data.title || 'Untitled';
+        return `• ${title}${dueDate ? ` (Due: ${dueDate.toLocaleDateString()})` : ''}`;
+      };
 
-    // Combine all items
-    const allItems = [
-      ...(tasks.map(t => formatItem(t, 'task')) || []),
-      ...(goals.map(g => formatItem(g, 'goal')) || []),
-      ...(projects.map(p => formatItem(p, 'project')) || []),
-      ...(plans.map(p => formatItem(p, 'plan')) || [])
-    ];
+      // Combine all items
+      const allItems = [
+        ...(tasks.map(t => formatItem(t, 'task')) || []),
+        ...(goals.map(g => formatItem(g, 'goal')) || []),
+        ...(projects.map(p => formatItem(p, 'project')) || []),
+        ...(plans.map(p => formatItem(p, 'plan')) || [])
+      ];
 
-    // If there are no items, show the empty state message
-    if (!allItems.length) {
-      setSmartOverview(`
-        <div class="text-gray-400 font-large">
-          Add some items to get started with your Smart Overview!
-        </div>
-      `);
-      return;
-    }
+      // If there are no items, show the empty state message
+      if (!allItems.length) {
+        setSmartOverview(`
+          <div class="text-gray-400 font-large">
+            Add some items to get started with your Smart Overview!
+          </div>
+        `);
+        return;
+      }
 
-    const formattedData = allItems.join('\n');
+      const formattedData = allItems.join('\n');
 
-    // If there are no changes, return early
-    if (formattedData === lastGeneratedData) {
-      return;
-    }
+      // If there are no changes, return early
+      if (formattedData === lastGeneratedData) {
+        return;
+      }
 
-    setOverviewLoading(true);
-    setLastGeneratedData(formattedData);
+      setOverviewLoading(true);
+      setLastGeneratedData(formattedData);
 
-    try {
-      // 3. Construct AI prompt
-      // Extract only the first name from the full userName
-      const firstName = userName.split(" ")[0];
-      const prompt = `[INST] <<SYS>>
+      try {
+        // 3. Construct AI prompt
+        // Extract only the first name from the full userName
+        const firstName = userName.split(" ")[0];
+        const prompt = `[INST] <<SYS>>
 You are TaskMaster, an advanced AI productivity assistant. Analyze the following items and generate a Smart Overview:
 
 ${formattedData}
@@ -741,158 +784,126 @@ FORBIDDEN IN YOUR FINAL RESPONSE:
 Remember: Focus on actionable strategies and specific next steps, not just describing the items.
 <</SYS>>[/INST]`;
 
-      // 4. Call Hugging Face API
-      const response = await fetch("https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${hfApiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          inputs: prompt,
-          parameters: {
-            max_new_tokens: 500,
-            temperature: 0.4,
-            top_p: 0.85,
-            repetition_penalty: 1.1,
-            return_full_text: false,
-            do_sample: true,
-            presence_penalty: 0.1
-          }
-        }),
-      });
+        // 4. Call Gemini API
+        const geminiOptions = {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }]
+          })
+        };
 
-      if (!response.ok) throw new Error("API request failed");
+        const resultResponse = await streamResponse(geminiEndpoint, geminiOptions, (chunk) => {
+          // Optionally, you can update an overview streaming state here.
+        }, 45000);
 
-      // 5. Process and clean response
-      const result = await response.json();
-      const rawText = result[0]?.generated_text || '';
+        // 5. Process and clean response
+        const rawText = extractCandidateText(resultResponse) || '';
 
-      const cleanAndValidate = (text: string) => {
-        // Additional filters - phrases to trigger text removal
-        const excludePhrases = [
-          "I see I made some minor errors",
-          "Here is the corrected response",
-          "was removed as per request",
-          "since I am forced to put something here",
-          "-> You are TaskMaster",
-          "The is:",
-          "Note:",
-          "You are TaskMaster, an advanced AI productivity assistant. Analyze the following items and generate a Smart Overview:",
-          "Follow these guidelines exactly:",
-          "- Start with a number"
-        ];
+        const cleanAndValidate = (text: string) => {
+          const excludePhrases = [
+            "I see I made some minor errors",
+            "Here is the corrected response",
+            "was removed as per request",
+            "since I am forced to put something here",
+            "-> You are TaskMaster",
+            "The is:",
+            "Note:",
+            "You are TaskMaster, an advanced AI productivity assistant. Analyze the following items and generate a Smart Overview:",
+            "Follow these guidelines exactly:",
+            "- Start with a number"
+          ];
 
-        // Remove text after any excluded phrase
-        let cleanedText = text;
-        for (const phrase of excludePhrases) {
-          const index = cleanedText.indexOf(phrase);
-          if (index !== -1) {
-            cleanedText = cleanedText.substring(0, index).trim();
-          }
-        }
-
-        // Basic cleanup
-        cleanedText = cleanedText
-          .replace(/\[\/?(INST|SYS)\]|<\/?s>|\[\/?(FONT|COLOR)\]/gi, '')
-          .replace(/(\*\*|###|boxed|final answer|step \d+:)/gi, '')
-          .replace(/\$\{.*?\}\$/g, '')
-          .replace(/\[\/?[^\]]+\]/g, '')
-          .replace(/\{.*?\}\}/g, '')
-          .replace(/📋|📅|🎯|📊/g, '')
-          .replace(/\b(TASKS?|GOALS?|PROJECTS?|PLANS?)\b:/gi, '')
-          .replace(/\n\s*\n/g, '\n');
-
-        // Split cleaned text into lines and filter out empty or irrelevant lines
-        let lines = cleanedText
-          .split('\n')
-          .map(line => line.trim())
-          .filter(line => line.length > 0 && !/^[^a-zA-Z0-9]+$/.test(line));
-
-        let helloCount = 0;
-        const truncatedLines: string[] = [];
-
-        for (const line of lines) {
-          if (!line.trim()) continue;
-
-          // 1) "The is:" pattern
-          if (line.trim().startsWith("The is:")) {
-            break;
-          }
-
-          // 2) "<|reserved" pattern
-          if (line.trim().startsWith("<|reserved")) {
-            break;
-          }
-
-          // 3) Check if line contains "[/"
-          if (line.indexOf("[/") !== -1) {
-            if (line.trim().startsWith("[/")) {
-              break;
-            } else {
-              // Truncate the line at the occurrence of "[/"
-              const truncatedLine = line.substring(0, line.indexOf("[/")).trim();
-              if (truncatedLine) {
-                truncatedLines.push(truncatedLine);
-              }
-              break;
+          let cleanedText = text;
+          for (const phrase of excludePhrases) {
+            const index = cleanedText.indexOf(phrase);
+            if (index !== -1) {
+              cleanedText = cleanedText.substring(0, index).trim();
             }
           }
 
-    // 4) If the line starts with "I", break out of the loop.
-    if (line.trim().startsWith("I")) {
-      break;
-    }
+          cleanedText = cleanedText
+            .replace(/\[\/?(INST|SYS)\]|<\/?s>|\[\/?(FONT|COLOR)\]/gi, '')
+            .replace(/(\*\*|###|boxed|final answer|step \d+:)/gi, '')
+            .replace(/\$\{.*?\}\$/g, '')
+            .replace(/\[\/?[^\]]+\]/g, '')
+            .replace(/\{.*?\}\}/g, '')
+            .replace(/📋|📅|🎯|📊/g, '')
+            .replace(/\b(TASKS?|GOALS?|PROJECTS?|PLANS?)\b:/gi, '')
+            .replace(/\n\s*\n/g, '\n');
 
-    // 5) "Hello" pattern (case-insensitive, allowing punctuation)
-    if (/^\s*hello[\s,.!?]?/i.test(line)) {
-      helloCount++;
-      if (helloCount === 2) {
-        break;
-      }
-    }
+          let lines = cleanedText
+            .split('\n')
+            .map(line => line.trim())
+            .filter(line => line.length > 0 && !/^[^a-zA-Z0-9]+$/.test(line));
 
-    truncatedLines.push(line);
-  }
+          let helloCount = 0;
+          const truncatedLines: string[] = [];
 
-  return truncatedLines.join('\n');
-};
+          for (const line of lines) {
+            if (!line.trim()) continue;
 
-const cleanedText = cleanAndValidate(rawText);
+            if (line.trim().startsWith("The is:")) {
+              break;
+            }
 
-// Check for duplicate
-if (cleanedText === lastResponse) {
-  setOverviewLoading(false);
-  return;
-}
-setLastResponse(cleanedText);
+            if (line.trim().startsWith("<|reserved")) {
+              break;
+            }
 
-const cleanTextLines = cleanedText
-  .split('\n')
-  .filter(line => line.length > 0);
+            if (line.indexOf("[/") !== -1) {
+              if (line.trim().startsWith("[/")) {
+                break;
+              } else {
+                const truncatedLine = line.substring(0, line.indexOf("[/")).trim();
+                if (truncatedLine) {
+                  truncatedLines.push(truncatedLine);
+                }
+                break;
+              }
+            }
 
-// Format HTML
-const formattedHtml = cleanTextLines
-  .map((line, index) => {
-    if (index === 0) {
-      // Greeting
-      return `<div class="text-green-400 text-lg font-medium mb-4">${line}</div>`;
-    } else if (line.match(/^\d+\./)) {
-      // Priority item
-      return `<div class="text-blue-300 mb-3 pl-4 border-l-2 border-blue-500">${line}</div>`;
-    } else {
-      // Other content
-      return `<div class="text-gray-300 mb-3">${line}</div>`;
-    }
-  })
-  .join('');
+            if (line.trim().startsWith("I")) {
+              break;
+            }
 
-setSmartOverview(formattedHtml);
+            if (/^\s*hello[\s,.!?]?/i.test(line)) {
+              helloCount++;
+              if (helloCount === 2) {
+                break;
+              }
+            }
 
+            truncatedLines.push(line);
+          }
 
+          return truncatedLines.join('\n');
+        };
 
+        const cleanedText = cleanAndValidate(rawText);
+        if (cleanedText === lastResponse) {
+          setOverviewLoading(false);
+          return;
+        }
+        setLastResponse(cleanedText);
 
+        const cleanTextLines = cleanedText
+          .split('\n')
+          .filter(line => line.length > 0);
 
+        const formattedHtml = cleanTextLines
+          .map((line, index) => {
+            if (index === 0) {
+              return `<div class="text-green-400 text-lg font-medium mb-4">${line}</div>`;
+            } else if (line.match(/^\d+\./)) {
+              return `<div class="text-blue-300 mb-3 pl-4 border-l-2 border-blue-500">${line}</div>`;
+            } else {
+              return `<div class="text-gray-300 mb-3">${line}</div>`;
+            }
+          })
+          .join('');
+
+        setSmartOverview(formattedHtml);
 
       } catch (error) {
         console.error("Overview generation error:", error);
@@ -905,8 +916,7 @@ setSmartOverview(formattedHtml);
     };
 
     generateOverview();
-    // Removed lastGeneratedData from dependencies
-  }, [user, tasks, goals, projects, plans, userName, hfApiKey]);
+  }, [user, tasks, goals, projects, plans, userName, geminiApiKey]);
 
   // ---------------------
   // 11. CREATE & EDIT & DELETE

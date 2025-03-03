@@ -372,29 +372,33 @@ Follow these instructions strictly.
 `;
   };
 
-  // After ~4 messages, generate a dynamic chat name from Gemini
-  const generateChatName = async (convId: string, conversationSoFar: string) => {
-    try {
-      const namePrompt = `
+// Generate a dynamic chat name after the first 4 messages
+const generateChatName = async (convId: string, conversationSoFar: string, messageCount: number) => {
+  try {
+    if (messageCount !== 4) return; // Only run after exactly 4 messages
+
+    const namePrompt = `
 Please provide a short 3-5 word title summarizing the conversation so far:
 ${conversationSoFar}
 Return ONLY the title, with no extra commentary.
 `;
-      const options = {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: namePrompt }] }]
-        })
-      };
-      const rawText = await fetchWithTimeout(geminiEndpoint, options, 30000);
-      const text = await rawText.text();
-      const finalText = extractCandidateText(text) || 'Untitled Chat';
-      await updateChatConversationName(convId, finalText.trim());
-    } catch (err) {
-      console.error('Error generating chat name:', err);
-    }
-  };
+    const options = {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: namePrompt }] }]
+      })
+    };
+    const rawText = await fetchWithTimeout(geminiEndpoint, options, 30000);
+    const text = await rawText.text();
+    const finalText = extractCandidateText(text) || 'Untitled Chat';
+
+    await updateChatConversationName(convId, finalText.trim());
+  } catch (err) {
+    console.error('Error generating chat name:', err);
+  }
+};
+
 
   // Send the user's message to Gemini, get streaming response, save final assistant message to Firestore.
   const handleChatSubmit = async (e: React.FormEvent) => {

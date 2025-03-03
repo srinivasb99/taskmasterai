@@ -698,7 +698,7 @@ return (
     </main>
 
     {/* Right Sidebar: Chat Conversations (increased width for improved visibility) */}
-    <aside className="w-82 border-l border-gray-800 bg-gray-800">
+    <aside className="w-75 border-l border-gray-800 bg-gray-800">
       <div className="p-4">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-white text-lg font-bold">Conversations</h2>

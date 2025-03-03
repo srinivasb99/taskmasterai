@@ -52,7 +52,7 @@ function SplashScreen() {
     {
       icon: Bot,
       title: 'AI Assistant',
-      description: 'Your AI-powered productivity partner. Get instant answers to complex questions and optimize tasks. TaskMaster learns from your workflow to provide personalized tips, break down big projects, and summarize content. With access to your notes, it helps you stay organized with tasks and goals. It’s always there from all quick queries to in-depth projects.',
+      description: 'Your AI-powered productivity partner. Get instant answers to complex questions and optimize tasks. It learns from your workflow to provide personalized tips, break down big projects, and summarize content. With access to your notes, it helps you stay organized with tasks and goals. It’s always there from all quick queries to in-depth projects.',
       isNew: true,
       link: '/ai',
       image: 'https://firebasestorage.googleapis.com/v0/b/deepworkai-c3419.appspot.com/o/Screenshot%202025-03-02%20at%207.50.48%E2%80%AFPM.png?alt=media&token=6f761a6b-1000-4f4a-a2a5-172f5af6df44'

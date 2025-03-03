@@ -52,9 +52,10 @@ function SplashScreen() {
     {
       icon: Bot,
       title: 'AI Assistant',
-      description: 'Your personal productivity assistant powered by advanced AI. Get instant answers to complex questions, receive suggestions for task optimization, and get help with time management. The AI learns from your work patterns to provide personalized productivity tips, helps break down large projects into manageable tasks, and can even draft responses or summarize long content for you. With access to your notes, it can answer your questions, help you organize and retrieve information, and assist with your tasks, goals, projects, plans, and events—anything you need to stay on top of your life. Available 24/7 for everything from quick queries to deep problem-solving,  it\'s your ultimate tool for productivity and organization.',
+      description: 'Your personal productivity assistant powered by advanced AI. Get instant answers to complex questions, receive suggestions for task optimization, and get help with time management. The AI learns from your work patterns to provide personalized productivity tips, helps break down large projects into manageable tasks, and can even draft responses or summarize long content for you. With access to your notes, it can answer your questions, help you organize and retrieve information, and assist with your tasks, goals, projects, plans, and events—anything you need to stay on top of your life. Available 24/7 for everything from quick queries to deep problem-solving, it\'s your ultimate tool for productivity and organization.',
       isNew: true,
-      link: '/ai'
+      link: '/ai',
+      image: 'https://firebasestorage.googleapis.com/v0/b/deepworkai-c3419.appspot.com/o/Screenshot%202025-03-02%20at%207.50.48%E2%80%AFPM.png?alt=media&token=6f761a6b-1000-4f4a-a2a5-172f5af6df44'
     },
     {
       icon: Calendar,
@@ -73,13 +74,14 @@ function SplashScreen() {
   ];
 
   useEffect(() => {
-    // Preload the dashboard image
-    if (features[0].image) {
+    const currentFeature = features[currentFeatureIndex];
+    if (currentFeature.image) {
+      setIsImageLoaded(false);
       const img = new Image();
-      img.src = features[0].image;
+      img.src = currentFeature.image;
       img.onload = () => setIsImageLoaded(true);
     }
-  }, []);
+  }, [currentFeatureIndex, features]);
 
   const handleNext = () => {
     if (currentFeatureIndex < features.length - 1) {
@@ -177,13 +179,13 @@ function SplashScreen() {
               </p>
             </div>
 
-            {/* Feature Image - Only for Dashboard */}
-            {currentFeatureIndex === 0 && features[0].image && (
+            {/* Feature Image - Render if the current feature has an image */}
+            {features[currentFeatureIndex].image && (
               <div className="md:w-1/2 relative group">
                 <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 rounded-xl blur-xl transition-all duration-300 group-hover:blur-2xl"></div>
                 <img
-                  src={features[0].image}
-                  alt="Dashboard Preview"
+                  src={features[currentFeatureIndex].image}
+                  alt={`${features[currentFeatureIndex].title} Preview`}
                   className={`rounded-xl shadow-2xl transition-all duration-500 transform group-hover:scale-[1.02] ${
                     isImageLoaded ? 'opacity-100' : 'opacity-0'
                   }`}

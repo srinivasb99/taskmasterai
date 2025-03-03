@@ -12,11 +12,15 @@ import {
   X,
   Timer as TimerIcon,
   Send,
+  Plus,
+  MoreHorizontal,
+  Edit2,
+  Share,
+  Trash2,
 } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { Timer } from './Timer';
 import { FlashcardsQuestions } from './FlashcardsQuestions';
-import { getTimeBasedGreeting, getRandomQuote } from '../lib/greetings';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import remarkGfm from 'remark-gfm';
@@ -39,14 +43,14 @@ import {
   deleteCustomTimer,
   weatherApiKey,
   hfApiKey,
-  geminiApiKey, // Added for Gemini integration
+  geminiApiKey,
 } from '../lib/dashboard-firebase';
-import { auth } from '../lib/firebase'
-import { User, onAuthStateChanged } from 'firebase/auth'
+import { auth } from '../lib/firebase';
+import { User, onAuthStateChanged } from 'firebase/auth';
 import { updateUserProfile, signOutUser, deleteUserAccount, AuthError, getCurrentUser } from '../lib/settings-firebase';
 
 // ---------------------
-// Helper functions for Gemini integration
+// Gemini Integration Helpers
 // ---------------------
 const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`;
 
@@ -113,7 +117,7 @@ const extractCandidateText = (text: string): string => {
 };
 
 // ---------------------
-// Helper functions (place these OUTSIDE and BEFORE your component)
+// Helper functions (outside and before your component)
 // ---------------------
 const getWeekDates = (date: Date): Date[] => {
   const sunday = new Date(date);
@@ -139,48 +143,67 @@ export function Dashboard() {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [userName, setUserName] = useState<string>("Loading...");
-  const [quote, setQuote] = useState(getRandomQuote());
-  const [greeting, setGreeting] = useState(getTimeBasedGreeting());
+  const [quote, setQuote] = useState("");
+  const [greeting, setGreeting] = useState("");
+  
+  // Chat modal state
+  const [isChatModalOpen, setIsChatModalOpen] = useState(false);
+  
+  // Chat message and history states
+  const [chatMessage, setChatMessage] = useState('');
+  const [chatHistory, setChatHistory] = useState<Array<{
+    role: 'user' | 'assistant';
+    content: string;
+    timer?: { type: 'timer'; duration: number; id: string };
+    flashcard?: { type: 'flashcard'; data: any[] };
+    question?: { type: 'question'; data: any[] };
+  }>>([
+    {
+      role: 'assistant',
+      content: "👋 Hi I'm TaskMaster, How can I help you today? Need help with your items? Simply ask me!"
+    }
+  ]);
+  const [isChatLoading, setIsChatLoading] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // Initialize state from localStorage
+  // Conversation state (for chat history)
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [conversationList, setConversationList] = useState<any[]>([]);
+
+  // Sidebar collapsed state (for left sidebar only if needed elsewhere)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     const stored = localStorage.getItem('isSidebarCollapsed');
     return stored ? JSON.parse(stored) : false;
   });
-
-  // Update localStorage whenever the state changes
   useEffect(() => {
     localStorage.setItem('isSidebarCollapsed', JSON.stringify(isSidebarCollapsed));
   }, [isSidebarCollapsed]);
 
   useEffect(() => {
-    const user = getCurrentUser();
-    if (!user) {
-      // If no user is logged in, redirect to login
+    const currentUser = getCurrentUser();
+    if (!currentUser) {
       navigate('/login');
     } else {
-      // If user exists, update their lastSeen in Firestore
-      updateDashboardLastSeen(user.uid);
+      updateDashboardLastSeen(currentUser.uid);
     }
   }, [navigate]);
 
-  // Example toggle function
   const handleToggleSidebar = () => {
     setIsSidebarCollapsed((prev) => !prev);
   };
-  
+
   const [currentWeek, setCurrentWeek] = useState<Date[]>(getWeekDates(new Date()));
   const today = new Date();
 
   // ---------------------
-  // Types for timer messages
+  // 2. CHAT & TIMER TYPES
+  // ---------------------
   interface TimerMessage {
     type: 'timer';
     duration: number;
     id: string;
   }
 
-  // Types for flashcard and question messages
   interface FlashcardData {
     id: string;
     question: string;
@@ -198,38 +221,22 @@ export function Dashboard() {
 
   interface FlashcardMessage {
     type: 'flashcard';
-    data: FlashcardData[];  // Changed to array
+    data: FlashcardData[];
   }
 
   interface QuestionMessage {
     type: 'question';
-    data: QuestionData[];   // Changed to array
-  }
-
-  interface ChatMessage {
-    role: 'user' | 'assistant';
-    content: string;
-    timer?: TimerMessage;
-    flashcard?: FlashcardMessage;
-    question?: QuestionMessage;
+    data: QuestionData[];
   }
 
   // ---------------------
-  // CHAT MODAL (NEW AI CHAT FUNCTIONALITY)
+  // TIMER HANDLING
   // ---------------------
-  const [isChatModalOpen, setIsChatModalOpen] = useState(false);
-  const [chatMessage, setChatMessage] = useState('');
-  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([
-    {
-      role: 'assistant',
-      content: "👋 Hi I'm TaskMaster, How can I help you today? Need help with your items? Simply ask me!"
-    }
-  ]);
-  const [isChatLoading, setIsChatLoading] = useState(false);
-  const chatEndRef = useRef<HTMLDivElement>(null);
-
-  // Timer handling functions
   const handleTimerComplete = (timerId: string) => {
+    if (!conversationId || !user) return;
+    // Call your Firebase function to save the timer completion message
+    // (Assuming saveChatMessage is imported from your ai-chat-firebase module)
+    // Here we simply update local chat history as an example.
     setChatHistory(prev => [
       ...prev,
       {
@@ -242,127 +249,68 @@ export function Dashboard() {
   const parseTimerRequest = (message: string): number | null => {
     const timeRegex = /(\d+)\s*(minutes?|mins?|hours?|hrs?|seconds?|secs?)/i;
     const match = message.match(timeRegex);
-    
     if (!match) return null;
-    
     const amount = parseInt(match[1]);
     const unit = match[2].toLowerCase();
-    
-    if (unit.startsWith('hour') || unit.startsWith('hr')) {
-      return amount * 3600;
-    } else if (unit.startsWith('min')) {
-      return amount * 60;
-    } else if (unit.startsWith('sec')) {
-      return amount;
-    }
-    
+    if (unit.startsWith('hour') || unit.startsWith('hr')) return amount * 3600;
+    if (unit.startsWith('min')) return amount * 60;
+    if (unit.startsWith('sec')) return amount;
     return null;
   };
 
-  // Whenever chatHistory changes, scroll to the bottom of the chat
   useEffect(() => {
     if (chatEndRef.current) {
       chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [chatHistory]);
 
-  // Utility: Format the user's tasks/goals/projects/plans as text
+  // ---------------------
+  // UTILITY: Format Items for Chat
+  // ---------------------
+  const [tasks, setTasks] = useState<Array<{ id: string; data: any }>>([]);
+  const [goals, setGoals] = useState<Array<{ id: string; data: any }>>([]);
+  const [projects, setProjects] = useState<Array<{ id: string; data: any }>>([]);
+  const [plans, setPlans] = useState<Array<{ id: string; data: any }>>([]);
+  const [customTimers, setCustomTimers] = useState<Array<{ id: string; data: any }>>([]);
+
   const formatItemsForChat = () => {
     const lines: string[] = [];
-
     lines.push(`${userName}'s items:\n`);
-
     tasks.forEach((t) => {
       const due = t.data.dueDate?.toDate?.();
-      lines.push(
-        `Task: ${t.data.task || 'Untitled'}${
-          due ? ` (Due: ${due.toLocaleDateString()})` : ''
-        }`
-      );
+      lines.push(`Task: ${t.data.task || 'Untitled'}${due ? ` (Due: ${due.toLocaleDateString()})` : ''}`);
     });
     goals.forEach((g) => {
       const due = g.data.dueDate?.toDate?.();
-      lines.push(
-        `Goal: ${g.data.goal || 'Untitled'}${
-          due ? ` (Due: ${due.toLocaleDateString()})` : ''
-        }`
-      );
+      lines.push(`Goal: ${g.data.goal || 'Untitled'}${due ? ` (Due: ${due.toLocaleDateString()})` : ''}`);
     });
     projects.forEach((p) => {
       const due = p.data.dueDate?.toDate?.();
-      lines.push(
-        `Project: ${p.data.project || 'Untitled'}${
-          due ? ` (Due: ${due.toLocaleDateString()})` : ''
-        }`
-      );
+      lines.push(`Project: ${p.data.project || 'Untitled'}${due ? ` (Due: ${due.toLocaleDateString()})` : ''}`);
     });
     plans.forEach((p) => {
       const due = p.data.dueDate?.toDate?.();
-      lines.push(
-        `Plan: ${p.data.plan || 'Untitled'}${
-          due ? ` (Due: ${due.toLocaleDateString()})` : ''
-        }`
-      );
+      lines.push(`Plan: ${p.data.plan || 'Untitled'}${due ? ` (Due: ${due.toLocaleDateString()})` : ''}`);
     });
-
     return lines.join('\n');
   };
 
-  // NEW handleChatSubmit with Gemini integration
-  const handleChatSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!chatMessage.trim()) return;
+  // ---------------------
+  // 3. GEMINI-BASED CHAT SUBMISSION & CONVERSATION HANDLING
+  // ---------------------
+  const [streamingAssistantContent, setStreamingAssistantContent] = useState('');
 
-    // Check for timer request
-    const timerDuration = parseTimerRequest(chatMessage);
-    const userMsg: ChatMessage = { 
-      role: 'user',
-      content: chatMessage
-    };
-    
-    setChatHistory(prev => [...prev, userMsg]);
-    setChatMessage('');
-
-    // If it's a timer request, add timer immediately
-    if (timerDuration) {
-      const timerId = Math.random().toString(36).substr(2, 9);
-      setChatHistory(prev => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: `Starting a timer for ${timerDuration} seconds.`,
-          timer: {
-            type: 'timer',
-            duration: timerDuration,
-            id: timerId
-          }
-        }
-      ]);
-      return;
-    }
-
-    // Regular chat processing
-    const conversation = chatHistory
-      .map((m) => `${m.role === 'user' ? userName : 'Assistant'}: ${m.content}`)
+  const createPrompt = (userMessage: string): string => {
+    const conversationSoFar = chatHistory
+      .map(m => `${m.role === 'user' ? userName : 'Assistant'}: ${m.content}`)
       .join('\n');
     const itemsText = formatItemsForChat();
-
     const now = new Date();
     const currentDateTime = {
-      date: now.toLocaleDateString('en-US', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-      }),
-      time: now.toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true
-      })
+      date: now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
+      time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
     };
-
-    const prompt = `
+    return `
 [CONTEXT]
 User's Name: ${userName}
 Current Date: ${currentDateTime.date}
@@ -371,10 +319,10 @@ Current Time: ${currentDateTime.time}
 ${itemsText}
 
 [CONVERSATION SO FAR]
-${conversation}
+${conversationSoFar}
 
 [NEW USER MESSAGE]
-${userName}: ${userMsg.content}
+${userName}: ${userMessage}
 
 You are TaskMaster, a friendly and versatile AI productivity assistant. Engage in casual conversation, provide productivity advice, and discuss ${userName}'s items only when explicitly asked by ${userName}.
 
@@ -441,225 +389,185 @@ Guidelines:
    - Provide a direct response to ${userName} without any extraneous openings or meta-text.
    - Do not mix JSON with regular text. JSON is only for requested educational content.
    - Always address ${userName} in a friendly, helpful tone.
-
-Follow these instructions strictly.
 `;
+  };
 
-    setIsChatLoading(true);
+  const generateChatName = async (convId: string, conversationSoFar: string) => {
     try {
-      const geminiOptions = {
+      const namePrompt = `
+Please provide a short 3-5 word title summarizing the conversation so far:
+${conversationSoFar}
+Return ONLY the title, with no extra commentary.
+`;
+      const options = {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }]
+          contents: [{ parts: [{ text: namePrompt }] }]
         })
       };
+      const rawText = await fetchWithTimeout(geminiEndpoint, options, 30000);
+      const text = await rawText.text();
+      const finalText = extractCandidateText(text) || 'Untitled Chat';
+      // Update conversation name in your backend
+      await updateChatConversationName(convId, finalText.trim());
+    } catch (err) {
+      console.error('Error generating chat name:', err);
+    }
+  };
 
+  const handleChatSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatMessage.trim() || !user) return;
+
+    let convId = conversationId;
+    if (!convId) {
+      convId = await createChatConversation(user.uid, "New Chat");
+      setConversationId(convId);
+    }
+
+    const userMsg = { role: 'user', content: chatMessage };
+    await saveChatMessage(convId, userMsg);
+    const updatedHistory = [...chatHistory, userMsg];
+
+    setChatMessage('');
+
+    const timerDuration = parseTimerRequest(userMsg.content);
+    if (timerDuration) {
+      const timerId = Math.random().toString(36).substr(2, 9);
+      const timerMsg = {
+        role: 'assistant',
+        content: `Starting a timer for ${timerDuration} seconds.`,
+        timer: { type: 'timer', duration: timerDuration, id: timerId }
+      };
+      await saveChatMessage(convId, timerMsg);
+      return;
+    }
+
+    setIsChatLoading(true);
+    setStreamingAssistantContent('');
+
+    const prompt = createPrompt(userMsg.content);
+    const geminiOptions = {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }]
+      })
+    };
+
+    try {
       let finalResponse = '';
       await streamResponse(geminiEndpoint, geminiOptions, (chunk) => {
+        setStreamingAssistantContent(chunk);
         finalResponse = chunk;
       }, 45000);
 
       const finalText = extractCandidateText(finalResponse).trim() || '';
+      setStreamingAssistantContent('');
       let assistantReply = finalText;
-
-      // Parse any JSON content in the response
-      const jsonMatch = assistantReply.match(/```json\n([\s\S]*?)\n```/);
+      const jsonMatch = assistantReply.match(/```json\s*([\s\S]*?)\s*```/);
       if (jsonMatch) {
         try {
           const jsonContent = JSON.parse(jsonMatch[1].trim());
-          // Remove the JSON block from the text response
-          assistantReply = assistantReply.replace(/```json\n[\s\S]*?\n```/, '').trim();
-          
-          // Validate JSON structure
+          assistantReply = assistantReply.replace(/```json\s*[\s\S]*?\s*```/, '').trim();
           if (
             jsonContent.type &&
             jsonContent.data &&
             (jsonContent.type === 'flashcard' || jsonContent.type === 'question')
           ) {
-            setChatHistory((prev) => [
-              ...prev,
-              {
-                role: 'assistant',
-                content: assistantReply,
-                ...(jsonContent.type === 'flashcard' && { flashcard: jsonContent }),
-                ...(jsonContent.type === 'question' && { question: jsonContent })
-              },
-            ]);
+            const message = {
+              role: 'assistant',
+              content: assistantReply,
+              ...(jsonContent.type === 'flashcard'
+                ? { flashcard: jsonContent }
+                : { question: jsonContent })
+            };
+            await saveChatMessage(convId, message);
           } else {
             throw new Error('Invalid JSON structure');
           }
         } catch (e) {
           console.error('Failed to parse JSON content:', e);
-          setChatHistory((prev) => [
-            ...prev,
-            { 
-              role: 'assistant', 
-              content: '' + assistantReply 
-            },
-          ]);
+          await saveChatMessage(convId, { role: 'assistant', content: assistantReply });
         }
       } else {
-        setChatHistory((prev) => [
-          ...prev,
-          { role: 'assistant', content: assistantReply },
-        ]);
+        await saveChatMessage(convId, { role: 'assistant', content: assistantReply });
       }
-    } catch (err) {
+
+      const totalUserMessages = updatedHistory.filter(m => m.role === 'user').length;
+      if (totalUserMessages >= 3) {
+        const conversationText = updatedHistory
+          .map(m => `${m.role === 'user' ? userName : 'Assistant'}: ${m.content}`)
+          .join('\n');
+        await generateChatName(convId, conversationText);
+      }
+    } catch (err: any) {
       console.error('Chat error:', err);
-      setChatHistory((prev) => [
-        ...prev,
-        {
-          role: 'assistant',
-          content:
-            'Sorry, I had an issue responding. Please try again in a moment.',
-        },
-      ]);
+      await saveChatMessage(convId, {
+        role: 'assistant',
+        content: 'Sorry, I had an issue responding. Please try again in a moment.'
+      });
     } finally {
       setIsChatLoading(false);
     }
   };
 
-  // ---------------------
-  // 2. COLLECTION STATES
-  // ---------------------
-  const [tasks, setTasks] = useState<Array<{ id: string; data: any }>>([]);
-  const [goals, setGoals] = useState<Array<{ id: string; data: any }>>([]);
-  const [projects, setProjects] = useState<Array<{ id: string; data: any }>>([]);
-  const [plans, setPlans] = useState<Array<{ id: string; data: any }>>([]);
-  const [customTimers, setCustomTimers] = useState<Array<{ id: string; data: any }>>([]);
-
-  const handleMarkComplete = async (itemId: string) => {
+  // Conversation list functions (using your actual Firebase functions)
+  const handleNewConversation = async () => {
     if (!user) return;
-    try {
-      await markItemComplete(activeTab, itemId);
-    } catch (error) {
-      console.error("Error marking item as complete:", error);
+    const newConvId = await createChatConversation(user.uid, "New Chat");
+    setConversationId(newConvId);
+    setChatHistory([]);
+  };
+
+  const handleSelectConversation = (convId: string) => {
+    setConversationId(convId);
+  };
+
+  const handleRenameConversation = async (conv: any) => {
+    const newName = window.prompt('Enter new chat name:', conv.chatName);
+    if (!newName || !newName.trim()) return;
+    await updateChatConversationName(conv.id, newName.trim());
+  };
+
+  const handleDeleteConversationClick = async (conv: any) => {
+    const confirmed = window.confirm(`Are you sure you want to delete "${conv.chatName}"?`);
+    if (!confirmed) return;
+    await deleteChatConversation(conv.id);
+    if (conversationId === conv.id) {
+      setConversationId(null);
+      setChatHistory([]);
     }
   };
 
-  // ---------------------
-  // 3. WEATHER STATE
-  // ---------------------
-  const [weatherData, setWeatherData] = useState<any>(null);
+  const handleShareConversation = async (conv: any) => {
+    alert(`Sharing conversation ID: ${conv.id}`);
+  };
 
-  // ---------------------
-  // 4. GREETING UPDATE
-  // ---------------------
+  // Listen for conversation list
   useEffect(() => {
-    const updateGreeting = () => {
-      setGreeting(getTimeBasedGreeting());
-    };
-    
-    // Update greeting every minute
-    const interval = setInterval(updateGreeting, 60000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // ---------------------
-  // 5. UI STATES
-  // ---------------------
-  const [activeTab, setActiveTab] = useState<"tasks" | "goals" | "projects" | "plans">("tasks");
-  const [newItemText, setNewItemText] = useState("");
-  const [newItemDate, setNewItemDate] = useState("");
-  const [editingItemId, setEditingItemId] = useState<string | null>(null);
-  const [editingText, setEditingText] = useState("");
-  const [editingDate, setEditingDate] = useState("");
-  const [cardVisible, setCardVisible] = useState(false);
-  const [editingTimerId, setEditingTimerId] = useState<string | null>(null);
-  const [editingTimerName, setEditingTimerName] = useState("");
-  const [editingTimerMinutes, setEditingTimerMinutes] = useState("");
-
-  // Effect for card animation on mount
-  useEffect(() => {
-    setCardVisible(true);
-  }, []);
-
-  // ---------------------
-  // 6. MAIN POMODORO TIMER (LOCAL)
-  // ---------------------
-  const [pomodoroTimeLeft, setPomodoroTimeLeft] = useState(25 * 60);
-  const [pomodoroRunning, setPomodoroRunning] = useState(false);
-  const pomodoroRef = useRef<NodeJS.Timer | null>(null);
-  const pomodoroAudioRef = useRef<HTMLAudioElement | null>(null);
-
-  const handlePomodoroStart = () => {
-    if (pomodoroRunning) return;
-    setPomodoroRunning(true);
-    pomodoroRef.current = setInterval(() => {
-      setPomodoroTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(pomodoroRef.current as NodeJS.Timer);
-          setPomodoroRunning(false);
-          // Play the alarm sound (if not already playing)
-          if (!pomodoroAudioRef.current) {
-            const alarmAudio = new Audio('https://firebasestorage.googleapis.com/v0/b/deepworkai-c3419.appspot.com/o/ios-17-ringtone-tilt-gg8jzmiv_pUhS32fz.mp3?alt=media&token=a0a522e0-8a49-408a-9dfe-17e41d3bc801');
-            alarmAudio.loop = true;
-            alarmAudio.play();
-            pomodoroAudioRef.current = alarmAudio;
-          }
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  };
-
-  const handlePomodoroPause = () => {
-    setPomodoroRunning(false);
-    if (pomodoroRef.current) clearInterval(pomodoroRef.current);
-  };
-
-  const handlePomodoroReset = () => {
-    setPomodoroRunning(false);
-    if (pomodoroRef.current) clearInterval(pomodoroRef.current);
-    setPomodoroTimeLeft(25 * 60);
-    if (pomodoroAudioRef.current) {
-      pomodoroAudioRef.current.pause();
-      pomodoroAudioRef.current.currentTime = 0;
-      pomodoroAudioRef.current = null;
-    }
-  };
-
-  const formatPomodoroTime = (timeInSeconds: number) => {
-    const mins = Math.floor(timeInSeconds / 60);
-    const secs = timeInSeconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  // ---------------------
-  // 7. AUTH LISTENER
-  // ---------------------
-  useEffect(() => {
-    const unsubscribe = onFirebaseAuthStateChanged((firebaseUser) => {
-      setUser(firebaseUser);
-      if (firebaseUser) {
-        if (firebaseUser.displayName) {
-          setUserName(firebaseUser.displayName);
-        } else {
-          // If displayName is not set, fetch the "name" field from Firestore.
-          getDoc(doc(db, "users", firebaseUser.uid))
-            .then((docSnap) => {
-              if (docSnap.exists() && docSnap.data().name) {
-                setUserName(docSnap.data().name);
-              } else {
-                setUserName("User");
-              }
-            })
-            .catch((error) => {
-              console.error("Error fetching user data:", error);
-              setUserName("User");
-            });
-        }
-      } else {
-        setUserName("Loading...");
-      }
+    if (!user) return;
+    const unsubscribe = onChatConversationsSnapshot(user.uid, (conversations) => {
+      setConversationList(conversations);
     });
     return () => unsubscribe();
-  }, []);
+  }, [user]);
+
+  // Listen for messages in the selected conversation
+  useEffect(() => {
+    if (!conversationId) {
+      setChatHistory([]);
+      return;
+    }
+    const unsubscribe = onChatMessagesSnapshot(conversationId, (messages) => {
+      setChatHistory(messages);
+    });
+    return () => unsubscribe();
+  }, [conversationId]);
 
   // ---------------------
-  // 8. COLLECTION SNAPSHOTS
+  // 4. COLLECTION SNAPSHOTS & WEATHER FETCH
   // ---------------------
   useEffect(() => {
     if (!user) return;
@@ -679,9 +587,7 @@ Follow these instructions strictly.
     };
   }, [user]);
 
-  // ---------------------
-  // 9. WEATHER FETCH (using 3-day forecast)
-  // ---------------------
+  const [weatherData, setWeatherData] = useState<any>(null);
   useEffect(() => {
     if (!user) {
       setWeatherData(null);
@@ -710,7 +616,7 @@ Follow these instructions strictly.
   }, [user]);
 
   // ---------------------
-  // SMART OVERVIEW GENERATION (Gemini integration)
+  // 5. SMART OVERVIEW GENERATION (Gemini integration)
   // ---------------------
   const [smartOverview, setSmartOverview] = useState<string>("");
   const [overviewLoading, setOverviewLoading] = useState(false);
@@ -719,24 +625,18 @@ Follow these instructions strictly.
 
   useEffect(() => {
     if (!user) return;
-
     const generateOverview = async () => {
-      // 1. Format current data with better handling of due dates
       const formatItem = (item: any, type: string) => {
         const dueDate = item.data.dueDate?.toDate?.();
         const title = item.data[type] || item.data.title || 'Untitled';
         return `• ${title}${dueDate ? ` (Due: ${dueDate.toLocaleDateString()})` : ''}`;
       };
-
-      // Combine all items
       const allItems = [
         ...(tasks.map(t => formatItem(t, 'task')) || []),
         ...(goals.map(g => formatItem(g, 'goal')) || []),
         ...(projects.map(p => formatItem(p, 'project')) || []),
         ...(plans.map(p => formatItem(p, 'plan')) || [])
       ];
-
-      // If there are no items, show the empty state message
       if (!allItems.length) {
         setSmartOverview(`
           <div class="text-gray-400 font-large">
@@ -745,20 +645,11 @@ Follow these instructions strictly.
         `);
         return;
       }
-
       const formattedData = allItems.join('\n');
-
-      // If there are no changes, return early
-      if (formattedData === lastGeneratedData) {
-        return;
-      }
-
+      if (formattedData === lastGeneratedData) return;
       setOverviewLoading(true);
       setLastGeneratedData(formattedData);
-
       try {
-        // 3. Construct AI prompt
-        // Extract only the first name from the full userName
         const firstName = userName.split(" ")[0];
         const prompt = `[INST] <<SYS>>
 You are TaskMaster, an advanced AI productivity assistant. Analyze the following items and generate a Smart Overview:
@@ -783,8 +674,6 @@ FORBIDDEN IN YOUR FINAL RESPONSE:
 
 Remember: Focus on actionable strategies and specific next steps, not just describing the items.
 <</SYS>>[/INST]`;
-
-        // 4. Call Gemini API
         const geminiOptions = {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -792,14 +681,8 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
             contents: [{ parts: [{ text: prompt }] }]
           })
         };
-
-        const resultResponse = await streamResponse(geminiEndpoint, geminiOptions, (chunk) => {
-          // Optionally, you can update an overview streaming state here.
-        }, 45000);
-
-        // 5. Process and clean response
+        const resultResponse = await streamResponse(geminiEndpoint, geminiOptions, (chunk) => {}, 45000);
         const rawText = extractCandidateText(resultResponse) || '';
-
         const cleanAndValidate = (text: string) => {
           const excludePhrases = [
             "I see I made some minor errors",
@@ -813,7 +696,6 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
             "Follow these guidelines exactly:",
             "- Start with a number"
           ];
-
           let cleanedText = text;
           for (const phrase of excludePhrases) {
             const index = cleanedText.indexOf(phrase);
@@ -821,76 +703,46 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
               cleanedText = cleanedText.substring(0, index).trim();
             }
           }
-
           cleanedText = cleanedText
             .replace(/\[\/?(INST|SYS)\]|<\/?s>|\[\/?(FONT|COLOR)\]/gi, '')
             .replace(/(\*\*|###|boxed|final answer|step \d+:)/gi, '')
-            .replace(/\$\{.*?\}\$/g, '')
+            .replace(/\$\{.*?\}\}$/g, '')
             .replace(/\[\/?[^\]]+\]/g, '')
             .replace(/\{.*?\}\}/g, '')
             .replace(/📋|📅|🎯|📊/g, '')
             .replace(/\b(TASKS?|GOALS?|PROJECTS?|PLANS?)\b:/gi, '')
             .replace(/\n\s*\n/g, '\n');
-
-          let lines = cleanedText
-            .split('\n')
-            .map(line => line.trim())
-            .filter(line => line.length > 0 && !/^[^a-zA-Z0-9]+$/.test(line));
-
+          let lines = cleanedText.split('\n').map(line => line.trim()).filter(line => line.length > 0 && !/^[^a-zA-Z0-9]+$/.test(line));
           let helloCount = 0;
           const truncatedLines: string[] = [];
-
           for (const line of lines) {
             if (!line.trim()) continue;
-
-            if (line.trim().startsWith("The is:")) {
-              break;
-            }
-
-            if (line.trim().startsWith("<|reserved")) {
-              break;
-            }
-
+            if (line.trim().startsWith("The is:")) break;
+            if (line.trim().startsWith("<|reserved")) break;
             if (line.indexOf("[/") !== -1) {
-              if (line.trim().startsWith("[/")) {
-                break;
-              } else {
+              if (line.trim().startsWith("[/")) break;
+              else {
                 const truncatedLine = line.substring(0, line.indexOf("[/")).trim();
-                if (truncatedLine) {
-                  truncatedLines.push(truncatedLine);
-                }
+                if (truncatedLine) truncatedLines.push(truncatedLine);
                 break;
               }
             }
-
-            if (line.trim().startsWith("I")) {
-              break;
-            }
-
+            if (line.trim().startsWith("I")) break;
             if (/^\s*hello[\s,.!?]?/i.test(line)) {
               helloCount++;
-              if (helloCount === 2) {
-                break;
-              }
+              if (helloCount === 2) break;
             }
-
             truncatedLines.push(line);
           }
-
           return truncatedLines.join('\n');
         };
-
         const cleanedText = cleanAndValidate(rawText);
         if (cleanedText === lastResponse) {
           setOverviewLoading(false);
           return;
         }
         setLastResponse(cleanedText);
-
-        const cleanTextLines = cleanedText
-          .split('\n')
-          .filter(line => line.length > 0);
-
+        const cleanTextLines = cleanedText.split('\n').filter(line => line.length > 0);
         const formattedHtml = cleanTextLines
           .map((line, index) => {
             if (index === 0) {
@@ -902,9 +754,7 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
             }
           })
           .join('');
-
         setSmartOverview(formattedHtml);
-
       } catch (error) {
         console.error("Overview generation error:", error);
         setSmartOverview(`
@@ -914,9 +764,9 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
         setOverviewLoading(false);
       }
     };
-
     generateOverview();
   }, [user, tasks, goals, projects, plans, userName, geminiApiKey]);
+
 
   // ---------------------
   // 11. CREATE & EDIT & DELETE
@@ -1371,98 +1221,208 @@ return (
   )}
 </div>
 
-     {/* Chat History Modal */}
+      <form onSubmit={handleChatSubmit} className="p-4 border-t border-gray-700">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={chatMessage}
+              onChange={(e) => setChatMessage(e.target.value)}
+              placeholder="Type your message..."
+              className="flex-1 bg-gray-700 text-gray-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <button type="submit" disabled={isChatLoading} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+              <Send className="w-5 h-5" />
+            </button>
+          </div>
+        </form>
+
+        {/* Chat Modal with conversation list integrated */}
         {isChatModalOpen && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
-            <div className="bg-gray-800 rounded-xl w-full max-w-2xl mx-4 max-h-[80vh] flex flex-col">
+            <div className="bg-gray-800 rounded-xl w-full max-w-4xl mx-4 max-h-[80vh] flex flex-col">
               <div className="p-4 border-b border-gray-700 flex justify-between items-center">
                 <h3 className="text-lg font-semibold text-blue-300 flex items-center">
                   <MessageCircle className="w-5 h-5 mr-2" />
                   Chat with TaskMaster
                   <span className="ml-2 text-xs bg-gradient-to-r from-pink-500 to-purple-500 text-gray-300 px-2 py-0.5 rounded-full">BETA</span>
-                  <span className="ml-2 text-xs bg-blue text-gray-300 px-2 py-0.5 rounded-full">Chat history is not saved.</span>
+                  <span className="ml-2 text-xs bg-blue text-gray-300 px-2 py-0.5 rounded-full">Chat history is saved.</span>
                 </h3>
                 <button onClick={() => setIsChatModalOpen(false)} className="text-gray-400 hover:text-gray-200 transition-colors">
                   <X className="w-5 h-5" />
                 </button>
               </div>
-
-              <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={chatEndRef}>
-                {chatHistory.map((message, index) => (
-                  <div key={index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[80%] rounded-lg px-4 py-2 ${message.role === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-200'}`}>
-                      <ReactMarkdown
-                        remarkPlugins={[remarkMath, remarkGfm]}
-                        rehypePlugins={[rehypeKatex]}
-                        components={{
-                          p: ({ children }) => <p className="mb-2">{children}</p>,
-                          ul: ({ children }) => <ul className="list-disc ml-4 mb-2">{children}</ul>,
-                          ol: ({ children }) => <ol className="list-decimal ml-4 mb-2">{children}</ol>,
-                          li: ({ children }) => <li className="mb-1">{children}</li>,
-                          code: ({ inline, children }) =>
-                            inline ? (
-                              <code className="bg-gray-800 px-1 rounded">{children}</code>
-                            ) : (
-                              <pre className="bg-gray-800 p-2 rounded-lg overflow-x-auto">
-                                <code>{children}</code>
-                              </pre>
-                            ),
-                        }}
+              <div className="flex flex-1">
+                {/* Conversation List Section */}
+                <div className="w-1/3 border-r border-gray-700 p-4 overflow-y-auto">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-white text-lg font-bold">Conversations</h2>
+                    <button
+                      onClick={handleNewConversation}
+                      className="flex items-center justify-center p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    {conversationList.map((conv) => (
+                      <div
+                        key={conv.id}
+                        className={`flex items-center justify-between cursor-pointer p-3 rounded-lg transition-all ${
+                          conversationId === conv.id
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-700 text-gray-200 hover:bg-gray-600'
+                        }`}
+                        onClick={() => handleSelectConversation(conv.id)}
                       >
-                        {message.content}
-                      </ReactMarkdown>
-                      {message.timer && (
-                        <div className="mt-2">
-                          <div className="flex items-center space-x-2 bg-gray-900 rounded-lg px-4 py-2">
-                            <TimerIcon className="w-5 h-5 text-blue-400" />
-                            <Timer key={message.timer.id} initialDuration={message.timer.duration} onComplete={() => handleTimerComplete(message.timer.id)} />
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <MessageCircle className="w-4 h-4 flex-shrink-0" />
+                          <span className="truncate overflow-hidden text-ellipsis w-full">{conv.chatName}</span>
+                        </div>
+                        <div className="relative flex-shrink-0">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const menu = document.getElementById(`conv-menu-${conv.id}`);
+                              if (menu) {
+                                menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+                              }
+                            }}
+                            className="p-1 rounded-full hover:bg-gray-600 transition-colors"
+                          >
+                            <MoreHorizontal className="w-4 h-4" />
+                          </button>
+                          <div
+                            id={`conv-menu-${conv.id}`}
+                            className="hidden absolute top-8 right-0 bg-gray-700 text-gray-200 rounded-lg shadow-lg z-50"
+                            style={{ minWidth: '160px' }}
+                          >
+                            <button
+                              className="flex items-center w-full text-left px-4 py-2 hover:bg-gray-600 rounded-t-lg"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const menu = document.getElementById(`conv-menu-${conv.id}`);
+                                if (menu) menu.style.display = 'none';
+                                handleRenameConversation(conv);
+                              }}
+                            >
+                              <Edit2 className="w-4 h-4 mr-2" />
+                              Rename
+                            </button>
+                            <button
+                              className="flex items-center w-full text-left px-4 py-2 hover:bg-gray-600"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const menu = document.getElementById(`conv-menu-${conv.id}`);
+                                if (menu) menu.style.display = 'none';
+                                handleShareConversation(conv);
+                              }}
+                            >
+                              <Share className="w-4 h-4 mr-2" />
+                              Share
+                            </button>
+                            <button
+                              className="flex items-center w-full text-left px-4 py-2 hover:bg-gray-600 text-red-400 rounded-b-lg"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const menu = document.getElementById(`conv-menu-${conv.id}`);
+                                if (menu) menu.style.display = 'none';
+                                handleDeleteConversationClick(conv);
+                              }}
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete
+                            </button>
                           </div>
                         </div>
-                      )}
-                      {message.flashcard && (
-                        <div className="mt-2">
-                          <FlashcardsQuestions type="flashcard" data={message.flashcard.data} onComplete={() => {}} />
-                        </div>
-                      )}
-                      {message.question && (
-                        <div className="mt-2">
-                          <FlashcardsQuestions type="question" data={message.question.data} onComplete={() => {}} />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-                {isChatLoading && (
-                  <div className="flex justify-start">
-                    <div className="bg-gray-700 text-gray-200 rounded-lg px-4 py-2 max-w-[80%]">
-                      <div className="flex space-x-2">
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100"></div>
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200"></div>
                       </div>
-                    </div>
+                    ))}
                   </div>
-                )}
-              </div>
-
-              <form onSubmit={handleChatSubmit} className="p-4 border-t border-gray-700">
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={chatMessage}
-                    onChange={(e) => setChatMessage(e.target.value)}
-                    placeholder="Ask TaskMaster about your items or set a timer..."
-                    className="flex-1 bg-gray-700 text-gray-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <button type="submit" disabled={isChatLoading} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                    <Send className="w-5 h-5" />
+                  <button
+                    onClick={handleNewConversation}
+                    className="mt-4 w-full flex items-center justify-center gap-2 bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    <PlusCircle className="w-5 h-5" />
+                    <span>New Conversation</span>
                   </button>
                 </div>
-              </form>
+                {/* Chat Conversation Section */}
+                <div className="w-2/3 flex flex-col">
+                  <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={chatEndRef}>
+                    {chatHistory.map((message, index) => (
+                      <div key={index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                        <div className={`max-w-[80%] rounded-lg px-4 py-2 ${message.role === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-200'}`}>
+                          <ReactMarkdown
+                            remarkPlugins={[remarkMath, remarkGfm]}
+                            rehypePlugins={[rehypeKatex]}
+                            components={{
+                              p: ({ children }) => <p className="mb-2">{children}</p>,
+                              ul: ({ children }) => <ul className="list-disc ml-4 mb-2">{children}</ul>,
+                              ol: ({ children }) => <ol className="list-decimal ml-4 mb-2">{children}</ol>,
+                              li: ({ children }) => <li className="mb-1">{children}</li>,
+                              code: ({ inline, children }) =>
+                                inline ? (
+                                  <code className="bg-gray-800 px-1 rounded">{children}</code>
+                                ) : (
+                                  <pre className="bg-gray-800 p-2 rounded-lg overflow-x-auto">
+                                    <code>{children}</code>
+                                  </pre>
+                                ),
+                            }}
+                          >
+                            {message.content}
+                          </ReactMarkdown>
+                          {message.timer && (
+                            <div className="mt-2">
+                              <div className="flex items-center space-x-2 bg-gray-900 rounded-lg px-4 py-2">
+                                <TimerIcon className="w-5 h-5 text-blue-400" />
+                                <Timer key={message.timer.id} initialDuration={message.timer.duration} onComplete={() => handleTimerComplete(message.timer.id)} />
+                              </div>
+                            </div>
+                          )}
+                          {message.flashcard && (
+                            <div className="mt-2">
+                              <FlashcardsQuestions type="flashcard" data={message.flashcard.data} onComplete={() => {}} />
+                            </div>
+                          )}
+                          {message.question && (
+                            <div className="mt-2">
+                              <FlashcardsQuestions type="question" data={message.question.data} onComplete={() => {}} />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    {isChatLoading && (
+                      <div className="flex justify-start">
+                        <div className="bg-gray-700 text-gray-200 rounded-lg px-4 py-2 max-w-[80%]">
+                          <div className="flex space-x-2">
+                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100"></div>
+                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200"></div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <form onSubmit={handleChatSubmit} className="p-4 border-t border-gray-700">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={chatMessage}
+                        onChange={(e) => setChatMessage(e.target.value)}
+                        placeholder="Ask TaskMaster about your items or set a timer..."
+                        className="flex-1 bg-gray-700 text-gray-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <button type="submit" disabled={isChatLoading} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                        <Send className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
             </div>
           </div>
         )}
-
 
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">

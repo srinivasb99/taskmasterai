@@ -148,6 +148,9 @@ export function Dashboard() {
     return stored ? JSON.parse(stored) : false;
   });
 
+  const [blackoutMode, setBlackoutMode] = useState(false);
+
+
   // Update localStorage whenever the state changes
   useEffect(() => {
     localStorage.setItem('isSidebarCollapsed', JSON.stringify(isSidebarCollapsed));
@@ -1197,6 +1200,8 @@ return (
       userName={userName}
       isCollapsed={isSidebarCollapsed}
       onToggle={handleToggleSidebar}
+      blackoutMode={blackoutMode}
+      onBlackoutToggle={() => setBlackoutMode(!blackoutMode)}
     />
 
     {/* Adjust the main content's left margin depending on sidebar width */}

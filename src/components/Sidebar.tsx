@@ -139,7 +139,7 @@ export function Sidebar({
               <Sun className="w-5 h-5 text-yellow-400" strokeWidth={2} />
             )}
           </div>
-          {!isCollapsed && <span>Blackout Mode</span>}
+          {!isCollapsed && <span>Blackout</span>}
         </button>
 
         {/* Toggle Button */}

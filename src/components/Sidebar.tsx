@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   LayoutDashboard,
   Settings,
@@ -12,6 +12,8 @@ import {
   CircleUserRound,
   PanelLeftClose,
   PanelLeftOpen,
+  Moon,
+  Sun,
 } from 'lucide-react';
 import { Logo } from './Logo';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -21,6 +23,8 @@ interface SidebarProps {
   userName: string;
   onToggle?: () => void;
   isCollapsed?: boolean;
+  blackoutMode?: boolean;
+  onBlackoutToggle?: () => void;
 }
 
 // List of developer emails
@@ -34,6 +38,8 @@ export function Sidebar({
   userName,
   onToggle,
   isCollapsed = false,
+  blackoutMode = false,
+  onBlackoutToggle,
 }: SidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -64,7 +70,7 @@ export function Sidebar({
   return (
     <div
       className={`
-        fixed top-0 left-0 h-full bg-[#0c111c] flex flex-col
+        fixed top-0 left-0 h-full ${blackoutMode ? 'bg-gray-950' : 'bg-[#0c111c]'} flex flex-col
         py-6 px-3 font-poppins border-r border-gray-800/50
         transition-all duration-300 ease-in-out
         ${isCollapsed ? 'w-20' : 'w-64'}
@@ -103,7 +109,8 @@ export function Sidebar({
             <button
               key={item.label}
               onClick={() => handleNavigation(item.path)}
-              className={`flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 rounded-lg transition-all duration-200
+              className={`
+                flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 rounded-lg transition-all duration-200
                 ${
                   isActive
                     ? 'bg-gray-800 text-white font-medium'
@@ -116,6 +123,24 @@ export function Sidebar({
             </button>
           );
         })}
+
+        {/* Blackout Mode Toggle Button */}
+        <button
+          onClick={onBlackoutToggle}
+          className={`
+            flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 rounded-lg transition-all duration-200
+            hover:bg-gray-800/70 hover:text-white
+          `}
+        >
+          <div className="relative w-5 h-5 min-w-[1.25rem] flex items-center justify-center">
+            {blackoutMode ? (
+              <Moon className="w-5 h-5 text-white" strokeWidth={2} />
+            ) : (
+              <Sun className="w-5 h-5 text-yellow-400" strokeWidth={2} />
+            )}
+          </div>
+          {!isCollapsed && <span>Blackout Mode</span>}
+        </button>
 
         {/* Toggle Button */}
         <button

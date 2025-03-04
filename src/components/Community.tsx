@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef, ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
-import { useBlackoutMode } from '../hooks/useBlackoutMode';
 import { motion } from 'framer-motion';
 import { Loader2, Globe2, Search, Coins, CircleUserRound, Crown } from 'lucide-react';
 import { getCurrentUser } from '../lib/settings-firebase';
 import { uploadCommunityFile } from '../lib/community-firebase';
 import { pricing, db, storage } from '../lib/firebase';
+import { useBlackoutMode } from '../hooks/useBlackoutMode';
 import {
   doc,
   getDoc,
@@ -68,6 +68,7 @@ export function Community() {
     return stored ? JSON.parse(stored) : false;
   });
 
+
     // Blackout mode state
   const [isBlackoutEnabled, setIsBlackoutEnabled] = useState(() => {
     const stored = localStorage.getItem('isBlackoutEnabled');
@@ -79,6 +80,7 @@ export function Community() {
     const stored = localStorage.getItem('isSidebarBlackoutEnabled');
     return stored ? JSON.parse(stored) : false;
   });
+  
   
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('All');
@@ -289,6 +291,21 @@ const unlockFile = async (file: any) => {
 };
 
 
+  
+    // Determine the background color based on Blackout mode
+  const bgColor = isBlackoutEnabled ? 'bg-gray-950' : 'bg-gray-900';
+
+  
+  // Update localStorage and document body for Blackout mode
+  useEffect(() => {
+    localStorage.setItem('isBlackoutEnabled', JSON.stringify(isBlackoutEnabled));
+    document.body.classList.toggle('blackout-mode', isBlackoutEnabled);
+  }, [isBlackoutEnabled]);
+
+  // Update localStorage for Sidebar Blackout option
+  useEffect(() => {
+    localStorage.setItem('isSidebarBlackoutEnabled', JSON.stringify(isSidebarBlackoutEnabled));
+  }, [isSidebarBlackoutEnabled]);
 
 
   if (loading) {
@@ -313,27 +330,11 @@ const unlockFile = async (file: any) => {
     const typeMatch = filterType === 'All' ? true : ext === filterType.toLowerCase();
     return searchMatch && typeMatch;
   });
-  
-    const handleToggleBlackout = () => {
-    setIsBlackoutEnabled(prev => !prev);
-  };
-    // Update localStorage and document body for Blackout mode
-  useEffect(() => {
-    localStorage.setItem('isBlackoutEnabled', JSON.stringify(isBlackoutEnabled));
-    document.body.classList.toggle('blackout-mode', isBlackoutEnabled);
-  }, [isBlackoutEnabled]);
-
-  // Update localStorage for Sidebar Blackout option
-  useEffect(() => {
-    localStorage.setItem('isSidebarBlackoutEnabled', JSON.stringify(isSidebarBlackoutEnabled));
-  }, [isSidebarBlackoutEnabled]);
 
   return (
     <div className="flex h-screen ${bgColor}">
       {/* Sidebar */}
       <Sidebar
-        // Pass a prop for Sidebar background update if both Blackout mode and Sidebar Blackout option are enabled
-        isBlackoutEnabled={isBlackoutEnabled && isSidebarBlackoutEnabled}
         isCollapsed={isSidebarCollapsed}
         onToggle={() => {
           setIsSidebarCollapsed((prev) => {
@@ -342,6 +343,8 @@ const unlockFile = async (file: any) => {
           });
         }}
         userName={userName}
+                // Pass a prop for Sidebar background update if both Blackout mode and Sidebar Blackout option are enabled
+        isBlackoutEnabled={isBlackoutEnabled && isSidebarBlackoutEnabled}
       />
 
 {/* Insufficient Tokens Popup */}

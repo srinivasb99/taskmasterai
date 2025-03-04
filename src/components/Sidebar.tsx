@@ -21,24 +21,25 @@ interface SidebarProps {
   userName: string;
   onToggle?: () => void;
   isCollapsed?: boolean;
+  isBlackoutEnabled?: boolean;
 }
-
-// List of developer emails
-const DEV_EMAILS = [
-  'bajinsrinivasr@lexington1.net',
-  'srinibaj10@gmail.com',
-  'fugegate@gmail.com'
-];
 
 export function Sidebar({
   userName,
   onToggle,
   isCollapsed = false,
+  isBlackoutEnabled = false,
 }: SidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const isSettingsPage = location.pathname === '/settings';
   const currentUser = auth.currentUser;
+  // List of developer emails
+  const DEV_EMAILS = [
+    'bajinsrinivasr@lexington1.net',
+    'srinibaj10@gmail.com',
+    'fugegate@gmail.com'
+  ];
   const isDev = currentUser?.email && DEV_EMAILS.includes(currentUser.email);
 
   // Define the menu items with label, icon component, and path
@@ -61,10 +62,13 @@ export function Sidebar({
     navigate('/pricing');
   };
 
+  // Set the background based on Blackout mode for the Sidebar
+  const sidebarBgClass = isBlackoutEnabled ? 'bg-gray-950' : 'bg-[#0c111c]';
+
   return (
     <div
       className={`
-        fixed top-0 left-0 h-full bg-[#0c111c] flex flex-col
+        fixed top-0 left-0 h-full ${sidebarBgClass} flex flex-col
         py-6 px-3 font-poppins border-r border-gray-800/50
         transition-all duration-300 ease-in-out
         ${isCollapsed ? 'w-20' : 'w-64'}
@@ -118,16 +122,18 @@ export function Sidebar({
         })}
 
         {/* Toggle Button */}
-        <button
-          onClick={onToggle}
-          className="absolute -right-4 top-6 bg-[#0c111c] p-1.5 rounded-full border border-gray-800/50 text-gray-400 hover:text-white transition-colors z-50"
-        >
-          {isCollapsed ? (
-            <PanelLeftOpen className="w-4 h-4 min-w-[1rem]" strokeWidth={2} />
-          ) : (
-            <PanelLeftClose className="w-4 h-4 min-w-[1rem]" strokeWidth={2} />
-          )}
-        </button>
+        {onToggle && (
+          <button
+            onClick={onToggle}
+            className="absolute -right-4 top-6 bg-[#0c111c] p-1.5 rounded-full border border-gray-800/50 text-gray-400 hover:text-white transition-colors z-50"
+          >
+            {isCollapsed ? (
+              <PanelLeftOpen className="w-4 h-4 min-w-[1rem]" strokeWidth={2} />
+            ) : (
+              <PanelLeftClose className="w-4 h-4 min-w-[1rem]" strokeWidth={2} />
+            )}
+          </button>
+        )}
       </div>
 
       {/* Bottom Section: Premium Button and User Profile */}

@@ -10,6 +10,11 @@
   body {
     @apply bg-gray-900 text-gray-100;
   }
+  
+  /* Blackout mode styling */
+  body.blackout-mode {
+    @apply bg-gray-950;
+  }
 }
 
 @layer components {

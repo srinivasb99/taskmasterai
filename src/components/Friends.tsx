@@ -298,7 +298,7 @@ export function Friends() {
   };
 
   return (
-    <div className="flex h-screen bg-gray-900">
+    <div className="flex h-screen ${bgColor}">
       {/* Left: Navigation Sidebar */}
       <Sidebar
         isCollapsed={isSidebarCollapsed}

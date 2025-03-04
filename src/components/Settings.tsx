@@ -56,6 +56,12 @@ export function Settings() {
     return stored ? JSON.parse(stored) : false;
   });
 
+  // Sidebar Blackout option state
+  const [isSidebarBlackoutEnabled, setIsSidebarBlackoutEnabled] = useState(() => {
+    const stored = localStorage.getItem('isSidebarBlackoutEnabled');
+    return stored ? JSON.parse(stored) : false;
+  });
+
   // Form data state
   const [formData, setFormData] = useState({
     name: '',
@@ -111,12 +117,16 @@ export function Settings() {
     localStorage.setItem('isSidebarCollapsed', JSON.stringify(isSidebarCollapsed));
   }, [isSidebarCollapsed]);
 
-  // Update localStorage whenever the blackout mode changes
+  // Update localStorage and document body for Blackout mode
   useEffect(() => {
     localStorage.setItem('isBlackoutEnabled', JSON.stringify(isBlackoutEnabled));
-    // Apply blackout mode to the document body
     document.body.classList.toggle('blackout-mode', isBlackoutEnabled);
   }, [isBlackoutEnabled]);
+
+  // Update localStorage for Sidebar Blackout option
+  useEffect(() => {
+    localStorage.setItem('isSidebarBlackoutEnabled', JSON.stringify(isSidebarBlackoutEnabled));
+  }, [isSidebarBlackoutEnabled]);
 
   const handleToggleSidebar = () => {
     setIsSidebarCollapsed(prev => !prev);
@@ -272,7 +282,7 @@ export function Settings() {
     }
   };
 
-  // Determine the background color based on blackout mode
+  // Determine the background color based on Blackout mode
   const bgColor = isBlackoutEnabled ? 'bg-gray-950' : 'bg-gray-900';
 
   return (
@@ -284,6 +294,8 @@ export function Settings() {
           return !prev;
         })}
         userName={userData.name}
+        // Pass a prop for Sidebar background update if both Blackout mode and Sidebar Blackout option are enabled
+        isBlackoutEnabled={isBlackoutEnabled && isSidebarBlackoutEnabled}
       />
       
       {/* Delete Account Modal Popup */}
@@ -336,8 +348,8 @@ export function Settings() {
                   )}
                 </div>
                 <div>
-                  <p className="text-white font-medium">Blackout Mode</p>
-                  <p className="text-gray-400 text-sm">Use darker background for reduced eye strain</p>
+                  <p className="text-white font-medium">Blackout</p>
+                  <p className="text-gray-400 text-sm">Use a darker background for reduced eye strain</p>
                 </div>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
@@ -350,6 +362,24 @@ export function Settings() {
                 <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
               </label>
             </div>
+            {/* Sidebar Blackout Toggle (only visible if Blackout mode is enabled) */}
+            {isBlackoutEnabled && (
+              <div className="flex items-center justify-between mt-4">
+                <div>
+                  <p className="text-white font-medium">Sidebar Blackout</p>
+                  <p className="text-gray-400 text-sm">Apply Blackout background to Sidebar</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isSidebarBlackoutEnabled}
+                    onChange={(e) => setIsSidebarBlackoutEnabled(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+            )}
           </div>
 
           {/* Profile Picture Section */}

@@ -373,7 +373,7 @@ export function Settings() {
       </div>
       <div>
         <p className="text-white font-medium">Sidebar Blackout</p>
-        <p className="text-gray-400 text-sm">Apply Blackout background to Sidebar</p>
+        <p className="text-gray-400 text-sm">Apply Blackout to Sidebar.</p>
       </div>
     </div>
 

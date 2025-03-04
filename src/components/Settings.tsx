@@ -14,7 +14,8 @@ import {
   Upload,
   Camera,
   Moon,
-  Sun
+  Sun,
+  PanelLeftDashed
 } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { 
@@ -349,7 +350,7 @@ export function Settings() {
                 </div>
                 <div>
                   <p className="text-white font-medium">Blackout</p>
-                  <p className="text-gray-400 text-sm">Use a darker background for reduced eye strain</p>
+                  <p className="text-gray-400 text-sm">Sharpen your focus.</p>
                 </div>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
@@ -365,9 +366,12 @@ export function Settings() {
             {/* Sidebar Blackout Toggle (only visible if Blackout mode is enabled) */}
             {isBlackoutEnabled && (
               <div className="flex items-center justify-between mt-4">
-                <div>
-                  <p className="text-white font-medium">Sidebar Blackout</p>
-                  <p className="text-gray-400 text-sm">Apply Blackout background to Sidebar</p>
+                <div className="flex flex-col">
+                  <div className="flex items-center gap-2">
+                    <PanelLeftDashed className="w-5 h-5 text-white" />
+                    <p className="text-white font-medium">Sidebar Blackout</p>
+                  </div>
+                  <p className="text-gray-400 text-sm">Apply Blackout to Sidebar</p>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input

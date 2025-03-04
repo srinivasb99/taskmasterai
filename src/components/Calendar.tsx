@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useBlackoutMode } from '../hooks/useBlackoutMode';
 import {
   Calendar as CalendarIcon,
   ChevronLeft,
@@ -19,7 +20,6 @@ import {
 import { Sidebar } from './Sidebar';
 import { auth } from '../lib/firebase';
 import { User } from 'firebase/auth';
-import { useBlackoutMode } from '../hooks/useBlackoutMode';
 import {
   format,
   startOfWeek,
@@ -102,8 +102,21 @@ export function Calendar() {
   const [showEventModal, setShowEventModal] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     const stored = localStorage.getItem('isSidebarCollapsed');
+    return stored ? JSON.parse(stored) : false;
+  });
+
+  // Blackout mode state
+  const [isBlackoutEnabled, setIsBlackoutEnabled] = useState(() => {
+    const stored = localStorage.getItem('isBlackoutEnabled');
+    return stored ? JSON.parse(stored) : false;
+  });
+
+  // Sidebar Blackout option state
+  const [isSidebarBlackoutEnabled, setIsSidebarBlackoutEnabled] = useState(() => {
+    const stored = localStorage.getItem('isSidebarBlackoutEnabled');
     return stored ? JSON.parse(stored) : false;
   });
 
@@ -117,29 +130,12 @@ export function Calendar() {
     color: '#3B82F6' // Default blue
   });
 
-
-    // Determine the background color based on Blackout mode
-  const bgColor = isBlackoutEnabled ? 'bg-gray-950' : 'bg-gray-900';
-  
-    // Blackout mode state
-  const [isBlackoutEnabled, setIsBlackoutEnabled] = useState(() => {
-    const stored = localStorage.getItem('isBlackoutEnabled');
-    return stored ? JSON.parse(stored) : false;
-  });
-
-  // Sidebar Blackout option state
-  const [isSidebarBlackoutEnabled, setIsSidebarBlackoutEnabled] = useState(() => {
-    const stored = localStorage.getItem('isSidebarBlackoutEnabled');
-    return stored ? JSON.parse(stored) : false;
-  });
-
-
   // Update localStorage whenever the sidebar state changes
   useEffect(() => {
     localStorage.setItem('isSidebarCollapsed', JSON.stringify(isSidebarCollapsed));
   }, [isSidebarCollapsed]);
 
-   // Update localStorage and document body for Blackout mode
+  // Update localStorage and document body for Blackout mode
   useEffect(() => {
     localStorage.setItem('isBlackoutEnabled', JSON.stringify(isBlackoutEnabled));
     document.body.classList.toggle('blackout-mode', isBlackoutEnabled);
@@ -149,7 +145,7 @@ export function Calendar() {
   useEffect(() => {
     localStorage.setItem('isSidebarBlackoutEnabled', JSON.stringify(isSidebarBlackoutEnabled));
   }, [isSidebarBlackoutEnabled]);
-  
+
   // Auth state listener
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((firebaseUser) => {
@@ -402,8 +398,11 @@ export function Calendar() {
     return null;
   }
 
+    // Determine the background color based on Blackout mode
+  const bgColor = isBlackoutEnabled ? 'bg-gray-950' : 'bg-gray-900';
+  
   return (
-    <div className={`flex h-screen ${bgColor}`}>
+    <div className="flex h-screen ${bgColor}">
       <Sidebar 
         isCollapsed={isSidebarCollapsed} 
         onToggle={handleToggleSidebar}

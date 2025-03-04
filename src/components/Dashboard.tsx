@@ -17,6 +17,7 @@ import { Sidebar } from './Sidebar';
 import { Timer } from './Timer';
 import { FlashcardsQuestions } from './FlashcardsQuestions';
 import { getTimeBasedGreeting, getRandomQuote } from '../lib/greetings';
+import { useBlackoutMode } from '../hooks/useBlackoutMode';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import remarkGfm from 'remark-gfm';
@@ -137,6 +138,8 @@ export function Dashboard() {
   // 1. USER & GENERAL STATE
   // ---------------------
   const navigate = useNavigate();
+  const [isBlackoutEnabled] = useBlackoutMode();
+  const bgColor = isBlackoutEnabled ? 'bg-gray-950' : 'bg-gray-900';
   const [user, setUser] = useState<User | null>(null);
   const [userName, setUserName] = useState<string>("Loading...");
   const [quote, setQuote] = useState(getRandomQuote());
@@ -1194,7 +1197,7 @@ const resetCustomTimer = (timerId: string, defaultTime?: number) => {
 
 
 return (
-  <div className="bg-gray-900 text-white min-h-screen w-full overflow-hidden">
+  <div className="${bgColor} text-white min-h-screen w-full overflow-hidden">
     {/* Pass collapse state & toggle handler to Sidebar */}
     <Sidebar
       userName={userName}

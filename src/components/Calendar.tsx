@@ -19,6 +19,7 @@ import {
 import { Sidebar } from './Sidebar';
 import { auth } from '../lib/firebase';
 import { User } from 'firebase/auth';
+import { useBlackoutMode } from '../hooks/useBlackoutMode';
 import {
   format,
   startOfWeek,
@@ -116,11 +117,39 @@ export function Calendar() {
     color: '#3B82F6' // Default blue
   });
 
+
+    // Determine the background color based on Blackout mode
+  const bgColor = isBlackoutEnabled ? 'bg-gray-950' : 'bg-gray-900';
+  
+    // Blackout mode state
+  const [isBlackoutEnabled, setIsBlackoutEnabled] = useState(() => {
+    const stored = localStorage.getItem('isBlackoutEnabled');
+    return stored ? JSON.parse(stored) : false;
+  });
+
+  // Sidebar Blackout option state
+  const [isSidebarBlackoutEnabled, setIsSidebarBlackoutEnabled] = useState(() => {
+    const stored = localStorage.getItem('isSidebarBlackoutEnabled');
+    return stored ? JSON.parse(stored) : false;
+  });
+
+
   // Update localStorage whenever the sidebar state changes
   useEffect(() => {
     localStorage.setItem('isSidebarCollapsed', JSON.stringify(isSidebarCollapsed));
   }, [isSidebarCollapsed]);
 
+   // Update localStorage and document body for Blackout mode
+  useEffect(() => {
+    localStorage.setItem('isBlackoutEnabled', JSON.stringify(isBlackoutEnabled));
+    document.body.classList.toggle('blackout-mode', isBlackoutEnabled);
+  }, [isBlackoutEnabled]);
+
+  // Update localStorage for Sidebar Blackout option
+  useEffect(() => {
+    localStorage.setItem('isSidebarBlackoutEnabled', JSON.stringify(isSidebarBlackoutEnabled));
+  }, [isSidebarBlackoutEnabled]);
+  
   // Auth state listener
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((firebaseUser) => {
@@ -187,6 +216,10 @@ export function Calendar() {
 
   const handleToggleSidebar = () => {
     setIsSidebarCollapsed(prev => !prev);
+  };
+
+    const handleToggleBlackout = () => {
+    setIsBlackoutEnabled(prev => !prev);
   };
 
   const handlePrevMonth = () => {
@@ -370,11 +403,13 @@ export function Calendar() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-900">
+    <div className={`flex h-screen ${bgColor}`}>
       <Sidebar 
         isCollapsed={isSidebarCollapsed} 
         onToggle={handleToggleSidebar}
         userName={user.displayName || 'User'}
+        // Pass a prop for Sidebar background update if both Blackout mode and Sidebar Blackout option are enabled
+        isBlackoutEnabled={isBlackoutEnabled && isSidebarBlackoutEnabled}
       />
       
       <main className={`flex-1 overflow-hidden transition-all duration-300 ${

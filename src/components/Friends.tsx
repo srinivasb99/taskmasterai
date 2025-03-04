@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, ChangeEvent, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useBlackoutMode } from '../hooks/useBlackoutMode';
 import {
   User,
   MessageSquare,
@@ -67,6 +68,33 @@ export function Friends() {
     const stored = localStorage.getItem('isSidebarCollapsed');
     return stored ? JSON.parse(stored) : false;
   });
+
+    // Blackout mode state
+  const [isBlackoutEnabled, setIsBlackoutEnabled] = useState(() => {
+    const stored = localStorage.getItem('isBlackoutEnabled');
+    return stored ? JSON.parse(stored) : false;
+  });
+
+  // Sidebar Blackout option state
+  const [isSidebarBlackoutEnabled, setIsSidebarBlackoutEnabled] = useState(() => {
+    const stored = localStorage.getItem('isSidebarBlackoutEnabled');
+    return stored ? JSON.parse(stored) : false;
+  });
+
+    const handleToggleBlackout = () => {
+    setIsBlackoutEnabled(prev => !prev);
+  };
+
+  // Update localStorage and document body for Blackout mode
+  useEffect(() => {
+    localStorage.setItem('isBlackoutEnabled', JSON.stringify(isBlackoutEnabled));
+    document.body.classList.toggle('blackout-mode', isBlackoutEnabled);
+  }, [isBlackoutEnabled]);
+
+  // Update localStorage for Sidebar Blackout option
+  useEffect(() => {
+    localStorage.setItem('isSidebarBlackoutEnabled', JSON.stringify(isSidebarBlackoutEnabled));
+  }, [isSidebarBlackoutEnabled]);
 
   // Right-hand panels
   const [chats, setChats] = useState<Chat[]>([]);
@@ -274,6 +302,8 @@ export function Friends() {
       {/* Left: Navigation Sidebar */}
       <Sidebar
         isCollapsed={isSidebarCollapsed}
+                // Pass a prop for Sidebar background update if both Blackout mode and Sidebar Blackout option are enabled
+        isBlackoutEnabled={isBlackoutEnabled && isSidebarBlackoutEnabled}
         onToggle={() => {
           setIsSidebarCollapsed((prev) => {
             localStorage.setItem('isSidebarCollapsed', JSON.stringify(!prev));

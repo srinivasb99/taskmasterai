@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useBlackoutMode } from '../hooks/useBlackoutMode';
 import {
   PlusCircle,
   Edit,
@@ -17,7 +18,6 @@ import { Sidebar } from './Sidebar';
 import { Timer } from './Timer';
 import { FlashcardsQuestions } from './FlashcardsQuestions';
 import { getTimeBasedGreeting, getRandomQuote } from '../lib/greetings';
-import { useBlackoutMode } from '../hooks/useBlackoutMode';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import remarkGfm from 'remark-gfm';
@@ -138,8 +138,6 @@ export function Dashboard() {
   // 1. USER & GENERAL STATE
   // ---------------------
   const navigate = useNavigate();
-  const [isBlackoutEnabled] = useBlackoutMode();
-  const bgColor = isBlackoutEnabled ? 'bg-gray-950' : 'bg-gray-900';
   const [user, setUser] = useState<User | null>(null);
   const [userName, setUserName] = useState<string>("Loading...");
   const [quote, setQuote] = useState(getRandomQuote());
@@ -151,13 +149,34 @@ export function Dashboard() {
     return stored ? JSON.parse(stored) : false;
   });
 
-  const [blackoutMode, setBlackoutMode] = useState(false);
+  // Blackout mode state
+  const [isBlackoutEnabled, setIsBlackoutEnabled] = useState(() => {
+    const stored = localStorage.getItem('isBlackoutEnabled');
+    return stored ? JSON.parse(stored) : false;
+  });
 
+  // Sidebar Blackout option state
+  const [isSidebarBlackoutEnabled, setIsSidebarBlackoutEnabled] = useState(() => {
+    const stored = localStorage.getItem('isSidebarBlackoutEnabled');
+    return stored ? JSON.parse(stored) : false;
+  });
 
   // Update localStorage whenever the state changes
   useEffect(() => {
     localStorage.setItem('isSidebarCollapsed', JSON.stringify(isSidebarCollapsed));
   }, [isSidebarCollapsed]);
+
+  // Update localStorage and document body for Blackout mode
+  useEffect(() => {
+    localStorage.setItem('isBlackoutEnabled', JSON.stringify(isBlackoutEnabled));
+    document.body.classList.toggle('blackout-mode', isBlackoutEnabled);
+  }, [isBlackoutEnabled]);
+
+  // Update localStorage for Sidebar Blackout option
+  useEffect(() => {
+    localStorage.setItem('isSidebarBlackoutEnabled', JSON.stringify(isSidebarBlackoutEnabled));
+  }, [isSidebarBlackoutEnabled]);
+
 
   useEffect(() => {
     const user = getCurrentUser();
@@ -1193,7 +1212,8 @@ const resetCustomTimer = (timerId: string, defaultTime?: number) => {
   const plansProgress = totalPlans > 0 ? (completedPlans / totalPlans) * 100 : 0;
 
 
-
+    // Determine the background color based on Blackout mode
+  const bgColor = isBlackoutEnabled ? 'bg-gray-950' : 'bg-gray-900';
 
 
 return (
@@ -1203,8 +1223,8 @@ return (
       userName={userName}
       isCollapsed={isSidebarCollapsed}
       onToggle={handleToggleSidebar}
-      blackoutMode={blackoutMode}
-      onBlackoutToggle={() => setBlackoutMode(!blackoutMode)}
+      // Pass a prop for Sidebar background update if both Blackout mode and Sidebar Blackout option are enabled
+      isBlackoutEnabled={isBlackoutEnabled && isSidebarBlackoutEnabled}
     />
 
     {/* Adjust the main content's left margin depending on sidebar width */}

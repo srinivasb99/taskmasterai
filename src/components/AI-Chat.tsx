@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useBlackoutMode } from '../hooks/useBlackoutMode';
 import { 
   Send, 
   Timer as TimerIcon, 
@@ -170,6 +171,30 @@ export function AIChat() {
     localStorage.setItem('isSidebarCollapsed', JSON.stringify(isSidebarCollapsed));
   }, [isSidebarCollapsed]);
 
+    // Blackout mode state
+  const [isBlackoutEnabled, setIsBlackoutEnabled] = useState(() => {
+    const stored = localStorage.getItem('isBlackoutEnabled');
+    return stored ? JSON.parse(stored) : false;
+  });
+
+  // Sidebar Blackout option state
+  const [isSidebarBlackoutEnabled, setIsSidebarBlackoutEnabled] = useState(() => {
+    const stored = localStorage.getItem('isSidebarBlackoutEnabled');
+    return stored ? JSON.parse(stored) : false;
+  });
+
+  
+  // Update localStorage and document body for Blackout mode
+  useEffect(() => {
+    localStorage.setItem('isBlackoutEnabled', JSON.stringify(isBlackoutEnabled));
+    document.body.classList.toggle('blackout-mode', isBlackoutEnabled);
+  }, [isBlackoutEnabled]);
+
+  // Update localStorage for Sidebar Blackout option
+  useEffect(() => {
+    localStorage.setItem('isSidebarBlackoutEnabled', JSON.stringify(isSidebarBlackoutEnabled));
+  }, [isSidebarBlackoutEnabled]);
+
   // Auth listeners.
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
@@ -233,6 +258,10 @@ export function AIChat() {
   }, [chatHistory]);
 
   const handleToggleSidebar = () => setIsSidebarCollapsed((prev) => !prev);
+
+      const handleToggleBlackout = () => {
+    setIsBlackoutEnabled(prev => !prev);
+  };
 
   const parseTimerRequest = (message: string): number | null => {
     const timeRegex = /(\d+)\s*(minutes?|mins?|hours?|hrs?|seconds?|secs?)/i;
@@ -552,12 +581,14 @@ if (!hasGeneratedChatName && totalUserMessages === 3) {
   };
 
 return (
-  <div className="flex h-screen bg-gray-900">
+  <div className="flex h-screen ${bgColor}">
     {/* Left Sidebar */}
     <Sidebar
       isCollapsed={isSidebarCollapsed}
       onToggle={handleToggleSidebar}
       userName={userName}
+      // Pass a prop for Sidebar background update if both Blackout mode and Sidebar Blackout option are enabled
+      isBlackoutEnabled={isBlackoutEnabled && isSidebarBlackoutEnabled}
     />
 
     {/* Main Chat Area */}

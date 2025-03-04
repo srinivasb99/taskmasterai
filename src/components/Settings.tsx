@@ -363,27 +363,38 @@ export function Settings() {
                 <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
               </label>
             </div>
-            {/* Sidebar Blackout Toggle (only visible if Blackout mode is enabled) */}
-            {isBlackoutEnabled && (
-              <div className="flex items-center justify-between mt-4">
-                <div className="flex flex-col">
-                  <div className="flex items-center gap-2">
-                    <PanelLeftDashed className="w-5 h-5 text-white" />
-                    <p className="text-white font-medium">Sidebar Blackout</p>
-                  </div>
-                  <p className="text-gray-400 text-sm">Apply Blackout to Sidebar</p>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={isSidebarBlackoutEnabled}
-                    onChange={(e) => setIsSidebarBlackoutEnabled(e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                </label>
-              </div>
-            )}
+{/* Sidebar Blackout Toggle (only visible if Blackout mode is enabled) */}
+{isBlackoutEnabled && (
+  <div className="flex items-center justify-between mt-4">
+    {/* Icon + Text section, matching the Blackout layout */}
+    <div className="flex items-center">
+      <div className="mr-4">
+        <PanelLeftDashed className="w-6 h-6 text-blue-400" />
+      </div>
+      <div>
+        <p className="text-white font-medium">Sidebar Blackout</p>
+        <p className="text-gray-400 text-sm">Apply Blackout background to Sidebar</p>
+      </div>
+    </div>
+
+    {/* Toggle */}
+    <label className="relative inline-flex items-center cursor-pointer">
+      <input
+        type="checkbox"
+        checked={isSidebarBlackoutEnabled}
+        onChange={(e) => setIsSidebarBlackoutEnabled(e.target.checked)}
+        className="sr-only peer"
+      />
+      <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none peer-focus:ring-2 
+          peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full 
+          after:content-[''] after:absolute after:top-[2px] after:left-[2px] 
+          after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all 
+          peer-checked:bg-blue-600"
+      ></div>
+    </label>
+  </div>
+)}
+
           </div>
 
           {/* Profile Picture Section */}

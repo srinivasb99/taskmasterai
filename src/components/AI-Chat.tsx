@@ -306,7 +306,7 @@ export function AIChat() {
 // Define theming classes that take both illuminate and blackout modes into account.
 const containerBg = isBlackoutEnabled 
   ? 'bg-gray-950' 
-  : (isIlluminateEnabled ? 'bg-gray-100' : 'bg-gray-900');
+  : (isIlluminateEnabled ? 'bg-white' : 'bg-gray-900');
 
 const headerBorder = isBlackoutEnabled 
   ? 'border-gray-700' 

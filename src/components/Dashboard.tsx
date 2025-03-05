@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBlackoutMode } from '../hooks/useBlackoutMode';
+import { useIlluminateMode } from '../hooks/useIlluminateMode';
 import {
   PlusCircle,
   Edit,
@@ -161,6 +162,17 @@ export function Dashboard() {
     return stored ? JSON.parse(stored) : false;
   });
 
+   // Illuminate (light mode) state
+  const [isIlluminateEnabled, setIsIlluminateEnabled] = useState(() => {
+    const stored = localStorage.getItem('isIlluminateEnabled');
+    return stored ? JSON.parse(stored) : false;
+  });
+  // Sidebar Illuminate option state
+  const [isSidebarIlluminateEnabled, setIsSidebarIlluminateEnabled] = useState(() => {
+    const stored = localStorage.getItem('isSidebarIlluminateEnabled');
+    return stored ? JSON.parse(stored) : false;
+  });
+
   // Update localStorage whenever the state changes
   useEffect(() => {
     localStorage.setItem('isSidebarCollapsed', JSON.stringify(isSidebarCollapsed));
@@ -177,6 +189,20 @@ export function Dashboard() {
     localStorage.setItem('isSidebarBlackoutEnabled', JSON.stringify(isSidebarBlackoutEnabled));
   }, [isSidebarBlackoutEnabled]);
 
+   // Update localStorage and document.body for Illuminate mode
+  useEffect(() => {
+    localStorage.setItem('isIlluminateEnabled', JSON.stringify(isIlluminateEnabled));
+    if (isIlluminateEnabled) {
+      document.body.classList.add('illuminate-mode');
+    } else {
+      document.body.classList.remove('illuminate-mode');
+    }
+  }, [isIlluminateEnabled]);
+
+  // Update localStorage for Sidebar Illuminate option state
+  useEffect(() => {
+    localStorage.setItem('isSidebarIlluminateEnabled', JSON.stringify(isSidebarIlluminateEnabled));
+  }, [isSidebarIlluminateEnabled]);
 
   useEffect(() => {
     const user = getCurrentUser();
@@ -1212,8 +1238,12 @@ const resetCustomTimer = (timerId: string, defaultTime?: number) => {
   const plansProgress = totalPlans > 0 ? (completedPlans / totalPlans) * 100 : 0;
 
 
-    // Determine the background color based on Blackout mode
-  const bgColor = isBlackoutEnabled ? 'bg-gray-950' : 'bg-gray-900';
+  const bgColor = isIlluminateEnabled
+    ? 'bg-white text-gray-900'
+    : isBlackoutEnabled
+    ? 'bg-gray-950 text-white'
+    : 'bg-gray-900 text-white';
+
 
 
 return (
@@ -1224,7 +1254,8 @@ return (
       isCollapsed={isSidebarCollapsed}
       onToggle={handleToggleSidebar}
       // Pass a prop for Sidebar background update if both Blackout mode and Sidebar Blackout option are enabled
-      isBlackoutEnabled={isBlackoutEnabled && isSidebarBlackoutEnabled}
+        isBlackoutEnabled={isBlackoutEnabled && isSidebarBlackoutEnabled}
+        isIlluminateEnabled={isIlluminateEnabled && isSidebarIlluminateEnabled}
     />
 
     {/* Adjust the main content's left margin depending on sidebar width */}

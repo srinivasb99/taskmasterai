@@ -18,7 +18,30 @@ import {
   Calendar,
   Folder,
   BarChart2,
-  Clock
+  Clock,
+  Bell,
+  TrendingUp,
+  Lightbulb,
+  Target,
+  FileText,
+  Notebook,
+  Wand,
+  ListChecks,
+  SortAsc,
+  Search,
+  Timer,
+  ClipboardList,
+  Sun,
+  Layers,
+  AlignLeft,
+  UserCheck,
+  Hourglass,
+  Settings,
+  Columns,
+  PieChart,
+  Users,
+  CalendarCheck,
+  Eye
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
@@ -778,23 +801,70 @@ const handleChatSubmit = async (e: React.FormEvent) => {
   const iconClass = "w-6 h-6"; // Use consistent size for all icons
   
   // ----- Quick Actions for "no conversation selected" -----
-  const quickActions = [
-    'Create a Task',
-    'Create a Goal',
-    'Create a Plan',
-    'Create a Project',
-    'Analyze my items',
-    'Schedule a plan for me',
-  ];
+ const quickActions = [
+  'Create a Task',
+  'Create a Goal',
+  'Create a Plan',
+  'Create a Project',
+  'Analyze my items',
+  'Schedule a plan for me',
+  'Set a Reminder',
+  'Track My Progress',
+  'Brainstorm Ideas',
+  'Review My Goals',
+  'Generate a Report',
+  'Organize My Notes',
+  'Suggest Improvements',
+  'Create a Checklist',
+  'Prioritize My Tasks',
+  'Find a Solution',
+  'Start a Timer',
+  'Log My Activity',
+  'Plan My Day',
+  'Break Down a Project',
+  'Summarize Information',
+  'Assign a Task',
+  'Set a Deadline',
+  'Optimize My Workflow',
+  'Compare My Options',
+  'Visualize My Data',
+  'Delegate Work',
+  'Sync My Calendar',
+  'Reflect on Progress',
+];
 
-  const quickActionIcons: Record<string, JSX.Element> = {
+const quickActionIcons: Record<string, JSX.Element> = {
   'Create a Task': <CheckCircle className={iconClass + " inline-block"} />,
   'Create a Goal': <Goal className={iconClass + " inline-block"} />,
   'Create a Plan': <Calendar className={iconClass + " inline-block"} />,
   'Create a Project': <Folder className={iconClass + " inline-block"} />,
   'Analyze my items': <BarChart2 className={iconClass + " inline-block"} />,
   'Schedule a plan for me': <Clock className={iconClass + " inline-block"} />,
+  'Set a Reminder': <Bell className={iconClass + " inline-block"} />,
+  'Track My Progress': <TrendingUp className={iconClass + " inline-block"} />,
+  'Brainstorm Ideas': <Lightbulb className={iconClass + " inline-block"} />,
+  'Review My Goals': <Target className={iconClass + " inline-block"} />,
+  'Generate a Report': <FileText className={iconClass + " inline-block"} />,
+  'Organize My Notes': <Notebook className={iconClass + " inline-block"} />,
+  'Suggest Improvements': <Wand className={iconClass + " inline-block"} />,
+  'Create a Checklist': <ListChecks className={iconClass + " inline-block"} />,
+  'Prioritize My Tasks': <SortAsc className={iconClass + " inline-block"} />,
+  'Find a Solution': <Search className={iconClass + " inline-block"} />,
+  'Start a Timer': <Timer className={iconClass + " inline-block"} />,
+  'Log My Activity': <ClipboardList className={iconClass + " inline-block"} />,
+  'Plan My Day': <Sun className={iconClass + " inline-block"} />,
+  'Break Down a Project': <Layers className={iconClass + " inline-block"} />,
+  'Summarize Information': <AlignLeft className={iconClass + " inline-block"} />,
+  'Assign a Task': <UserCheck className={iconClass + " inline-block"} />,
+  'Set a Deadline': <Hourglass className={iconClass + " inline-block"} />,
+  'Optimize My Workflow': <Settings className={iconClass + " inline-block"} />,
+  'Compare My Options': <Columns className={iconClass + " inline-block"} />,
+  'Visualize My Data': <PieChart className={iconClass + " inline-block"} />,
+  'Delegate Work': <Users className={iconClass + " inline-block"} />,
+  'Sync My Calendar': <CalendarCheck className={iconClass + " inline-block"} />,
+  'Reflect on Progress': <Eye className={iconClass + " inline-block"} />,
 };
+
 
   const handleQuickActionClick = (action: string) => {
     setChatMessage(action);

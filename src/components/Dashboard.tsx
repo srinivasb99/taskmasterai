@@ -938,23 +938,23 @@ Remember: Focus on actionable strategies and specific next steps, not just descr
         }
         setLastResponse(cleanedText);
 
-        const cleanTextLines = cleanedText
-          .split('\n')
-          .filter(line => line.length > 0);
+const cleanTextLines = cleanedText
+  .split('\n')
+  .filter(line => line.length > 0);
 
-        const formattedHtml = cleanTextLines
-          .map((line, index) => {
-            if (index === 0) {
-              return `<div class="text-green-400 text-lg font-medium mb-4">${line}</div>`;
-            } else if (line.match(/^\d+\./)) {
-              return `<div class="text-blue-300 mb-3 pl-4 border-l-2 border-blue-500">${line}</div>`;
-            } else {
-              return `<div class="text-gray-300 mb-3">${line}</div>`;
-            }
-          })
-          .join('');
+const formattedHtml = cleanTextLines
+  .map((line, index) => {
+    if (index === 0) {
+      return `<div class="${headlineColor} text-lg font-medium mb-4">${line}</div>`;
+    } else if (line.match(/^\d+\./)) {
+      return `<div class="${bulletTextColor} mb-3 pl-4 border-l-2 ${bulletBorderColor}">${line}</div>`;
+    } else {
+      return `<div class="${defaultTextColor} mb-3">${line}</div>`;
+    }
+  })
+  .join('');
 
-        setSmartOverview(formattedHtml);
+setSmartOverview(formattedHtml);
 
       } catch (error) {
         console.error("Overview generation error:", error);
@@ -1243,7 +1243,11 @@ const resetCustomTimer = (timerId: string, defaultTime?: number) => {
 
 // 1. Define a few helper classes specifically for Illuminate mode
 //    to ensure better contrast on a light background.
-
+// Define conditional color classes based on the isIlluminateEnabled flag
+const headlineColor = isIlluminateEnabled ? 'text-green-700' : 'text-green-400';
+const bulletTextColor = isIlluminateEnabled ? 'text-blue-700' : 'text-blue-300';
+const bulletBorderColor = isIlluminateEnabled ? 'border-blue-700' : 'border-blue-500';
+const defaultTextColor = isIlluminateEnabled ? 'text-gray-700' : 'text-gray-300';
 const illuminateHighlightToday = 'bg-blue-200 text-blue-800 font-bold';
 const illuminateHighlightDeadline = 'bg-red-200 hover:bg-red-300';
 const illuminateHoverGray = 'hover:bg-gray-200';

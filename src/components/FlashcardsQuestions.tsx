@@ -7,12 +7,6 @@ import {
   X
 } from 'lucide-react';
 
-// For math/LaTeX support:
-import ReactMarkdown from 'react-markdown';
-import remarkMath from 'remark-math';
-import rehypeKatex from 'rehype-katex';
-import 'katex/dist/katex.min.css';
-
 interface Flashcard {
   id: string;
   question: string;
@@ -44,7 +38,7 @@ export const FlashcardsQuestions: React.FC<FlashcardsQuestionsProps> = ({
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [showExplanation, setShowExplanation] = useState(false);
 
-  // Read user’s mode preferences from localStorage
+  // Read user's mode preferences from localStorage
   const [isBlackoutEnabled] = useState(() => {
     const stored = localStorage.getItem('isBlackoutEnabled');
     return stored ? JSON.parse(stored) : false;
@@ -64,12 +58,12 @@ export const FlashcardsQuestions: React.FC<FlashcardsQuestionsProps> = ({
     ? 'bg-gray-950 text-white'
     : 'bg-gray-900 text-white';
 
-  // The “card” background
+  // The "card" background
   const cardBg = isIlluminateEnabled ? 'bg-gray-100' : 'bg-gray-800';
   const cardText = isIlluminateEnabled ? 'text-gray-900' : 'text-white';
   const cardBorder = isIlluminateEnabled ? 'border-gray-300' : 'border-gray-700';
 
-  // The “front”/“back” of flashcards or question blocks
+  // The "front"/"back" of flashcards or question blocks
   const frontBg = isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700';
   const frontText = isIlluminateEnabled ? 'text-gray-900' : 'text-white';
 
@@ -169,14 +163,9 @@ export const FlashcardsQuestions: React.FC<FlashcardsQuestionsProps> = ({
             {/* Front side */}
             <div className="absolute w-full backface-hidden">
               <div className={`${frontBg} p-6 rounded-lg shadow-lg`}>
-                {/* Use ReactMarkdown to display math expressions */}
-                <ReactMarkdown
-                  remarkPlugins={[remarkMath]}
-                  rehypePlugins={[rehypeKatex]}
-                  className={`text-lg ${frontText}`}
-                >
+                <div className={`text-lg ${frontText}`}>
                   {flashcard.question}
-                </ReactMarkdown>
+                </div>
               </div>
             </div>
 
@@ -187,13 +176,9 @@ export const FlashcardsQuestions: React.FC<FlashcardsQuestionsProps> = ({
               }`}
             >
               <div className={`${frontBg} p-6 rounded-lg shadow-lg`}>
-                <ReactMarkdown
-                  remarkPlugins={[remarkMath]}
-                  rehypePlugins={[rehypeKatex]}
-                  className={`text-lg ${frontText}`}
-                >
+                <div className={`text-lg ${frontText}`}>
                   {flashcard.answer}
-                </ReactMarkdown>
+                </div>
               </div>
             </div>
           </div>
@@ -247,13 +232,9 @@ export const FlashcardsQuestions: React.FC<FlashcardsQuestionsProps> = ({
 
       {/* Question */}
       <div className="mb-6">
-        <ReactMarkdown
-          remarkPlugins={[remarkMath]}
-          rehypePlugins={[rehypeKatex]}
-          className="text-lg mb-4"
-        >
+        <div className="text-lg mb-4">
           {quiz.question}
-        </ReactMarkdown>
+        </div>
 
         {/* Options */}
         <div className="space-y-3">
@@ -299,13 +280,9 @@ export const FlashcardsQuestions: React.FC<FlashcardsQuestionsProps> = ({
             isIlluminateEnabled ? 'bg-gray-300 text-gray-800' : 'bg-gray-700 text-white'
           }`}
         >
-          <ReactMarkdown
-            remarkPlugins={[remarkMath]}
-            rehypePlugins={[rehypeKatex]}
-            className="leading-relaxed"
-          >
+          <div className="leading-relaxed">
             {quiz.explanation}
-          </ReactMarkdown>
+          </div>
         </div>
       )}
 

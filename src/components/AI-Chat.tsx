@@ -503,18 +503,10 @@ Guidelines:
    - Return only the JSON object with no additional text or extra lines.
    - **Math Expressions:**  
      - When including math (e.g., integrals, summations, or equations) in questions, answers, options, or explanations, wrap them in standard LaTeX syntax.
-     - For inline math, use: ${triple}json
-{
-  "example": "$\\\\sin x$"
-}
-${triple}
-       (This will produce a JSON string containing "$\\sin x$")
-     - For block math, use: ${triple}json
-{
-  "example": "$$\\\\int \\\\sin x \\, dx = -\\\\cos x + C$$"
-}
-${triple}
-       (This will produce a JSON string containing "$$\\int \\sin x \\, dx = -\\cos x + C$$")
+     - For inline math, use: \`$\\\\\\\\sin x$\`
+       (This will produce a JSON string containing "$\\\\sin x$", which when parsed yields "$\\sin x$")
+     - For block math, use: \`$$\\\\\\\\int \\\\sin x \\, dx = -\\\\\\\\cos x + C$$\`
+       (This will produce a JSON string containing "$$\\\\int \\\\sin x \\, dx = -\\\\cos x + C$$", which when parsed yields "$$\\int \\sin x \\, dx = -\\cos x + C$$")
    - Use one of the following formats:
 
      **For flashcards:**
@@ -524,8 +516,8 @@ ${triple}
   "data": [
     {
       "id": "unique-id-1",
-      "question": "Question with optional math: $\\\\sin x$",
-      "answer": "Answer with optional math: $$\\\\int \\\\sin x \\, dx = -\\\\cos x + C$$",
+      "question": "Question with optional math: $\\\\\\\\sin x$",
+      "answer": "Answer with optional math: $$\\\\\\\\int \\\\sin x \\, dx = -\\\\\\\\cos x + C$$",
       "topic": "Subject area"
     },
     {
@@ -545,15 +537,15 @@ ${triple}
   "data": [
     {
       "id": "unique-id-1",
-      "question": "Question text with optional math: $\\\\sin x$",
+      "question": "Question text with optional math: $\\\\\\\\sin x$",
       "options": [
-        "Option with inline math: $\\\\cos x + C$",
-        "Option with block math: $$\\\\int e^x \\, dx = e^x + C$$",
+        "Option with inline math: $\\\\\\\\cos x + C$",
+        "Option with block math: $$\\\\\\\\int e^x \\, dx = e^x + C$$",
         "...",
         "..."
       ],
       "correctAnswer": 0,
-      "explanation": "Explanation with optional math: $\\\\frac{d}{dx}(\\\\cos x) = -\\\\sin x$"
+      "explanation": "Explanation with optional math: $\\\\\\\\frac{d}{dx}(\\\\\\\\cos x) = -\\\\\\\\sin x$"
     },
     {
       "id": "unique-id-2",

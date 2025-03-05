@@ -2,12 +2,16 @@ import { db } from './firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 /**
- * Helper to parse a date string and return a Date object set to local midnight.
- * This ensures that the dueDate is stored as intended, without timezone offsets.
+ * Helper to parse a date string and return a Date object set to local midnight,
+ * then add one day to avoid timezone offset issues.
  */
 function parseDueDate(dateString: string): Date {
   const temp = new Date(dateString);
-  return new Date(temp.getFullYear(), temp.getMonth(), temp.getDate());
+  // Set to local midnight
+  const localMidnight = new Date(temp.getFullYear(), temp.getMonth(), temp.getDate());
+  // Add one day
+  localMidnight.setDate(localMidnight.getDate() + 1);
+  return localMidnight;
 }
 
 /**

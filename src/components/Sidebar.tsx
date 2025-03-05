@@ -22,6 +22,7 @@ interface SidebarProps {
   onToggle?: () => void;
   isCollapsed?: boolean;
   isBlackoutEnabled?: boolean;
+  isIlluminateEnabled?: boolean; // <-- NEW: Light mode support
 }
 
 export function Sidebar({
@@ -29,20 +30,22 @@ export function Sidebar({
   onToggle,
   isCollapsed = false,
   isBlackoutEnabled = false,
+  isIlluminateEnabled = false,
 }: SidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const isSettingsPage = location.pathname === '/settings';
   const currentUser = auth.currentUser;
+
   // List of developer emails
   const DEV_EMAILS = [
     'bajinsrinivasr@lexington1.net',
     'srinibaj10@gmail.com',
-    'fugegate@gmail.com'
+    'fugegate@gmail.com',
   ];
   const isDev = currentUser?.email && DEV_EMAILS.includes(currentUser.email);
 
-  // Define the menu items with label, icon component, and path
+  // Define the menu items with label, icon, and path
   const menuItems = [
     { label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
     { label: 'Notes', icon: FileText, path: '/notes' },
@@ -62,14 +65,50 @@ export function Sidebar({
     navigate('/pricing');
   };
 
-  // Set the background based on Blackout mode for the Sidebar
-  const sidebarBgClass = isBlackoutEnabled ? 'bg-gray-950' : 'bg-[#0c111c]';
+  // -----------------------------
+  //   Determine Sidebar Colors
+  // -----------------------------
+  // Background & text color for the container
+  // Priority: Illuminate > Blackout > default
+  let sidebarContainerBg = 'bg-[#0c111c] text-gray-300 border-gray-800/50';
+  if (isIlluminateEnabled) {
+    sidebarContainerBg = 'bg-gray-100 text-gray-900 border-gray-300';
+  } else if (isBlackoutEnabled) {
+    sidebarContainerBg = 'bg-gray-950 text-white border-gray-800/50';
+  }
+
+  // Toggle button background
+  // (This is the small round button that collapses/expands the sidebar)
+  let toggleButtonBg =
+    'bg-[#0c111c] border-gray-800/50 text-gray-400 hover:text-white';
+  if (isIlluminateEnabled) {
+    toggleButtonBg = 'bg-gray-100 border-gray-300 text-gray-500 hover:text-gray-800';
+  } else if (isBlackoutEnabled) {
+    toggleButtonBg = 'bg-gray-950 border-gray-800/50 text-gray-400 hover:text-white';
+  }
+
+  // For menu items, define normal, hover, and active states
+  const baseMenuItemClasses =
+    'flex items-center gap-3 px-4 py-2.5 text-sm rounded-lg transition-all duration-200';
+  const isActiveClasses = isIlluminateEnabled
+    ? 'bg-gray-200 text-gray-900 font-medium'
+    : 'bg-gray-800 text-white font-medium';
+  const hoverClasses = isIlluminateEnabled
+    ? 'hover:bg-gray-200 hover:text-gray-900'
+    : 'hover:bg-gray-800/70 hover:text-white';
+  const defaultTextColor = isIlluminateEnabled ? 'text-gray-800' : 'text-gray-300';
+
+  // For the user profile / bottom section
+  const userProfileHoverBg = isIlluminateEnabled
+    ? 'hover:bg-gray-200'
+    : 'hover:bg-gray-800/50';
+  const userProfileText = isIlluminateEnabled ? 'text-gray-800' : 'text-gray-300';
 
   return (
     <div
       className={`
-        fixed top-0 left-0 h-full ${sidebarBgClass} flex flex-col
-        py-6 px-3 font-poppins border-r border-gray-800/50
+        fixed top-0 left-0 h-full ${sidebarContainerBg} flex flex-col
+        py-6 px-3 font-poppins border-r
         transition-all duration-300 ease-in-out
         ${isCollapsed ? 'w-20' : 'w-64'}
       `}
@@ -107,12 +146,11 @@ export function Sidebar({
             <button
               key={item.label}
               onClick={() => handleNavigation(item.path)}
-              className={`flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 rounded-lg transition-all duration-200
-                ${
-                  isActive
-                    ? 'bg-gray-800 text-white font-medium'
-                    : 'hover:bg-gray-800/70 hover:text-white'
-                }
+              className={`
+                ${baseMenuItemClasses}
+                ${defaultTextColor}
+                ${hoverClasses}
+                ${isActive ? isActiveClasses : ''}
               `}
             >
               <Icon className="w-5 h-5 min-w-[1.25rem]" strokeWidth={2} />
@@ -121,11 +159,11 @@ export function Sidebar({
           );
         })}
 
-        {/* Toggle Button */}
+        {/* Toggle Button (Collapse/Expand) */}
         {onToggle && (
           <button
             onClick={onToggle}
-            className="absolute -right-4 top-6 bg-[#0c111c] p-1.5 rounded-full border border-gray-800/50 text-gray-400 hover:text-white transition-colors z-50"
+            className={`absolute -right-4 top-6 p-1.5 rounded-full border transition-colors z-50 ${toggleButtonBg}`}
           >
             {isCollapsed ? (
               <PanelLeftOpen className="w-4 h-4 min-w-[1rem]" strokeWidth={2} />
@@ -150,9 +188,9 @@ export function Sidebar({
               ${isCollapsed ? 'aspect-square p-2.5' : 'px-4 py-2.5'}
             `}
           >
-            <Crown 
-              className={`min-w-[1.25rem] ${isCollapsed ? 'w-6 h-6' : 'w-5 h-5 mr-2'}`} 
-              strokeWidth={2} 
+            <Crown
+              className={`min-w-[1.25rem] ${isCollapsed ? 'w-6 h-6' : 'w-5 h-5 mr-2'}`}
+              strokeWidth={2}
             />
             {!isCollapsed && (
               <span className="text-sm font-medium whitespace-nowrap">Upgrade to Premium</span>
@@ -163,8 +201,9 @@ export function Sidebar({
           <button
             onClick={() => navigate('/settings')}
             className={`
-              mx-3 flex items-center gap-3 text-gray-300
-              rounded-lg hover:bg-gray-800/50 transition-colors
+              mx-3 flex items-center gap-3 rounded-lg transition-colors
+              ${userProfileText}
+              ${userProfileHoverBg}
               ${isCollapsed ? 'justify-center aspect-square' : 'px-4 py-2.5'}
             `}
           >

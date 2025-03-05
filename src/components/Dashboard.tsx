@@ -1239,7 +1239,21 @@ const resetCustomTimer = (timerId: string, defaultTime?: number) => {
 
 
 
-  // Dynamic classes for Dashboard styling
+// Example of improved color usage in Illuminate mode
+
+// 1. Define a few helper classes specifically for Illuminate mode
+//    to ensure better contrast on a light background.
+
+const illuminateHighlightToday = 'bg-blue-200 text-blue-800 font-bold';
+const illuminateHighlightDeadline = 'bg-red-200 hover:bg-red-300';
+const illuminateHoverGray = 'hover:bg-gray-200';
+const illuminateTextBlue = 'text-blue-700';
+const illuminateTextPurple = 'text-purple-700';
+const illuminateTextGreen = 'text-green-700';
+const illuminateTextPink = 'text-pink-700';
+const illuminateTextYellow = 'text-yellow-700';
+
+// Original dynamic classes
 const containerClass = isIlluminateEnabled
   ? 'bg-white text-gray-900'
   : isBlackoutEnabled
@@ -1251,8 +1265,10 @@ const cardClass = isIlluminateEnabled
   : 'bg-gray-800 text-gray-300';
 
 const headingClass = isIlluminateEnabled ? 'text-gray-900' : 'text-white';
-const subheadingClass = isIlluminateEnabled ? 'text-gray-600' : 'text-gray-400';
+// Darken subheading a bit so it’s easier to see on white
+const subheadingClass = isIlluminateEnabled ? 'text-gray-700' : 'text-gray-400';
 
+// Lighten input background but keep enough contrast
 const inputBg = isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700';
 
   

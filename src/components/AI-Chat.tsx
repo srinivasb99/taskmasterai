@@ -34,14 +34,7 @@ import {
   deleteChatConversation,
 } from '../lib/ai-chat-firebase';
 
-// Example Firestore item CRUD helpers (modify these to match your actual schema)
-import {
-  createUserTask,
-  createUserGoal,
-  createUserPlan,
-  createUserProject,
-  // updateUserTask, etc...
-} from '../lib/your-item-firebase';
+
 
 import { Sidebar } from './Sidebar';
 import { Timer } from './Timer';

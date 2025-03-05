@@ -458,12 +458,12 @@ export function Settings() {
                   {isBlackoutEnabled ? (
                     <Moon className="w-6 h-6 text-blue-400" />
                   ) : (
-                    <Sun className="w-6 h-6 text-yellow-400" />
+                    <Moon className="w-6 h-6 text-blue-400" />
                   )}
                 </div>
                 <div>
                   <p className={`font-medium ${headingClass}`}>Blackout</p>
-                  <p className={`${subheadingClass} text-sm`}>Sharpen your focus.</p>
+                  <p className={`${subheadingClass} text-sm`}>Ease the eyes.</p>
                 </div>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
@@ -491,7 +491,7 @@ export function Settings() {
                 <div>
                   <p className={`font-medium ${headingClass}`}>Illuminate</p>
                   <p className={`${subheadingClass} text-sm`}>
-                    Sharpen your focus with a brighter interface.
+                    Sharpen your focus.
                   </p>
                 </div>
               </div>

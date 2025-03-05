@@ -962,7 +962,7 @@ return (
     <aside className={`w-75 border-l ${asideBorder} ${asideBg}`}>
       <div className="p-4">
         <div className="flex items-center justify-between mb-4">
-          <h2 className={`text-lg font-bold ${isIlluminateEnabled || isBlackoutEnabled ? 'text-white' : 'text-white'}`}>
+          <h2 className={`text-lg font-bold ${isIlluminateEnabled ? 'text-gray-900' : (isBlackoutEnabled ? 'text-white' : 'text-white')}`}>
             Conversations
           </h2>
           <button

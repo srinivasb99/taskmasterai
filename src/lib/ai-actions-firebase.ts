@@ -1,11 +1,17 @@
 import { db } from './firebase'; // or wherever you export your Firestore db
 import {
   collection,
+  addDoc,
   doc,
   setDoc,
+  updateDoc,
+  deleteDoc,
   serverTimestamp,
-  Timestamp,
-} from 'firebase/firestore';
+  onSnapshot,
+  query,
+  where,
+  orderBy
+} from "firebase/firestore";
 
 /**
  * Create a Task document under users/{uid}/tasks/{taskId}.

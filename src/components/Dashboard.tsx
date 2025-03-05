@@ -1238,24 +1238,43 @@ const resetCustomTimer = (timerId: string, defaultTime?: number) => {
   const plansProgress = totalPlans > 0 ? (completedPlans / totalPlans) * 100 : 0;
 
 
+
+  // Dynamic classes for Dashboard styling
+const containerClass = isIlluminateEnabled
+  ? 'bg-white text-gray-900'
+  : isBlackoutEnabled
+  ? 'bg-gray-950 text-white'
+  : 'bg-gray-900 text-white';
+
+const cardClass = isIlluminateEnabled
+  ? 'bg-gray-100 text-gray-900'
+  : 'bg-gray-800 text-gray-300';
+
+const headingClass = isIlluminateEnabled ? 'text-gray-900' : 'text-white';
+const subheadingClass = isIlluminateEnabled ? 'text-gray-600' : 'text-gray-400';
+
+const inputBg = isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700';
+
+  
   const bgColor = isIlluminateEnabled
     ? 'bg-white text-gray-900'
     : isBlackoutEnabled
     ? 'bg-gray-950 text-white'
     : 'bg-gray-900 text-white';
 
+            
+
 
 
 return (
-  <div className="${bgColor} text-white min-h-screen w-full overflow-hidden">
+  <div className={`${containerClass} min-h-screen w-full overflow-hidden`}>
     {/* Pass collapse state & toggle handler to Sidebar */}
     <Sidebar
       userName={userName}
       isCollapsed={isSidebarCollapsed}
       onToggle={handleToggleSidebar}
-      // Pass a prop for Sidebar background update if both Blackout mode and Sidebar Blackout option are enabled
-        isBlackoutEnabled={isBlackoutEnabled && isSidebarBlackoutEnabled}
-        isIlluminateEnabled={isIlluminateEnabled && isSidebarIlluminateEnabled}
+      isBlackoutEnabled={isBlackoutEnabled && isSidebarBlackoutEnabled}
+      isIlluminateEnabled={isIlluminateEnabled && isSidebarIlluminateEnabled}
     />
 
     {/* Adjust the main content's left margin depending on sidebar width */}
@@ -1268,7 +1287,7 @@ return (
       <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6 mb-6">
         {/* Greeting Section */}
         <header className="dashboard-header transform transition-all duration-500 ease-out translate-y-0 opacity-100 pt-16 lg:pt-0">
-          <h1 className="text-2xl lg:text-4xl font-bold mb-2 text-white break-words">
+          <h1 className={`text-2xl lg:text-4xl font-bold mb-2 ${headingClass} break-words`}>
             {React.cloneElement(greeting.icon, {
               className:
                 "w-5 h-5 lg:w-6 lg:h-6 inline-block align-middle mr-2 -translate-y-0.5 " +
@@ -1277,258 +1296,240 @@ return (
             {/* Only display the first name */}
             {greeting.greeting},{" "}
             <span className="font-bold">
-              {userName
-                ? userName.split(" ")[0] // Grab only the first part
-                : "Loading..."}
+              {userName ? userName.split(" ")[0] : "Loading..."}
             </span>
           </h1>
-          <p className="text-gray-400 italic text-base lg:text-lg">
+          <p className={`italic text-base lg:text-lg ${subheadingClass}`}>
             "{quote.text}" - <span className="text-purple-400">{quote.author}</span>
           </p>
         </header>
 
-  {/* Calendar Card */}
-  <div className="bg-gray-800 rounded-xl p-2 min-w-[100px] max-w-[550px] w-full h-[80px] transform hover:scale-[1.02] transition-all duration-300 flex-shrink-0 lg:flex-shrink">
-    <div className="grid grid-cols-9 gap-1 h-full">
-      {/* Previous Week Button */}
-      <button 
-        onClick={() => {
-          const prevWeek = new Date(currentWeek[0]);
-          prevWeek.setDate(prevWeek.getDate() - 7);
-          setCurrentWeek(getWeekDates(prevWeek));
-        }}
-        className="text-gray-400 hover:text-white transition-colors w-8 h-full flex items-center justify-center"
-      >
-        ←
-      </button>
+        {/* Calendar Card */}
+        <div className={`${cardClass} rounded-xl p-2 min-w-[100px] max-w-[550px] w-full h-[80px] transform hover:scale-[1.02] transition-all duration-300 flex-shrink-0 lg:flex-shrink`}>
+          <div className="grid grid-cols-9 gap-1 h-full">
+            {/* Previous Week Button */}
+            <button 
+              onClick={() => {
+                const prevWeek = new Date(currentWeek[0]);
+                prevWeek.setDate(prevWeek.getDate() - 7);
+                setCurrentWeek(getWeekDates(prevWeek));
+              }}
+              className="w-8 h-full flex items-center justify-center text-gray-400 hover:text-white transition-colors"
+            >
+              ←
+            </button>
 
-      {/* Calendar Content */}
-      <div className="col-span-7">
-        <div className="grid grid-cols-7 gap-1 h-full">
-          {/* Day Labels */}
-          <div className="col-span-7 grid grid-cols-7 gap-1">
-            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-              <div key={day} className="text-center text-gray-400 text-[10px] font-medium">
-                {day}
+            {/* Calendar Content */}
+            <div className="col-span-7">
+              <div className="grid grid-cols-7 gap-1 h-full">
+                {/* Day Labels */}
+                <div className="col-span-7 grid grid-cols-7 gap-1">
+                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                    <div key={day} className={`text-center text-[10px] font-medium ${subheadingClass}`}>
+                      {day}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Date Cells */}
+                {currentWeek.map((date, index) => {
+                  // Merge items with a 'type' label
+                  const tasksWithType = tasks.map((t) => ({ ...t, type: 'Task' }));
+                  const goalsWithType = goals.map((g) => ({ ...g, type: 'Goal' }));
+                  const projectsWithType = projects.map((p) => ({ ...p, type: 'Project' }));
+                  const plansWithType = plans.map((p) => ({ ...p, type: 'Plan' }));
+
+                  const allItems = [
+                    ...tasksWithType,
+                    ...goalsWithType,
+                    ...projectsWithType,
+                    ...plansWithType,
+                  ];
+                  
+                  const hasDeadline = allItems?.some(item => {
+                    if (!item?.data?.dueDate) return false;
+                    
+                    let itemDate;
+                    try {
+                      itemDate = typeof item.data.dueDate.toDate === 'function'
+                        ? item.data.dueDate.toDate()
+                        : new Date(item.data.dueDate);
+                      itemDate.setHours(0, 0, 0, 0);
+                      const compareDate = new Date(date);
+                      compareDate.setHours(0, 0, 0, 0);
+                      return itemDate.getTime() === compareDate.getTime();
+                    } catch (e) {
+                      console.error('Error parsing date:', e);
+                      return false;
+                    }
+                  }) || false;
+
+                  const isToday = formatDateForComparison(date) === formatDateForComparison(today);
+
+                  return (
+                    <div
+                      key={index}
+                      className={`relative w-full h-6 text-center rounded-lg transition-all duration-200 cursor-pointer flex items-center justify-center 
+                        ${isToday ? 'bg-blue-500/20 text-blue-300 font-bold' : subheadingClass}
+                        ${hasDeadline ? 'bg-red-500/10 hover:bg-red-500/20' : 'hover:bg-gray-700/50'}
+                      `}
+                    >
+                      <span className="text-xs">{date.getDate()}</span>
+                      {hasDeadline && (
+                        <div className="absolute bottom-0.5 left-1/2 transform -translate-x-1/2 w-1 h-1 rounded-full bg-red-400"></div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-            ))}
+            </div>
+
+            {/* Next Week Button */}
+            <button 
+              onClick={() => {
+                const nextWeek = new Date(currentWeek[0]);
+                nextWeek.setDate(nextWeek.getDate() + 7);
+                setCurrentWeek(getWeekDates(nextWeek));
+              }}
+              className="w-8 h-full flex items-center justify-center text-gray-400 hover:text-white transition-colors"
+            >
+              →
+            </button>
           </div>
-
-          {/* Date Cells */}
-          {currentWeek.map((date, index) => {
-            // 1. Combine all items with a 'type' label
-            const tasksWithType = tasks.map((t) => ({ ...t, type: 'Task' }));
-            const goalsWithType = goals.map((g) => ({ ...g, type: 'Goal' }));
-            const projectsWithType = projects.map((p) => ({ ...p, type: 'Project' }));
-            const plansWithType = plans.map((p) => ({ ...p, type: 'Plan' }));
-
-            // 2. Merge into a single array
-            const allItems = [
-              ...tasksWithType,
-              ...goalsWithType,
-              ...projectsWithType,
-              ...plansWithType,
-            ];
-            
-            // Safely check for deadlines on this date
-            const hasDeadline = allItems?.some(item => {
-              if (!item?.data?.dueDate) return false;
-              
-              let itemDate;
-              try {
-                itemDate = typeof item.data.dueDate.toDate === 'function'
-                  ? item.data.dueDate.toDate()
-                  : new Date(item.data.dueDate);
-                
-                // Ensure we're comparing dates at midnight for accurate comparison
-                itemDate.setHours(0, 0, 0, 0);
-                const compareDate = new Date(date);
-                compareDate.setHours(0, 0, 0, 0);
-                
-                return itemDate.getTime() === compareDate.getTime();
-              } catch (e) {
-                console.error('Error parsing date:', e);
-                return false;
-              }
-            }) || false;
-
-            const isToday = formatDateForComparison(date) === formatDateForComparison(today);
-
-            return (
-              <div
-                key={index}
-                className={`relative w-full h-6 text-center rounded-lg transition-all duration-200
-                  ${isToday ? 'bg-blue-500/20 text-blue-300 font-bold' : 'text-gray-300'}
-                  ${hasDeadline ? 'bg-red-500/10 hover:bg-red-500/20' : 'hover:bg-gray-700/50'}
-                  cursor-pointer flex items-center justify-center`}
-              >
-                <span className="text-xs">{date.getDate()}</span>
-                {hasDeadline && (
-                  <div className="absolute bottom-0.5 left-1/2 transform -translate-x-1/2 w-1 h-1 rounded-full bg-red-400"></div>
-                )}
-              </div>
-            );
-          })}
         </div>
       </div>
 
-      {/* Next Week Button */}
-      <button 
-        onClick={() => {
-          const nextWeek = new Date(currentWeek[0]);
-          nextWeek.setDate(nextWeek.getDate() + 7);
-          setCurrentWeek(getWeekDates(nextWeek));
-        }}
-        className="text-gray-400 hover:text-white transition-colors w-8 h-full flex items-center justify-center"
-      >
-        →
-      </button>
-    </div>
-  </div>
-</div>
+      {/* Smart Overview Card */}
+      <div className={`${cardClass} rounded-xl p-6 relative min-h-[200px] transform hover:shadow-lg hover:shadow-purple-500/10 transition-all duration-500 ease-out ${cardVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}`}>
+        <div className="flex items-center mb-4">
+          <h2 className="text-xl font-semibold mr-2 flex items-center text-blue-300">
+            <Sparkles className="w-5 h-5 mr-2 text-yellow-400" />
+            Smart Overview
+          </h2>
+          <button
+            onClick={() => setIsChatModalOpen(true)}
+            className="p-2 text-blue-300 hover:text-blue-400 hover:bg-blue-500/10 rounded-full transition-colors duration-200"
+            title="Chat with TaskMaster"
+          >
+            <MessageCircle className="w-5 h-5" />
+          </button>
+          <span className="ml-2 text-xs bg-gradient-to-r from-pink-500 to-purple-500 text-white px-3 py-1 rounded-full font-medium">
+            BETA
+          </span>
+        </div>
 
-
-        
-
-{/* Smart Overview Card */}
-<div
-  className={`bg-gray-800 rounded-xl p-6 relative min-h-[200px] transform transition-all duration-500 ease-out ${cardVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'} hover:shadow-lg hover:shadow-purple-500/10`}
->
-  <div className="flex items-center mb-4">
-    <h2 className="text-xl font-semibold text-blue-300 mr-2 flex items-center">
-      <Sparkles className="w-5 h-5 mr-2 text-yellow-400" />
-      Smart Overview
-    </h2>
-    <button
-      onClick={() => setIsChatModalOpen(true)}
-      className="p-2 text-blue-300 hover:text-blue-400 hover:bg-blue-500/10 rounded-full transition-colors duration-200"
-      title="Chat with TaskMaster"
-    >
-      <MessageCircle className="w-5 h-5" />
-    </button>
-    <span className="text-xs bg-gradient-to-r from-pink-500 to-purple-500 text-white px-3 py-1 rounded-full font-medium ml-2">
-      BETA
-    </span>
-  </div>
-
-  {overviewLoading ? (
-    <div className="space-y-3">
-      <div className="h-4 bg-gray-700 rounded-full w-3/4 animate-pulse"></div>
-      <div className="h-4 bg-gray-700 rounded-full w-2/3 animate-pulse delay-75"></div>
-      <div className="h-4 bg-gray-700 rounded-full w-4/5 animate-pulse delay-150"></div>
-    </div>
-  ) : (
-    <>
-      <div
-        className="text-sm text-gray-300 prose prose-invert"
-        dangerouslySetInnerHTML={{ __html: smartOverview }}
-      />
-      <div className="text-left mt-4 text-xs text-gray-400">
-        TaskMaster can make mistakes. Verify details.
+        {overviewLoading ? (
+          <div className="space-y-3">
+            <div className="h-4 rounded-full w-3/4 animate-pulse bg-gray-700"></div>
+            <div className="h-4 rounded-full w-2/3 animate-pulse bg-gray-700 delay-75"></div>
+            <div className="h-4 rounded-full w-4/5 animate-pulse bg-gray-700 delay-150"></div>
+          </div>
+        ) : (
+          <>
+            <div className="text-sm prose prose-invert" dangerouslySetInnerHTML={{ __html: smartOverview }} />
+            <div className="mt-4 text-left text-xs text-gray-400">
+              TaskMaster can make mistakes. Verify details.
+            </div>
+          </>
+        )}
       </div>
-    </>
-  )}
-</div>
 
-     {/* Chat History Modal */}
-        {isChatModalOpen && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
-            <div className="bg-gray-800 rounded-xl w-full max-w-2xl mx-4 max-h-[80vh] flex flex-col">
-              <div className="p-4 border-b border-gray-700 flex justify-between items-center">
-                <h3 className="text-lg font-semibold text-blue-300 flex items-center">
-                  <MessageCircle className="w-5 h-5 mr-2" />
-                  Chat with TaskMaster
-                  <span className="ml-2 text-xs bg-gradient-to-r from-pink-500 to-purple-500 text-gray-300 px-2 py-0.5 rounded-full">BETA</span>
-                  <span className="ml-2 text-xs bg-blue text-gray-300 px-2 py-0.5 rounded-full">Chat history is not saved.</span>
-                </h3>
-                <button onClick={() => setIsChatModalOpen(false)} className="text-gray-400 hover:text-gray-200 transition-colors">
-                  <X className="w-5 h-5" />
+      {/* Chat History Modal */}
+      {isChatModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="bg-gray-800 rounded-xl w-full max-w-2xl mx-4 max-h-[80vh] flex flex-col">
+            <div className="p-4 border-b border-gray-700 flex justify-between items-center">
+              <h3 className="text-lg font-semibold text-blue-300 flex items-center">
+                <MessageCircle className="w-5 h-5 mr-2" />
+                Chat with TaskMaster
+                <span className="ml-2 text-xs bg-gradient-to-r from-pink-500 to-purple-500 text-gray-300 px-2 py-0.5 rounded-full">BETA</span>
+                <span className="ml-2 text-xs bg-blue text-gray-300 px-2 py-0.5 rounded-full">Chat history is not saved.</span>
+              </h3>
+              <button onClick={() => setIsChatModalOpen(false)} className="text-gray-400 hover:text-gray-200 transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={chatEndRef}>
+              {chatHistory.map((message, index) => (
+                <div key={index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[80%] rounded-lg px-4 py-2 ${message.role === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-200'}`}>
+                    <ReactMarkdown
+                      remarkPlugins={[remarkMath, remarkGfm]}
+                      rehypePlugins={[rehypeKatex]}
+                      components={{
+                        p: ({ children }) => <p className="mb-2">{children}</p>,
+                        ul: ({ children }) => <ul className="list-disc ml-4 mb-2">{children}</ul>,
+                        ol: ({ children }) => <ol className="list-decimal ml-4 mb-2">{children}</ol>,
+                        li: ({ children }) => <li className="mb-1">{children}</li>,
+                        code: ({ inline, children }) =>
+                          inline ? (
+                            <code className="bg-gray-800 px-1 rounded">{children}</code>
+                          ) : (
+                            <pre className="bg-gray-800 p-2 rounded-lg overflow-x-auto">
+                              <code>{children}</code>
+                            </pre>
+                          ),
+                      }}
+                    >
+                      {message.content}
+                    </ReactMarkdown>
+                    {message.timer && (
+                      <div className="mt-2">
+                        <div className="flex items-center space-x-2 bg-gray-900 rounded-lg px-4 py-2">
+                          <TimerIcon className="w-5 h-5 text-blue-400" />
+                          <Timer key={message.timer.id} initialDuration={message.timer.duration} onComplete={() => handleTimerComplete(message.timer.id)} />
+                        </div>
+                      </div>
+                    )}
+                    {message.flashcard && (
+                      <div className="mt-2">
+                        <FlashcardsQuestions type="flashcard" data={message.flashcard.data} onComplete={() => {}} />
+                      </div>
+                    )}
+                    {message.question && (
+                      <div className="mt-2">
+                        <FlashcardsQuestions type="question" data={message.question.data} onComplete={() => {}} />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {isChatLoading && (
+                <div className="flex justify-start">
+                  <div className="bg-gray-700 text-gray-200 rounded-lg px-4 py-2 max-w-[80%]">
+                    <div className="flex space-x-2">
+                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100"></div>
+                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200"></div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <form onSubmit={handleChatSubmit} className="p-4 border-t border-gray-700">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={chatMessage}
+                  onChange={(e) => setChatMessage(e.target.value)}
+                  placeholder="Ask TaskMaster about your items or set a timer..."
+                  className={`flex-1 ${inputBg} text-gray-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                />
+                <button type="submit" disabled={isChatLoading} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                  <Send className="w-5 h-5" />
                 </button>
               </div>
-
-              <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={chatEndRef}>
-                {chatHistory.map((message, index) => (
-                  <div key={index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[80%] rounded-lg px-4 py-2 ${message.role === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-200'}`}>
-                      <ReactMarkdown
-                        remarkPlugins={[remarkMath, remarkGfm]}
-                        rehypePlugins={[rehypeKatex]}
-                        components={{
-                          p: ({ children }) => <p className="mb-2">{children}</p>,
-                          ul: ({ children }) => <ul className="list-disc ml-4 mb-2">{children}</ul>,
-                          ol: ({ children }) => <ol className="list-decimal ml-4 mb-2">{children}</ol>,
-                          li: ({ children }) => <li className="mb-1">{children}</li>,
-                          code: ({ inline, children }) =>
-                            inline ? (
-                              <code className="bg-gray-800 px-1 rounded">{children}</code>
-                            ) : (
-                              <pre className="bg-gray-800 p-2 rounded-lg overflow-x-auto">
-                                <code>{children}</code>
-                              </pre>
-                            ),
-                        }}
-                      >
-                        {message.content}
-                      </ReactMarkdown>
-                      {message.timer && (
-                        <div className="mt-2">
-                          <div className="flex items-center space-x-2 bg-gray-900 rounded-lg px-4 py-2">
-                            <TimerIcon className="w-5 h-5 text-blue-400" />
-                            <Timer key={message.timer.id} initialDuration={message.timer.duration} onComplete={() => handleTimerComplete(message.timer.id)} />
-                          </div>
-                        </div>
-                      )}
-                      {message.flashcard && (
-                        <div className="mt-2">
-                          <FlashcardsQuestions type="flashcard" data={message.flashcard.data} onComplete={() => {}} />
-                        </div>
-                      )}
-                      {message.question && (
-                        <div className="mt-2">
-                          <FlashcardsQuestions type="question" data={message.question.data} onComplete={() => {}} />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-                {isChatLoading && (
-                  <div className="flex justify-start">
-                    <div className="bg-gray-700 text-gray-200 rounded-lg px-4 py-2 max-w-[80%]">
-                      <div className="flex space-x-2">
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100"></div>
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200"></div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <form onSubmit={handleChatSubmit} className="p-4 border-t border-gray-700">
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={chatMessage}
-                    onChange={(e) => setChatMessage(e.target.value)}
-                    placeholder="Ask TaskMaster about your items or set a timer..."
-                    className="flex-1 bg-gray-700 text-gray-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <button type="submit" disabled={isChatLoading} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                    <Send className="w-5 h-5" />
-                  </button>
-                </div>
-              </form>
-            </div>
+            </form>
           </div>
         )}
-
-
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
           <div className="flex flex-col gap-6">
             {/* Productivity Card */}
-            <div className="bg-gray-800 rounded-xl p-6 transform hover:scale-[1.02] transition-all duration-300">
-              <h2 className="text-xl font-semibold text-purple-400 mb-4">
+            <div className={`${cardClass} rounded-xl p-6 transform hover:scale-[1.02] transition-all duration-300`}>
+              <h2 className={`text-xl font-semibold mb-4 text-purple-400`}>
                 Your Productivity
               </h2>
               <div className="space-y-4">
@@ -1613,18 +1614,15 @@ return (
             </div>
 
             {/* Upcoming Deadlines Card */}
-            <div className="bg-gray-800 rounded-xl p-6 transform hover:scale-[1.02] transition-all duration-300">
-              <h2 className="text-xl font-semibold text-blue-400 mb-4">
+            <div className={`${cardClass} rounded-xl p-6 transform hover:scale-[1.02] transition-all duration-300`}>
+              <h2 className={`text-xl font-semibold mb-4 text-blue-400`}>
                 Upcoming Deadlines
               </h2>
               {(() => {
-                // 1. Combine all items with a 'type' label
                 const tasksWithType = tasks.map((t) => ({ ...t, type: 'Task' }));
                 const goalsWithType = goals.map((g) => ({ ...g, type: 'Goal' }));
                 const projectsWithType = projects.map((p) => ({ ...p, type: 'Project' }));
                 const plansWithType = plans.map((p) => ({ ...p, type: 'Plan' }));
-
-                // 2. Merge into a single array
                 const allItems = [
                   ...tasksWithType,
                   ...goalsWithType,
@@ -1632,22 +1630,16 @@ return (
                   ...plansWithType,
                 ];
 
-                // 3. Filter for items that:
-                //    - Have a dueDate
-                //    - Are due in the future (not past)
-                //    - Are NOT completed
                 const now = new Date();
                 const upcomingDeadlines = allItems
                   .filter((item) => {
                     const { dueDate, completed } = item.data;
                     if (!dueDate) return false;
-
                     const dueDateObj = dueDate.toDate
                       ? dueDate.toDate()
                       : new Date(dueDate);
                     return dueDateObj > now && !completed;
                   })
-                  // 4. Sort by ascending due date
                   .sort((a, b) => {
                     const aDate = a.data.dueDate.toDate
                       ? a.data.dueDate.toDate()
@@ -1657,10 +1649,8 @@ return (
                       : new Date(b.data.dueDate);
                     return aDate - bDate;
                   })
-                  // (Optionally limit to 5 or so, if desired)
                   .slice(0, 5);
 
-                // 5. If none found, show a message. Otherwise list them.
                 if (!upcomingDeadlines.length) {
                   return <p className="text-gray-400">No upcoming deadlines</p>;
                 }
@@ -1702,7 +1692,7 @@ return (
             </div>
 
             {/* Tabs & List */}
-            <div className="bg-gray-800 rounded-xl p-6 transform hover:scale-[1.02] transition-all duration-300">
+            <div className={`${cardClass} rounded-xl p-6 transform hover:scale-[1.02] transition-all duration-300`}>
               <div className="flex space-x-3 mb-6">
                 {["tasks", "goals", "projects", "plans"].map((tab) => (
                   <button
@@ -1722,14 +1712,14 @@ return (
               <div className="flex gap-2 mb-6">
                 <input
                   type="text"
-                  className="flex-grow bg-gray-900 border border-gray-700 rounded-full p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300"
+                  className={`flex-grow ${inputBg} border border-gray-700 rounded-full p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300`}
                   placeholder={`Enter new ${activeTab}...`}
                   value={newItemText}
                   onChange={(e) => setNewItemText(e.target.value)}
                 />
                 <input
                   type="date"
-                  className="bg-gray-900 border border-gray-700 rounded-full p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300"
+                  className={` ${inputBg} border border-gray-700 rounded-full p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300`}
                   value={newItemDate}
                   onChange={(e) => setNewItemDate(e.target.value)}
                 />
@@ -1767,10 +1757,7 @@ return (
                         key={item.id}
                         className={`p-4 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3
                           ${isCompleted ? "bg-green-900/30" : overdue ? "bg-red-900/50" : "bg-gray-700/50"}
-                          backdrop-blur-sm
-                          transform transition-all duration-300
-                          hover:scale-[1.02] hover:shadow-lg
-                          animate-fadeIn
+                          backdrop-blur-sm transform transition-all duration-300 hover:scale-[1.02] hover:shadow-lg animate-fadeIn
                           ${isCompleted ? "opacity-75" : "opacity-100"}`}
                         style={{
                           animationDelay: `${index * 100}ms`
@@ -1779,9 +1766,7 @@ return (
                         {!isEditing ? (
                           <div className="flex items-center gap-3">
                             <span
-                              className={`font-bold text-lg ${
-                                isCompleted ? "line-through text-gray-400" : ""
-                              }`}
+                              className={`font-bold text-lg ${isCompleted ? "line-through text-gray-400" : ""}`}
                             >
                               {textValue}
                             </span>
@@ -1799,13 +1784,13 @@ return (
                         ) : (
                           <div className="flex flex-col sm:flex-row gap-3 w-full">
                             <input
-                              className="flex-grow bg-gray-800 border border-gray-600 rounded-full p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300"
+                              className={`flex-grow ${inputBg} border border-gray-600 rounded-full p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300`}
                               value={editingText}
                               onChange={(e) => setEditingText(e.target.value)}
                             />
                             <input
                               type="date"
-                              className="bg-gray-800 border border-gray-600 rounded-full p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300"
+                              className={` ${inputBg} border border-gray-600 rounded-full p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300`}
                               value={editingDate}
                               onChange={(e) => setEditingDate(e.target.value)}
                             />
@@ -1864,286 +1849,274 @@ return (
             </div>
           </div>
 
-          {/* RIGHT COLUMN */}
-          <div className="flex flex-col gap-6">
-            {/* ADVANCED WEATHER CARD */}
-            <div className="bg-gray-800 rounded-xl p-6 transform hover:scale-[1.02] transition-all duration-300">
-              <h2 className="text-xl font-semibold mb-4">Weather & Forecast</h2>
-              {weatherData ? (
-                <>
-                  {/* Current weather */}
-                  <div className="space-y-3 mb-6">
-                    <p className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">
-                      {weatherData.location.name}
-                    </p>
-                    <p className="text-gray-300 text-lg flex items-center gap-2">
-                      <img
-                        src={weatherData.current.condition.icon}
-                        alt={weatherData.current.condition.text}
-                        className="w-10 h-10"
-                      />
-                      {weatherData.current.condition.text} - {weatherData.current.temp_f}°F
-                      <span className="text-gray-400 text-base ml-2">
-                        Feels like {weatherData.current.feelslike_f}°F
-                      </span>
-                    </p>
-                    <div className="flex gap-4 text-sm text-gray-400">
-                      <div className="flex items-center">
-                        <strong>Wind:</strong>
-                        <span className="ml-2">
-                          {Math.round(weatherData.current.wind_mph)} mph
-                        </span>
+{/* RIGHT COLUMN */}
+<div className="flex flex-col gap-6">
+  {/* ADVANCED WEATHER CARD */}
+  <div className={`${cardClass} rounded-xl p-6 transform hover:scale-[1.02] transition-all duration-300`}>
+    <h2 className={`text-xl font-semibold mb-4 ${headingClass}`}>Weather & Forecast</h2>
+    {weatherData ? (
+      <>
+        {/* Current weather */}
+        <div className="space-y-3 mb-6">
+          <p className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">
+            {weatherData.location.name}
+          </p>
+          <p className={`flex items-center gap-2 text-lg ${subheadingClass}`}>
+            <img
+              src={weatherData.current.condition.icon}
+              alt={weatherData.current.condition.text}
+              className="w-10 h-10"
+            />
+            {weatherData.current.condition.text} - {weatherData.current.temp_f}°F
+            <span className={`ml-2 text-base ${subheadingClass}`}>
+              Feels like {weatherData.current.feelslike_f}°F
+            </span>
+          </p>
+          <div className="flex gap-4 text-sm">
+            <div className="flex items-center">
+              <strong>Wind:</strong>
+              <span className="ml-2">
+                {Math.round(weatherData.current.wind_mph)} mph
+              </span>
+            </div>
+            <div className="flex items-center">
+              <strong>Humidity:</strong>
+              <span className="ml-2">
+                {weatherData.current.humidity}%
+              </span>
+            </div>
+            <div className="flex items-center">
+              <strong>UV Index:</strong>
+              <span className="ml-2">{weatherData.current.uv}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Forecast */}
+        {weatherData.forecast && weatherData.forecast.forecastday && (
+          <div className="space-y-4">
+            <h3 className={`text-lg font-semibold ${headingClass} text-blue-400`}>
+              Forecast
+            </h3>
+            {(() => {
+              const now = new Date();
+              now.setHours(0, 0, 0, 0);
+              const validDays = weatherData.forecast.forecastday.filter((day: any) => {
+                const d = new Date(day.date);
+                d.setHours(0, 0, 0, 0);
+                return d >= now;
+              });
+              const finalDays = validDays.slice(0, 3);
+              const dayLabels = ["Today", "Tomorrow", "Day After Tomorrow"];
+              return finalDays.map((day: any, idx: number) => {
+                const dateObj = new Date(day.date);
+                const monthDay = dateObj.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+                const label = `${dayLabels[idx]} (${monthDay})`;
+                const maxF = Math.round(day.day.maxtemp_f);
+                const minF = Math.round(day.day.mintemp_f);
+                const icon = day.day.condition.icon;
+                const barWidth = maxF > 0 ? (maxF / 120) * 100 : 0;
+                const forecastBg = isIlluminateEnabled ? 'bg-gray-300/50' : 'bg-gray-700/50';
+                return (
+                  <div
+                    key={day.date}
+                    className={`flex items-center gap-4 ${forecastBg} p-3 rounded-lg relative overflow-hidden`}
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 opacity-10 pointer-events-none" />
+                    <img
+                      src={icon}
+                      alt={day.day.condition.text}
+                      className="w-10 h-10 z-10"
+                    />
+                    <div className="z-10 flex-grow">
+                      <p className={`text-sm font-medium ${isIlluminateEnabled ? 'text-gray-800' : 'text-gray-200'}`}>
+                        {label}
+                      </p>
+                      <div className="flex items-center gap-3 mt-1">
+                        <p className="text-sm text-red-300">
+                          High: {maxF}°F
+                        </p>
+                        <p className="text-sm text-blue-300">
+                          Low: {minF}°F
+                        </p>
                       </div>
-                      <div className="flex items-center">
-                        <strong>Humidity:</strong>
-                        <span className="ml-2">
-                          {weatherData.current.humidity}%
-                        </span>
-                      </div>
-                      <div className="flex items-center">
-                        <strong>UV Index:</strong>
-                        <span className="ml-2">{weatherData.current.uv}</span>
+                      <div className="mt-2 w-full h-2 bg-gray-600 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-yellow-300 to-red-500 rounded-full transition-all duration-700 ease-out"
+                          style={{ width: `${barWidth}%` }}
+                        />
                       </div>
                     </div>
                   </div>
+                );
+              });
+            })()}
+          </div>
+        )}
+      </>
+    ) : (
+      <div className="animate-pulse space-y-4">
+        <div className="h-8 rounded-full w-1/2 bg-gray-700"></div>
+        <div className="h-6 rounded-full w-3/4 bg-gray-700"></div>
+        <div className="h-4 rounded-full w-1/3 bg-gray-700"></div>
+      </div>
+    )}
+  </div>
 
-                  {/* Show only the next 3 relevant days */}
-                  {weatherData.forecast && weatherData.forecast.forecastday && (
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-semibold text-blue-400">
-                        Forecast
-                      </h3>
-                      {(() => {
-                        // Filter out any past days in case API date is behind local date
-                        const now = new Date();
-                        now.setHours(0, 0, 0, 0);
+  {/* MAIN POMODORO TIMER */}
+  <div className={`${cardClass} rounded-xl p-6 transform hover:scale-[1.02] transition-all duration-300`}>
+    <div className="flex items-center justify-between mb-4">
+      <h2 className={`text-xl font-semibold ${headingClass}`}>Pomodoro Timer</h2>
+      <button
+        className="bg-gradient-to-r from-purple-400 to-purple-600 text-white px-4 py-2 rounded-full font-bold flex items-center gap-2 hover:shadow-lg hover:shadow-purple-500/20 transition-all duration-300 transform hover:scale-105"
+        onClick={handleAddCustomTimer}
+      >
+        <PlusCircle className="w-4 h-4" /> New Timer
+      </button>
+    </div>
+    <div className="text-6xl font-bold mb-6 text-center bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">
+      {formatPomodoroTime(pomodoroTimeLeft)}
+    </div>
+    <div className="flex justify-center space-x-4">
+      <button
+        className="bg-gradient-to-r from-green-400 to-green-600 px-6 py-3 rounded-full font-semibold hover:shadow-lg hover:shadow-green-500/20 transition-all duration-300 transform hover:scale-105"
+        onClick={handlePomodoroStart}
+      >
+        Start
+      </button>
+      <button
+        className="bg-gradient-to-r from-yellow-400 to-yellow-600 px-6 py-3 rounded-full font-semibold hover:shadow-lg hover:shadow-yellow-500/20 transition-all duration-300 transform hover:scale-105"
+        onClick={handlePomodoroPause}
+      >
+        Pause
+      </button>
+      <button
+        className="bg-gradient-to-r from-red-400 to-red-600 px-6 py-3 rounded-full font-semibold hover:shadow-lg hover:shadow-red-500/20 transition-all duration-300 transform hover:scale-105"
+        onClick={handlePomodoroReset}
+      >
+        Reset
+      </button>
+    </div>
+    {!customTimers.length && (
+      <p className="text-sm text-gray-400 mt-6 text-center">
+        🍎 No custom timers yet. Click the "New Timer" button to create one! 🍎
+      </p>
+    )}
+  </div>
 
-                        const validDays = weatherData.forecast.forecastday.filter(
-                          (day: any) => {
-                            const d = new Date(day.date);
-                            d.setHours(0, 0, 0, 0);
-                            return d >= now;
-                          }
-                        );
-
-                        // Only take up to 3 days from that filtered list
-                        const finalDays = validDays.slice(0, 3);
-                        const dayLabels = [
-                          "Today",
-                          "Tomorrow",
-                          "Day After Tomorrow",
-                        ];
-
-                        return finalDays.map((day: any, idx: number) => {
-                          const dateObj = new Date(day.date);
-                          const monthDay = dateObj.toLocaleDateString(undefined, {
-                            month: 'short',
-                            day: 'numeric',
-                          });
-                          const label = `${dayLabels[idx]} (${monthDay})`;
-
-                          const maxF = Math.round(day.day.maxtemp_f);
-                          const minF = Math.round(day.day.mintemp_f);
-                          const icon = day.day.condition.icon;
-                          const barWidth = maxF > 0 ? (maxF / 120) * 100 : 0;
-
-                          return (
-                            <div
-                              key={day.date}
-                              className="flex items-center gap-4 bg-gray-700/50 p-3 rounded-lg relative overflow-hidden"
-                            >
-                              <div className="absolute inset-0 bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 opacity-10 pointer-events-none" />
-                              <img
-                                src={icon}
-                                alt={day.day.condition.text}
-                                className="w-10 h-10 z-10"
-                              />
-                              <div className="z-10 flex-grow">
-                                <p className="text-sm text-gray-200 font-medium">
-                                  {label}
-                                </p>
-                                <div className="flex items-center gap-3 mt-1">
-                                  <p className="text-sm text-red-300">
-                                    High: {maxF}°F
-                                  </p>
-                                  <p className="text-sm text-blue-300">
-                                    Low: {minF}°F
-                                  </p>
-                                </div>
-                                <div className="mt-2 w-full h-2 bg-gray-600 rounded-full overflow-hidden">
-                                  <div
-                                    className="h-full bg-gradient-to-r from-yellow-300 to-red-500 rounded-full transition-all duration-700 ease-out"
-                                    style={{ width: `${barWidth}%` }}
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        });
-                      })()}
+  {/* CUSTOM TIMERS LIST */}
+  <div className={`${cardClass} rounded-xl p-6 transform hover:scale-[1.02] transition-all duration-300`}>
+    <h2 className={`text-xl font-semibold mb-6 ${headingClass}`}>Custom Timers</h2>
+    {customTimers.length === 0 ? (
+      <p className="text-gray-400 text-center py-8">No custom timers yet...</p>
+    ) : (
+      <ul className="space-y-4">
+        {customTimers.map((timer, index) => {
+          const timerId = timer.id;
+          const runningState = runningTimers[timerId];
+          const timeLeft = runningState ? runningState.timeLeft : timer.data.time;
+          const isRunning = runningState ? runningState.isRunning : false;
+          const isEditing = editingTimerId === timerId;
+          // Determine list item background based on mode and item status
+          const listItemBg = isIlluminateEnabled
+            ? isCompleted => isCompleted ? "bg-green-200/30" : "bg-gray-200/50"
+            : isCompleted => isCompleted ? "bg-green-900/30" : "bg-gray-700/50";
+          const overdueBg = isIlluminateEnabled ? "bg-red-200/50" : "bg-red-900/50";
+          const itemBgClass = isEditing
+            ? ""
+            : (timer.data.completed
+                ? (isIlluminateEnabled ? "bg-green-200/30" : "bg-green-900/30")
+                : timer.data.dueDate && new Date(timer.data.dueDate) < new Date()
+                ? (isIlluminateEnabled ? "bg-red-200/50" : "bg-red-900/50")
+                : (isIlluminateEnabled ? "bg-gray-200/50" : "bg-gray-700/50"));
+          return (
+            <li
+              key={timerId}
+              className={`p-4 rounded-lg backdrop-blur-sm transform transition-all duration-300 hover:scale-[1.02] hover:shadow-lg animate-fadeIn ${itemBgClass} ${timer.data.completed ? "opacity-75" : "opacity-100"}`}
+              style={{ animationDelay: `${index * 100}ms` }}
+            >
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="flex flex-col items-center sm:items-start">
+                  {isEditing ? (
+                    <div className="flex flex-col gap-2 w-full">
+                      <input
+                        type="text"
+                        className={`flex-grow ${inputBg} border border-gray-600 rounded-full p-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300`}
+                        value={editingTimerName}
+                        onChange={(e) => setEditingTimerName(e.target.value)}
+                        placeholder="Timer name"
+                      />
+                      <input
+                        type="number"
+                        className={`flex-grow ${inputBg} border border-gray-600 rounded-full p-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300`}
+                        value={editingTimerMinutes}
+                        onChange={(e) => setEditingTimerMinutes(e.target.value)}
+                        placeholder="Minutes"
+                        min="1"
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          className="bg-gradient-to-r from-green-400 to-green-600 px-4 py-2 rounded-full text-white hover:shadow-lg hover:shadow-green-500/20 transition-all duration-300"
+                          onClick={() => handleEditTimerSave(timerId)}
+                        >
+                          Save
+                        </button>
+                        <button
+                          className="bg-gradient-to-r from-gray-400 to-gray-600 px-4 py-2 rounded-full text-white hover:shadow-lg hover:shadow-gray-500/20 transition-all duration-300"
+                          onClick={() => setEditingTimerId(null)}
+                        >
+                          Cancel
+                        </button>
+                      </div>
                     </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="font-bold text-lg">{timer.data.name}</span>
+                        <button
+                          className="bg-gradient-to-r from-blue-400 to-blue-600 p-2 rounded-full text-white hover:shadow-lg hover:shadow-blue-500/20 transition-all duration-300 transform hover:scale-105"
+                          onClick={() =>
+                            handleEditTimerClick(timerId, timer.data.name, timer.data.time)
+                          }
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          className="bg-gradient-to-r from-red-400 to-red-600 p-2 rounded-full text-white hover:shadow-lg hover:shadow-red-500/20 transition-all duration-300 transform hover:scale-105"
+                          onClick={() => handleDeleteTimer(timerId)}
+                        >
+                          <Trash className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <span className="text-3xl font-semibold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">
+                        {formatCustomTime(timeLeft)}
+                      </span>
+                    </>
                   )}
-                </>
-              ) : (
-                <div className="animate-pulse space-y-4">
-                  <div className="h-8 bg-gray-700 rounded-full w-1/2"></div>
-                  <div className="h-6 bg-gray-700 rounded-full w-3/4"></div>
-                  <div className="h-4 bg-gray-700 rounded-full w-1/3"></div>
                 </div>
-              )}
-            </div>
-
-            {/* Main Pomodoro Timer */}
-            <div className="bg-gray-800 rounded-xl p-6 transform hover:scale-[1.02] transition-all duration-300">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold">Pomodoro Timer</h2>
-                <button
-                  className="bg-gradient-to-r from-purple-400 to-purple-600 text-white px-4 py-2 rounded-full font-bold flex items-center gap-2 hover:shadow-lg hover:shadow-purple-500/20 transition-all duration-300 transform hover:scale-105"
-                  onClick={handleAddCustomTimer}
-                >
-                  <PlusCircle className="w-4 h-4" /> New Timer
-                </button>
-              </div>
-              <div className="text-6xl font-bold mb-6 text-center bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">
-                {formatPomodoroTime(pomodoroTimeLeft)}
-              </div>
-              <div className="flex justify-center space-x-4">
-                <button
-                  className="bg-gradient-to-r from-green-400 to-green-600 px-6 py-3 rounded-full font-semibold hover:shadow-lg hover:shadow-green-500/20 transition-all duration-300 transform hover:scale-105"
-                  onClick={handlePomodoroStart}
-                >
-                  Start
-                </button>
-                <button
-                  className="bg-gradient-to-r from-yellow-400 to-yellow-600 px-6 py-3 rounded-full font-semibold hover:shadow-lg hover:shadow-yellow-500/20 transition-all duration-300 transform hover:scale-105"
-                  onClick={handlePomodoroPause}
-                >
-                  Pause
-                </button>
-                <button
-                  className="bg-gradient-to-r from-red-400 to-red-600 px-6 py-3 rounded-full font-semibold hover:shadow-lg hover:shadow-red-500/20 transition-all duration-300 transform hover:scale-105"
-                  onClick={handlePomodoroReset}
-                >
-                  Reset
-                </button>
-              </div>
-              {!customTimers.length && (
-                <p className="text-sm text-gray-400 mt-6 text-center">
-                  🍎 No custom timers yet. Click the "New Timer" button to create one! 🍎
-                </p>
-              )}
-            </div>
-
-            {/* Custom Timers List */}
-            <div className="bg-gray-800 rounded-xl p-6 transform hover:scale-[1.02] transition-all duration-300">
-              <h2 className="text-xl font-semibold mb-6">Custom Timers</h2>
-              {customTimers.length === 0 ? (
-                <p className="text-gray-400 text-center py-8">No custom timers yet...</p>
-              ) : (
-                <ul className="space-y-4">
-                  {customTimers.map((timer, index) => {
-                    const timerId = timer.id;
-                    const runningState = runningTimers[timerId];
-                    const timeLeft = runningState ? runningState.timeLeft : timer.data.time;
-                    const isRunning = runningState ? runningState.isRunning : false;
-                    const isEditing = editingTimerId === timerId;
-
-                    return (
-                      <li
-                        key={timerId}
-                        className="bg-gray-700/50 p-4 rounded-lg backdrop-blur-sm transform transition-all duration-300 hover:scale-[1.02] hover:shadow-lg animate-fadeIn"
-                        style={{
-                          animationDelay: `${index * 100}ms`
-                        }}
+                {!isEditing && (
+                  <div className="flex gap-2">
+                    {!isRunning && (
+                      <button
+                        className="bg-gradient-to-r from-green-400 to-green-600 px-4 py-2 rounded-full font-semibold hover:shadow-lg hover:shadow-green-500/20 transition-all duration-300 transform hover:scale-105"
+                        onClick={() => startCustomTimer(timerId)}
                       >
-                        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                          <div className="flex flex-col items-center sm:items-start">
-                            {isEditing ? (
-                              <div className="flex flex-col gap-2 w-full">
-                                <input
-                                  type="text"
-                                  className="bg-gray-800 border border-gray-600 rounded-full p-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                                  value={editingTimerName}
-                                  onChange={(e) => setEditingTimerName(e.target.value)}
-                                  placeholder="Timer name"
-                                />
-                                <input
-                                  type="number"
-                                  className="bg-gray-800 border border-gray-600 rounded-full p-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                                  value={editingTimerMinutes}
-                                  onChange={(e) => setEditingTimerMinutes(e.target.value)}
-                                  placeholder="Minutes"
-                                  min="1"
-                                />
-                                <div className="flex gap-2">
-                                  <button
-                                    className="bg-gradient-to-r from-green-400 to-green-600 px-4 py-2 rounded-full text-white hover:shadow-lg hover:shadow-green-500/20 transition-all duration-300"
-                                    onClick={() => handleEditTimerSave(timerId)}
-                                  >
-                                    Save
-                                  </button>
-                                  <button
-                                    className="bg-gradient-to-r from-gray-400 to-gray-600 px-4 py-2 rounded-full text-white hover:shadow-lg hover:shadow-gray-500/20 transition-all duration-300"
-                                    onClick={() => setEditingTimerId(null)}
-                                  >
-                                    Cancel
-                                  </button>
-                                </div>
-                              </div>
-                            ) : (
-                              <>
-                                <div className="flex items-center gap-2 mb-2">
-                                  <span className="font-bold text-lg">
-                                    {timer.data.name}
-                                  </span>
-                                  <button
-                                    className="bg-gradient-to-r from-blue-400 to-blue-600 p-2 rounded-full text-white hover:shadow-lg hover:shadow-blue-500/20 transition-all duration-300 transform hover:scale-105"
-                                    onClick={() =>
-                                      handleEditTimerClick(
-                                        timerId,
-                                        timer.data.name,
-                                        timer.data.time
-                                      )
-                                    }
-                                  >
-                                    <Edit className="w-4 h-4" />
-                                  </button>
-                                  <button
-                                    className="bg-gradient-to-r from-red-400 to-red-600 p-2 rounded-full text-white hover:shadow-lg hover:shadow-red-500/20 transition-all duration-300 transform hover:scale-105"
-                                    onClick={() => handleDeleteTimer(timerId)}
-                                  >
-                                    <Trash className="w-4 h-4" />
-                                  </button>
-                                </div>
-                                <span className="text-3xl font-semibold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">
-                                  {formatCustomTime(timeLeft)}
-                                </span>
-                              </>
-                            )}
-                          </div>
-                          {!isEditing && (
-                            <div className="flex gap-2">
-                              {!isRunning && (
-                                <button
-                                  className="bg-gradient-to-r from-green-400 to-green-600 px-4 py-2 rounded-full font-semibold hover:shadow-lg hover:shadow-green-500/20 transition-all duration-300 transform hover:scale-105"
-                                  onClick={() => startCustomTimer(timerId)}
-                                >
-                                  Start
-                                </button>
-                              )}
-                              {isRunning && (
-                                <button
-                                  className="bg-gradient-to-r from-yellow-400 to-yellow-600 px-4 py-2 rounded-full font-semibold hover:shadow-lg hover:shadow-yellow-500/20 transition-all duration-300 transform hover:scale-105"
-                                  onClick={() => pauseCustomTimer(timerId)}
-                                >
-                                  Pause
-                                </button>
-                              )}
-                              <button
-                                className="bg-gradient-to-r from-gray-400 to-gray-600 px-4 py-2 rounded-full font-semibold hover:shadow-lg hover:shadow-gray-500/20 transition-all duration-300 transform hover:scale-105"
-                                onClick={() => resetCustomTimer(timerId)}
-                              >
-                                Reset
+                        Start
+                      </button>
+                    )}
+                    {isRunning && (
+                      <button
+                        className="bg-gradient-to-r from-yellow-400 to-yellow-600 px-4 py-2 rounded-full font-semibold hover:shadow-lg hover:shadow-yellow-500/20 transition-all duration-300 transform hover:scale-105"
+                        onClick={() => pauseCustomTimer(timerId)}
+                      >
+                        Pause
+                      </button>
+                    )}
+                    <button
+                      className="bg-gradient-to-r from-gray-400 to-gray-600 px-4 py-2 rounded-full font-semibold hover:shadow-lg hover:shadow-gray-500/20 transition-all duration-300 transform hover:scale-105"
+                      onClick={() => resetCustomTimer(timerId)}
+                    >
+                      Reset
                               </button>
                             </div>
                           )}

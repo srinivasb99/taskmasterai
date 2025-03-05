@@ -77,25 +77,24 @@ export function Community() {
     const stored = localStorage.getItem('isSidebarBlackoutEnabled');
     return stored ? JSON.parse(stored) : false;
   });
-
+  
   // Illuminate (light mode) state
   const [isIlluminateEnabled, setIsIlluminateEnabled] = useState(() => {
     const stored = localStorage.getItem('isIlluminateEnabled');
     return stored ? JSON.parse(stored) : false;
   });
-
-  // For consistency, you might also pass a sidebar illuminate option if needed.
+  
+  // Sidebar Illuminate option state
   const [isSidebarIlluminateEnabled, setIsSidebarIlluminateEnabled] = useState(() => {
     const stored = localStorage.getItem('isSidebarIlluminateEnabled');
     return stored ? JSON.parse(stored) : false;
   });
 
-  // Search & filter
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('All');
 
   // ---------------------------
-  // MODE & THEME EFFECTS & DYNAMIC CLASSES
+  // MODE & THEME EFFECTS
   // ---------------------------
   useEffect(() => {
     localStorage.setItem('isBlackoutEnabled', JSON.stringify(isBlackoutEnabled));
@@ -119,20 +118,22 @@ export function Community() {
     localStorage.setItem('isSidebarIlluminateEnabled', JSON.stringify(isSidebarIlluminateEnabled));
   }, [isSidebarIlluminateEnabled]);
 
-  // Root container: for Illuminate mode, use a light background with dark text
+  // ---------------------------
+  // DYNAMIC CLASSES FOR ILLUMINATE MODE
+  // ---------------------------
   const containerClass = isIlluminateEnabled
     ? 'bg-white text-gray-900'
     : isBlackoutEnabled
     ? 'bg-gray-950 text-white'
     : 'bg-gray-900 text-white';
 
-  // For sections (file lists), adjust backgrounds and borders
+  // Sections for file lists
   const sectionBg = isIlluminateEnabled ? 'bg-gray-100' : 'bg-gray-800/60';
   const sectionBorder = isIlluminateEnabled ? 'border border-gray-300' : 'border border-gray-700';
   const sectionHeadingClass = isIlluminateEnabled ? 'text-gray-900' : 'text-white';
   const sectionTextClass = isIlluminateEnabled ? 'text-gray-700' : 'text-gray-400';
 
-  // For inputs & select elements
+  // Inputs & select elements
   const inputBg = isIlluminateEnabled ? 'bg-gray-200 text-gray-900' : 'bg-gray-800 text-gray-200';
   const searchContainerClass = isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-800';
   const searchInputTextClass = isIlluminateEnabled ? 'text-gray-900' : 'text-gray-200';
@@ -172,7 +173,6 @@ export function Community() {
     }
   }, [user]);
 
-  // Listener for communityFiles collection
   useEffect(() => {
     const unsubCommunity = onSnapshot(collection(db, 'communityFiles'), (snapshot) => {
       const files: any[] = [];
@@ -184,7 +184,6 @@ export function Community() {
     return () => unsubCommunity();
   }, []);
 
-  // Listener for unlockedFiles for the current user
   useEffect(() => {
     if (!user) return;
     const q = query(collection(db, 'unlockedFiles'), where('userId', '==', user.uid));
@@ -198,7 +197,6 @@ export function Community() {
     return () => unsubUnlocked();
   }, [user]);
 
-  // Listener for user profiles (for each file's uploader)
   useEffect(() => {
     const uniqueUserIds = [...new Set(communityFiles.map((f) => f.userId))];
     if (uniqueUserIds.length > 0) {
@@ -214,7 +212,6 @@ export function Community() {
     }
   }, [communityFiles]);
 
-  // Abuse Prevention: Monitor file uploads
   useEffect(() => {
     if (user && !DEV_EMAILS.includes(user.email)) {
       const userFiles = communityFiles.filter((file) => file.userId === user.uid);
@@ -265,7 +262,6 @@ export function Community() {
     }
   };
 
-  // Remove a shared file (only for DEV users)
   const removeFile = async (file: any) => {
     if (!user) return;
     if (!DEV_EMAILS.includes(user.email)) return;
@@ -278,7 +274,6 @@ export function Community() {
     }
   };
 
-  // Unlock a file (deduct tokens, etc.)
   const unlockFile = async (file: any) => {
     if (!user) return;
     const parts = file.fileName.split('.');
@@ -302,25 +297,7 @@ export function Community() {
   };
 
   // ---------------------------
-  // DYNAMIC CLASSES FOR UI ELEMENTS
-  // ---------------------------
-  // Root container for the page
-  // (Uses containerClass defined above)
-  // For header icon & title
-  const headerTitleClass = isIlluminateEnabled ? 'text-gray-900' : 'text-white';
-
-  // For aside (right panel)
-  const asideClass = isIlluminateEnabled
-    ? 'bg-gray-100 border-l border-gray-300'
-    : 'bg-gray-800 border-l border-gray-700';
-
-  // For group chat modal
-  const groupModalClass = isIlluminateEnabled
-    ? 'bg-gray-100 text-gray-900'
-    : 'bg-gray-800 text-gray-300';
-
-  // ---------------------------
-  // Split files into sections
+  // SPLIT FILES INTO SECTIONS
   // ---------------------------
   const yourSharedFiles = communityFiles.filter((file) => file.userId === user.uid);
   const unlockedFiles = communityFiles.filter((file) => unlockedFileIds.includes(file.id));
@@ -358,18 +335,13 @@ export function Community() {
         isIlluminateEnabled={isIlluminateEnabled && isSidebarIlluminateEnabled}
       />
 
-{/* Main Content */}
-<main
-  className={`flex-1 overflow-hidden transition-all duration-300 ${
-    isSidebarCollapsed ? 'ml-16' : 'ml-64'
-  } p-8`}
->
-  <div className="overflow-y-auto h-full">
-    {/* Header */}
-    <div className="flex items-center justify-between mb-6">
-      <div className="flex items-center gap-2">
-        <Globe2 className="w-6 h-6 text-blue-400" />
-            <h1 className={`text-3xl font-bold ${headerTitleClass}`}>Community</h1>
+      {/* Main Content */}
+      <main className="flex-1 overflow-hidden transition-all duration-300 p-8">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-2">
+            <Globe2 className="w-6 h-6 text-blue-400" />
+            <h1 className={`text-3xl font-bold ${isIlluminateEnabled ? 'text-gray-900' : 'text-white'}`}>Community</h1>
           </div>
           <div className="flex items-center gap-2">
             <Coins className="w-5 h-5 text-yellow-400" />
@@ -449,9 +421,8 @@ export function Community() {
                       key={file.id}
                       className={`${sectionBg} rounded-lg ${sectionBorder} p-4 transition-colors hover:${isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700'}`}
                     >
-                      {/* Uploader Info */}
                       <div className="flex items-center gap-3 mb-2">
-                        <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-gray-700">
+                        <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-700 flex items-center justify-center">
                           {uploaderProfile?.photoURL ? (
                             <img
                               src={uploaderProfile.photoURL}
@@ -466,7 +437,6 @@ export function Community() {
                           {uploaderProfile?.name || 'Unknown'}
                         </span>
                       </div>
-                      {/* File Info */}
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <span className="font-medium text-indigo-400">
@@ -616,7 +586,7 @@ export function Community() {
           </section>
         </div>
       </main>
-      
+
       {/* Insufficient Tokens Popup */}
       {insufficientTokensInfo && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">

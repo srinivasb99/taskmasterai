@@ -69,6 +69,12 @@ export function Settings() {
     return stored ? JSON.parse(stored) : false;
   });
 
+  // Sidebar Illuminate option state
+  const [isSidebarIlluminateEnabled, setIsSidebarIlluminateEnabled] = useState(() => {
+    const stored = localStorage.getItem('isSidebarIlluminateEnabled');
+    return stored ? JSON.parse(stored) : false;
+  });
+
   // Form data state
   const [formData, setFormData] = useState({
     name: '',
@@ -81,7 +87,9 @@ export function Settings() {
   // Determine if user signed in via Google
   const [isGoogleUser, setIsGoogleUser] = useState<boolean>(false);
 
-  // Load user data and set the current user state
+  // ---------------------------
+  //    LOAD USER DATA
+  // ---------------------------
   useEffect(() => {
     const loadUserData = async () => {
       const currentUser = getCurrentUser();
@@ -97,7 +105,7 @@ export function Settings() {
 
       try {
         const firestoreData = await getUserData(currentUser.uid);
-        // Use Firestore's "name" and "photoURL" if available; otherwise, fallback to Auth values
+        // Use Firestore's "name" and "photoURL" if available; otherwise fallback to Auth values
         const loadedUserData = {
           name: firestoreData?.name || currentUser.displayName || '',
           email: currentUser.email || '',
@@ -121,44 +129,29 @@ export function Settings() {
     loadUserData();
   }, [navigate]);
 
-  // Update localStorage whenever the sidebar state changes
+  // ---------------------------
+  //    SIDEBAR COLLAPSE
+  // ---------------------------
   useEffect(() => {
     localStorage.setItem('isSidebarCollapsed', JSON.stringify(isSidebarCollapsed));
   }, [isSidebarCollapsed]);
 
-  // Toggle the Blackout class on <body> whenever isBlackoutEnabled changes
+  const handleToggleSidebar = () => {
+    setIsSidebarCollapsed(prev => !prev);
+  };
+
+  // ---------------------------
+  //    BLACKOUT MODE
+  // ---------------------------
   useEffect(() => {
     localStorage.setItem('isBlackoutEnabled', JSON.stringify(isBlackoutEnabled));
     document.body.classList.toggle('blackout-mode', isBlackoutEnabled);
   }, [isBlackoutEnabled]);
 
-  // Illuminate effect: store in localStorage + toggle body class
-  useEffect(() => {
-    localStorage.setItem('isIlluminateEnabled', JSON.stringify(isIlluminateEnabled));
-    if (isIlluminateEnabled) {
-      // If Illuminate is turned on, automatically disable Blackout
-      setIsBlackoutEnabled(false);
-      document.body.classList.remove('blackout-mode');
-      document.body.classList.add('illuminate-mode');
-    } else {
-      document.body.classList.remove('illuminate-mode');
-    }
-  }, [isIlluminateEnabled, setIsBlackoutEnabled]);
-
-  // Update localStorage for Sidebar Blackout option
-  useEffect(() => {
-    localStorage.setItem('isSidebarBlackoutEnabled', JSON.stringify(isSidebarBlackoutEnabled));
-  }, [isSidebarBlackoutEnabled]);
-
-  // Toggle the sidebar
-  const handleToggleSidebar = () => {
-    setIsSidebarCollapsed(prev => !prev);
-  };
-
-  // If we enable Blackout, automatically disable Illuminate
   const handleToggleBlackout = () => {
     setIsBlackoutEnabled(prev => {
       const next = !prev;
+      // If we enable Blackout, disable Illuminate
       if (next) {
         setIsIlluminateEnabled(false);
       }
@@ -166,7 +159,85 @@ export function Settings() {
     });
   };
 
-  // Handle form input changes
+  // ---------------------------
+  //    ILLUMINATE MODE
+  // ---------------------------
+  useEffect(() => {
+    localStorage.setItem('isIlluminateEnabled', JSON.stringify(isIlluminateEnabled));
+    if (isIlluminateEnabled) {
+      // If Illuminate is turned on, disable Blackout
+      setIsBlackoutEnabled(false);
+      document.body.classList.remove('blackout-mode');
+      document.body.classList.add('illuminate-mode');
+    } else {
+      document.body.classList.remove('illuminate-mode');
+    }
+  }, [isIlluminateEnabled]);
+
+  const handleToggleIlluminate = (checked: boolean) => {
+    setIsIlluminateEnabled(checked);
+  };
+
+  // ---------------------------
+  //    SIDEBAR BLACKOUT
+  // ---------------------------
+  useEffect(() => {
+    localStorage.setItem('isSidebarBlackoutEnabled', JSON.stringify(isSidebarBlackoutEnabled));
+  }, [isSidebarBlackoutEnabled]);
+
+  // ---------------------------
+  //    SIDEBAR ILLUMINATE
+  // ---------------------------
+  useEffect(() => {
+    localStorage.setItem('isSidebarIlluminateEnabled', JSON.stringify(isSidebarIlluminateEnabled));
+  }, [isSidebarIlluminateEnabled]);
+
+  // ---------------------------
+  //    DYNAMIC TAILWIND CLASSES
+  // ---------------------------
+  // Container background + text color
+  const containerClass = isIlluminateEnabled
+    ? 'bg-white text-gray-900'
+    : isBlackoutEnabled
+    ? 'bg-gray-950 text-white'
+    : 'bg-gray-900 text-white';
+
+  // Card background + text color
+  // (We’ll use these on all “cards” to ensure they switch properly.)
+  const cardClass = isIlluminateEnabled
+    ? 'bg-gray-100 text-gray-900'
+    : 'bg-gray-800 text-gray-300';
+
+  // Heading color (used for H1, H2, etc.)
+  const headingClass = isIlluminateEnabled ? 'text-gray-900' : 'text-white';
+
+  // Subheading color (smaller text)
+  const subheadingClass = isIlluminateEnabled ? 'text-gray-600' : 'text-gray-400';
+
+  // Button or overlay backgrounds that might look off in light mode
+  // We’ll do a quick approach for the “Delete” modals, etc.
+  const deleteModalBg = isIlluminateEnabled ? 'bg-red-100' : 'bg-red-900/20';
+  const deleteModalText = isIlluminateEnabled ? 'text-red-700' : 'text-red-300';
+  const deleteModalHover = isIlluminateEnabled ? 'hover:bg-red-200' : 'hover:bg-red-900/30';
+
+  // For the “Error” alert box
+  const errorBoxBg = isIlluminateEnabled ? 'bg-red-100' : 'bg-red-900/20';
+  const errorTextColor = isIlluminateEnabled ? 'text-red-700' : 'text-red-300';
+
+  // For the small gray background buttons, etc.
+  const grayButtonBg = isIlluminateEnabled ? 'bg-gray-200 hover:bg-gray-300' : 'bg-gray-700 hover:bg-gray-600';
+  const grayButtonText = isIlluminateEnabled ? 'text-gray-700' : 'text-gray-300';
+
+  // For the sign out button background
+  const signOutBg = isIlluminateEnabled ? 'bg-gray-200 hover:bg-gray-300' : 'bg-gray-700 hover:bg-gray-600';
+  const signOutText = isIlluminateEnabled ? 'text-gray-800' : 'text-gray-300';
+
+  // For the text input background
+  const inputBg = isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700';
+
+  // ---------------------------
+  //    FORM INPUT CHANGES
+  // ---------------------------
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setError(null);
     setFormData({
@@ -175,7 +246,9 @@ export function Settings() {
     });
   };
 
-  // Handle profile picture changes
+  // ---------------------------
+  //    PROFILE PICTURE
+  // ---------------------------
   const handleProfilePictureClick = () => {
     fileInputRef.current?.click();
   };
@@ -232,7 +305,9 @@ export function Settings() {
     }
   };
 
-  // Handle profile save
+  // ---------------------------
+  //    PROFILE SAVE
+  // ---------------------------
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -284,7 +359,9 @@ export function Settings() {
     }
   };
 
-  // Handle sign out
+  // ---------------------------
+  //    SIGN OUT
+  // ---------------------------
   const handleSignOut = async () => {
     try {
       await signOutUser();
@@ -294,7 +371,9 @@ export function Settings() {
     }
   };
 
-  // Handle account deletion
+  // ---------------------------
+  //    DELETE ACCOUNT
+  // ---------------------------
   const handleDeleteAccount = async () => {
     setError(null);
     setIsLoading(true);
@@ -317,42 +396,31 @@ export function Settings() {
     }
   };
 
-  // Dynamically set the background color:
-  // - White if Illuminate is on
-  // - Darker gray if Blackout is on
-  // - Default gray otherwise
-  const bgColor = isIlluminateEnabled
-    ? 'bg-white'
-    : isBlackoutEnabled
-    ? 'bg-gray-950'
-    : 'bg-gray-900';
-
+  // ---------------------------
+  //    RENDER
+  // ---------------------------
   return (
-    <div className={`flex h-screen ${bgColor}`}>
-      <Sidebar 
-        isCollapsed={isSidebarCollapsed} 
-        onToggle={() => {
-          setIsSidebarCollapsed(prev => {
-            localStorage.setItem('isSidebarCollapsed', JSON.stringify(!prev));
-            return !prev;
-          });
-        }}
+    <div className={`flex h-screen ${containerClass}`}>
+      <Sidebar
+        isCollapsed={isSidebarCollapsed}
+        onToggle={handleToggleSidebar}
         userName={userData.name}
-        // Pass a prop for Sidebar background update if both Blackout mode and Sidebar Blackout option are enabled
+        // Pass these to the Sidebar so it can style accordingly
         isBlackoutEnabled={isBlackoutEnabled && isSidebarBlackoutEnabled}
+        isIlluminateEnabled={isIlluminateEnabled && isSidebarIlluminateEnabled}
       />
 
       {/* Delete Account Modal Popup */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/50">
-          <div className="bg-red-900/20 p-6 rounded-lg">
-            <p className="text-red-300 mb-4">
+          <div className={`${deleteModalBg} p-6 rounded-lg`}>
+            <p className={`${deleteModalText} mb-4`}>
               Are you sure you want to delete your account? This action cannot be undone.
             </p>
             <div className="flex gap-4 justify-end">
               <button
                 onClick={() => setShowDeleteConfirm(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600"
+                className={`px-4 py-2 text-sm font-medium ${grayButtonText} ${grayButtonBg} rounded-lg`}
               >
                 Cancel
               </button>
@@ -370,18 +438,18 @@ export function Settings() {
       <main className={`flex-1 overflow-y-auto transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'}`}>
         <div className="container mx-auto px-6 py-8">
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+            <h1 className={`text-3xl font-bold flex items-center gap-3 ${headingClass}`}>
               <SettingsIcon className="w-8 h-8 text-blue-400" />
               Settings
             </h1>
-            <p className="text-gray-400 mt-2">
+            <p className={`${subheadingClass} mt-2`}>
               Manage your account settings and preferences
             </p>
           </div>
 
           {/* Appearance Settings Card */}
-          <div className="bg-gray-800 rounded-xl p-6 mb-6">
-            <h2 className="text-xl font-semibold text-white mb-4">Appearance</h2>
+          <div className={`rounded-xl p-6 mb-6 ${cardClass}`}>
+            <h2 className={`text-xl font-semibold mb-4 ${headingClass}`}>Appearance</h2>
 
             {/* Blackout Toggle */}
             <div className="flex items-center justify-between">
@@ -394,8 +462,8 @@ export function Settings() {
                   )}
                 </div>
                 <div>
-                  <p className="text-white font-medium">Blackout</p>
-                  <p className="text-gray-400 text-sm">Sharpen your focus.</p>
+                  <p className={`font-medium ${headingClass}`}>Blackout</p>
+                  <p className={`${subheadingClass} text-sm`}>Sharpen your focus.</p>
                 </div>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
@@ -421,15 +489,17 @@ export function Settings() {
                   <Sun className="w-6 h-6 text-yellow-400" />
                 </div>
                 <div>
-                  <p className="text-white font-medium">Illuminate</p>
-                  <p className="text-gray-400 text-sm">Sharpen your focus.</p>
+                  <p className={`font-medium ${headingClass}`}>Illuminate</p>
+                  <p className={`${subheadingClass} text-sm`}>
+                    Sharpen your focus with a brighter interface.
+                  </p>
                 </div>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
                 <input
                   type="checkbox"
                   checked={isIlluminateEnabled}
-                  onChange={(e) => setIsIlluminateEnabled(e.target.checked)}
+                  onChange={(e) => handleToggleIlluminate(e.target.checked)}
                   className="sr-only peer"
                 />
                 <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none peer-focus:ring-2 
@@ -449,8 +519,8 @@ export function Settings() {
                     <PanelLeftDashed className="w-6 h-6 text-blue-400" />
                   </div>
                   <div>
-                    <p className="text-white font-medium">Sidebar Blackout</p>
-                    <p className="text-gray-400 text-sm">Apply Blackout to Sidebar.</p>
+                    <p className={`font-medium ${headingClass}`}>Sidebar Blackout</p>
+                    <p className={`${subheadingClass} text-sm`}>Apply Blackout to Sidebar.</p>
                   </div>
                 </div>
 
@@ -470,16 +540,48 @@ export function Settings() {
                 </label>
               </div>
             )}
+
+            {/* Sidebar Illuminate Toggle (only visible if Illuminate mode is enabled) */}
+            {isIlluminateEnabled && (
+              <div className="flex items-center justify-between mt-4">
+                <div className="flex items-center">
+                  <div className="mr-4">
+                    <PanelLeftDashed className="w-6 h-6 text-blue-400" />
+                  </div>
+                  <div>
+                    <p className={`font-medium ${headingClass}`}>Sidebar Illuminate</p>
+                    <p className={`${subheadingClass} text-sm`}>Apply Illuminate to Sidebar.</p>
+                  </div>
+                </div>
+
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isSidebarIlluminateEnabled}
+                    onChange={(e) => setIsSidebarIlluminateEnabled(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none peer-focus:ring-2 
+                      peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full 
+                      after:content-[''] after:absolute after:top-[2px] after:left-[2px] 
+                      after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all 
+                      peer-checked:bg-blue-600"
+                  ></div>
+                </label>
+              </div>
+            )}
           </div>
 
           {/* Profile Picture Section */}
-          <div className="bg-gray-800 rounded-xl p-6 mb-6">
-            <h2 className="text-xl font-semibold text-white mb-4">Profile Picture</h2>
+          <div className={`rounded-xl p-6 mb-6 ${cardClass}`}>
+            <h2 className={`text-xl font-semibold mb-4 ${headingClass}`}>Profile Picture</h2>
             <div className="flex items-center gap-6">
               <div className="relative group">
                 <div
-                  className={`w-24 h-24 rounded-full overflow-hidden bg-gray-700 flex items-center justify-center ${
+                  className={`w-24 h-24 rounded-full overflow-hidden flex items-center justify-center ${
                     isUploading ? 'opacity-50' : ''
+                  } ${
+                    isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700'
                   }`}
                 >
                   {userData.photoURL ? (
@@ -521,7 +623,11 @@ export function Settings() {
                   <button
                     onClick={handleRemoveProfilePicture}
                     disabled={isUploading}
-                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-300 bg-red-900/20 rounded-lg hover:bg-red-900/30 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed ${
+                      isIlluminateEnabled
+                        ? 'text-red-700 bg-red-100 hover:bg-red-200'
+                        : 'text-red-300 bg-red-900/20 hover:bg-red-900/30'
+                    }`}
                   >
                     <Trash2 className="w-4 h-4" />
                     Remove Picture
@@ -532,16 +638,16 @@ export function Settings() {
           </div>
 
           {/* Subscription Status Card */}
-          <div className="bg-gray-800 rounded-xl p-6 mb-6">
+          <div className={`rounded-xl p-6 mb-6 ${cardClass}`}>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+              <h2 className={`text-xl font-semibold flex items-center gap-2 ${headingClass}`}>
                 Current Subscription
               </h2>
               <span className="px-3 py-1 bg-blue-500 text-white rounded-full text-sm">
                 Basic
               </span>
             </div>
-            <div className="text-gray-300">
+            <div>
               <p className="mb-2">Your free plan includes:</p>
               <ul className="list-disc list-inside space-y-1 text-sm">
                 <li>2 PDF and Text Notes per month</li>
@@ -559,20 +665,20 @@ export function Settings() {
 
           {/* Error Message */}
           {error && (
-            <div className="mb-6 p-4 bg-red-900/20 text-red-300 rounded-lg flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-              <p>{error}</p>
+            <div className={`mb-6 p-4 rounded-lg flex items-start gap-3 ${errorBoxBg}`}>
+              <AlertCircle className={`w-5 h-5 flex-shrink-0 mt-0.5 ${isIlluminateEnabled ? 'text-red-700' : 'text-red-400'}`} />
+              <p className={`${errorTextColor}`}>{error}</p>
             </div>
           )}
 
           {/* Profile Settings Card */}
-          <div className="bg-gray-800 rounded-xl p-6 mb-6">
-            <h2 className="text-xl font-semibold text-white mb-4">Profile Settings</h2>
+          <div className={`rounded-xl p-6 mb-6 ${cardClass}`}>
+            <h2 className={`text-xl font-semibold mb-4 ${headingClass}`}>Profile Settings</h2>
             <form onSubmit={handleSave}>
               <div className="space-y-4">
                 {/* Name Field */}
                 <div>
-                  <label className="flex items-center text-sm font-medium text-gray-300 mb-2">
+                  <label className={`flex items-center text-sm font-medium mb-2 ${subheadingClass}`}>
                     <User className="w-4 h-4 mr-2 text-blue-400" />
                     Name
                   </label>
@@ -582,13 +688,13 @@ export function Settings() {
                     value={formData.name}
                     onChange={handleInputChange}
                     disabled={!isEditing || isLoading}
-                    className="w-full bg-gray-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className={`w-full ${inputBg} rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-sm`}
                   />
                 </div>
 
                 {/* Email Field (always visible; editable only for non‑Google users) */}
                 <div>
-                  <label className="flex items-center text-sm font-medium text-gray-300 mb-2">
+                  <label className={`flex items-center text-sm font-medium mb-2 ${subheadingClass}`}>
                     <Mail className="w-4 h-4 mr-2 text-blue-400" />
                     Email
                   </label>
@@ -598,7 +704,7 @@ export function Settings() {
                     value={formData.email}
                     onChange={handleInputChange}
                     disabled={!isEditing || isLoading || isGoogleUser}
-                    className="w-full bg-gray-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className={`w-full ${inputBg} rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-sm`}
                   />
                 </div>
 
@@ -606,7 +712,7 @@ export function Settings() {
                 {isEditing && !isGoogleUser && (
                   <>
                     <div>
-                      <label className="flex items-center text-sm font-medium text-gray-300 mb-2">
+                      <label className={`flex items-center text-sm font-medium mb-2 ${subheadingClass}`}>
                         <Key className="w-4 h-4 mr-2 text-blue-400" />
                         Current Password
                       </label>
@@ -616,11 +722,11 @@ export function Settings() {
                         value={formData.currentPassword}
                         onChange={handleInputChange}
                         disabled={isLoading}
-                        className="w-full bg-gray-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className={`w-full ${inputBg} rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-sm`}
                       />
                     </div>
                     <div>
-                      <label className="flex items-center text-sm font-medium text-gray-300 mb-2">
+                      <label className={`flex items-center text-sm font-medium mb-2 ${subheadingClass}`}>
                         <Key className="w-4 h-4 mr-2 text-blue-400" />
                         New Password
                       </label>
@@ -630,11 +736,11 @@ export function Settings() {
                         value={formData.newPassword}
                         onChange={handleInputChange}
                         disabled={isLoading}
-                        className="w-full bg-gray-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className={`w-full ${inputBg} rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-sm`}
                       />
                     </div>
                     <div>
-                      <label className="flex items-center text-sm font-medium text-gray-300 mb-2">
+                      <label className={`flex items-center text-sm font-medium mb-2 ${subheadingClass}`}>
                         <Key className="w-4 h-4 mr-2 text-blue-400" />
                         Confirm New Password
                       </label>
@@ -644,7 +750,7 @@ export function Settings() {
                         value={formData.confirmPassword}
                         onChange={handleInputChange}
                         disabled={isLoading}
-                        className="w-full bg-gray-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className={`w-full ${inputBg} rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-sm`}
                       />
                     </div>
                   </>
@@ -670,7 +776,7 @@ export function Settings() {
                         }));
                       }}
                       disabled={isLoading}
-                      className="flex items-center px-4 py-2 text-sm font-medium text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className={`flex items-center px-4 py-2 text-sm font-medium rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed ${grayButtonText} ${grayButtonBg}`}
                     >
                       <X className="w-4 h-4 mr-2" />
                       Cancel
@@ -699,14 +805,14 @@ export function Settings() {
           </div>
 
           {/* Account Actions Card */}
-          <div className="bg-gray-800 rounded-xl p-6">
-            <h2 className="text-xl font-semibold text-white mb-4">Account Actions</h2>
+          <div className={`rounded-xl p-6 ${cardClass}`}>
+            <h2 className={`text-xl font-semibold mb-4 ${headingClass}`}>Account Actions</h2>
             <div className="space-y-4">
               {/* Sign Out Button */}
               <button
                 onClick={handleSignOut}
                 disabled={isLoading}
-                className="w-full flex items-center justify-between px-4 py-3 text-left text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                className={`w-full flex items-center justify-between px-4 py-3 text-left rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed ${signOutBg} ${signOutText}`}
               >
                 <span className="flex items-center">
                   <LogOut className="w-5 h-5 mr-3 text-gray-400" />
@@ -719,7 +825,7 @@ export function Settings() {
                 <button
                   onClick={() => setShowDeleteConfirm(true)}
                   disabled={isLoading}
-                  className="w-full flex items-center justify-between px-4 py-3 text-left text-red-300 bg-red-900/20 rounded-lg hover:bg-red-900/30 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className={`w-full flex items-center justify-between px-4 py-3 text-left rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed ${deleteModalBg} ${deleteModalText} ${deleteModalHover}`}
                 >
                   <span className="flex items-center">
                     <Trash2 className="w-5 h-5 mr-3 text-red-400" />
@@ -732,17 +838,17 @@ export function Settings() {
         </div>
       </main>
 
-      {/* Delete Account Modal Popup */}
+      {/* Delete Account Modal Popup (backup) */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/50">
-          <div className="bg-red-900/20 p-6 rounded-lg">
-            <p className="text-red-300 mb-4">
+          <div className={`${deleteModalBg} p-6 rounded-lg`}>
+            <p className={`${deleteModalText} mb-4`}>
               Are you sure you want to delete your account? This action cannot be undone.
             </p>
             <div className="flex gap-4 justify-end">
               <button
                 onClick={() => setShowDeleteConfirm(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600"
+                className={`px-4 py-2 text-sm font-medium rounded-lg ${grayButtonText} ${grayButtonBg}`}
               >
                 Cancel
               </button>

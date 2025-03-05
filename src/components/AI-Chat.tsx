@@ -836,31 +836,63 @@ return (
     >
       Select one of the quick actions below or start a new conversation.
     </p>
-    {/* Marquee container with gradient overlays */}
+    
+    {/* Improved marquee container with gradient overlays */}
     <div className="relative w-full overflow-hidden my-4">
       {/* Left gradient overlay */}
-      <div className="absolute left-0 top-0 h-full w-16 pointer-events-none bg-gradient-to-r from-gray-900 to-transparent" />
+      <div className="absolute left-0 top-0 h-full w-16 z-10 pointer-events-none bg-gradient-to-r from-gray-900 to-transparent" />
       {/* Right gradient overlay */}
-      <div className="absolute right-0 top-0 h-full w-16 pointer-events-none bg-gradient-to-l from-gray-900 to-transparent" />
-      <motion.div
-        className="flex space-x-4 whitespace-nowrap"
-        animate={{ x: ["0%", "-50%"] }}
-        transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-      >
-        {/* Duplicate the quick actions for smooth scrolling */}
-        {quickActions.concat(quickActions).map((action, index) => (
-          <motion.button
-            key={index}
-            whileHover={{ scale: 1.05, transition: { duration: 0.2 } }}
-            className="flex items-center space-x-2 bg-blue-600 px-4 py-2 rounded-lg text-white whitespace-nowrap"
-            onClick={() => handleQuickActionClick(action)}
-          >
-            {quickActionIcons[action]}
-            <span className="whitespace-nowrap">{action}</span>
-          </motion.button>
-        ))}
-      </motion.div>
+      <div className="absolute right-0 top-0 h-full w-16 z-10 pointer-events-none bg-gradient-to-l from-gray-900 to-transparent" />
+      
+      <div className="flex relative overflow-hidden">
+        {/* First copy of buttons */}
+        <motion.div
+          className="flex space-x-4 whitespace-nowrap"
+          animate={{
+            x: [0, -100 * quickActions.length],
+          }}
+          transition={{
+            x: {
+              repeat: Infinity,
+              repeatType: "loop",
+              duration: 20,
+              ease: "linear",
+            },
+          }}
+          style={{
+            width: `calc(${quickActions.length} * 100%)`,
+            display: 'flex',
+            justifyContent: 'space-around',
+          }}
+        >
+          {quickActions.map((action, index) => (
+            <motion.button
+              key={`original-${index}`}
+              whileHover={{ scale: 1.05, transition: { duration: 0.2 } }}
+              className="flex items-center space-x-2 bg-blue-600 px-4 py-2 rounded-lg text-white whitespace-nowrap"
+              onClick={() => handleQuickActionClick(action)}
+            >
+              {quickActionIcons[action]}
+              <span className="whitespace-nowrap">{action}</span>
+            </motion.button>
+          ))}
+          
+          {/* Duplicate set for smooth looping */}
+          {quickActions.map((action, index) => (
+            <motion.button
+              key={`duplicate-${index}`}
+              whileHover={{ scale: 1.05, transition: { duration: 0.2 } }}
+              className="flex items-center space-x-2 bg-blue-600 px-4 py-2 rounded-lg text-white whitespace-nowrap"
+              onClick={() => handleQuickActionClick(action)}
+            >
+              {quickActionIcons[action]}
+              <span className="whitespace-nowrap">{action}</span>
+            </motion.button>
+          ))}
+        </motion.div>
+      </div>
     </div>
+    
     {/* Optional: chat input */}
     <form onSubmit={handleChatSubmit} className="mt-8 w-full max-w-lg">
       <div className="flex gap-2">

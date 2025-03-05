@@ -924,7 +924,7 @@ return (
         x: {
           repeat: Infinity,
           repeatType: "loop",
-          duration: 10,
+          duration: 40,
           ease: "linear",
         },
       }}

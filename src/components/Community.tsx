@@ -370,21 +370,20 @@ export function Community() {
       <div className="flex items-center gap-2">
         <Globe2 className="w-6 h-6 text-blue-400" />
             <h1 className={`text-3xl font-bold ${headerTitleClass}`}>Community</h1>
-      </div>
-      <div className="flex items-center gap-2 text-gray-300">
-        <Coins className="w-5 h-5 text-yellow-400" />
-        <motion.span
-          key={tokens}
-          initial={{ scale: 0.8, opacity: 0.5 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-          className="text-lg"
-        >
-          {Number(tokens).toLocaleString()}
-        </motion.span>
-      </div>
-    </div>
-
+          </div>
+          <div className="flex items-center gap-2">
+            <Coins className="w-5 h-5 text-yellow-400" />
+            <motion.span
+              key={tokens}
+              initial={{ scale: 0.8, opacity: 0.5 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+              className="text-lg"
+            >
+              {Number(tokens).toLocaleString()}
+            </motion.span>
+          </div>
+        </div>
 
         {/* File Upload */}
         <div className="mb-6">

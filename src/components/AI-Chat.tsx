@@ -35,7 +35,7 @@ import {
   deleteChatConversation,
 } from '../lib/ai-chat-firebase';
 
-// Firestore item CRUD helpers (make sure these exist in your code)
+// Firestore item CRUD helpers
 import {
   createUserTask,
   createUserGoal,
@@ -138,6 +138,9 @@ const streamResponse = async (
   return accumulatedText;
 };
 
+/**
+ * Extract the "candidate text" from the Gemini JSON response
+ */
 const extractCandidateText = (text: string): string => {
   let candidateText = text;
   try {
@@ -158,10 +161,47 @@ const extractCandidateText = (text: string): string => {
   return candidateText;
 };
 
+/**
+ * Extract JSON blocks from text. 
+ * 1) First tries to find triple-backtick JSON code blocks 
+ * 2) If none found, tries to find top-level { ... } blocks
+ */
+function extractJsonBlocks(text: string): string[] {
+  const blocks: string[] = [];
+
+  // 1) Attempt to find triple-backtick code blocks
+  const tripleBacktickRegex = /```json\s*([\s\S]*?)```/g;
+  let match = tripleBacktickRegex.exec(text);
+  while (match) {
+    blocks.push(match[1]);
+    match = tripleBacktickRegex.exec(text);
+  }
+
+  if (blocks.length > 0) return blocks;
+
+  // 2) Fallback: look for { ... } blocks
+  // This is simplistic—doesn't handle nested braces—but good enough for single-level JSON.
+  const curlyRegex = /(\{[^{}]+\})/g;
+  let curlyMatch = curlyRegex.exec(text);
+  while (curlyMatch) {
+    blocks.push(curlyMatch[1]);
+    curlyMatch = curlyRegex.exec(text);
+  }
+
+  return blocks;
+}
+
 export function AIChat() {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
+
+  /**
+   * We'll store the user's full display name in `userName`,
+   * but for the greeting, we only show the first name.
+   */
   const [userName, setUserName] = useState<string>('Loading...');
+  const truncatedName = userName.split(' ')[0] || userName; // e.g. "Srinivas" from "Srinivas Byin"
+
   const [chatMessage, setChatMessage] = useState('');
   const [chatHistory, setChatHistory] = useState<ChatMessageData[]>([]);
   const [isChatLoading, setIsChatLoading] = useState(false);
@@ -234,7 +274,6 @@ export function AIChat() {
   }, [isSidebarIlluminateEnabled]);
 
   // ----- Theming Classes -----
-  // Adjust these as desired for your light/dark color schemes.
   const containerBg = isIlluminateEnabled ? 'bg-gray-100' : 'bg-gray-900';
   const headerBorder = isIlluminateEnabled ? 'border-gray-300' : 'border-gray-800';
   const headerBg = isIlluminateEnabled ? 'bg-white' : '';
@@ -430,8 +469,7 @@ Guidelines:
    - Only reference ${userName}'s items if ${userName} explicitly asks about them.
 
 2. Educational Content (JSON):
-   - If ${userName} explicitly requests educational content (flashcards or quiz questions), provide exactly one JSON object in a code block. 
-     (flashcard or question formats)...
+   - If ${userName} explicitly requests educational content (flashcards or quiz questions), provide exactly one JSON object in a code block.
 
 3. Data Modifications (JSON):
    - If you want to create or update items (task, goal, plan, project), return a JSON block like:
@@ -444,12 +482,11 @@ Guidelines:
      }
    }
    \`\`\`
-   - Supported actions: "createTask", "createGoal", "createPlan", "createProject"
-   - Provide the JSON block separate from normal text.
+   - You may also create multiple items by returning multiple JSON blocks.
 
 4. Response Structure:
    - Provide a direct response to ${userName} without extraneous meta-text.
-   - If returning JSON, do so in a single code block with the language "json".
+   - If returning JSON, do so in a code block or braces that can be parsed.
 
 Follow these instructions strictly.
 `;
@@ -548,18 +585,17 @@ Return ONLY the title, with no extra commentary.
       const finalText = extractCandidateText(finalResponse).trim() || '';
       setStreamingAssistantContent('');
 
-      // Look for JSON blocks
+      // Now parse JSON from the assistant's text
       let assistantReply = finalText;
-      const jsonRegex = /```json\s*([\s\S]*?)```/g;
-      let match = jsonRegex.exec(assistantReply);
+      const jsonBlocks = extractJsonBlocks(assistantReply);
 
-      while (match) {
-        const jsonBlock = match[1]; // content inside ```json ... ```
-        assistantReply = assistantReply.replace(match[0], '').trim(); // remove the JSON block from displayed text
+      for (const jsonBlock of jsonBlocks) {
+        // Remove the block from the final displayed text
+        assistantReply = assistantReply.replace(jsonBlock, '').trim();
 
+        // Attempt to parse and handle action
         try {
           const parsed = JSON.parse(jsonBlock);
-          // For example: { action: 'createTask', payload: {...} }
           if (parsed.action && parsed.payload) {
             // Attempt each action
             if (parsed.action === 'createTask') {
@@ -575,10 +611,9 @@ Return ONLY the title, with no extra commentary.
         } catch (err) {
           console.error('Failed to parse or execute JSON action:', err);
         }
-        match = jsonRegex.exec(assistantReply);
       }
 
-      // Save the assistant's final message
+      // Save the assistant's final message (minus any JSON)
       await saveChatMessage(convId!, {
         role: 'assistant',
         content: assistantReply,
@@ -682,7 +717,7 @@ Return ONLY the title, with no extra commentary.
                 isIlluminateEnabled ? 'text-gray-900' : 'text-white'
               }`}
             >
-              Hey {userName}, how can I help you be productive today?
+              Hey {truncatedName}, how can I help you be productive today?
             </h1>
             <p
               className={`mb-8 ${

@@ -69,7 +69,7 @@ export function Friends() {
     return stored ? JSON.parse(stored) : false;
   });
 
-    // Blackout mode state
+  // Blackout mode state
   const [isBlackoutEnabled, setIsBlackoutEnabled] = useState(() => {
     const stored = localStorage.getItem('isBlackoutEnabled');
     return stored ? JSON.parse(stored) : false;
@@ -81,22 +81,42 @@ export function Friends() {
     return stored ? JSON.parse(stored) : false;
   });
 
-    const handleToggleBlackout = () => {
-    setIsBlackoutEnabled(prev => !prev);
-  };
+  // Illuminate (light mode) state
+  const [isIlluminateEnabled, setIsIlluminateEnabled] = useState(() => {
+    const stored = localStorage.getItem('isIlluminateEnabled');
+    return stored ? JSON.parse(stored) : false;
+  });
 
-  // Update localStorage and document body for Blackout mode
+  // Sidebar Illuminate option state
+  const [isSidebarIlluminateEnabled, setIsSidebarIlluminateEnabled] = useState(() => {
+    const stored = localStorage.getItem('isSidebarIlluminateEnabled');
+    return stored ? JSON.parse(stored) : false;
+  });
+
+  // Update localStorage and document.body for modes
   useEffect(() => {
     localStorage.setItem('isBlackoutEnabled', JSON.stringify(isBlackoutEnabled));
     document.body.classList.toggle('blackout-mode', isBlackoutEnabled);
   }, [isBlackoutEnabled]);
 
-  // Update localStorage for Sidebar Blackout option
   useEffect(() => {
     localStorage.setItem('isSidebarBlackoutEnabled', JSON.stringify(isSidebarBlackoutEnabled));
   }, [isSidebarBlackoutEnabled]);
 
-  // Right-hand panels
+  useEffect(() => {
+    localStorage.setItem('isIlluminateEnabled', JSON.stringify(isIlluminateEnabled));
+    if (isIlluminateEnabled) {
+      document.body.classList.add('illuminate-mode');
+    } else {
+      document.body.classList.remove('illuminate-mode');
+    }
+  }, [isIlluminateEnabled]);
+
+  useEffect(() => {
+    localStorage.setItem('isSidebarIlluminateEnabled', JSON.stringify(isSidebarIlluminateEnabled));
+  }, [isSidebarIlluminateEnabled]);
+
+  // Right-hand panels state
   const [chats, setChats] = useState<Chat[]>([]);
   const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
 
@@ -121,6 +141,76 @@ export function Friends() {
   // File uploading
   const [fileUploading, setFileUploading] = useState(false);
 
+  // ---------------------------
+  // Dynamic CSS Classes for Modes
+  // ---------------------------
+  const containerClass = isIlluminateEnabled
+    ? 'bg-white text-gray-900'
+    : isBlackoutEnabled
+    ? 'bg-gray-950 text-white'
+    : 'bg-gray-900 text-white';
+
+  const headingClass = isIlluminateEnabled ? 'text-gray-900' : 'text-white';
+  const subheadingClass = isIlluminateEnabled ? 'text-gray-600' : 'text-gray-400';
+
+  // For the main chat header background
+  const chatHeaderClass = isIlluminateEnabled
+    ? 'bg-gray-100 border-b border-gray-300'
+    : 'bg-gray-800 border-b border-gray-700';
+
+  // For the chat messages area
+  const messageAreaClass = isIlluminateEnabled ? 'bg-gray-100' : 'bg-gray-700';
+
+  // For message bubbles: your own and others
+  const ownMessageClass = isIlluminateEnabled
+    ? 'bg-blue-300 text-gray-900'
+    : 'bg-blue-600 text-white';
+  const otherMessageClass = isIlluminateEnabled
+    ? 'bg-gray-200 text-gray-900'
+    : 'bg-gray-600 text-white';
+
+  // Chat input container
+  const chatInputContainerClass = isIlluminateEnabled ? 'bg-gray-100' : 'bg-gray-800';
+
+  // Input fields used inside chat input area
+  const inputBg = isIlluminateEnabled
+    ? 'bg-gray-200 text-gray-900'
+    : 'bg-gray-700 text-white';
+
+  // Navigation buttons (e.g. for friend requests, etc.)
+  const navButtonClass = isIlluminateEnabled
+    ? 'text-gray-700 hover:text-gray-900 hover:bg-gray-200'
+    : 'text-gray-400 hover:text-white hover:bg-gray-800';
+
+  // Aside (right panel) background
+  const asideClass = isIlluminateEnabled
+    ? 'bg-gray-100 border-l border-gray-300'
+    : 'bg-gray-800 border-l border-gray-700';
+
+  // Group Modal styling
+  const groupModalClass = isIlluminateEnabled
+    ? 'bg-gray-100 text-gray-900'
+    : 'bg-gray-800 text-gray-300';
+
+  // Friend request buttons
+  const acceptButtonClass = isIlluminateEnabled
+    ? 'text-green-600 hover:text-green-500'
+    : 'text-green-400 hover:text-green-300';
+  const rejectButtonClass = isIlluminateEnabled
+    ? 'text-red-600 hover:text-red-500'
+    : 'text-red-400 hover:text-red-300';
+
+  // Chat list items (in aside)
+  const selectedChatClass = isIlluminateEnabled
+    ? 'bg-blue-300 text-gray-900'
+    : 'bg-blue-600 text-white';
+  const chatListItemClass = isIlluminateEnabled
+    ? 'bg-gray-200 text-gray-900'
+    : 'bg-gray-700 text-white';
+
+  // ---------------------------
+  // Auth & Real-time Listeners
+  // ---------------------------
   useEffect(() => {
     const currentUser = getCurrentUser();
     if (!currentUser) {
@@ -155,7 +245,6 @@ export function Friends() {
   }, [selectedChat]);
 
   // Helper to compute display name for a chat:
-  // For direct chats, we assume the chat "name" field stores the friend’s name.
   const getChatDisplayName = (chat: Chat): string => {
     if (chat.isGroup) {
       return chat.name || 'Group Chat';
@@ -163,13 +252,12 @@ export function Friends() {
     return chat.name || 'Direct Chat';
   };
 
-  // Handle sending text message
+  // Handle sending a text message
   const handleSendMessage = async (e: FormEvent) => {
     e.preventDefault();
     if (!selectedChat || !newMessage.trim()) return;
 
     try {
-      // For group chats, include senderName and senderPhotoURL.
       let senderName: string | undefined;
       let senderPhotoURL: string | undefined;
       if (selectedChat.isGroup) {
@@ -274,7 +362,6 @@ export function Friends() {
     if (!selectedChat || !newChatName.trim()) return;
     try {
       await renameChat(selectedChat.id, newChatName.trim());
-      // Optionally update the local state (if not using real-time update)
       setSelectedChat({ ...selectedChat, name: newChatName.trim() });
       setIsEditingChatName(false);
     } catch (err) {
@@ -282,7 +369,7 @@ export function Friends() {
     }
   };
 
-  // Delete or leave chat: For direct chat, unfriend; for group, leave.
+  // Delete or leave chat
   const handleDeleteChat = async () => {
     if (!selectedChat) return;
     try {
@@ -298,12 +385,12 @@ export function Friends() {
   };
 
   return (
-    <div className="flex h-screen ${bgColor}">
+    <div className={`flex h-screen ${containerClass}`}>
       {/* Left: Navigation Sidebar */}
       <Sidebar
         isCollapsed={isSidebarCollapsed}
-                // Pass a prop for Sidebar background update if both Blackout mode and Sidebar Blackout option are enabled
         isBlackoutEnabled={isBlackoutEnabled && isSidebarBlackoutEnabled}
+        isIlluminateEnabled={isIlluminateEnabled && isSidebarIlluminateEnabled}
         onToggle={() => {
           setIsSidebarCollapsed((prev) => {
             localStorage.setItem('isSidebarCollapsed', JSON.stringify(!prev));
@@ -320,12 +407,12 @@ export function Friends() {
         } flex flex-col`}
       >
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-800">
-          <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+        <div className={`${chatHeaderClass} px-6 py-4`}>
+          <h1 className={`text-3xl font-bold ${headingClass} flex items-center gap-3`}>
             <User className="w-8 h-8 text-blue-400" />
             Friends
           </h1>
-          <p className="text-gray-400 mt-1">
+          <p className={`mt-1 text-sm ${subheadingClass}`}>
             Manage friend requests and chat with your friends.
           </p>
         </div>
@@ -342,15 +429,13 @@ export function Friends() {
                     onChange={(e) => setNewChatName(e.target.value)}
                     onBlur={handleRenameChat}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        handleRenameChat();
-                      }
+                      if (e.key === 'Enter') handleRenameChat();
                     }}
                     className="bg-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     autoFocus
                   />
                 ) : (
-                  <h2 className="text-xl text-white font-semibold">
+                  <h2 className={`text-xl font-semibold ${headingClass}`}>
                     {getChatDisplayName(selectedChat)}
                   </h2>
                 )}
@@ -377,9 +462,9 @@ export function Friends() {
             </div>
 
             {/* Messages */}
-            <div className="flex-1 p-4 overflow-y-auto bg-gray-700 flex flex-col">
+            <div className={`flex-1 p-4 overflow-y-auto ${messageAreaClass} flex flex-col`}>
               {messages.length === 0 ? (
-                <p className="text-gray-400">
+                <p className={subheadingClass}>
                   No messages yet. Start the conversation!
                 </p>
               ) : (
@@ -388,12 +473,11 @@ export function Friends() {
                     key={msg.id}
                     className={`mb-4 p-2 rounded-lg max-w-xs break-words ${
                       msg.senderId === user.uid
-                        ? 'bg-blue-600 self-end ml-auto'
-                        : 'bg-gray-600 self-start'
+                        ? `${ownMessageClass} self-end ml-auto`
+                        : `${otherMessageClass} self-start`
                     }`}
                     style={{ maxWidth: '75%' }}
                   >
-                    {/* For group chats, show sender info */}
                     {selectedChat.isGroup && msg.senderId !== user.uid && (
                       <div className="flex items-center mb-1">
                         {msg.senderPhotoURL && (
@@ -429,14 +513,14 @@ export function Friends() {
             {/* Message Input */}
             <form
               onSubmit={handleSendMessage}
-              className="bg-gray-800 p-4 flex items-center gap-2"
+              className={`${chatInputContainerClass} p-4 flex items-center gap-2`}
             >
               <input
                 type="text"
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
                 placeholder="Type your message"
-                className="flex-1 bg-gray-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={`flex-1 ${inputBg} rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500`}
               />
               <button
                 type="submit"
@@ -470,10 +554,10 @@ export function Friends() {
       </main>
 
       {/* Right: Friend Requests, Add Friend, Group Chat, and Chat List */}
-      <aside className="w-72 bg-gray-800 border-l border-gray-700 flex-shrink-0 flex flex-col">
+      <aside className={`${asideClass} w-72 flex-shrink-0 flex flex-col`}>
         {/* Friend Requests */}
         <div className="p-4 border-b border-gray-700">
-          <h2 className="text-xl font-semibold text-white mb-3 flex items-center gap-2">
+          <h2 className={`text-xl font-semibold ${headingClass} mb-3 flex items-center gap-2`}>
             <MessageSquare className="w-5 h-5" />
             Friend Requests
           </h2>
@@ -493,14 +577,14 @@ export function Friends() {
                   <div className="flex gap-2">
                     <button
                       onClick={() => handleAcceptRequest(req.id)}
-                      className="text-green-400 hover:text-green-300"
+                      className={acceptButtonClass}
                       title="Accept"
                     >
                       <CheckCircle className="w-5 h-5" />
                     </button>
                     <button
                       onClick={() => handleRejectRequest(req.id)}
-                      className="text-red-400 hover:text-red-300"
+                      className={rejectButtonClass}
                       title="Reject"
                     >
                       <XCircle className="w-5 h-5" />
@@ -514,7 +598,7 @@ export function Friends() {
 
         {/* Add Friend */}
         <div className="p-4 border-b border-gray-700">
-          <h2 className="text-xl font-semibold text-white mb-3 flex items-center gap-2">
+          <h2 className={`text-xl font-semibold ${headingClass} mb-3 flex items-center gap-2`}>
             <PlusCircle className="w-5 h-5" />
             Add Friend
           </h2>
@@ -524,7 +608,7 @@ export function Friends() {
               value={friendEmail}
               onChange={(e) => setFriendEmail(e.target.value)}
               placeholder="Friend's email"
-              className="flex-1 bg-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              className={`flex-1 ${inputBg} rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm`}
             />
             <button
               onClick={handleSendFriendRequest}
@@ -539,7 +623,7 @@ export function Friends() {
         {/* Group Chat Creation */}
         <div className="p-4 border-b border-gray-700">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+            <h2 className={`text-xl font-semibold ${headingClass} flex items-center gap-2`}>
               <Users className="w-5 h-5" />
               Group Chats
             </h2>
@@ -550,12 +634,11 @@ export function Friends() {
               Create
             </button>
           </div>
-          {/* List of group chats could be shown here if needed */}
         </div>
 
         {/* Chat List */}
         <div className="p-4 flex-1 overflow-y-auto">
-          <h2 className="text-xl font-semibold text-white mb-3">Your Chats</h2>
+          <h2 className={`text-xl font-semibold ${headingClass} mb-3`}>Your Chats</h2>
           {chats.length === 0 ? (
             <p className="text-gray-400 text-sm">No chats yet.</p>
           ) : (
@@ -565,8 +648,8 @@ export function Friends() {
                   key={chat.id}
                   onClick={() => setSelectedChat(chat)}
                   className={`w-full text-left px-3 py-2 rounded-lg ${
-                    selectedChat?.id === chat.id ? 'bg-blue-600' : 'bg-gray-700'
-                  } text-white text-sm`}
+                    selectedChat?.id === chat.id ? selectedChatClass : chatListItemClass
+                  } text-sm`}
                 >
                   {getChatDisplayName(chat)}
                 </button>
@@ -579,30 +662,30 @@ export function Friends() {
       {/* Modal for Group Chat Creation */}
       {isGroupModalOpen && (
         <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/50">
-          <div className="bg-gray-800 p-6 rounded-lg w-96">
-            <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+          <div className={`${groupModalClass} p-6 rounded-lg w-96`}>
+            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
               <Users className="w-5 h-5" />
               Create Group Chat
             </h2>
             <div className="mb-4">
-              <label className="block text-gray-300 text-sm mb-1">
+              <label className="block text-sm mb-1">
                 Group Name
               </label>
               <input
                 type="text"
                 value={groupName}
                 onChange={(e) => setGroupName(e.target.value)}
-                className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                className={`w-full ${inputBg} rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm`}
               />
             </div>
             <div className="mb-4">
-              <label className="block text-gray-300 text-sm mb-1">
+              <label className="block text-sm mb-1">
                 Member Emails (comma-separated)
               </label>
               <textarea
                 value={groupEmails}
                 onChange={(e) => setGroupEmails(e.target.value)}
-                className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                className={`w-full ${inputBg} rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm`}
                 rows={2}
               />
             </div>

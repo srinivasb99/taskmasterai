@@ -183,7 +183,7 @@ export function AIChat() {
     return stored ? JSON.parse(stored) : false;
   });
 
-  // Illuminate (light mode) state
+   // Illuminate (light mode) state
   const [isIlluminateEnabled, setIsIlluminateEnabled] = useState(() => {
     const stored = localStorage.getItem('isIlluminateEnabled');
     return stored ? JSON.parse(stored) : false;
@@ -194,7 +194,7 @@ export function AIChat() {
     return stored ? JSON.parse(stored) : false;
   });
 
-  // Update localStorage and document.body for Illuminate mode
+   // Update localStorage and document.body for Illuminate mode
   useEffect(() => {
     localStorage.setItem('isIlluminateEnabled', JSON.stringify(isIlluminateEnabled));
     if (isIlluminateEnabled) {
@@ -208,6 +208,7 @@ export function AIChat() {
   useEffect(() => {
     localStorage.setItem('isSidebarIlluminateEnabled', JSON.stringify(isSidebarIlluminateEnabled));
   }, [isSidebarIlluminateEnabled]);
+
 
   // Update localStorage and document body for Blackout mode
   useEffect(() => {
@@ -617,7 +618,7 @@ Return ONLY the title, with no extra commentary.
         onToggle={handleToggleSidebar}
         userName={userName}
         isBlackoutEnabled={isBlackoutEnabled && isSidebarBlackoutEnabled}
-        isIlluminateEnabled={isIlluminateEnabled}
+        isIlluminateEnabled={isIlluminateEnabled && isSidebarIlluminateEnabled}
       />
 
       {/* Main Chat Area */}

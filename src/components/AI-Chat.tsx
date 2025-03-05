@@ -680,10 +680,14 @@ const handleChatSubmit = async (e: React.FormEvent) => {
         console.error('Failed to parse or execute JSON block:', err);
       }
       // Remove this block from the reply so it doesn't show up.
+      // This replaces any occurrence of the block content.
       assistantReply = assistantReply.replace(block, '').trim();
     }
 
-    // Remove any empty lines from the final assistant reply.
+    // Additionally, remove any leftover empty JSON/code blocks (i.e. empty triple-backticks).
+    assistantReply = assistantReply.replace(/```(?:json)?\s*```/g, '').trim();
+
+    // Also, remove any extra empty lines.
     assistantReply = assistantReply
       .split('\n')
       .filter(line => line.trim() !== '')
@@ -727,6 +731,7 @@ const handleChatSubmit = async (e: React.FormEvent) => {
     setIsChatLoading(false);
   }
 };
+
 
 
   // ----- Conversation Management -----

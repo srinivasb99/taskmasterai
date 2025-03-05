@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { motion } from 'framer-motion';
+import { motion, useAnimationControls } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
   Send,
@@ -779,21 +779,71 @@ const handleChatSubmit = async (e: React.FormEvent) => {
   
   // ----- Quick Actions for "no conversation selected" -----
   const quickActions = [
-    'Create a Task',
-    'Create a Goal',
-    'Create a Plan',
-    'Create a Project',
-    'Analyze my items',
-    'Schedule a plan for me',
-  ];
+  'Create a Task',
+  'Create a Goal',
+  'Create a Plan',
+  'Create a Project',
+  'Analyze my items',
+  'Schedule a plan for me'
+];
 
-  const quickActionIcons: Record<string, JSX.Element> = {
+const quickActionIcons = {
   'Create a Task': <CheckCircle className={iconClass + " inline-block"} />,
   'Create a Goal': <Target className={iconClass + " inline-block"} />,
   'Create a Plan': <Calendar className={iconClass + " inline-block"} />,
   'Create a Project': <Folder className={iconClass + " inline-block"} />,
   'Analyze my items': <BarChart2 className={iconClass + " inline-block"} />,
   'Schedule a plan for me': <Clock className={iconClass + " inline-block"} />,
+};
+
+const InfiniteCarousel = ({ actions, icons, onActionClick }) => {
+  const [width, setWidth] = useState(0);
+  const carousel = useRef(null);
+  
+  useEffect(() => {
+    // Calculate the total width of all items
+    if (carousel.current) {
+      setWidth(carousel.current.scrollWidth - carousel.current.offsetWidth);
+    }
+  }, []);
+
+  const renderActions = (keyPrefix) => {
+    return actions.map((action, index) => (
+      <motion.button
+        key={`${keyPrefix}-${index}`}
+        whileHover={{ scale: 1.05 }}
+        className="flex items-center space-x-2 bg-blue-600 px-4 py-2 rounded-lg text-white mx-2"
+        onClick={() => onActionClick(action)}
+      >
+        {icons[action]}
+        <span>{action}</span>
+      </motion.button>
+    ));
+  };
+
+  return (
+    <div className="overflow-hidden w-full my-4" ref={carousel}>
+      <motion.div
+        className="flex"
+        animate={{
+          x: [-width/2, 0],
+        }}
+        transition={{
+          x: {
+            repeat: Infinity,
+            repeatType: "loop",
+            duration: 25,
+            ease: "linear",
+          },
+        }}
+      >
+        {/* Triple the items to ensure smooth looping */}
+        {renderActions('set1')}
+        {renderActions('set2')}
+        {renderActions('set3')}
+      </motion.div>
+    </div>
+  );
 };
 
   const handleQuickActionClick = (action: string) => {
@@ -821,7 +871,7 @@ return (
     >
       {/* If no conversation is selected, show a "welcome" area */}
       {!conversationId ? (
-  <div className="h-full flex flex-col items-center justify-center text-center p-8">
+ <div className="h-full flex flex-col items-center justify-center text-center p-8">
     <h1
       className={`text-3xl font-semibold mb-4 ${
         isIlluminateEnabled ? 'text-gray-900' : (isBlackoutEnabled ? 'text-white' : 'text-white')
@@ -837,61 +887,12 @@ return (
       Select one of the quick actions below or start a new conversation.
     </p>
     
-    {/* Improved marquee container with gradient overlays */}
-    <div className="relative w-full overflow-hidden my-4">
-      {/* Left gradient overlay */}
-      <div className="absolute left-0 top-0 h-full w-16 z-10 pointer-events-none bg-gradient-to-r from-gray-900 to-transparent" />
-      {/* Right gradient overlay */}
-      <div className="absolute right-0 top-0 h-full w-16 z-10 pointer-events-none bg-gradient-to-l from-gray-900 to-transparent" />
-      
-      <div className="flex relative overflow-hidden">
-        {/* First copy of buttons */}
-        <motion.div
-          className="flex space-x-4 whitespace-nowrap"
-          animate={{
-            x: [0, -100 * quickActions.length],
-          }}
-          transition={{
-            x: {
-              repeat: Infinity,
-              repeatType: "loop",
-              duration: 20,
-              ease: "linear",
-            },
-          }}
-          style={{
-            width: `calc(${quickActions.length} * 100%)`,
-            display: 'flex',
-            justifyContent: 'space-around',
-          }}
-        >
-          {quickActions.map((action, index) => (
-            <motion.button
-              key={`original-${index}`}
-              whileHover={{ scale: 1.05, transition: { duration: 0.2 } }}
-              className="flex items-center space-x-2 bg-blue-600 px-4 py-2 rounded-lg text-white whitespace-nowrap"
-              onClick={() => handleQuickActionClick(action)}
-            >
-              {quickActionIcons[action]}
-              <span className="whitespace-nowrap">{action}</span>
-            </motion.button>
-          ))}
-          
-          {/* Duplicate set for smooth looping */}
-          {quickActions.map((action, index) => (
-            <motion.button
-              key={`duplicate-${index}`}
-              whileHover={{ scale: 1.05, transition: { duration: 0.2 } }}
-              className="flex items-center space-x-2 bg-blue-600 px-4 py-2 rounded-lg text-white whitespace-nowrap"
-              onClick={() => handleQuickActionClick(action)}
-            >
-              {quickActionIcons[action]}
-              <span className="whitespace-nowrap">{action}</span>
-            </motion.button>
-          ))}
-        </motion.div>
-      </div>
-    </div>
+    {/* Completely redesigned carousel with no gradients */}
+    <InfiniteCarousel 
+      actions={quickActions} 
+      icons={quickActionIcons} 
+      onActionClick={handleQuickActionClick} 
+    />
     
     {/* Optional: chat input */}
     <form onSubmit={handleChatSubmit} className="mt-8 w-full max-w-lg">

@@ -540,7 +540,7 @@ Guidelines:
      \`\`\`
 
 3. Data Modifications (JSON):
-   - When ${userName} provides a command to create or update an item (e.g., "add a task to buy a dog by tomorrow", "create a goal to exercise daily", etc.), you must respond with a JSON block that specifies the action and its payload.
+   - When ${userName} provides a command to create or update an item (e.g., "add a task to buy a dog by tomorrow", "create a goal to exercise daily", etc.), you must respond by first stating the action you will do and then create a JSON block that specifies the action and its payload.
    - The JSON block must be wrapped in triple backticks with the "json" language identifier and returned as the only content for that modification.
    - For example:
    \`\`\`json

@@ -595,7 +595,7 @@ Return ONLY the title, with no extra commentary.
   // ----- Chat Submission -----
   const [streamingAssistantContent, setStreamingAssistantContent] = useState('');
 
- // Send the user's message to Gemini, get streaming response, and save the final assistant message.
+// Send the user's message to Gemini, get streaming response, and save the final assistant message.
 const handleChatSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
   if (!chatMessage.trim() || !user) return;
@@ -680,9 +680,15 @@ const handleChatSubmit = async (e: React.FormEvent) => {
         console.error('Failed to parse or execute JSON block:', err);
       }
       // Remove this block from the reply so it doesn't show up.
-      // (We assume the block text appears verbatim in assistantReply.)
       assistantReply = assistantReply.replace(block, '').trim();
     }
+
+    // Remove any empty lines from the final assistant reply.
+    assistantReply = assistantReply
+      .split('\n')
+      .filter(line => line.trim() !== '')
+      .join('\n')
+      .trim();
 
     // Save the assistant's final message with educational content if available.
     if (educationalContent) {
@@ -721,6 +727,7 @@ const handleChatSubmit = async (e: React.FormEvent) => {
     setIsChatLoading(false);
   }
 };
+
 
   // ----- Conversation Management -----
   const handleNewConversation = async () => {
@@ -824,7 +831,7 @@ return (
                 type="text"
                 value={chatMessage}
                 onChange={(e) => setChatMessage(e.target.value)}
-                placeholder="Type something..."
+                placeholder="Ask anything..."
                 className={`flex-1 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                   isBlackoutEnabled 
                     ? 'bg-gray-800 text-white'

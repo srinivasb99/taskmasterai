@@ -850,7 +850,6 @@ const quickActionIcons: Record<string, JSX.Element> = {
   'Create a Checklist': <ListChecks className={iconClass + " inline-block"} />,
   'Prioritize My Tasks': <SortAsc className={iconClass + " inline-block"} />,
   'Find a Solution': <Search className={iconClass + " inline-block"} />,
-  'Start a Timer': <Timer className={iconClass + " inline-block"} />,
   'Log My Activity': <ClipboardList className={iconClass + " inline-block"} />,
   'Plan My Day': <Sun className={iconClass + " inline-block"} />,
   'Break Down a Project': <Layers className={iconClass + " inline-block"} />,

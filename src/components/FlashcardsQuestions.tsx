@@ -6,6 +6,8 @@ import {
   Check,
   X
 } from 'lucide-react';
+
+// For math/LaTeX support:
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
@@ -42,7 +44,7 @@ export const FlashcardsQuestions: React.FC<FlashcardsQuestionsProps> = ({
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [showExplanation, setShowExplanation] = useState(false);
 
-  // Read mode settings from localStorage (default to dark mode)
+  // Read user’s mode preferences from localStorage
   const [isBlackoutEnabled] = useState(() => {
     const stored = localStorage.getItem('isBlackoutEnabled');
     return stored ? JSON.parse(stored) : false;
@@ -52,7 +54,7 @@ export const FlashcardsQuestions: React.FC<FlashcardsQuestionsProps> = ({
     return stored ? JSON.parse(stored) : false;
   });
 
- // ---------------------------
+  // ---------------------------
   //   Dynamic Classes for Modes
   // ---------------------------
   // Overall container background & text
@@ -94,19 +96,15 @@ export const FlashcardsQuestions: React.FC<FlashcardsQuestionsProps> = ({
     ? 'bg-blue-500 hover:bg-blue-600 text-white'
     : 'bg-blue-600 hover:bg-blue-700 text-white';
 
-
-  // Helper to ensure a text value is not undefined
-  const safeText = (text: string | undefined): string => text || '';
-
   // ---------------------------
-  // Handlers
+  //   Handlers
   // ---------------------------
   const handleFlip = () => {
     setIsFlipped(!isFlipped);
   };
 
   const handleOptionSelect = (index: number, correctAnswer: number) => {
-    if (selectedAnswer !== null) return;
+    if (selectedAnswer !== null) return; // Already answered
     setSelectedAnswer(index);
     setShowExplanation(true);
   };
@@ -131,6 +129,7 @@ export const FlashcardsQuestions: React.FC<FlashcardsQuestionsProps> = ({
     }
   };
 
+  // No data => show error
   if (!data || data.length === 0) {
     return <div className="text-red-500">No content available</div>;
   }
@@ -138,12 +137,16 @@ export const FlashcardsQuestions: React.FC<FlashcardsQuestionsProps> = ({
   const currentItem = data[currentIndex];
 
   // ---------------------------
-  // Flashcard Mode Rendering
+  //   FLASHCARD MODE
   // ---------------------------
   if (type === 'flashcard') {
     const flashcard = currentItem as Flashcard;
+
     return (
-      <div className={`${cardBg} ${cardText} ${cardBorder} rounded-xl p-6 max-w-xl w-full`}>
+      <div
+        className={`${cardBg} ${cardText} border ${cardBorder} rounded-xl p-6 max-w-xl w-full`}
+      >
+        {/* Topic & Index */}
         <div className="flex justify-between items-center mb-3">
           <div className={`text-sm ${highlightTextColor}`}>
             Topic: {flashcard.topic}
@@ -152,37 +155,51 @@ export const FlashcardsQuestions: React.FC<FlashcardsQuestionsProps> = ({
             {currentIndex + 1} / {data.length}
           </div>
         </div>
+
+        {/* Card flipping container */}
         <div
           className="relative min-h-[200px] cursor-pointer perspective-1000"
           onClick={handleFlip}
         >
           <div
-            className={`transform transition-transform duration-500 preserve-3d ${isFlipped ? 'rotate-y-180' : ''}`}
+            className={`transform transition-transform duration-500 preserve-3d ${
+              isFlipped ? 'rotate-y-180' : ''
+            }`}
           >
-            <div className="absolute backface-hidden w-full">
+            {/* Front side */}
+            <div className="absolute w-full backface-hidden">
               <div className={`${frontBg} p-6 rounded-lg shadow-lg`}>
+                {/* Use ReactMarkdown to display math expressions */}
                 <ReactMarkdown
                   remarkPlugins={[remarkMath]}
                   rehypePlugins={[rehypeKatex]}
                   className={`text-lg ${frontText}`}
                 >
-                  {safeText(flashcard.question)}
+                  {flashcard.question}
                 </ReactMarkdown>
               </div>
             </div>
-            <div className={`absolute backface-hidden w-full rotate-y-180 ${isFlipped ? 'visible' : 'invisible'}`}>
+
+            {/* Back side */}
+            <div
+              className={`absolute w-full backface-hidden rotate-y-180 ${
+                isFlipped ? 'visible' : 'invisible'
+              }`}
+            >
               <div className={`${frontBg} p-6 rounded-lg shadow-lg`}>
                 <ReactMarkdown
                   remarkPlugins={[remarkMath]}
                   rehypePlugins={[rehypeKatex]}
                   className={`text-lg ${frontText}`}
                 >
-                  {safeText(flashcard.answer)}
+                  {flashcard.answer}
                 </ReactMarkdown>
               </div>
             </div>
           </div>
         </div>
+
+        {/* Navigation Buttons */}
         <div className="mt-4 flex justify-between items-center">
           <button
             onClick={handlePrevious}
@@ -213,41 +230,54 @@ export const FlashcardsQuestions: React.FC<FlashcardsQuestionsProps> = ({
   }
 
   // ---------------------------
-  // Quiz Question Mode Rendering
+  //   QUIZ QUESTION MODE
   // ---------------------------
   const quiz = currentItem as Question;
+
   return (
-    <div className={`${cardBg} ${cardText} ${cardBorder} rounded-xl p-6 max-w-xl w-full`}>
+    <div
+      className={`${cardBg} ${cardText} border ${cardBorder} rounded-xl p-6 max-w-xl w-full`}
+    >
+      {/* Index */}
       <div className="flex justify-between items-center mb-3">
         <div className={`text-sm ${subTextColor}`}>
           Question {currentIndex + 1} of {data.length}
         </div>
       </div>
+
+      {/* Question */}
       <div className="mb-6">
         <ReactMarkdown
           remarkPlugins={[remarkMath]}
           rehypePlugins={[rehypeKatex]}
           className="text-lg mb-4"
         >
-          {safeText(quiz.question)}
+          {quiz.question}
         </ReactMarkdown>
+
+        {/* Options */}
         <div className="space-y-3">
           {quiz.options.map((option, index) => {
-            let optionClasses = optionDefault;
+            let optionClasses = optionDefault; // default unselected
             if (selectedAnswer !== null) {
               if (index === quiz.correctAnswer) {
-                optionClasses = correctBg;
+                optionClasses = correctBg; // correct
               } else if (selectedAnswer === index) {
-                optionClasses = incorrectBg;
+                optionClasses = incorrectBg; // user-chosen, but wrong
               }
             }
             const isDisabled = selectedAnswer !== null;
+
             return (
               <button
                 key={index}
-                onClick={() => handleOptionSelect(index, quiz.correctAnswer)}
+                onClick={() => {
+                  handleOptionSelect(index, quiz.correctAnswer);
+                }}
                 disabled={isDisabled}
-                className={`w-full text-left p-3 rounded-lg transition-colors flex justify-between items-center ${optionClasses} ${isDisabled && 'cursor-default'}`}
+                className={`w-full text-left p-3 rounded-lg transition-colors flex justify-between items-center ${
+                  optionClasses
+                } ${isDisabled && 'cursor-default'}`}
               >
                 <span>{option}</span>
                 {selectedAnswer !== null && index === quiz.correctAnswer && (
@@ -261,17 +291,25 @@ export const FlashcardsQuestions: React.FC<FlashcardsQuestionsProps> = ({
           })}
         </div>
       </div>
+
+      {/* Explanation */}
       {showExplanation && (
-        <div className={`mt-4 p-4 rounded-lg ${isIlluminateEnabled ? 'bg-gray-300 text-gray-800' : 'bg-gray-700 text-white'}`}>
+        <div
+          className={`mt-4 p-4 rounded-lg ${
+            isIlluminateEnabled ? 'bg-gray-300 text-gray-800' : 'bg-gray-700 text-white'
+          }`}
+        >
           <ReactMarkdown
             remarkPlugins={[remarkMath]}
             rehypePlugins={[rehypeKatex]}
             className="leading-relaxed"
           >
-            {safeText(quiz.explanation)}
+            {quiz.explanation}
           </ReactMarkdown>
         </div>
       )}
+
+      {/* Navigation */}
       <div className="mt-4 flex justify-between items-center">
         <button
           onClick={handlePrevious}
@@ -300,5 +338,3 @@ export const FlashcardsQuestions: React.FC<FlashcardsQuestionsProps> = ({
     </div>
   );
 };
-
-export default FlashcardsQuestions;

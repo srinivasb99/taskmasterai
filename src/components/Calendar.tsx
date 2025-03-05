@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useBlackoutMode } from '../hooks/useBlackoutMode';
 import {
   Calendar as CalendarIcon,
   ChevronLeft,
@@ -44,7 +43,6 @@ import {
   deleteEvent
 } from '../lib/calendar-firebase';
 
-// Types
 interface Event {
   id: string;
   title: string;
@@ -102,7 +100,7 @@ export function Calendar() {
   const [showEventModal, setShowEventModal] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  
+
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     const stored = localStorage.getItem('isSidebarCollapsed');
     return stored ? JSON.parse(stored) : false;
@@ -120,6 +118,17 @@ export function Calendar() {
     return stored ? JSON.parse(stored) : false;
   });
 
+  // Illuminate (light mode) state
+  const [isIlluminateEnabled, setIsIlluminateEnabled] = useState(() => {
+    const stored = localStorage.getItem('isIlluminateEnabled');
+    return stored ? JSON.parse(stored) : false;
+  });
+  // Sidebar Illuminate option state
+  const [isSidebarIlluminateEnabled, setIsSidebarIlluminateEnabled] = useState(() => {
+    const stored = localStorage.getItem('isSidebarIlluminateEnabled');
+    return stored ? JSON.parse(stored) : false;
+  });
+
   // Event form state
   const [eventForm, setEventForm] = useState({
     title: '',
@@ -130,23 +139,77 @@ export function Calendar() {
     color: '#3B82F6' // Default blue
   });
 
-  // Update localStorage whenever the sidebar state changes
+  // ---------------------------
+  //   Dynamic Classes for Modes
+  // ---------------------------
+  const containerClass = isIlluminateEnabled
+    ? 'bg-white text-gray-900'
+    : isBlackoutEnabled
+    ? 'bg-gray-950 text-white'
+    : 'bg-gray-900 text-white';
+
+  const cardClass = isIlluminateEnabled
+    ? 'bg-gray-100 text-gray-900'
+    : 'bg-gray-800 text-gray-300';
+
+  const headingClass = isIlluminateEnabled ? 'text-gray-900' : 'text-white';
+  const subheadingClass = isIlluminateEnabled ? 'text-gray-600' : 'text-gray-400';
+  const borderColor = isIlluminateEnabled ? 'border-gray-300' : 'border-gray-800';
+
+  const inputBg = isIlluminateEnabled ? 'bg-gray-200 text-gray-900' : 'bg-gray-700 text-white';
+
+  const navButtonClass = isIlluminateEnabled
+    ? 'text-gray-700 hover:text-gray-900 hover:bg-gray-200'
+    : 'text-gray-400 hover:text-white hover:bg-gray-800';
+
+  const dayCellCurrentBg = isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-800/50';
+  const dayCellOtherBg = isIlluminateEnabled ? 'bg-gray-100' : 'bg-gray-800/20';
+  const dayCellHoverBg = isIlluminateEnabled ? 'hover:bg-gray-200' : 'hover:bg-gray-800';
+
+  const modalClass = isIlluminateEnabled
+    ? 'bg-gray-100 text-gray-900'
+    : 'bg-gray-800 text-gray-300';
+
+  const deleteButtonClass = isIlluminateEnabled
+    ? 'px-4 py-2 text-red-700 bg-red-100/20 rounded-lg hover:bg-red-100/30 transition-colors'
+    : 'px-4 py-2 text-red-300 bg-red-900/20 rounded-lg hover:bg-red-900/30 transition-colors';
+
+  const cancelButtonClass = isIlluminateEnabled
+    ? 'px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors'
+    : 'px-4 py-2 text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors';
+
+  // ---------------------------
+  //   LocalStorage & Mode Effects
+  // ---------------------------
   useEffect(() => {
     localStorage.setItem('isSidebarCollapsed', JSON.stringify(isSidebarCollapsed));
   }, [isSidebarCollapsed]);
 
-  // Update localStorage and document body for Blackout mode
   useEffect(() => {
     localStorage.setItem('isBlackoutEnabled', JSON.stringify(isBlackoutEnabled));
     document.body.classList.toggle('blackout-mode', isBlackoutEnabled);
   }, [isBlackoutEnabled]);
 
-  // Update localStorage for Sidebar Blackout option
   useEffect(() => {
     localStorage.setItem('isSidebarBlackoutEnabled', JSON.stringify(isSidebarBlackoutEnabled));
   }, [isSidebarBlackoutEnabled]);
 
-  // Auth state listener
+  useEffect(() => {
+    localStorage.setItem('isIlluminateEnabled', JSON.stringify(isIlluminateEnabled));
+    if (isIlluminateEnabled) {
+      document.body.classList.add('illuminate-mode');
+    } else {
+      document.body.classList.remove('illuminate-mode');
+    }
+  }, [isIlluminateEnabled]);
+
+  useEffect(() => {
+    localStorage.setItem('isSidebarIlluminateEnabled', JSON.stringify(isSidebarIlluminateEnabled));
+  }, [isSidebarIlluminateEnabled]);
+
+  // ---------------------------
+  //   Auth & Collection Effects
+  // ---------------------------
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((firebaseUser) => {
       setUser(firebaseUser);
@@ -156,11 +219,10 @@ export function Calendar() {
     return () => unsubscribe();
   }, []);
 
-  // Collection snapshots
   useEffect(() => {
     if (!user) return;
     
-    const unsubEvents = onCollectionSnapshot('events', user.uid, (items) => 
+    const unsubEvents = onCollectionSnapshot('events', user.uid, (items) =>
       setEvents(items.map(item => ({
         id: item.id,
         ...item.data,
@@ -169,7 +231,7 @@ export function Calendar() {
       })))
     );
     
-    const unsubTasks = onCollectionSnapshot('tasks', user.uid, (items) => 
+    const unsubTasks = onCollectionSnapshot('tasks', user.uid, (items) =>
       setTasks(items.map(item => ({
         id: item.id,
         ...item.data,
@@ -177,7 +239,7 @@ export function Calendar() {
       })))
     );
     
-    const unsubGoals = onCollectionSnapshot('goals', user.uid, (items) => 
+    const unsubGoals = onCollectionSnapshot('goals', user.uid, (items) =>
       setGoals(items.map(item => ({
         id: item.id,
         ...item.data,
@@ -185,7 +247,7 @@ export function Calendar() {
       })))
     );
     
-    const unsubProjects = onCollectionSnapshot('projects', user.uid, (items) => 
+    const unsubProjects = onCollectionSnapshot('projects', user.uid, (items) =>
       setProjects(items.map(item => ({
         id: item.id,
         ...item.data,
@@ -193,7 +255,7 @@ export function Calendar() {
       })))
     );
     
-    const unsubPlans = onCollectionSnapshot('plans', user.uid, (items) => 
+    const unsubPlans = onCollectionSnapshot('plans', user.uid, (items) =>
       setPlans(items.map(item => ({
         id: item.id,
         ...item.data,
@@ -214,7 +276,7 @@ export function Calendar() {
     setIsSidebarCollapsed(prev => !prev);
   };
 
-    const handleToggleBlackout = () => {
+  const handleToggleBlackout = () => {
     setIsBlackoutEnabled(prev => !prev);
   };
 
@@ -291,40 +353,27 @@ export function Calendar() {
     }
   };
 
-  // Get calendar days
   const calendarDays = eachDayOfInterval({
     start: startOfWeek(currentDate),
     end: endOfWeek(currentDate)
   });
 
-  // Get all items for a specific day
   const getDayItems = (date: Date) => {
     const dayStart = startOfDay(date);
     const dayEnd = endOfDay(date);
 
-    const dayEvents = events.filter(event => 
+    const dayEvents = events.filter(event =>
       isWithinInterval(dayStart, { start: event.startDate, end: event.endDate }) ||
       isWithinInterval(dayEnd, { start: event.startDate, end: event.endDate })
     );
 
-    const dayTasks = tasks.filter(task => 
-      isSameDay(task.dueDate, date)
-    );
-
-    const dayGoals = goals.filter(goal => 
-      isSameDay(goal.dueDate, date)
-    );
-
-    const dayProjects = projects.filter(project => 
-      isSameDay(project.dueDate, date)
-    );
-
-    const dayPlans = plans.filter(plan => 
-      isSameDay(plan.dueDate, date)
-    );
+    const dayTasks = tasks.filter(task => isSameDay(task.dueDate, date));
+    const dayGoals = goals.filter(goal => isSameDay(goal.dueDate, date));
+    const dayProjects = projects.filter(project => isSameDay(project.dueDate, date));
+    const dayPlans = plans.filter(plan => isSameDay(plan.dueDate, date));
 
     return [
-      ...dayEvents, 
+      ...dayEvents,
       ...dayTasks.map(task => ({
         id: task.id,
         title: task.task,
@@ -364,7 +413,6 @@ export function Calendar() {
     ];
   };
 
-  // Get type icon
   const getTypeIcon = (type: Event['type']) => {
     switch (type) {
       case 'task':
@@ -380,10 +428,9 @@ export function Calendar() {
     }
   };
 
-  // Show loading state while checking auth
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-gray-900 text-white">
+      <div className={`flex items-center justify-center h-screen ${containerClass}`}>
         <div className="animate-pulse">
           <p className="text-xl">Loading...</p>
           <div className="mt-4 h-2 w-32 bg-gray-700 rounded"></div>
@@ -392,43 +439,40 @@ export function Calendar() {
     );
   }
 
-  // Redirect to login if not authenticated
   if (!user) {
     navigate('/login');
     return null;
   }
 
-    // Determine the background color based on Blackout mode
-  const bgColor = isBlackoutEnabled ? 'bg-gray-950' : 'bg-gray-900';
-  
+  // Update background based on mode
+  const bgColor = containerClass;
+
   return (
-    <div className="flex h-screen ${bgColor}">
-      <Sidebar 
-        isCollapsed={isSidebarCollapsed} 
+    <div className={`flex h-screen ${bgColor}`}>
+      <Sidebar
+        isCollapsed={isSidebarCollapsed}
         onToggle={handleToggleSidebar}
         userName={user.displayName || 'User'}
-        // Pass a prop for Sidebar background update if both Blackout mode and Sidebar Blackout option are enabled
         isBlackoutEnabled={isBlackoutEnabled && isSidebarBlackoutEnabled}
+        isIlluminateEnabled={isIlluminateEnabled && isSidebarIlluminateEnabled}
       />
       
-      <main className={`flex-1 overflow-hidden transition-all duration-300 ${
-        isSidebarCollapsed ? 'ml-16' : 'ml-64'
-      }`}>
+      <main className={`flex-1 overflow-hidden transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'}`}>
         <div className="h-full flex flex-col">
           {/* Header */}
-          <div className="p-4 border-b border-gray-800">
+          <div className={`p-4 border-b ${borderColor}`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <CalendarIcon className="w-6 h-6 text-blue-400" />
                 <div>
-                  <h1 className="text-xl font-semibold text-white">Calendar</h1>
-                  <p className="text-sm text-gray-400">Manage your schedule and deadlines</p>
+                  <h1 className={`text-xl font-semibold ${headingClass}`}>Calendar</h1>
+                  <p className={`text-sm ${subheadingClass}`}>Manage your schedule and deadlines</p>
                 </div>
               </div>
               <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2 text-xs text-gray-400">
+                <div className="flex items-center gap-2 text-xs">
                   <AlertTriangle className="w-4 h-4 text-yellow-400" />
-                  <span>All times are in your local timezone</span>
+                  <span className={subheadingClass}>All times are in your local timezone</span>
                 </div>
                 <button
                   onClick={() => {
@@ -455,25 +499,25 @@ export function Calendar() {
           {/* Calendar Header */}
           <div className="p-4 flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <h2 className="text-2xl font-bold text-white">
+              <h2 className={`text-2xl font-bold ${headingClass}`}>
                 {format(currentDate, 'MMMM yyyy')}
               </h2>
               <div className="flex items-center gap-2">
                 <button
                   onClick={handlePrevMonth}
-                  className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+                  className={`p-2 ${navButtonClass} rounded-lg transition-colors`}
                 >
                   <ChevronLeft className="w-5 h-5" />
                 </button>
                 <button
                   onClick={() => setCurrentDate(new Date())}
-                  className="px-3 py-1 text-sm text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+                  className={`px-3 py-1 text-sm ${navButtonClass} rounded-lg transition-colors`}
                 >
                   Today
                 </button>
                 <button
                   onClick={handleNextMonth}
-                  className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+                  className={`p-2 ${navButtonClass} rounded-lg transition-colors`}
                 >
                   <ChevronRight className="w-5 h-5" />
                 </button>
@@ -482,19 +526,19 @@ export function Calendar() {
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
                 <span className="w-3 h-3 bg-red-500 rounded-full"></span>
-                <span className="text-sm text-gray-400">Tasks</span>
+                <span className="text-sm">Tasks</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="w-3 h-3 bg-green-500 rounded-full"></span>
-                <span className="text-sm text-gray-400">Goals</span>
+                <span className="text-sm">Goals</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="w-3 h-3 bg-indigo-500 rounded-full"></span>
-                <span className="text-sm text-gray-400">Projects</span>
+                <span className="text-sm">Projects</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="w-3 h-3 bg-purple-500 rounded-full"></span>
-                <span className="text-sm text-gray-400">Plans</span>
+                <span className="text-sm">Plans</span>
               </div>
             </div>
           </div>
@@ -502,36 +546,36 @@ export function Calendar() {
           {/* Calendar Grid */}
           <div className="flex-1 p-4 overflow-y-auto">
             <div className="grid grid-cols-7 gap-4">
-              {/* Day headers */}
               {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-                <div key={day} className="text-sm font-medium text-gray-400 text-center">
+                <div key={day} className={`text-sm font-medium ${subheadingClass} text-center`}>
                   {day}
                 </div>
               ))}
 
-              {/* Calendar days */}
               {calendarDays.map((day) => {
                 const dayItems = getDayItems(day);
                 const isToday = isSameDay(day, new Date());
                 const isCurrentMonth = isSameMonth(day, currentDate);
+                const dayNumberColor = isCurrentMonth
+                  ? (isIlluminateEnabled ? 'text-gray-900' : 'text-white')
+                  : 'text-gray-500';
 
                 return (
                   <div
                     key={day.toISOString()}
                     onClick={() => handleDateClick(day)}
-                    className={`min-h-[120px] p-2 rounded-lg border border-gray-800 transition-colors cursor-pointer
-                      ${isCurrentMonth ? 'bg-gray-800/50' : 'bg-gray-800/20'}
+                    className={`min-h-[120px] p-2 rounded-lg border ${borderColor} transition-colors cursor-pointer
+                      ${isCurrentMonth ? dayCellCurrentBg : dayCellOtherBg}
                       ${isToday ? 'ring-2 ring-blue-500' : ''}
-                      hover:bg-gray-800`}
+                      ${dayCellHoverBg}
+                    `}
                   >
                     <div className="flex items-center justify-between mb-2">
-                      <span className={`text-sm font-medium ${
-                        isCurrentMonth ? 'text-white' : 'text-gray-500'
-                      }`}>
+                      <span className={`text-sm font-medium ${dayNumberColor}`}>
                         {format(day, 'd')}
                       </span>
                       {dayItems.length > 0 && (
-                        <span className="text-xs text-gray-400">
+                        <span className={`text-xs ${subheadingClass}`}>
                           {dayItems.length} items
                         </span>
                       )}
@@ -544,8 +588,7 @@ export function Calendar() {
                             e.stopPropagation();
                             handleEventClick(item);
                           }}
-                          className={`w-full text-left px-2 py-1 rounded text-xs flex items-center gap-1.5
-                            ${item.status === 'completed' ? 'line-through opacity-50' : ''}`}
+                          className={`w-full text-left px-2 py-1 rounded text-xs flex items-center gap-1.5 ${item.status === 'completed' ? 'line-through opacity-50' : ''}`}
                           style={{ backgroundColor: `${item.color}20`, color: item.color }}
                         >
                           {getTypeIcon(item.type)}
@@ -563,9 +606,9 @@ export function Calendar() {
         {/* Event Modal */}
         {showEventModal && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-            <div className="bg-gray-800 rounded-xl p-6 max-w-md w-full mx-4">
+            <div className={`${modalClass} rounded-xl p-6 max-w-md w-full mx-4`}>
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-semibold text-white">
+                <h3 className="text-lg font-semibold">
                   {selectedEvent ? 'Edit Event' : 'New Event'}
                 </h3>
                 <button
@@ -581,26 +624,26 @@ export function Calendar() {
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                  <label className="block text-sm font-medium mb-2">
                     Title
                   </label>
                   <input
                     type="text"
                     value={eventForm.title}
                     onChange={(e) => setEventForm(prev => ({ ...prev, title: e.target.value }))}
-                    className="w-full bg-gray-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className={`w-full ${inputBg} rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500`}
                     placeholder="Event title"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                  <label className="block text-sm font-medium mb-2">
                     Description
                   </label>
                   <textarea
                     value={eventForm.description}
                     onChange={(e) => setEventForm(prev => ({ ...prev, description: e.target.value }))}
-                    className="w-full bg-gray-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className={`w-full ${inputBg} rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500`}
                     placeholder="Event description"
                     rows={3}
                   />
@@ -608,7 +651,7 @@ export function Calendar() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                    <label className="block text-sm font-medium mb-2">
                       Start Date
                     </label>
                     <input
@@ -618,11 +661,11 @@ export function Calendar() {
                         ...prev, 
                         startDate: parseISO(e.target.value)
                       }))}
-                      className="w-full bg-gray-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className={`w-full ${inputBg} rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500`}
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                    <label className="block text-sm font-medium mb-2">
                       End Date
                     </label>
                     <input
@@ -632,13 +675,13 @@ export function Calendar() {
                         ...prev, 
                         endDate: parseISO(e.target.value)
                       }))}
-                      className="w-full bg-gray-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className={`w-full ${inputBg} rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500`}
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                  <label className="block text-sm font-medium mb-2">
                     Color
                   </label>
                   <div className="flex gap-2">
@@ -657,10 +700,7 @@ export function Calendar() {
 
                 <div className="flex justify-end gap-3 mt-6">
                   {selectedEvent && (
-                    <button
-                      onClick={handleDeleteEvent}
-                      className="px-4 py-2 text-red-300 bg-red-900/20 rounded-lg hover:bg-red-900/30 transition-colors"
-                    >
+                    <button onClick={handleDeleteEvent} className={deleteButtonClass}>
                       Delete
                     </button>
                   )}
@@ -669,7 +709,7 @@ export function Calendar() {
                       setShowEventModal(false);
                       setSelectedEvent(null);
                     }}
-                    className="px-4 py-2 text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors"
+                    className={cancelButtonClass}
                   >
                     Cancel
                   </button>

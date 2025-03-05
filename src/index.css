@@ -15,6 +15,11 @@
   body.blackout-mode {
     @apply bg-gray-950;
   }
+
+  /* Illuminate mode styling */
+  body.illuminate-mode {
+    @apply bg-white text-gray-900;
+  }
 }
 
 @layer components {

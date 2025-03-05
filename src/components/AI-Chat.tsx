@@ -502,9 +502,9 @@ Guidelines:
    - Return only the JSON object with no additional text or extra lines.
    - **Math Expressions:**  
      - When including math (e.g., integrals, summations, or equations) in questions, answers, options, or explanations, wrap them in standard LaTeX syntax:
-       - Inline math: \`$\\sin x$\`
-       - Block math: \`$$\\int \\sin x \\, dx = -\\cos x + C$$\`
-     - Escape backslashes as needed (e.g., \`\\sin\`, \`\\int\`).
+       - Inline math: \`$\\\\sin x$\`
+       - Block math: \`$$\\\\int \\\\sin x \\, dx = -\\\\cos x + C$$\`
+     - Escape backslashes as needed (e.g., \`\\\\sin\`, \`\\\\int\`).
    - Use one of the following formats:
 
      **For flashcards:**
@@ -514,8 +514,8 @@ Guidelines:
        "data": [
          {
            "id": "unique-id-1",
-           "question": "Question with optional math: $\\sin x$",
-           "answer": "Answer with optional math: $$\\int \\sin x \\, dx = -\\cos x + C$$",
+           "question": "Question with optional math: $\\\\sin x$",
+           "answer": "Answer with optional math: $$\\\\int \\\\sin x \\, dx = -\\\\cos x + C$$",
            "topic": "Subject area"
          },
          {
@@ -535,15 +535,15 @@ Guidelines:
        "data": [
          {
            "id": "unique-id-1",
-           "question": "Question text with optional math: $\\sin x$",
+           "question": "Question text with optional math: $\\\\sin x$",
            "options": [
-             "Option with inline math: $\\cos x + C$",
-             "Option with block math: $$\\int e^x \\, dx = e^x + C$$",
+             "Option with inline math: $\\\\cos x + C$",
+             "Option with block math: $$\\\\int e^x \\, dx = e^x + C$$",
              "...",
              "..."
            ],
            "correctAnswer": 0,
-           "explanation": "Explanation with optional math: $\\frac{d}{dx}(\\cos x) = -\\sin x$"
+           "explanation": "Explanation with optional math: $\\\\frac{d}{dx}(\\\\cos x) = -\\\\sin x$"
          },
          {
            "id": "unique-id-2",
@@ -578,7 +578,6 @@ Guidelines:
    - Always address ${userName} in a friendly and helpful tone.
 
 Follow these instructions strictly.
-
 `;
   };
 

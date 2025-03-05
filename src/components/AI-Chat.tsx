@@ -870,6 +870,20 @@ const quickActionIcons: Record<string, JSX.Element> = {
     setChatMessage(action);
   };
 
+
+// Compute gradient overlay classes based on theme modes.
+const leftOverlayClass = isIlluminateEnabled
+  ? "absolute left-0 top-0 h-full w-16 z-10 pointer-events-none bg-gradient-to-r from-gray-50 to-transparent"
+  : isBlackoutEnabled
+    ? "absolute left-0 top-0 h-full w-16 z-10 pointer-events-none bg-gradient-to-r from-gray-950 to-transparent"
+    : "absolute left-0 top-0 h-full w-16 z-10 pointer-events-none bg-gradient-to-r from-gray-900 to-transparent";
+
+const rightOverlayClass = isIlluminateEnabled
+  ? "absolute right-0 top-0 h-full w-16 z-10 pointer-events-none bg-gradient-to-l from-gray-50 to-transparent"
+  : isBlackoutEnabled
+    ? "absolute right-0 top-0 h-full w-16 z-10 pointer-events-none bg-gradient-to-l from-gray-950 to-transparent"
+    : "absolute right-0 top-0 h-full w-16 z-10 pointer-events-none bg-gradient-to-l from-gray-900 to-transparent";
+
   // ----- Render -----
 return (
   <div className={`flex h-screen ${containerBg}`}>
@@ -910,9 +924,9 @@ return (
     {/* Improved marquee container with gradient overlays */}
 <div className="relative w-full overflow-hidden my-4">
   {/* Left gradient overlay */}
-  <div className="absolute left-0 top-0 h-full w-16 z-10 pointer-events-none bg-gradient-to-r from-gray-900 to-transparent" />
+  <div className={leftOverlayClass} />
   {/* Right gradient overlay */}
-  <div className="absolute right-0 top-0 h-full w-16 z-10 pointer-events-none bg-gradient-to-l from-gray-900 to-transparent" />
+  <div className={rightOverlayClass} />
   
   <div className="flex relative overflow-hidden">
     {/* Animated container with 6 sets of buttons */}

@@ -496,7 +496,7 @@ Guidelines:
    - Use one of the following formats:
 
      For flashcards:
-     ```json
+     \`\`\`json
      {
        "type": "flashcard",
        "data": [
@@ -514,10 +514,10 @@ Guidelines:
          }
        ]
      }
-     ```
+     \`\`\`
 
      For quiz questions:
-     ```json
+     \`\`\`json
      {
        "type": "question",
        "data": [
@@ -537,21 +537,21 @@ Guidelines:
          }
        ]
      }
-     ```
+     \`\`\`
 
 3. Data Modifications (JSON):
    - When ${userName} provides a command to create or update an item (e.g., "add a task to buy a dog by tomorrow", "create a goal to exercise daily", etc.), you must respond with a JSON block that specifies the action and its payload.
    - The JSON block must be wrapped in triple backticks with the "json" language identifier and returned as the only content for that modification.
    - For example:
-     ```json
-     {
-       "action": "createTask",
-       "payload": {
-         "task": "Buy a dog",
-         "dueDate": "2025-03-04"
-       }
+   \`\`\`json
+   {
+     "action": "createTask",
+     "payload": {
+       "task": "Study Digital Marketing",
+       "dueDate": "2025-03-03"
      }
-     ```
+   }
+   \`\`\`
    - You may return multiple JSON blocks if multiple items are to be created or updated.
    - Do not include any additional text with the JSON block; it should be the sole output for that command.
 
@@ -561,6 +561,7 @@ Guidelines:
    - Always address ${userName} in a friendly and helpful tone.
 
 Follow these instructions strictly.
+
 `;
   };
 

@@ -52,35 +52,36 @@ export const FlashcardsQuestions: React.FC<FlashcardsQuestionsProps> = ({
     return stored ? JSON.parse(stored) : false;
   });
 
-  // ---------------------------
-  // Dynamic Classes
+ // ---------------------------
+  //   Dynamic Classes for Modes
   // ---------------------------
   // Overall container background & text
   const containerClass = isIlluminateEnabled
-    ? 'bg-gray-100 text-gray-900'
+    ? 'bg-white text-gray-900'
     : isBlackoutEnabled
     ? 'bg-gray-950 text-white'
     : 'bg-gray-900 text-white';
 
-  // Card background, text and border for flashcards/questions
-  const cardBg = isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-800';
+  // The “card” background
+  const cardBg = isIlluminateEnabled ? 'bg-gray-100' : 'bg-gray-800';
   const cardText = isIlluminateEnabled ? 'text-gray-900' : 'text-white';
-  const cardBorder = isIlluminateEnabled ? 'border border-gray-300' : 'border border-gray-700';
+  const cardBorder = isIlluminateEnabled ? 'border-gray-300' : 'border-gray-700';
 
-  // Front side (flashcard question) styling
+  // The “front”/“back” of flashcards or question blocks
   const frontBg = isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700';
   const frontText = isIlluminateEnabled ? 'text-gray-900' : 'text-white';
 
-  // Subdued text for labels
+  // Subdued text color for smaller labels
   const subTextColor = isIlluminateEnabled ? 'text-gray-600' : 'text-gray-400';
   const highlightTextColor = isIlluminateEnabled ? 'text-blue-700' : 'text-blue-300';
 
-  // Quiz option default styling
+  // For quiz option buttons (default unselected)
   const optionDefault = isIlluminateEnabled
     ? 'bg-gray-200 hover:bg-gray-300 text-gray-900'
     : 'bg-gray-700 hover:bg-gray-600 text-white';
 
-  // Colors for correct and incorrect options
+  // Correct & incorrect backgrounds
+  // (One set of colors that are visible in all modes)
   const correctBg = 'bg-green-600 text-white';
   const incorrectBg = 'bg-red-600 text-white';
 
@@ -88,9 +89,11 @@ export const FlashcardsQuestions: React.FC<FlashcardsQuestionsProps> = ({
   const navButtonDefault = isIlluminateEnabled
     ? 'bg-gray-300 hover:bg-gray-400 text-gray-800'
     : 'bg-gray-700 hover:bg-gray-600 text-white';
+
   const navButtonPrimary = isIlluminateEnabled
     ? 'bg-blue-500 hover:bg-blue-600 text-white'
     : 'bg-blue-600 hover:bg-blue-700 text-white';
+
 
   // Helper to ensure a text value is not undefined
   const safeText = (text: string | undefined): string => text || '';

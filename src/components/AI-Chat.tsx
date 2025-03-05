@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBlackoutMode } from '../hooks/useBlackoutMode';
+import { useIlluminateMode } from '../hooks/useIlluminateMode';
 import { 
   Send, 
   Timer as TimerIcon, 
@@ -28,7 +29,7 @@ import { geminiApiKey } from '../lib/dashboard-firebase';
 import { onCollectionSnapshot } from '../lib/dashboard-firebase';
 import { getCurrentUser } from '../lib/settings-firebase';
 
-// Import Firebase chat functions (including rename/delete/share placeholders)
+// Import Firebase chat functions
 import {
   createChatConversation,
   saveChatMessage,
@@ -155,14 +156,13 @@ export function AIChat() {
   const [goals, setGoals] = useState<Array<{ id: string; data: any }>>([]);
   const [projects, setProjects] = useState<Array<{ id: string; data: any }>>([]);
   const [plans, setPlans] = useState<Array<{ id: string; data: any }>>([]);
-  // Add this state at the top of your component (e.g., near your other useState calls)
   const [hasGeneratedChatName, setHasGeneratedChatName] = useState(false);
 
   // Conversation state
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [conversationList, setConversationList] = useState<any[]>([]);
 
-  // Sidebar state (left) from localStorage remains as before.
+  // Sidebar state from localStorage remains as before.
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     const stored = localStorage.getItem('isSidebarCollapsed');
     return stored ? JSON.parse(stored) : false;
@@ -171,7 +171,7 @@ export function AIChat() {
     localStorage.setItem('isSidebarCollapsed', JSON.stringify(isSidebarCollapsed));
   }, [isSidebarCollapsed]);
 
-    // Blackout mode state
+  // Blackout mode state
   const [isBlackoutEnabled, setIsBlackoutEnabled] = useState(() => {
     const stored = localStorage.getItem('isBlackoutEnabled');
     return stored ? JSON.parse(stored) : false;
@@ -183,7 +183,32 @@ export function AIChat() {
     return stored ? JSON.parse(stored) : false;
   });
 
-  
+  // Illuminate (light mode) state
+  const [isIlluminateEnabled, setIsIlluminateEnabled] = useState(() => {
+    const stored = localStorage.getItem('isIlluminateEnabled');
+    return stored ? JSON.parse(stored) : false;
+  });
+  // Sidebar Illuminate option state
+  const [isSidebarIlluminateEnabled, setIsSidebarIlluminateEnabled] = useState(() => {
+    const stored = localStorage.getItem('isSidebarIlluminateEnabled');
+    return stored ? JSON.parse(stored) : false;
+  });
+
+  // Update localStorage and document.body for Illuminate mode
+  useEffect(() => {
+    localStorage.setItem('isIlluminateEnabled', JSON.stringify(isIlluminateEnabled));
+    if (isIlluminateEnabled) {
+      document.body.classList.add('illuminate-mode');
+    } else {
+      document.body.classList.remove('illuminate-mode');
+    }
+  }, [isIlluminateEnabled]);
+
+  // Update localStorage for Sidebar Illuminate option state
+  useEffect(() => {
+    localStorage.setItem('isSidebarIlluminateEnabled', JSON.stringify(isSidebarIlluminateEnabled));
+  }, [isSidebarIlluminateEnabled]);
+
   // Update localStorage and document body for Blackout mode
   useEffect(() => {
     localStorage.setItem('isBlackoutEnabled', JSON.stringify(isBlackoutEnabled));
@@ -259,7 +284,7 @@ export function AIChat() {
 
   const handleToggleSidebar = () => setIsSidebarCollapsed((prev) => !prev);
 
-      const handleToggleBlackout = () => {
+  const handleToggleBlackout = () => {
     setIsBlackoutEnabled(prev => !prev);
   };
 
@@ -340,10 +365,8 @@ Guidelines:
 1. General Conversation:
    - Respond in a friendly, natural tone matching ${userName}'s style.
    - Do not include any internal instructions, meta commentary, or explanations of your process.
-   - Do not include phrases such as "Here's my response to continue the conversation:"
-     or similar wording that introduces your reply.
-   - Do not include or reference code blocks for languages like Python, Bash, or any other
-     unless explicitly requested by ${userName}.
+   - Do not include phrases such as "Here's my response to continue the conversation:" or similar wording that introduces your reply.
+   - Do not include or reference code blocks for languages like Python, Bash, or any other unless explicitly requested by ${userName}.
    - Only reference ${userName}'s items if ${userName} explicitly asks about them.
 
 2. Educational Content (JSON):
@@ -481,55 +504,51 @@ Return ONLY the title, with no extra commentary.
         finalResponse = chunk;
       }, 45000);
 
-// Extract final text from the Gemini response
-const finalText = extractCandidateText(finalResponse).trim() || '';
-setStreamingAssistantContent(''); // clear streaming content
+      // Extract final text from the Gemini response
+      const finalText = extractCandidateText(finalResponse).trim() || '';
+      setStreamingAssistantContent(''); // clear streaming content
 
-let assistantReply = finalText;
-const jsonMatch = assistantReply.match(/```json\s*([\s\S]*?)\s*```/);
-if (jsonMatch) {
-  try {
-    const jsonContent = JSON.parse(jsonMatch[1].trim());
-    // Remove the JSON block from the reply text
-    assistantReply = assistantReply.replace(/```json\s*[\s\S]*?\s*```/, '').trim();
-    // Validate the JSON structure and attach to message accordingly
-    if (
-      jsonContent.type &&
-      jsonContent.data &&
-      (jsonContent.type === 'flashcard' || jsonContent.type === 'question')
-    ) {
-      const message = {
-        role: 'assistant',
-        content: assistantReply,
-        ...(jsonContent.type === 'flashcard'
-          ? { flashcard: jsonContent }
-          : { question: jsonContent })
-      };
-      await saveChatMessage(convId!, message);
-    } else {
-      throw new Error('Invalid JSON structure');
-    }
-  } catch (e) {
-    console.error('Failed to parse JSON content:', e);
-    await saveChatMessage(convId!, { role: 'assistant', content: assistantReply });
-  }
-} else {
-  await saveChatMessage(convId!, { role: 'assistant', content: assistantReply });
-}
-
+      let assistantReply = finalText;
+      const jsonMatch = assistantReply.match(/```json\s*([\s\S]*?)\s*```/);
+      if (jsonMatch) {
+        try {
+          const jsonContent = JSON.parse(jsonMatch[1].trim());
+          // Remove the JSON block from the reply text
+          assistantReply = assistantReply.replace(/```json\s*[\s\S]*?\s*```/, '').trim();
+          // Validate the JSON structure and attach to message accordingly
+          if (
+            jsonContent.type &&
+            jsonContent.data &&
+            (jsonContent.type === 'flashcard' || jsonContent.type === 'question')
+          ) {
+            const message = {
+              role: 'assistant',
+              content: assistantReply,
+              ...(jsonContent.type === 'flashcard'
+                ? { flashcard: jsonContent }
+                : { question: jsonContent })
+            };
+            await saveChatMessage(convId!, message);
+          } else {
+            throw new Error('Invalid JSON structure');
+          }
+        } catch (e) {
+          console.error('Failed to parse JSON content:', e);
+          await saveChatMessage(convId!, { role: 'assistant', content: assistantReply });
+        }
+      } else {
+        await saveChatMessage(convId!, { role: 'assistant', content: assistantReply });
+      }
 
       // If the user has at least 3 messages, generate a dynamic chat name.
-      // (That means total messages ~4, counting user + assistant.)
-// In your handleChatSubmit function, replace the current dynamic chat name block with:
-const totalUserMessages = updatedHistory.filter(m => m.role === 'user').length;
-if (!hasGeneratedChatName && totalUserMessages === 3) {
-  const conversationText = updatedHistory
-    .map(m => `${m.role === 'user' ? userName : 'Assistant'}: ${m.content}`)
-    .join('\n');
-  await generateChatName(convId!, conversationText);
-  setHasGeneratedChatName(true);
-}
-
+      const totalUserMessages = updatedHistory.filter(m => m.role === 'user').length;
+      if (!hasGeneratedChatName && totalUserMessages === 3) {
+        const conversationText = updatedHistory
+          .map(m => `${m.role === 'user' ? userName : 'Assistant'}: ${m.content}`)
+          .join('\n');
+        await generateChatName(convId!, conversationText);
+        setHasGeneratedChatName(true);
+      }
     } catch (err: any) {
       console.error('Chat error:', err);
       // Save error fallback message
@@ -575,270 +594,273 @@ if (!hasGeneratedChatName && totalUserMessages === 3) {
 
   // SHARE conversation
   const handleShareConversation = async (conv: any) => {
-    // For demonstration, just copy the ID or show an alert. 
-    // In a real app, you might generate a shareable link or set permissions.
     alert(`Sharing conversation ID: ${conv.id}`);
   };
 
-return (
-  <div className="flex h-screen ${bgColor}">
-    {/* Left Sidebar */}
-    <Sidebar
-      isCollapsed={isSidebarCollapsed}
-      onToggle={handleToggleSidebar}
-      userName={userName}
-      // Pass a prop for Sidebar background update if both Blackout mode and Sidebar Blackout option are enabled
-      isBlackoutEnabled={isBlackoutEnabled && isSidebarBlackoutEnabled}
-    />
+  // Define conditional classes for light vs. dark mode.
+  const containerBg = isIlluminateEnabled ? 'bg-gray-100' : 'bg-gray-900';
+  const headerBorder = isIlluminateEnabled ? 'border-gray-300' : 'border-gray-800';
+  const headerBg = isIlluminateEnabled ? 'bg-white' : '';
+  const userBubble = isIlluminateEnabled ? 'bg-blue-200 text-gray-900' : 'bg-blue-600 text-white';
+  const assistantBubble = isIlluminateEnabled ? 'bg-gray-200 text-gray-900' : 'bg-gray-700 text-gray-200';
+  const inputBg = isIlluminateEnabled ? 'bg-gray-200 text-gray-900' : 'bg-gray-700 text-gray-200';
+  const asideBg = isIlluminateEnabled ? 'bg-gray-50' : 'bg-gray-800';
+  const asideBorder = isIlluminateEnabled ? 'border-gray-300' : 'border-gray-800';
+  const conversationInactive = isIlluminateEnabled ? 'bg-gray-200 text-gray-900 hover:bg-gray-300' : 'bg-gray-700 text-gray-200 hover:bg-gray-600';
+  const conversationActive = isIlluminateEnabled ? 'bg-blue-200 text-gray-900' : 'bg-blue-600 text-white';
 
-    {/* Main Chat Area */}
-    <main className={`flex-1 overflow-hidden transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'}`}>
-      <div className="h-full flex flex-col">
-        {/* Header */}
-        <div className="p-4 border-b border-gray-800">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Bot className="w-6 h-6 text-blue-400" />
-              <div>
-                <h1 className="text-xl font-semibold text-white">AI Assistant</h1>
-                <p className="text-sm text-gray-400">Chat with TaskMaster</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 text-xs text-gray-400">
-              </div>
-              <div className="flex items-center gap-2 text-xs text-gray-400">
-                <AlertTriangle className="w-4 h-4 text-yellow-400" />
-                <span>TaskMaster can make mistakes. Verify details. </span>
-              </div>
-            </div>
-          </div>
-        </div>
+  return (
+    <div className={`flex h-screen ${containerBg}`}>
+      {/* Left Sidebar */}
+      <Sidebar
+        isCollapsed={isSidebarCollapsed}
+        onToggle={handleToggleSidebar}
+        userName={userName}
+        isBlackoutEnabled={isBlackoutEnabled && isSidebarBlackoutEnabled}
+        isIlluminateEnabled={isIlluminateEnabled}
+      />
 
-        {/* Chat Messages */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={chatEndRef}>
-          {chatHistory.map((message, index) => (
-            <div
-              key={index}
-              className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
-              <div
-                className={`max-w-[80%] rounded-lg px-4 py-2 ${
-                  message.role === 'user'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-700 text-gray-200'
-                }`}
-              >
-                <ReactMarkdown
-                  remarkPlugins={[remarkMath, remarkGfm]}
-                  rehypePlugins={[rehypeKatex]}
-                  components={{
-                    p: ({ children }) => <p className="mb-2">{children}</p>,
-                    ul: ({ children }) => <ul className="list-disc ml-4 mb-2">{children}</ul>,
-                    ol: ({ children }) => <ol className="list-decimal ml-4 mb-2">{children}</ol>,
-                    li: ({ children }) => <li className="mb-1">{children}</li>,
-                    code: ({ inline, children }) =>
-                      inline ? (
-                        <code className="bg-gray-800 px-1 rounded">{children}</code>
-                      ) : (
-                        <pre className="bg-gray-800 p-2 rounded-lg overflow-x-auto">
-                          <code>{children}</code>
-                        </pre>
-                      ),
-                  }}
-                >
-                  {message.content}
-                </ReactMarkdown>
-                {message.timer && (
-                  <div className="mt-2">
-                    <div className="flex items-center space-x-2 bg-gray-900 rounded-lg px-4 py-2">
-                      <TimerIcon className="w-5 h-5 text-blue-400" />
-                      <Timer
-                        key={message.timer.id}
-                        initialDuration={message.timer.duration}
-                        onComplete={() => handleTimerComplete(message.timer!.id)}
-                      />
-                    </div>
-                  </div>
-                )}
-                {message.flashcard && (
-                  <div className="mt-2">
-                    <FlashcardsQuestions
-                      type="flashcard"
-                      data={message.flashcard.data}
-                      onComplete={() => {}}
-                    />
-                  </div>
-                )}
-                {message.question && (
-                  <div className="mt-2">
-                    <FlashcardsQuestions
-                      type="question"
-                      data={message.question.data}
-                      onComplete={() => {}}
-                    />
-                  </div>
-                )}
+      {/* Main Chat Area */}
+      <main className={`flex-1 overflow-hidden transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'}`}>
+        <div className="h-full flex flex-col">
+          {/* Header */}
+          <div className={`p-4 border-b ${headerBorder} ${headerBg}`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Bot className="w-6 h-6 text-blue-400" />
+                <div>
+                  <h1 className={`text-xl font-semibold ${isIlluminateEnabled ? 'text-gray-900' : 'text-white'}`}>AI Assistant</h1>
+                  <p className={`text-sm ${isIlluminateEnabled ? 'text-gray-600' : 'text-gray-400'}`}>Chat with TaskMaster</p>
+                </div>
               </div>
-            </div>
-          ))}
-
-          {/* If streaming in memory, show partial content as an assistant bubble */}
-          {streamingAssistantContent && (
-            <div className="flex justify-start">
-              <div className="max-w-[80%] rounded-lg px-4 py-2 bg-gray-700 text-gray-200">
-                <ReactMarkdown>{streamingAssistantContent}</ReactMarkdown>
-              </div>
-            </div>
-          )}
-
-          {isChatLoading && (
-            <div className="flex justify-start">
-              <div className="max-w-[80%] rounded-lg px-4 py-2 bg-gray-700 text-gray-200">
-                {streamingAssistantContent ? (
-                  <ReactMarkdown>{streamingAssistantContent}</ReactMarkdown>
-                ) : (
-                  <div className="flex space-x-2">
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100"></div>
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200"></div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          <div ref={chatEndRef} />
-        </div>
-
-        {/* Chat Input */}
-        <form onSubmit={handleChatSubmit} className="p-4 border-t border-gray-800">
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={chatMessage}
-              onChange={(e) => setChatMessage(e.target.value)}
-              placeholder="Ask TaskMaster about your items or set a timer..."
-              className="flex-1 bg-gray-700 text-gray-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <button
-              type="submit"
-              disabled={isChatLoading}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Send className="w-5 h-5" />
-            </button>
-          </div>
-        </form>
-      </div>
-    </main>
-
-    {/* Right Sidebar: Chat Conversations (increased width for improved visibility) */}
-    <aside className="w-75 border-l border-gray-800 bg-gray-800">
-      <div className="p-4">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-white text-lg font-bold">Conversations</h2>
-          <button
-            onClick={handleNewConversation}
-            className="flex items-center justify-center p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-          </button>
-        </div>
-        
-        <div className="space-y-2">
-          {conversationList.map((conv) => (
-            <div
-              key={conv.id}
-              className={`flex items-center justify-between cursor-pointer p-3 rounded-lg transition-all ${
-                conversationId === conv.id
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-700 text-gray-200 hover:bg-gray-600'
-              }`}
-            >
-              <div
-                className="flex items-center gap-2 flex-1 min-w-0" // Added min-width: 0
-                onClick={() => handleSelectConversation(conv.id)}
-              >
-                <MessageSquare className="w-4 h-4 flex-shrink-0" /> {/* Added flex-shrink-0 */}
-                <span className="truncate overflow-hidden text-ellipsis w-full">{conv.chatName}</span>
-              </div>
-              
-              {/* More actions dropdown */}
-              <div className="relative flex-shrink-0"> {/* Added flex-shrink-0 */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    const menu = document.getElementById(`conv-menu-${conv.id}`);
-                    if (menu) {
-                      menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
-                    }
-                  }}
-                  className="p-1 rounded-full hover:bg-gray-600 transition-colors"
-                >
-                  <MoreHorizontal className="w-4 h-4" />
-                </button>
-                        
-                <div
-                  id={`conv-menu-${conv.id}`}
-                  className="hidden absolute top-8 right-0 bg-gray-700 text-gray-200 rounded-lg shadow-lg z-50"
-                  style={{ minWidth: '160px' }}
-                >
-                  <button
-                    className="flex items-center w-full text-left px-4 py-2 hover:bg-gray-600 rounded-t-lg"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const menu = document.getElementById(`conv-menu-${conv.id}`);
-                      if (menu) menu.style.display = 'none';
-                      handleRenameConversation(conv);
-                    }}
-                  >
-                    <Edit2 className="w-4 h-4 mr-2" />
-                    Rename
-                  </button>
-                  
-                  <button
-                    className="flex items-center w-full text-left px-4 py-2 hover:bg-gray-600"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const menu = document.getElementById(`conv-menu-${conv.id}`);
-                      if (menu) menu.style.display = 'none';
-                      handleShareConversation(conv);
-                    }}
-                  >
-                    <Share className="w-4 h-4 mr-2" />
-                    Share
-                  </button>
-                  
-                  <button
-                    className="flex items-center w-full text-left px-4 py-2 hover:bg-gray-600 text-red-400 rounded-b-lg"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const menu = document.getElementById(`conv-menu-${conv.id}`);
-                      if (menu) menu.style.display = 'none';
-                      handleDeleteConversationClick(conv);
-                    }}
-                  >
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Delete
-                  </button>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2 text-xs">
+                  {/* Additional header content if needed */}
+                </div>
+                <div className="flex items-center gap-2 text-xs">
+                  <AlertTriangle className="w-4 h-4 text-yellow-400" />
+                  <span>{isIlluminateEnabled ? 'TaskMaster can make mistakes. Verify details.' : 'TaskMaster can make mistakes. Verify details.'}</span>
                 </div>
               </div>
             </div>
-          ))}
+          </div>
+
+          {/* Chat Messages */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={chatEndRef}>
+            {chatHistory.map((message, index) => (
+              <div
+                key={index}
+                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              >
+                <div className={`max-w-[80%] rounded-lg px-4 py-2 ${message.role === 'user' ? userBubble : assistantBubble}`}>
+                  <ReactMarkdown
+                    remarkPlugins={[remarkMath, remarkGfm]}
+                    rehypePlugins={[rehypeKatex]}
+                    components={{
+                      p: ({ children }) => <p className="mb-2">{children}</p>,
+                      ul: ({ children }) => <ul className="list-disc ml-4 mb-2">{children}</ul>,
+                      ol: ({ children }) => <ol className="list-decimal ml-4 mb-2">{children}</ol>,
+                      li: ({ children }) => <li className="mb-1">{children}</li>,
+                      code: ({ inline, children }) =>
+                        inline ? (
+                          <code className="bg-gray-800 px-1 rounded">{children}</code>
+                        ) : (
+                          <pre className="bg-gray-800 p-2 rounded-lg overflow-x-auto">
+                            <code>{children}</code>
+                          </pre>
+                        ),
+                    }}
+                  >
+                    {message.content}
+                  </ReactMarkdown>
+                  {message.timer && (
+                    <div className="mt-2">
+                      <div className={`flex items-center space-x-2 rounded-lg px-4 py-2 ${isIlluminateEnabled ? 'bg-gray-100' : 'bg-gray-900'}`}>
+                        <TimerIcon className={`w-5 h-5 ${isIlluminateEnabled ? 'text-blue-600' : 'text-blue-400'}`} />
+                        <Timer
+                          key={message.timer.id}
+                          initialDuration={message.timer.duration}
+                          onComplete={() => handleTimerComplete(message.timer!.id)}
+                        />
+                      </div>
+                    </div>
+                  )}
+                  {message.flashcard && (
+                    <div className="mt-2">
+                      <FlashcardsQuestions
+                        type="flashcard"
+                        data={message.flashcard.data}
+                        onComplete={() => {}}
+                      />
+                    </div>
+                  )}
+                  {message.question && (
+                    <div className="mt-2">
+                      <FlashcardsQuestions
+                        type="question"
+                        data={message.question.data}
+                        onComplete={() => {}}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+
+            {/* Streaming assistant bubble */}
+            {streamingAssistantContent && (
+              <div className="flex justify-start">
+                <div className={`max-w-[80%] rounded-lg px-4 py-2 ${assistantBubble}`}>
+                  <ReactMarkdown>{streamingAssistantContent}</ReactMarkdown>
+                </div>
+              </div>
+            )}
+
+            {isChatLoading && (
+              <div className="flex justify-start">
+                <div className={`max-w-[80%] rounded-lg px-4 py-2 ${assistantBubble}`}>
+                  {streamingAssistantContent ? (
+                    <ReactMarkdown>{streamingAssistantContent}</ReactMarkdown>
+                  ) : (
+                    <div className="flex space-x-2">
+                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100"></div>
+                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200"></div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div ref={chatEndRef} />
+          </div>
+
+          {/* Chat Input */}
+          <form onSubmit={handleChatSubmit} className={`p-4 border-t ${headerBorder}`}>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={chatMessage}
+                onChange={(e) => setChatMessage(e.target.value)}
+                placeholder="Ask TaskMaster about your items or set a timer..."
+                className={`flex-1 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputBg}`}
+              />
+              <button
+                type="submit"
+                disabled={isChatLoading}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Send className="w-5 h-5" />
+              </button>
+            </div>
+          </form>
         </div>
-        
-        <button
-          onClick={handleNewConversation}
-          className="mt-4 w-full flex items-center justify-center gap-2 bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <PlusCircle className="w-5 h-5" />
-          <span>New Conversation</span>
-        </button>
-      </div>
-    </aside>
-  </div>
-);
+      </main>
+
+      {/* Right Sidebar: Chat Conversations */}
+      <aside className={`w-75 border-l ${asideBorder} ${asideBg}`}>
+        <div className="p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className={`text-lg font-bold ${isIlluminateEnabled ? 'text-gray-900' : 'text-white'}`}>Conversations</h2>
+            <button
+              onClick={handleNewConversation}
+              className="flex items-center justify-center p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+          </div>
+          
+          <div className="space-y-2">
+            {conversationList.map((conv) => (
+              <div
+                key={conv.id}
+                className={`flex items-center justify-between cursor-pointer p-3 rounded-lg transition-all ${
+                  conversationId === conv.id ? conversationActive : conversationInactive
+                }`}
+              >
+                <div
+                  className="flex items-center gap-2 flex-1 min-w-0"
+                  onClick={() => handleSelectConversation(conv.id)}
+                >
+                  <MessageSquare className="w-4 h-4 flex-shrink-0" />
+                  <span className="truncate overflow-hidden text-ellipsis w-full">{conv.chatName}</span>
+                </div>
+                
+                {/* More actions dropdown */}
+                <div className="relative flex-shrink-0">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const menu = document.getElementById(`conv-menu-${conv.id}`);
+                      if (menu) {
+                        menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+                      }
+                    }}
+                    className="p-1 rounded-full hover:bg-gray-600 transition-colors"
+                  >
+                    <MoreHorizontal className="w-4 h-4" />
+                  </button>
+                          
+                  <div
+                    id={`conv-menu-${conv.id}`}
+                    className="hidden absolute top-8 right-0 rounded-lg shadow-lg z-50"
+                    style={{ minWidth: '160px', backgroundColor: isIlluminateEnabled ? '#f3f4f6' : '#374151' }}
+                  >
+                    <button
+                      className="flex items-center w-full text-left px-4 py-2 hover:bg-gray-600 rounded-t-lg"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const menu = document.getElementById(`conv-menu-${conv.id}`);
+                        if (menu) menu.style.display = 'none';
+                        handleRenameConversation(conv);
+                      }}
+                    >
+                      <Edit2 className="w-4 h-4 mr-2" />
+                      Rename
+                    </button>
+                    
+                    <button
+                      className="flex items-center w-full text-left px-4 py-2 hover:bg-gray-600"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const menu = document.getElementById(`conv-menu-${conv.id}`);
+                        if (menu) menu.style.display = 'none';
+                        handleShareConversation(conv);
+                      }}
+                    >
+                      <Share className="w-4 h-4 mr-2" />
+                      Share
+                    </button>
+                    
+                    <button
+                      className="flex items-center w-full text-left px-4 py-2 hover:bg-gray-600 text-red-400 rounded-b-lg"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const menu = document.getElementById(`conv-menu-${conv.id}`);
+                        if (menu) menu.style.display = 'none';
+                        handleDeleteConversationClick(conv);
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          
+          <button
+            onClick={handleNewConversation}
+            className="mt-4 w-full flex items-center justify-center gap-2 bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <PlusCircle className="w-5 h-5" />
+            <span>New Conversation</span>
+          </button>
+        </div>
+      </aside>
+    </div>
+  );
 }
 
 export default AIChat;

@@ -306,7 +306,7 @@ export function AIChat() {
 // Define theming classes that take both illuminate and blackout modes into account.
 const containerBg = isBlackoutEnabled 
   ? 'bg-gray-950' 
-  : (isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-900');
+  : (isIlluminateEnabled ? 'bg-gray-100' : 'bg-gray-900');
 
 const headerBorder = isBlackoutEnabled 
   ? 'border-gray-700' 
@@ -910,9 +910,9 @@ return (
     {/* Improved marquee container with gradient overlays */}
 <div className="relative w-full overflow-hidden my-4">
   {/* Left gradient overlay */}
-  <div className="absolute left-0 top-0 h-full w-16 z-10 pointer-events-none bg-gradient-to-r from-gray-300 to-transparent" />
+  <div className="absolute left-0 top-0 h-full w-16 z-10 pointer-events-none bg-gradient-to-r from-gray-900 to-transparent" />
   {/* Right gradient overlay */}
-  <div className="absolute right-0 top-0 h-full w-16 z-10 pointer-events-none bg-gradient-to-l from-gray-300 to-transparent" />
+  <div className="absolute right-0 top-0 h-full w-16 z-10 pointer-events-none bg-gradient-to-l from-gray-900 to-transparent" />
   
   <div className="flex relative overflow-hidden">
     {/* Animated container with 6 sets of buttons */}

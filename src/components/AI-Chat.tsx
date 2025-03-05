@@ -775,6 +775,8 @@ const handleChatSubmit = async (e: React.FormEvent) => {
     alert(`Sharing conversation ID: ${conv.id}`);
   };
 
+  const iconClass = "w-6 h-6"; // Use consistent size for all icons
+  
   // ----- Quick Actions for "no conversation selected" -----
   const quickActions = [
     'Create a Task',
@@ -786,12 +788,12 @@ const handleChatSubmit = async (e: React.FormEvent) => {
   ];
 
   const quickActionIcons: Record<string, JSX.Element> = {
-  'Create a Task': <CheckCircle className="w-5 h-5" />,
-  'Create a Goal': <Target className="w-5 h-5" />,
-  'Create a Plan': <Calendar className="w-5 h-5" />,
-  'Create a Project': <Folder className="w-5 h-5" />,
-  'Analyze my items': <BarChart2 className="w-5 h-5" />,
-  'Schedule a plan for me': <Clock className="w-5 h-5" />,
+  'Create a Task': <CheckCircle className={iconClass + " inline-block"} />,
+  'Create a Goal': <Target className={iconClass + " inline-block"} />,
+  'Create a Plan': <Calendar className={iconClass + " inline-block"} />,
+  'Create a Project': <Folder className={iconClass + " inline-block"} />,
+  'Analyze my items': <BarChart2 className={iconClass + " inline-block"} />,
+  'Schedule a plan for me': <Clock className={iconClass + " inline-block"} />,
 };
 
   const handleQuickActionClick = (action: string) => {
@@ -834,36 +836,32 @@ return (
     >
       Select one of the quick actions below or start a new conversation.
     </p>
-    {/* Marquee container */}
-    <motion.div 
-      className="w-full overflow-hidden"
-      initial={{ x: 0 }}
-      animate={{ x: -300 }} // Adjust this distance as needed.
-      transition={{ duration: 20, repeat: Infinity, ease: 'linear' }}
-    >
-      <div className="flex space-x-4">
-        {quickActions.map((action) => (
-          <div
-            key={action}
-            className="flex items-center space-x-2 bg-blue-600 px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+    {/* Marquee container with gradient overlays */}
+    <div className="relative w-full overflow-hidden my-4">
+      {/* Left gradient overlay */}
+      <div className="absolute left-0 top-0 h-full w-16 pointer-events-none bg-gradient-to-r from-gray-900 to-transparent" />
+      {/* Right gradient overlay */}
+      <div className="absolute right-0 top-0 h-full w-16 pointer-events-none bg-gradient-to-l from-gray-900 to-transparent" />
+      <motion.div
+        className="flex space-x-4 whitespace-nowrap"
+        animate={{ x: ["0%", "-50%"] }}
+        transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+      >
+        {/* Duplicate the quick actions for smooth scrolling */}
+        {quickActions.concat(quickActions).map((action, index) => (
+          <motion.button
+            key={index}
+            whileHover={{ scale: 1.05, transition: { duration: 0.2 } }}
+            className="flex items-center space-x-2 bg-blue-600 px-4 py-2 rounded-lg text-white whitespace-nowrap"
+            onClick={() => handleQuickActionClick(action)}
           >
             {quickActionIcons[action]}
-            <span className="text-white">{action}</span>
-          </div>
+            <span className="whitespace-nowrap">{action}</span>
+          </motion.button>
         ))}
-        {/* Duplicate items for smooth scrolling */}
-        {quickActions.map((action) => (
-          <div
-            key={`dup-${action}`}
-            className="flex items-center space-x-2 bg-blue-600 px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            {quickActionIcons[action]}
-            <span className="text-white">{action}</span>
-          </div>
-        ))}
-      </div>
-    </motion.div>
-    {/* Optional chat input */}
+      </motion.div>
+    </div>
+    {/* Optional: chat input */}
     <form onSubmit={handleChatSubmit} className="mt-8 w-full max-w-lg">
       <div className="flex gap-2">
         <input

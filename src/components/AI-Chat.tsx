@@ -18,6 +18,7 @@ import remarkMath from 'remark-math';
 import remarkGfm from 'remark-gfm';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
+
 import { auth } from '../lib/firebase';
 import { User, onAuthStateChanged } from 'firebase/auth';
 import { geminiApiKey } from '../lib/dashboard-firebase';
@@ -34,12 +35,19 @@ import {
   deleteChatConversation,
 } from '../lib/ai-chat-firebase';
 
-
+// Firestore item CRUD helpers (make sure these exist in your code)
+import {
+  createUserTask,
+  createUserGoal,
+  createUserPlan,
+  createUserProject,
+} from '../lib/ai-actions-firebase';
 
 import { Sidebar } from './Sidebar';
 import { Timer } from './Timer';
 import { FlashcardsQuestions } from './FlashcardsQuestions';
 
+// ----- Types -----
 interface TimerMessage {
   type: 'timer';
   duration: number;
@@ -80,10 +88,9 @@ export interface ChatMessageData {
   question?: QuestionMessage;
 }
 
-// Gemini Endpoint
+// ----- Gemini Endpoint & Utilities -----
 const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`;
 
-// Utility: fetch with timeout
 const fetchWithTimeout = async (
   url: string,
   options: RequestInit,
@@ -92,7 +99,6 @@ const fetchWithTimeout = async (
   const controller = new AbortController();
   const { signal } = controller;
   const timeoutId = setTimeout(() => controller.abort(), timeout);
-
   try {
     const response = await fetch(url, { ...options, signal });
     clearTimeout(timeoutId);
@@ -103,7 +109,6 @@ const fetchWithTimeout = async (
   }
 };
 
-// Utility: stream Gemini response
 const streamResponse = async (
   url: string,
   options: RequestInit,
@@ -133,7 +138,6 @@ const streamResponse = async (
   return accumulatedText;
 };
 
-// Extract the candidate text from Gemini's JSON response
 const extractCandidateText = (text: string): string => {
   let candidateText = text;
   try {
@@ -162,32 +166,95 @@ export function AIChat() {
   const [chatHistory, setChatHistory] = useState<ChatMessageData[]>([]);
   const [isChatLoading, setIsChatLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Collections
   const [tasks, setTasks] = useState<Array<{ id: string; data: any }>>([]);
   const [goals, setGoals] = useState<Array<{ id: string; data: any }>>([]);
   const [projects, setProjects] = useState<Array<{ id: string; data: any }>>([]);
   const [plans, setPlans] = useState<Array<{ id: string; data: any }>>([]);
 
-  // Whether we've generated a chat name yet
+  // Conversation management
   const [hasGeneratedChatName, setHasGeneratedChatName] = useState(false);
-
-  // Conversation state
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [conversationList, setConversationList] = useState<any[]>([]);
 
-  // Example theme toggles (optional)
+  // ----- Theming & Sidebar States -----
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     const stored = localStorage.getItem('isSidebarCollapsed');
     return stored ? JSON.parse(stored) : false;
   });
   useEffect(() => {
-    localStorage.setItem(
-      'isSidebarCollapsed',
-      JSON.stringify(isSidebarCollapsed)
-    );
+    localStorage.setItem('isSidebarCollapsed', JSON.stringify(isSidebarCollapsed));
   }, [isSidebarCollapsed]);
 
-  // Replace with your own Dark/Light logic as needed
-  const [isIlluminateEnabled, setIsIlluminateEnabled] = useState(false);
+  // Blackout mode
+  const [isBlackoutEnabled, setIsBlackoutEnabled] = useState(() => {
+    const stored = localStorage.getItem('isBlackoutEnabled');
+    return stored ? JSON.parse(stored) : false;
+  });
+  // Sidebar blackout option
+  const [isSidebarBlackoutEnabled, setIsSidebarBlackoutEnabled] = useState(() => {
+    const stored = localStorage.getItem('isSidebarBlackoutEnabled');
+    return stored ? JSON.parse(stored) : false;
+  });
+  useEffect(() => {
+    localStorage.setItem('isBlackoutEnabled', JSON.stringify(isBlackoutEnabled));
+    document.body.classList.toggle('blackout-mode', isBlackoutEnabled);
+  }, [isBlackoutEnabled]);
+  useEffect(() => {
+    localStorage.setItem(
+      'isSidebarBlackoutEnabled',
+      JSON.stringify(isSidebarBlackoutEnabled)
+    );
+  }, [isSidebarBlackoutEnabled]);
+
+  // Illuminate (light) mode
+  const [isIlluminateEnabled, setIsIlluminateEnabled] = useState(() => {
+    const stored = localStorage.getItem('isIlluminateEnabled');
+    return stored ? JSON.parse(stored) : false;
+  });
+  // Sidebar illuminate option
+  const [isSidebarIlluminateEnabled, setIsSidebarIlluminateEnabled] = useState(() => {
+    const stored = localStorage.getItem('isSidebarIlluminateEnabled');
+    return stored ? JSON.parse(stored) : false;
+  });
+  useEffect(() => {
+    localStorage.setItem('isIlluminateEnabled', JSON.stringify(isIlluminateEnabled));
+    if (isIlluminateEnabled) {
+      document.body.classList.add('illuminate-mode');
+    } else {
+      document.body.classList.remove('illuminate-mode');
+    }
+  }, [isIlluminateEnabled]);
+  useEffect(() => {
+    localStorage.setItem(
+      'isSidebarIlluminateEnabled',
+      JSON.stringify(isSidebarIlluminateEnabled)
+    );
+  }, [isSidebarIlluminateEnabled]);
+
+  // ----- Theming Classes -----
+  // Adjust these as desired for your light/dark color schemes.
+  const containerBg = isIlluminateEnabled ? 'bg-gray-100' : 'bg-gray-900';
+  const headerBorder = isIlluminateEnabled ? 'border-gray-300' : 'border-gray-800';
+  const headerBg = isIlluminateEnabled ? 'bg-white' : '';
+  const userBubble = isIlluminateEnabled
+    ? 'bg-blue-200 text-gray-900'
+    : 'bg-blue-600 text-white';
+  const assistantBubble = isIlluminateEnabled
+    ? 'bg-gray-200 text-gray-900'
+    : 'bg-gray-700 text-gray-200';
+  const inputBg = isIlluminateEnabled
+    ? 'bg-gray-200 text-gray-900'
+    : 'bg-gray-700 text-gray-200';
+  const asideBg = isIlluminateEnabled ? 'bg-gray-50' : 'bg-gray-800';
+  const asideBorder = isIlluminateEnabled ? 'border-gray-300' : 'border-gray-800';
+  const conversationInactive = isIlluminateEnabled
+    ? 'bg-gray-200 text-gray-900 hover:bg-gray-300'
+    : 'bg-gray-700 text-gray-200 hover:bg-gray-600';
+  const conversationActive = isIlluminateEnabled
+    ? 'bg-blue-200 text-gray-900'
+    : 'bg-blue-600 text-white';
 
   // ----- Auth & Firestore Listeners -----
   useEffect(() => {
@@ -210,21 +277,13 @@ export function AIChat() {
     }
   }, [navigate]);
 
-  // Listen for tasks/goals/projects/plans
+  // Listen for user tasks/goals/projects/plans
   useEffect(() => {
     if (!user) return;
-    const unsubTasks = onCollectionSnapshot('tasks', user.uid, (items) =>
-      setTasks(items)
-    );
-    const unsubGoals = onCollectionSnapshot('goals', user.uid, (items) =>
-      setGoals(items)
-    );
-    const unsubProjects = onCollectionSnapshot('projects', user.uid, (items) =>
-      setProjects(items)
-    );
-    const unsubPlans = onCollectionSnapshot('plans', user.uid, (items) =>
-      setPlans(items)
-    );
+    const unsubTasks = onCollectionSnapshot('tasks', user.uid, (items) => setTasks(items));
+    const unsubGoals = onCollectionSnapshot('goals', user.uid, (items) => setGoals(items));
+    const unsubProjects = onCollectionSnapshot('projects', user.uid, (items) => setProjects(items));
+    const unsubPlans = onCollectionSnapshot('plans', user.uid, (items) => setPlans(items));
     return () => {
       unsubTasks();
       unsubGoals();
@@ -242,7 +301,7 @@ export function AIChat() {
     return () => unsubscribe();
   }, [user]);
 
-  // Listen for messages in selected conversation
+  // Listen for messages in the selected conversation
   useEffect(() => {
     if (!conversationId) {
       setChatHistory([]);
@@ -254,7 +313,7 @@ export function AIChat() {
     return () => unsubscribe();
   }, [conversationId]);
 
-  // Scroll to bottom when chat updates
+  // Scroll to bottom on chat updates
   useEffect(() => {
     if (chatEndRef.current) {
       chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
@@ -263,6 +322,7 @@ export function AIChat() {
 
   // ----- UI Toggles -----
   const handleToggleSidebar = () => setIsSidebarCollapsed((prev) => !prev);
+  const handleToggleBlackout = () => setIsBlackoutEnabled((prev) => !prev);
 
   // ----- Timer Logic -----
   const parseTimerRequest = (message: string): number | null => {
@@ -370,29 +430,26 @@ Guidelines:
    - Only reference ${userName}'s items if ${userName} explicitly asks about them.
 
 2. Educational Content (JSON):
-   - If ${userName} explicitly requests educational content (flashcards or quiz questions), provide exactly one JSON object.
-   - Wrap the JSON object in a single code block using triple backticks and the "json" language identifier.
-   - Use one of the following formats:
-     (flashcard or question)...
+   - If ${userName} explicitly requests educational content (flashcards or quiz questions), provide exactly one JSON object in a code block. 
+     (flashcard or question formats)...
 
-3. **Data Modifications (JSON)**:
+3. Data Modifications (JSON):
    - If you want to create or update items (task, goal, plan, project), return a JSON block like:
    \`\`\`json
    {
      "action": "createTask",
      "payload": {
-       "task": "Buy groceries",
-       "dueDate": "2025-05-01"
+       "task": "Study Digital Marketing",
+       "dueDate": "2025-03-03"
      }
    }
    \`\`\`
    - Supported actions: "createTask", "createGoal", "createPlan", "createProject"
-   - The "payload" should contain the needed fields. 
-   - Provide the JSON block separate from normal text. The user interface will parse it and execute the action.
+   - Provide the JSON block separate from normal text.
 
 4. Response Structure:
    - Provide a direct response to ${userName} without extraneous meta-text.
-   - If returning JSON, do so in a single code block (triple backticks) with the language "json".
+   - If returning JSON, do so in a single code block with the language "json".
 
 Follow these instructions strictly.
 `;
@@ -487,27 +544,24 @@ Return ONLY the title, with no extra commentary.
         45000
       );
 
-      // Extract final text from Gemini response
+      // Extract final text
       const finalText = extractCandidateText(finalResponse).trim() || '';
       setStreamingAssistantContent('');
 
-      // Check if there's a JSON block for data modifications or educational content
+      // Look for JSON blocks
       let assistantReply = finalText;
       const jsonRegex = /```json\s*([\s\S]*?)```/g;
       let match = jsonRegex.exec(assistantReply);
 
-      let hasActionJson = false;
-
       while (match) {
-        hasActionJson = true;
-        const jsonBlock = match[1]; // The content inside ```json ... ```
+        const jsonBlock = match[1]; // content inside ```json ... ```
         assistantReply = assistantReply.replace(match[0], '').trim(); // remove the JSON block from displayed text
 
         try {
           const parsed = JSON.parse(jsonBlock);
           // For example: { action: 'createTask', payload: {...} }
           if (parsed.action && parsed.payload) {
-            // Attempt to handle each action
+            // Attempt each action
             if (parsed.action === 'createTask') {
               await createUserTask(user.uid, parsed.payload);
             } else if (parsed.action === 'createGoal') {
@@ -517,7 +571,6 @@ Return ONLY the title, with no extra commentary.
             } else if (parsed.action === 'createProject') {
               await createUserProject(user.uid, parsed.payload);
             }
-            // ... additional actions like updateTask, etc.
           }
         } catch (err) {
           console.error('Failed to parse or execute JSON action:', err);
@@ -525,25 +578,26 @@ Return ONLY the title, with no extra commentary.
         match = jsonRegex.exec(assistantReply);
       }
 
-      // Finally, save the assistant's message
+      // Save the assistant's final message
       await saveChatMessage(convId!, {
         role: 'assistant',
         content: assistantReply,
       });
 
-      // If user has at least 3 messages, generate a dynamic chat name
-      const totalUserMessages = updatedHistory.filter((m) => m.role === 'user')
-        .length;
+      // Generate a dynamic chat name after 3 user messages
+      const totalUserMessages = updatedHistory.filter((m) => m.role === 'user').length;
       if (!hasGeneratedChatName && totalUserMessages === 3) {
         const conversationText = updatedHistory
           .map((m) =>
-            m.role === 'user' ? `${userName}: ${m.content}` : `Assistant: ${m.content}`
+            m.role === 'user'
+              ? `${userName}: ${m.content}`
+              : `Assistant: ${m.content}`
           )
           .join('\n');
         await generateChatName(convId!, conversationText);
         setHasGeneratedChatName(true);
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error('Chat error:', err);
       await saveChatMessage(convId!, {
         role: 'assistant',
@@ -588,7 +642,7 @@ Return ONLY the title, with no extra commentary.
     alert(`Sharing conversation ID: ${conv.id}`);
   };
 
-  // ----- "Quick Action" buttons when no conversation is selected -----
+  // ----- Quick Actions for "no conversation selected" -----
   const quickActions = [
     'Create a Task',
     'Create a Goal',
@@ -597,22 +651,21 @@ Return ONLY the title, with no extra commentary.
     'Analyze my items',
     'Schedule a plan for me',
   ];
-
-  // If user clicks one of these suggestions, we can pre-populate chatMessage or auto-submit
   const handleQuickActionClick = (action: string) => {
     setChatMessage(action);
   };
 
   // ----- Render -----
   return (
-    <div className="flex h-screen bg-gray-900">
+    <div className={`flex h-screen ${containerBg}`}>
       {/* Left Sidebar */}
       <Sidebar
         isCollapsed={isSidebarCollapsed}
         onToggle={handleToggleSidebar}
         userName={userName}
-        isBlackoutEnabled={false}
-        isIlluminateEnabled={isIlluminateEnabled}
+        // For the "Sidebar" styling, pass if it’s blackout + sidebar blackout
+        isBlackoutEnabled={isBlackoutEnabled && isSidebarBlackoutEnabled}
+        isIlluminateEnabled={isIlluminateEnabled && isSidebarIlluminateEnabled}
       />
 
       {/* Main Chat Area */}
@@ -621,13 +674,21 @@ Return ONLY the title, with no extra commentary.
           isSidebarCollapsed ? 'ml-16' : 'ml-64'
         }`}
       >
-        {/* If no conversation is selected, show the "welcome" area */}
+        {/* If no conversation is selected, show a "welcome" area */}
         {!conversationId ? (
-          <div className="h-full flex flex-col items-center justify-center text-center p-8 text-white">
-            <h1 className="text-3xl font-semibold mb-4">
+          <div className="h-full flex flex-col items-center justify-center text-center p-8">
+            <h1
+              className={`text-3xl font-semibold mb-4 ${
+                isIlluminateEnabled ? 'text-gray-900' : 'text-white'
+              }`}
+            >
               Hey {userName}, how can I help you be productive today?
             </h1>
-            <p className="text-gray-400 mb-8">
+            <p
+              className={`mb-8 ${
+                isIlluminateEnabled ? 'text-gray-600' : 'text-gray-400'
+              }`}
+            >
               Select one of the quick actions below or start a new conversation.
             </p>
             <div className="flex flex-wrap gap-4">
@@ -635,13 +696,14 @@ Return ONLY the title, with no extra commentary.
                 <button
                   key={action}
                   onClick={() => handleQuickActionClick(action)}
-                  className="bg-blue-600 px-4 py-2 rounded-lg hover:bg-blue-700"
+                  className="bg-blue-600 px-4 py-2 rounded-lg hover:bg-blue-700 text-white"
                 >
                   {action}
                 </button>
               ))}
             </div>
-            {/* Optional: show the chat input so user can type something else */}
+
+            {/* Optional: show chat input so user can type something else */}
             <form onSubmit={handleChatSubmit} className="mt-8 w-full max-w-lg">
               <div className="flex gap-2">
                 <input
@@ -649,7 +711,11 @@ Return ONLY the title, with no extra commentary.
                   value={chatMessage}
                   onChange={(e) => setChatMessage(e.target.value)}
                   placeholder="Type something..."
-                  className="flex-1 bg-gray-700 text-gray-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={`flex-1 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    isIlluminateEnabled
+                      ? 'bg-gray-200 text-gray-900'
+                      : 'bg-gray-700 text-gray-200'
+                  }`}
                 />
                 <button
                   type="submit"
@@ -662,26 +728,40 @@ Return ONLY the title, with no extra commentary.
             </form>
           </div>
         ) : (
-          // If conversation is selected, show the chat interface
+          // Otherwise, show the chat interface
           <div className="h-full flex flex-col">
             {/* Header */}
-            <div className="p-4 border-b border-gray-800">
+            <div className={`p-4 border-b ${headerBorder} ${headerBg}`}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <Bot className="w-6 h-6 text-blue-400" />
                   <div>
-                    <h1 className="text-xl font-semibold text-white">
+                    <h1
+                      className={`text-xl font-semibold ${
+                        isIlluminateEnabled ? 'text-gray-900' : 'text-white'
+                      }`}
+                    >
                       AI Assistant
                     </h1>
-                    <p className="text-sm text-gray-400">
+                    <p
+                      className={`text-sm ${
+                        isIlluminateEnabled ? 'text-gray-600' : 'text-gray-400'
+                      }`}
+                    >
                       Chat with TaskMaster
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2 text-xs text-gray-400">
+                  <div className="flex items-center gap-2 text-xs">
                     <AlertTriangle className="w-4 h-4 text-yellow-400" />
-                    <span>TaskMaster can make mistakes. Verify details.</span>
+                    <span
+                      className={
+                        isIlluminateEnabled ? 'text-gray-600' : 'text-gray-400'
+                      }
+                    >
+                      TaskMaster can make mistakes. Verify details.
+                    </span>
                   </div>
                 </div>
               </div>
@@ -698,9 +778,7 @@ Return ONLY the title, with no extra commentary.
                 >
                   <div
                     className={`max-w-[80%] rounded-lg px-4 py-2 ${
-                      message.role === 'user'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-700 text-gray-200'
+                      message.role === 'user' ? userBubble : assistantBubble
                     }`}
                   >
                     <ReactMarkdown
@@ -717,11 +795,23 @@ Return ONLY the title, with no extra commentary.
                         li: ({ children }) => <li className="mb-1">{children}</li>,
                         code: ({ inline, children }) =>
                           inline ? (
-                            <code className="bg-gray-800 px-1 rounded">
+                            <code
+                              className={
+                                isIlluminateEnabled
+                                  ? 'bg-gray-300 px-1 rounded'
+                                  : 'bg-gray-800 px-1 rounded'
+                              }
+                            >
                               {children}
                             </code>
                           ) : (
-                            <pre className="bg-gray-800 p-2 rounded-lg overflow-x-auto">
+                            <pre
+                              className={
+                                isIlluminateEnabled
+                                  ? 'bg-gray-300 p-2 rounded-lg overflow-x-auto'
+                                  : 'bg-gray-800 p-2 rounded-lg overflow-x-auto'
+                              }
+                            >
                               <code>{children}</code>
                             </pre>
                           ),
@@ -729,10 +819,21 @@ Return ONLY the title, with no extra commentary.
                     >
                       {message.content}
                     </ReactMarkdown>
+
                     {message.timer && (
                       <div className="mt-2">
-                        <div className="flex items-center space-x-2 bg-gray-900 rounded-lg px-4 py-2">
-                          <TimerIcon className="w-5 h-5 text-blue-400" />
+                        <div
+                          className={`flex items-center space-x-2 rounded-lg px-4 py-2 ${
+                            isIlluminateEnabled ? 'bg-gray-100' : 'bg-gray-900'
+                          }`}
+                        >
+                          <TimerIcon
+                            className={`w-5 h-5 ${
+                              isIlluminateEnabled
+                                ? 'text-blue-600'
+                                : 'text-blue-400'
+                            }`}
+                          />
                           <Timer
                             key={message.timer.id}
                             initialDuration={message.timer.duration}
@@ -741,6 +842,7 @@ Return ONLY the title, with no extra commentary.
                         </div>
                       </div>
                     )}
+
                     {message.flashcard && (
                       <div className="mt-2">
                         <FlashcardsQuestions
@@ -763,18 +865,19 @@ Return ONLY the title, with no extra commentary.
                 </div>
               ))}
 
-              {/* If streaming in memory, show partial content as an assistant bubble */}
+              {/* Streaming partial content */}
               {streamingAssistantContent && (
                 <div className="flex justify-start">
-                  <div className="max-w-[80%] rounded-lg px-4 py-2 bg-gray-700 text-gray-200">
+                  <div className={`max-w-[80%] rounded-lg px-4 py-2 ${assistantBubble}`}>
                     <ReactMarkdown>{streamingAssistantContent}</ReactMarkdown>
                   </div>
                 </div>
               )}
 
+              {/* Loading dots (if no partial content yet) */}
               {isChatLoading && !streamingAssistantContent && (
                 <div className="flex justify-start">
-                  <div className="max-w-[80%] rounded-lg px-4 py-2 bg-gray-700 text-gray-200">
+                  <div className={`max-w-[80%] rounded-lg px-4 py-2 ${assistantBubble}`}>
                     <div className="flex space-x-2">
                       <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
                       <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100"></div>
@@ -788,14 +891,14 @@ Return ONLY the title, with no extra commentary.
             </div>
 
             {/* Chat Input */}
-            <form onSubmit={handleChatSubmit} className="p-4 border-t border-gray-800">
+            <form onSubmit={handleChatSubmit} className={`p-4 border-t ${headerBorder}`}>
               <div className="flex gap-2">
                 <input
                   type="text"
                   value={chatMessage}
                   onChange={(e) => setChatMessage(e.target.value)}
                   placeholder="Ask TaskMaster about your items or set a timer..."
-                  className="flex-1 bg-gray-700 text-gray-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={`flex-1 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputBg}`}
                 />
                 <button
                   type="submit"
@@ -811,10 +914,16 @@ Return ONLY the title, with no extra commentary.
       </main>
 
       {/* Right Sidebar: Chat Conversations */}
-      <aside className="w-75 border-l border-gray-800 bg-gray-800">
+      <aside className={`w-75 border-l ${asideBorder} ${asideBg}`}>
         <div className="p-4">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-white text-lg font-bold">Conversations</h2>
+            <h2
+              className={`text-lg font-bold ${
+                isIlluminateEnabled ? 'text-gray-900' : 'text-white'
+              }`}
+            >
+              Conversations
+            </h2>
             <button
               onClick={handleNewConversation}
               className="flex items-center justify-center p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors"
@@ -829,8 +938,8 @@ Return ONLY the title, with no extra commentary.
                 key={conv.id}
                 className={`flex items-center justify-between cursor-pointer p-3 rounded-lg transition-all ${
                   conversationId === conv.id
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-700 text-gray-200 hover:bg-gray-600'
+                    ? conversationActive
+                    : conversationInactive
                 }`}
               >
                 <div
@@ -854,15 +963,20 @@ Return ONLY the title, with no extra commentary.
                           menu.style.display === 'block' ? 'none' : 'block';
                       }
                     }}
-                    className="p-1 rounded-full hover:bg-gray-600 transition-colors"
+                    className={`p-1 rounded-full ${
+                      isIlluminateEnabled ? 'hover:bg-gray-300' : 'hover:bg-gray-600'
+                    } transition-colors`}
                   >
                     <MoreHorizontal className="w-4 h-4" />
                   </button>
 
                   <div
                     id={`conv-menu-${conv.id}`}
-                    className="hidden absolute top-8 right-0 bg-gray-700 text-gray-200 rounded-lg shadow-lg z-50"
-                    style={{ minWidth: '160px' }}
+                    className="hidden absolute top-8 right-0 rounded-lg shadow-lg z-50"
+                    style={{
+                      minWidth: '160px',
+                      backgroundColor: isIlluminateEnabled ? '#f3f4f6' : '#374151',
+                    }}
                   >
                     <button
                       className="flex items-center w-full text-left px-4 py-2 hover:bg-gray-600 rounded-t-lg"

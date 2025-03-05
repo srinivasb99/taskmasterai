@@ -500,47 +500,57 @@ Guidelines:
    - If ${userName} explicitly requests educational content (flashcards or quiz questions), return exactly one JSON object.
    - The JSON must be wrapped in a single code block using triple backticks and the "json" language identifier.
    - Return only the JSON object with no additional text or extra lines.
+   - **Math Expressions:**  
+     - When including math (e.g., integrals, summations, or equations) in questions, answers, options, or explanations, wrap them in standard LaTeX syntax:
+       - Inline math: \`$\\sin x$\`
+       - Block math: \`$$\\int \\sin x \\, dx = -\\cos x + C$$\`
+     - Escape backslashes as needed (e.g., \`\\sin\`, \`\\int\`).
    - Use one of the following formats:
 
-     For flashcards:
+     **For flashcards:**
      \`\`\`json
      {
        "type": "flashcard",
        "data": [
          {
            "id": "unique-id-1",
-           "question": "Question 1",
-           "answer": "Answer 1",
+           "question": "Question with optional math: $\\sin x$",
+           "answer": "Answer with optional math: $$\\int \\sin x \\, dx = -\\cos x + C$$",
            "topic": "Subject area"
          },
          {
            "id": "unique-id-2",
-           "question": "Question 2",
-           "answer": "Answer 2",
-           "topic": "Subject area"
+           "question": "...",
+           "answer": "...",
+           "topic": "..."
          }
        ]
      }
      \`\`\`
 
-     For quiz questions:
+     **For quiz questions:**
      \`\`\`json
      {
        "type": "question",
        "data": [
          {
            "id": "unique-id-1",
-           "question": "Question 1",
-           "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
+           "question": "Question text with optional math: $\\sin x$",
+           "options": [
+             "Option with inline math: $\\cos x + C$",
+             "Option with block math: $$\\int e^x \\, dx = e^x + C$$",
+             "...",
+             "..."
+           ],
            "correctAnswer": 0,
-           "explanation": "Explanation 1"
+           "explanation": "Explanation with optional math: $\\frac{d}{dx}(\\cos x) = -\\sin x$"
          },
          {
            "id": "unique-id-2",
-           "question": "Question 2",
-           "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
+           "question": "...",
+           "options": ["...", "...", "...", "..."],
            "correctAnswer": 1,
-           "explanation": "Explanation 2"
+           "explanation": "..."
          }
        ]
      }

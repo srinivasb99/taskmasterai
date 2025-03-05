@@ -485,11 +485,59 @@ Guidelines:
 1. General Conversation:
    - Respond in a friendly, natural tone matching ${userName}'s style.
    - Do not include any internal instructions, meta commentary, or explanations of your process.
-   - Do not include or reference code blocks for languages like Python, Bash, or any other unless explicitly requested by ${userName}.
+   - Do not include phrases such as "Here's my response to continue the conversation:"
+     or similar wording that introduces your reply.
+   - Do not include or reference code blocks for languages like Python, Bash, or any other
+     unless explicitly requested by ${userName}.
    - Only reference ${userName}'s items if ${userName} explicitly asks about them.
 
 2. Educational Content (JSON):
-   - If ${userName} explicitly requests educational content (flashcards or quiz questions), provide exactly one JSON object in a code block.
+   - If ${userName} explicitly requests educational content (flashcards or quiz questions), provide exactly one JSON object.
+   - Wrap the JSON object in a single code block using triple backticks and the "json" language identifier.
+   - Use one of the following formats:
+
+     For flashcards:
+     {
+       "type": "flashcard",
+       "data": [
+         {
+           "id": "unique-id-1",
+           "question": "Question 1",
+           "answer": "Answer 1",
+           "topic": "Subject area"
+         },
+         {
+           "id": "unique-id-2",
+           "question": "Question 2",
+           "answer": "Answer 2",
+           "topic": "Subject area"
+         }
+       ]
+     }
+
+     For quiz questions:
+     {
+       "type": "question",
+       "data": [
+         {
+           "id": "unique-id-1",
+           "question": "Question 1",
+           "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
+           "correctAnswer": 0,
+           "explanation": "Explanation 1"
+         },
+         {
+           "id": "unique-id-2",
+           "question": "Question 2",
+           "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
+           "correctAnswer": 1,
+           "explanation": "Explanation 2"
+         }
+       ]
+     }
+
+   - Do not include any JSON unless ${userName} explicitly requests it.
+   - The JSON must be valid, complete, and include multiple items in its "data" array.
 
 3. Data Modifications (JSON):
    - If you want to create or update items (task, goal, plan, project), return a JSON block like:
@@ -506,7 +554,7 @@ Guidelines:
 
 4. Response Structure:
    - Provide a direct response to ${userName} without extraneous meta-text.
-   - If returning JSON, do so in a code block or braces that can be parsed.
+   - Do not mix JSON with regular text. If returning JSON, do so in a code block or braces that can be parsed.
 
 Follow these instructions strictly.
 `;
@@ -542,126 +590,132 @@ Return ONLY the title, with no extra commentary.
   // ----- Chat Submission -----
   const [streamingAssistantContent, setStreamingAssistantContent] = useState('');
 
-  const handleChatSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!chatMessage.trim() || !user) return;
+ // Send the user's message to Gemini, get streaming response, and save the final assistant message.
+const handleChatSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  if (!chatMessage.trim() || !user) return;
 
-    // If no conversation is selected, create one
-    let convId = conversationId;
-    if (!convId) {
-      convId = await createChatConversation(user.uid, 'New Chat');
-      setConversationId(convId);
-    }
+  // If no conversation is selected, create one.
+  let convId = conversationId;
+  if (!convId) {
+    convId = await createChatConversation(user.uid, "New Chat");
+    setConversationId(convId);
+  }
 
-    // Save user's message
-    const userMsg: ChatMessageData = { role: 'user', content: chatMessage };
-    await saveChatMessage(convId!, userMsg);
-    const updatedHistory = [...chatHistory, userMsg];
+  // Save user's message.
+  const userMsg: ChatMessageData = { role: 'user', content: chatMessage };
+  await saveChatMessage(convId!, userMsg);
+  const updatedHistory = [...chatHistory, userMsg];
 
-    // Clear user input
-    setChatMessage('');
+  // Clear user input.
+  setChatMessage('');
 
-    // Check if it's a timer request
-    const timerDuration = parseTimerRequest(userMsg.content);
-    if (timerDuration) {
-      const timerId = Math.random().toString(36).substr(2, 9);
-      const timerMsg: ChatMessageData = {
-        role: 'assistant',
-        content: `Starting a timer for ${timerDuration} seconds.`,
-        timer: { type: 'timer', duration: timerDuration, id: timerId },
-      };
-      await saveChatMessage(convId!, timerMsg);
-      return;
-    }
-
-    // Start loading / streaming
-    setIsChatLoading(true);
-    setStreamingAssistantContent('');
-
-    // Build prompt
-    const prompt = createPrompt(userMsg.content);
-    const geminiOptions = {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-      }),
+  // Check if it's a timer request.
+  const timerDuration = parseTimerRequest(userMsg.content);
+  if (timerDuration) {
+    const timerId = Math.random().toString(36).substr(2, 9);
+    const timerMsg: ChatMessageData = {
+      role: 'assistant',
+      content: `Starting a timer for ${timerDuration} seconds.`,
+      timer: { type: 'timer', duration: timerDuration, id: timerId }
     };
+    await saveChatMessage(convId!, timerMsg);
+    return;
+  }
 
-    try {
-      // Stream from Gemini
-      let finalResponse = '';
-      await streamResponse(
-        geminiEndpoint,
-        geminiOptions,
-        (chunk) => {
-          setStreamingAssistantContent(chunk);
-          finalResponse = chunk;
-        },
-        45000
-      );
+  setIsChatLoading(true);
+  setStreamingAssistantContent(''); // Start fresh for streaming
 
-      // Extract final text
-      const finalText = extractCandidateText(finalResponse).trim() || '';
-      setStreamingAssistantContent('');
+  // Build prompt for Gemini.
+  const prompt = createPrompt(userMsg.content);
+  const geminiOptions = {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }]
+    })
+  };
 
-      // Now parse JSON from the assistant's text
-      let assistantReply = finalText;
-      const jsonBlocks = extractJsonBlocks(assistantReply);
+  try {
+    // Stream response from Gemini.
+    let finalResponse = '';
+    await streamResponse(geminiEndpoint, geminiOptions, (chunk) => {
+      setStreamingAssistantContent(chunk);
+      finalResponse = chunk;
+    }, 45000);
 
-      for (const jsonBlock of jsonBlocks) {
-        // Remove the block from the final displayed text
-        assistantReply = assistantReply.replace(jsonBlock, '').trim();
+    // Extract final text.
+    let assistantReply = extractCandidateText(finalResponse).trim() || '';
+    setStreamingAssistantContent(''); // Clear streaming content
 
-        // Attempt to parse and handle action
-        try {
-          const parsed = JSON.parse(jsonBlock);
-          if (parsed.action && parsed.payload) {
-            // Attempt each action
-            if (parsed.action === 'createTask') {
-              await createUserTask(user.uid, parsed.payload);
-            } else if (parsed.action === 'createGoal') {
-              await createUserGoal(user.uid, parsed.payload);
-            } else if (parsed.action === 'createPlan') {
-              await createUserPlan(user.uid, parsed.payload);
-            } else if (parsed.action === 'createProject') {
-              await createUserProject(user.uid, parsed.payload);
-            }
+    // --- Process JSON Blocks ---
+    // Use extractJsonBlocks to find all JSON blocks in the reply.
+    const jsonBlocks = extractJsonBlocks(assistantReply);
+    let educationalContent: any = null; // To store flashcard or question JSON.
+    for (const block of jsonBlocks) {
+      try {
+        const parsed = JSON.parse(block);
+        // If this is an AI action block.
+        if (parsed.action && parsed.payload) {
+          if (parsed.action === 'createTask') {
+            await createUserTask(user.uid, parsed.payload);
+          } else if (parsed.action === 'createGoal') {
+            await createUserGoal(user.uid, parsed.payload);
+          } else if (parsed.action === 'createPlan') {
+            await createUserPlan(user.uid, parsed.payload);
+          } else if (parsed.action === 'createProject') {
+            await createUserProject(user.uid, parsed.payload);
           }
-        } catch (err) {
-          console.error('Failed to parse or execute JSON action:', err);
         }
+        // If this is educational content.
+        else if (parsed.type && parsed.data && (parsed.type === 'flashcard' || parsed.type === 'question')) {
+          educationalContent = parsed;
+        }
+      } catch (err) {
+        console.error('Failed to parse or execute JSON block:', err);
       }
+      // Remove this block from the reply so it doesn't show up.
+      // (We assume the block text appears verbatim in assistantReply.)
+      assistantReply = assistantReply.replace(block, '').trim();
+    }
 
-      // Save the assistant's final message (minus any JSON)
-      await saveChatMessage(convId!, {
+    // Save the assistant's final message with educational content if available.
+    if (educationalContent) {
+      const message = {
         role: 'assistant',
         content: assistantReply,
-      });
-
-      // Generate a dynamic chat name after 3 user messages
-      const totalUserMessages = updatedHistory.filter((m) => m.role === 'user').length;
-      if (!hasGeneratedChatName && totalUserMessages === 3) {
-        const conversationText = updatedHistory
-          .map((m) =>
-            m.role === 'user'
-              ? `${userName}: ${m.content}`
-              : `Assistant: ${m.content}`
-          )
-          .join('\n');
-        await generateChatName(convId!, conversationText);
-        setHasGeneratedChatName(true);
-      }
-    } catch (err) {
-      console.error('Chat error:', err);
-      await saveChatMessage(convId!, {
-        role: 'assistant',
-        content: 'Sorry, I had an issue responding. Please try again in a moment.',
-      });
-    } finally {
-      setIsChatLoading(false);
+        ...(educationalContent.type === 'flashcard'
+          ? { flashcard: educationalContent }
+          : { question: educationalContent })
+      };
+      await saveChatMessage(convId!, message);
+    } else {
+      await saveChatMessage(convId!, { role: 'assistant', content: assistantReply });
     }
-  };
+
+    // Generate a dynamic chat name after 3 user messages.
+    const totalUserMessages = updatedHistory.filter((m) => m.role === 'user').length;
+    if (!hasGeneratedChatName && totalUserMessages === 3) {
+      const conversationText = updatedHistory
+        .map((m) =>
+          m.role === 'user'
+            ? `${userName}: ${m.content}`
+            : `Assistant: ${m.content}`
+        )
+        .join('\n');
+      await generateChatName(convId!, conversationText);
+      setHasGeneratedChatName(true);
+    }
+  } catch (err) {
+    console.error('Chat error:', err);
+    await saveChatMessage(convId!, {
+      role: 'assistant',
+      content: 'Sorry, I had an issue responding. Please try again in a moment.'
+    });
+  } finally {
+    setIsChatLoading(false);
+  }
+};
 
   // ----- Conversation Management -----
   const handleNewConversation = async () => {

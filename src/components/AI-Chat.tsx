@@ -841,6 +841,7 @@ const quickActionIcons: Record<string, JSX.Element> = {
   'Analyze my items': <BarChart2 className={iconClass + " inline-block"} />,
   'Schedule a plan for me': <Clock className={iconClass + " inline-block"} />,
   'Set a Reminder': <Bell className={iconClass + " inline-block"} />,
+  'Start a Timer': <TimerIcon className={iconClass + " inline-block"} />,
   'Track My Progress': <TrendingUp className={iconClass + " inline-block"} />,
   'Brainstorm Ideas': <Lightbulb className={iconClass + " inline-block"} />,
   'Review My Goals': <Target className={iconClass + " inline-block"} />,

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
   Send,
@@ -12,6 +13,12 @@ import {
   Edit2,
   Share,
   Trash2,
+  CheckCircle,
+  Target,
+  Calendar,
+  Folder,
+  BarChart2,
+  Clock
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
@@ -777,6 +784,16 @@ const handleChatSubmit = async (e: React.FormEvent) => {
     'Analyze my items',
     'Schedule a plan for me',
   ];
+
+  const quickActionIcons: Record<string, JSX.Element> = {
+  'Create a Task': <CheckCircle className="w-5 h-5" />,
+  'Create a Goal': <Target className="w-5 h-5" />,
+  'Create a Plan': <Calendar className="w-5 h-5" />,
+  'Create a Project': <Folder className="w-5 h-5" />,
+  'Analyze my items': <BarChart2 className="w-5 h-5" />,
+  'Schedule a plan for me': <Clock className="w-5 h-5" />,
+};
+
   const handleQuickActionClick = (action: string) => {
     setChatMessage(action);
   };
@@ -802,57 +819,74 @@ return (
     >
       {/* If no conversation is selected, show a "welcome" area */}
       {!conversationId ? (
-        <div className="h-full flex flex-col items-center justify-center text-center p-8">
-          <h1
-            className={`text-3xl font-semibold mb-4 ${
-              isIlluminateEnabled ? 'text-gray-900' : (isBlackoutEnabled ? 'text-white' : 'text-white')
-            }`}
+  <div className="h-full flex flex-col items-center justify-center text-center p-8">
+    <h1
+      className={`text-3xl font-semibold mb-4 ${
+        isIlluminateEnabled ? 'text-gray-900' : (isBlackoutEnabled ? 'text-white' : 'text-white')
+      }`}
+    >
+      Hey {truncatedName}, how can I help you be productive today?
+    </h1>
+    <p
+      className={`mb-8 ${
+        isIlluminateEnabled ? 'text-gray-600' : (isBlackoutEnabled ? 'text-gray-400' : 'text-gray-400')
+      }`}
+    >
+      Select one of the quick actions below or start a new conversation.
+    </p>
+    {/* Marquee container */}
+    <motion.div 
+      className="w-full overflow-hidden"
+      initial={{ x: 0 }}
+      animate={{ x: -300 }} // Adjust this distance as needed.
+      transition={{ duration: 20, repeat: Infinity, ease: 'linear' }}
+    >
+      <div className="flex space-x-4">
+        {quickActions.map((action) => (
+          <div
+            key={action}
+            className="flex items-center space-x-2 bg-blue-600 px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
           >
-            Hey {truncatedName}, how can I help you be productive today?
-          </h1>
-          <p
-            className={`mb-8 ${
-              isIlluminateEnabled ? 'text-gray-600' : (isBlackoutEnabled ? 'text-gray-400' : 'text-gray-400')
-            }`}
-          >
-            Select one of the quick actions below or start a new conversation.
-          </p>
-          <div className="flex flex-wrap gap-4">
-            {quickActions.map((action) => (
-              <button
-                key={action}
-                onClick={() => handleQuickActionClick(action)}
-                className="bg-blue-600 px-4 py-2 rounded-lg hover:bg-blue-700 text-white"
-              >
-                {action}
-              </button>
-            ))}
+            {quickActionIcons[action]}
+            <span className="text-white">{action}</span>
           </div>
-
-          {/* Optional: chat input */}
-          <form onSubmit={handleChatSubmit} className="mt-8 w-full max-w-lg">
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={chatMessage}
-                onChange={(e) => setChatMessage(e.target.value)}
-                placeholder="Ask anything..."
-                className={`flex-1 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  isBlackoutEnabled 
-                    ? 'bg-gray-800 text-white'
-                    : (isIlluminateEnabled ? 'bg-gray-200 text-gray-900' : 'bg-gray-700 text-gray-200')
-                }`}
-              />
-              <button
-                type="submit"
-                disabled={isChatLoading}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Send className="w-5 h-5" />
-              </button>
-            </div>
-          </form>
-        </div>
+        ))}
+        {/* Duplicate items for smooth scrolling */}
+        {quickActions.map((action) => (
+          <div
+            key={`dup-${action}`}
+            className="flex items-center space-x-2 bg-blue-600 px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            {quickActionIcons[action]}
+            <span className="text-white">{action}</span>
+          </div>
+        ))}
+      </div>
+    </motion.div>
+    {/* Optional chat input */}
+    <form onSubmit={handleChatSubmit} className="mt-8 w-full max-w-lg">
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={chatMessage}
+          onChange={(e) => setChatMessage(e.target.value)}
+          placeholder="Ask anything..."
+          className={`flex-1 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+            isBlackoutEnabled 
+              ? 'bg-gray-800 text-white'
+              : (isIlluminateEnabled ? 'bg-gray-200 text-gray-900' : 'bg-gray-700 text-gray-200')
+          }`}
+        />
+        <button
+          type="submit"
+          disabled={isChatLoading}
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <Send className="w-5 h-5" />
+        </button>
+      </div>
+    </form>
+  </div>
       ) : (
         // Otherwise, show the chat interface
         <div className="h-full flex flex-col">

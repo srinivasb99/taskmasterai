@@ -37,14 +37,14 @@ export function Settings() {
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   // Store user profile data from Firestore
   const [userData, setUserData] = useState({
     name: '',
     email: '',
     photoURL: ''
   });
-  
+
   // Sidebar state
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     const stored = localStorage.getItem('isSidebarCollapsed');
@@ -54,6 +54,12 @@ export function Settings() {
   // Blackout mode state
   const [isBlackoutEnabled, setIsBlackoutEnabled] = useState(() => {
     const stored = localStorage.getItem('isBlackoutEnabled');
+    return stored ? JSON.parse(stored) : false;
+  });
+
+  // Illuminate (light mode) state
+  const [isIlluminateEnabled, setIsIlluminateEnabled] = useState(() => {
+    const stored = localStorage.getItem('isIlluminateEnabled');
     return stored ? JSON.parse(stored) : false;
   });
 
@@ -84,9 +90,11 @@ export function Settings() {
         return;
       }
       setUser(currentUser);
+
       // Determine if the user is a Google user
       const googleFlag = currentUser.providerData?.some((p: any) => p.providerId === 'google.com');
       setIsGoogleUser(googleFlag);
+
       try {
         const firestoreData = await getUserData(currentUser.uid);
         // Use Firestore's "name" and "photoURL" if available; otherwise, fallback to Auth values
@@ -118,25 +126,47 @@ export function Settings() {
     localStorage.setItem('isSidebarCollapsed', JSON.stringify(isSidebarCollapsed));
   }, [isSidebarCollapsed]);
 
-  // Update localStorage and document body for Blackout mode
+  // Toggle the Blackout class on <body> whenever isBlackoutEnabled changes
   useEffect(() => {
     localStorage.setItem('isBlackoutEnabled', JSON.stringify(isBlackoutEnabled));
     document.body.classList.toggle('blackout-mode', isBlackoutEnabled);
   }, [isBlackoutEnabled]);
+
+  // Illuminate effect: store in localStorage + toggle body class
+  useEffect(() => {
+    localStorage.setItem('isIlluminateEnabled', JSON.stringify(isIlluminateEnabled));
+    if (isIlluminateEnabled) {
+      // If Illuminate is turned on, automatically disable Blackout
+      setIsBlackoutEnabled(false);
+      document.body.classList.remove('blackout-mode');
+      document.body.classList.add('illuminate-mode');
+    } else {
+      document.body.classList.remove('illuminate-mode');
+    }
+  }, [isIlluminateEnabled, setIsBlackoutEnabled]);
 
   // Update localStorage for Sidebar Blackout option
   useEffect(() => {
     localStorage.setItem('isSidebarBlackoutEnabled', JSON.stringify(isSidebarBlackoutEnabled));
   }, [isSidebarBlackoutEnabled]);
 
+  // Toggle the sidebar
   const handleToggleSidebar = () => {
     setIsSidebarCollapsed(prev => !prev);
   };
 
+  // If we enable Blackout, automatically disable Illuminate
   const handleToggleBlackout = () => {
-    setIsBlackoutEnabled(prev => !prev);
+    setIsBlackoutEnabled(prev => {
+      const next = !prev;
+      if (next) {
+        setIsIlluminateEnabled(false);
+      }
+      return next;
+    });
   };
 
+  // Handle form input changes
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setError(null);
     setFormData({
@@ -145,6 +175,7 @@ export function Settings() {
     });
   };
 
+  // Handle profile picture changes
   const handleProfilePictureClick = () => {
     fileInputRef.current?.click();
   };
@@ -201,6 +232,7 @@ export function Settings() {
     }
   };
 
+  // Handle profile save
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -216,7 +248,7 @@ export function Settings() {
         throw new AuthError('New passwords do not match');
       }
 
-      // For Google users, skip email and password updates.
+      // For Google users, skip email/password updates
       const updateData = {
         name: formData.name !== userData.name ? formData.name : undefined,
         displayName: formData.name !== userData.name ? formData.name : undefined,
@@ -252,6 +284,7 @@ export function Settings() {
     }
   };
 
+  // Handle sign out
   const handleSignOut = async () => {
     try {
       await signOutUser();
@@ -261,6 +294,7 @@ export function Settings() {
     }
   };
 
+  // Handle account deletion
   const handleDeleteAccount = async () => {
     setError(null);
     setIsLoading(true);
@@ -283,22 +317,31 @@ export function Settings() {
     }
   };
 
-  // Determine the background color based on Blackout mode
-  const bgColor = isBlackoutEnabled ? 'bg-gray-950' : 'bg-gray-900';
+  // Dynamically set the background color:
+  // - White if Illuminate is on
+  // - Darker gray if Blackout is on
+  // - Default gray otherwise
+  const bgColor = isIlluminateEnabled
+    ? 'bg-white'
+    : isBlackoutEnabled
+    ? 'bg-gray-950'
+    : 'bg-gray-900';
 
   return (
     <div className={`flex h-screen ${bgColor}`}>
       <Sidebar 
         isCollapsed={isSidebarCollapsed} 
-        onToggle={() => setIsSidebarCollapsed(prev => {
-          localStorage.setItem('isSidebarCollapsed', JSON.stringify(!prev));
-          return !prev;
-        })}
+        onToggle={() => {
+          setIsSidebarCollapsed(prev => {
+            localStorage.setItem('isSidebarCollapsed', JSON.stringify(!prev));
+            return !prev;
+          });
+        }}
         userName={userData.name}
         // Pass a prop for Sidebar background update if both Blackout mode and Sidebar Blackout option are enabled
         isBlackoutEnabled={isBlackoutEnabled && isSidebarBlackoutEnabled}
       />
-      
+
       {/* Delete Account Modal Popup */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/50">
@@ -323,7 +366,7 @@ export function Settings() {
           </div>
         </div>
       )}
-      
+
       <main className={`flex-1 overflow-y-auto transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'}`}>
         <div className="container mx-auto px-6 py-8">
           <div className="mb-8">
@@ -339,6 +382,8 @@ export function Settings() {
           {/* Appearance Settings Card */}
           <div className="bg-gray-800 rounded-xl p-6 mb-6">
             <h2 className="text-xl font-semibold text-white mb-4">Appearance</h2>
+
+            {/* Blackout Toggle */}
             <div className="flex items-center justify-between">
               <div className="flex items-center">
                 <div className="mr-4">
@@ -360,41 +405,71 @@ export function Settings() {
                   onChange={handleToggleBlackout}
                   className="sr-only peer"
                 />
-                <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none peer-focus:ring-2 
+                  peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full 
+                  after:content-[''] after:absolute after:top-[2px] after:left-[2px] 
+                  after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all 
+                  peer-checked:bg-blue-600"
+                ></div>
               </label>
             </div>
-{/* Sidebar Blackout Toggle (only visible if Blackout mode is enabled) */}
-{isBlackoutEnabled && (
-  <div className="flex items-center justify-between mt-4">
-    {/* Icon + Text section, matching the Blackout layout */}
-    <div className="flex items-center">
-      <div className="mr-4">
-        <PanelLeftDashed className="w-6 h-6 text-blue-400" />
-      </div>
-      <div>
-        <p className="text-white font-medium">Sidebar Blackout</p>
-        <p className="text-gray-400 text-sm">Apply Blackout to Sidebar.</p>
-      </div>
-    </div>
 
-    {/* Toggle */}
-    <label className="relative inline-flex items-center cursor-pointer">
-      <input
-        type="checkbox"
-        checked={isSidebarBlackoutEnabled}
-        onChange={(e) => setIsSidebarBlackoutEnabled(e.target.checked)}
-        className="sr-only peer"
-      />
-      <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none peer-focus:ring-2 
-          peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full 
-          after:content-[''] after:absolute after:top-[2px] after:left-[2px] 
-          after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all 
-          peer-checked:bg-blue-600"
-      ></div>
-    </label>
-  </div>
-)}
+            {/* Illuminate Toggle */}
+            <div className="flex items-center justify-between mt-4">
+              <div className="flex items-center">
+                <div className="mr-4">
+                  <Sun className="w-6 h-6 text-yellow-400" />
+                </div>
+                <div>
+                  <p className="text-white font-medium">Illuminate</p>
+                  <p className="text-gray-400 text-sm">Sharpen your focus.</p>
+                </div>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isIlluminateEnabled}
+                  onChange={(e) => setIsIlluminateEnabled(e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none peer-focus:ring-2 
+                    peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full 
+                    after:content-[''] after:absolute after:top-[2px] after:left-[2px] 
+                    after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all 
+                    peer-checked:bg-blue-600"
+                ></div>
+              </label>
+            </div>
 
+            {/* Sidebar Blackout Toggle (only visible if Blackout mode is enabled) */}
+            {isBlackoutEnabled && (
+              <div className="flex items-center justify-between mt-4">
+                <div className="flex items-center">
+                  <div className="mr-4">
+                    <PanelLeftDashed className="w-6 h-6 text-blue-400" />
+                  </div>
+                  <div>
+                    <p className="text-white font-medium">Sidebar Blackout</p>
+                    <p className="text-gray-400 text-sm">Apply Blackout to Sidebar.</p>
+                  </div>
+                </div>
+
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isSidebarBlackoutEnabled}
+                    onChange={(e) => setIsSidebarBlackoutEnabled(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none peer-focus:ring-2 
+                      peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full 
+                      after:content-[''] after:absolute after:top-[2px] after:left-[2px] 
+                      after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all 
+                      peer-checked:bg-blue-600"
+                  ></div>
+                </label>
+              </div>
+            )}
           </div>
 
           {/* Profile Picture Section */}
@@ -402,9 +477,17 @@ export function Settings() {
             <h2 className="text-xl font-semibold text-white mb-4">Profile Picture</h2>
             <div className="flex items-center gap-6">
               <div className="relative group">
-                <div className={`w-24 h-24 rounded-full overflow-hidden bg-gray-700 flex items-center justify-center ${isUploading ? 'opacity-50' : ''}`}>
+                <div
+                  className={`w-24 h-24 rounded-full overflow-hidden bg-gray-700 flex items-center justify-center ${
+                    isUploading ? 'opacity-50' : ''
+                  }`}
+                >
                   {userData.photoURL ? (
-                    <img src={userData.photoURL} alt="Profile" className="w-full h-full object-cover" />
+                    <img
+                      src={userData.photoURL}
+                      alt="Profile"
+                      className="w-full h-full object-cover"
+                    />
                   ) : (
                     <User className="w-12 h-12 text-gray-400" />
                   )}

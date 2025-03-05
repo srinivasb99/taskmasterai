@@ -457,6 +457,7 @@ const conversationActive = isBlackoutEnabled
 
     const itemsText = formatItemsForChat();
     const now = new Date();
+    const triple = "```";
     const currentDateTime = {
       date: now.toLocaleDateString('en-US', {
         weekday: 'long',
@@ -502,74 +503,82 @@ Guidelines:
    - Return only the JSON object with no additional text or extra lines.
    - **Math Expressions:**  
      - When including math (e.g., integrals, summations, or equations) in questions, answers, options, or explanations, wrap them in standard LaTeX syntax.
-     - For inline math, use: \`$\\\\\\\\sin x$\`  
-       (This will produce a JSON string containing `$\\sin x$`)
-     - For block math, use: \`$$\\\\\\\\int \\\\sin x \\, dx = -\\\\\\\\cos x + C$$\`  
-       (This will produce a JSON string containing `$$\\int \\sin x \\, dx = -\\cos x + C$$`)
+     - For inline math, use: ${triple}json
+{
+  "example": "$\\\\sin x$"
+}
+${triple}
+       (This will produce a JSON string containing "$\\sin x$")
+     - For block math, use: ${triple}json
+{
+  "example": "$$\\\\int \\\\sin x \\, dx = -\\\\cos x + C$$"
+}
+${triple}
+       (This will produce a JSON string containing "$$\\int \\sin x \\, dx = -\\cos x + C$$")
    - Use one of the following formats:
 
      **For flashcards:**
-     \`\`\`json
-     {
-       "type": "flashcard",
-       "data": [
-         {
-           "id": "unique-id-1",
-           "question": "Question with optional math: $\\\\\\\\sin x$",
-           "answer": "Answer with optional math: $$\\\\\\\\int \\\\sin x \\, dx = -\\\\\\\\cos x + C$$",
-           "topic": "Subject area"
-         },
-         {
-           "id": "unique-id-2",
-           "question": "...",
-           "answer": "...",
-           "topic": "..."
-         }
-       ]
-     }
-     \`\`\`
+     ${triple}json
+{
+  "type": "flashcard",
+  "data": [
+    {
+      "id": "unique-id-1",
+      "question": "Question with optional math: $\\\\sin x$",
+      "answer": "Answer with optional math: $$\\\\int \\\\sin x \\, dx = -\\\\cos x + C$$",
+      "topic": "Subject area"
+    },
+    {
+      "id": "unique-id-2",
+      "question": "...",
+      "answer": "...",
+      "topic": "..."
+    }
+  ]
+}
+${triple}
 
      **For quiz questions:**
-     \`\`\`json
-     {
-       "type": "question",
-       "data": [
-         {
-           "id": "unique-id-1",
-           "question": "Question text with optional math: $\\\\\\\\sin x$",
-           "options": [
-             "Option with inline math: $\\\\\\\\cos x + C$",
-             "Option with block math: $$\\\\\\\\int e^x \\, dx = e^x + C$$",
-             "...",
-             "..."
-           ],
-           "correctAnswer": 0,
-           "explanation": "Explanation with optional math: $\\\\\\\\frac{d}{dx}(\\\\\\\\cos x) = -\\\\\\\\sin x$"
-         },
-         {
-           "id": "unique-id-2",
-           "question": "...",
-           "options": ["...", "...", "...", "..."],
-           "correctAnswer": 1,
-           "explanation": "..."
-         }
-       ]
-     }
-     \`\`\`
+     ${triple}json
+{
+  "type": "question",
+  "data": [
+    {
+      "id": "unique-id-1",
+      "question": "Question text with optional math: $\\\\sin x$",
+      "options": [
+        "Option with inline math: $\\\\cos x + C$",
+        "Option with block math: $$\\\\int e^x \\, dx = e^x + C$$",
+        "...",
+        "..."
+      ],
+      "correctAnswer": 0,
+      "explanation": "Explanation with optional math: $\\\\frac{d}{dx}(\\\\cos x) = -\\\\sin x$"
+    },
+    {
+      "id": "unique-id-2",
+      "question": "...",
+      "options": ["...", "...", "...", "..."],
+      "correctAnswer": 1,
+      "explanation": "..."
+    }
+  ]
+}
+${triple}
 
 3. Data Modifications (JSON):
    - When ${userName} provides a command to create or update an item (e.g., "add a task to buy a dog by tomorrow", "create a goal to exercise daily", etc.), you must respond by first stating the action you will do and then create a JSON block that specifies the action and its payload.
    - The JSON block must be wrapped in triple backticks with the "json" language identifier and returned as the only content for that modification.
    - For example:
-   \`\`\`json
-   {
-     "action": "createTask",
-     "payload": {
-       "task": "Study Digital Marketing",
-       "dueDate": "2025-03-03"
-     }
-   }
-   \`\`\`
+   ${triple}json
+{
+  "action": "createTask",
+  "payload": {
+    "task": "Study Digital Marketing",
+    "dueDate": "2025-03-03"
+  }
+}
+${triple}
    - You may return multiple JSON blocks if multiple items are to be created or updated.
    - Do not include any additional text with the JSON block; it should be the sole output for that command.
 

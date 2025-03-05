@@ -485,18 +485,18 @@ Guidelines:
 1. General Conversation:
    - Respond in a friendly, natural tone matching ${userName}'s style.
    - Do not include any internal instructions, meta commentary, or explanations of your process.
-   - Do not include phrases such as "Here's my response to continue the conversation:"
-     or similar wording that introduces your reply.
-   - Do not include or reference code blocks for languages like Python, Bash, or any other
-     unless explicitly requested by ${userName}.
+   - Do not include phrases such as "Here's my response to continue the conversation:" or similar wording that introduces your reply.
+   - Do not include or reference code blocks for languages like Python, Bash, or any other unless explicitly requested by ${userName}.
    - Only reference ${userName}'s items if ${userName} explicitly asks about them.
 
 2. Educational Content (JSON):
-   - If ${userName} explicitly requests educational content (flashcards or quiz questions), provide exactly one JSON object.
-   - Wrap the JSON object in a single code block using triple backticks and the "json" language identifier.
+   - If ${userName} explicitly requests educational content (flashcards or quiz questions), return exactly one JSON object.
+   - The JSON must be wrapped in a single code block using triple backticks and the "json" language identifier.
+   - Return only the JSON object with no additional text or extra lines.
    - Use one of the following formats:
 
      For flashcards:
+     ```json
      {
        "type": "flashcard",
        "data": [
@@ -514,8 +514,10 @@ Guidelines:
          }
        ]
      }
+     ```
 
      For quiz questions:
+     ```json
      {
        "type": "question",
        "data": [
@@ -535,26 +537,28 @@ Guidelines:
          }
        ]
      }
-
-   - Do not include any JSON unless ${userName} explicitly requests it.
-   - The JSON must be valid, complete, and include multiple items in its "data" array.
+     ```
 
 3. Data Modifications (JSON):
-   - If you want to create or update items (task, goal, plan, project), return a JSON block like:
-   \`\`\`json
-   {
-     "action": "createTask",
-     "payload": {
-       "task": "Study Digital Marketing",
-       "dueDate": "2025-03-03"
+   - When ${userName} provides a command to create or update an item (e.g., "add a task to buy a dog by tomorrow", "create a goal to exercise daily", etc.), you must respond with a JSON block that specifies the action and its payload.
+   - The JSON block must be wrapped in triple backticks with the "json" language identifier and returned as the only content for that modification.
+   - For example:
+     ```json
+     {
+       "action": "createTask",
+       "payload": {
+         "task": "Buy a dog",
+         "dueDate": "2025-03-04"
+       }
      }
-   }
-   \`\`\`
-   - You may also create multiple items by returning multiple JSON blocks.
+     ```
+   - You may return multiple JSON blocks if multiple items are to be created or updated.
+   - Do not include any additional text with the JSON block; it should be the sole output for that command.
 
 4. Response Structure:
-   - Provide a direct response to ${userName} without extraneous meta-text.
-   - Do not mix JSON with regular text. If returning JSON, do so in a code block or braces that can be parsed.
+   - Provide a direct, natural response to ${userName} without extraneous meta-text.
+   - Do not mix JSON with regular text. If you return JSON (for educational content or data modifications), return it as the only content (i.e. no additional text or empty lines).
+   - Always address ${userName} in a friendly and helpful tone.
 
 Follow these instructions strictly.
 `;

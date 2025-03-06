@@ -1225,7 +1225,7 @@ return (
       )}
     </main>
 {/* Right Sidebar: Chat Conversations */}
-<aside className={`w-75 border-l ${asideBorder} ${asideBg}`}>
+<aside className={`w-105 border-l ${asideBorder} ${asideBg}`}>
   <div className="p-4 flex flex-col h-full">
     {/* Header */}
     <div className="flex items-center justify-between mb-4">

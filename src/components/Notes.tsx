@@ -462,7 +462,6 @@ export function Notes() {
       [questionIndex]: selectedOption
     }));
   };
-}
 
 
 

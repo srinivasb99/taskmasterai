@@ -3,6 +3,7 @@ import { createWorker } from 'tesseract.js';
 import { v4 as uuidv4 } from 'uuid';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from './firebase';
+import { geminiApiKey } from './dashboard-firebase';
 
 // Set PDF.js worker source
 GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
@@ -31,27 +32,55 @@ function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// Helper function to retry fetch requests for the questions generation
+// Helper function to retry fetch requests
 async function fetchWithRetry(url: string, options: RequestInit, retries = 3, delayMs = 2000): Promise<Response> {
   for (let attempt = 0; attempt < retries; attempt++) {
-    const response = await fetch(url, options);
-    if (response.ok) {
-      return response;
-    }
-    // Retry only on timeout-related status codes (503, 504)
-    if (response.status === 503 || response.status === 504) {
+    try {
+      const response = await fetch(url, options);
+      if (response.ok) {
+        return response;
+      }
+      // Retry only on timeout-related status codes (503, 504)
+      if (response.status === 503 || response.status === 504) {
+        await sleep(delayMs);
+      } else {
+        throw new Error(`Request failed with status: ${response.status}`);
+      }
+    } catch (error) {
+      if (attempt === retries - 1) throw error;
       await sleep(delayMs);
-    } else {
-      throw new Error(`Request failed with status: ${response.status}`);
     }
   }
   throw new Error(`Max retries reached for: ${url}`);
 }
 
+// Extract the "candidate text" from the Gemini JSON response
+const extractCandidateText = (text: string): string => {
+  let candidateText = text;
+  try {
+    const jsonResponse = JSON.parse(text);
+    if (
+      jsonResponse &&
+      jsonResponse.candidates &&
+      jsonResponse.candidates[0] &&
+      jsonResponse.candidates[0].content &&
+      jsonResponse.candidates[0].content.parts &&
+      jsonResponse.candidates[0].content.parts[0]
+    ) {
+      candidateText = jsonResponse.candidates[0].content.parts[0].text;
+    }
+  } catch (err) {
+    console.error('Error parsing Gemini response:', err);
+  }
+  return candidateText;
+};
+
+// Gemini API endpoint
+const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`;
+
 export async function processPDF(
   file: File,
   userId: string,
-  huggingFaceApiKey: string,
   onProgress: (progress: ProcessingProgress) => void
 ): Promise<ProcessedPDF> {
   try {
@@ -131,14 +160,14 @@ export async function processPDF(
 
     onProgress({ progress: 60, status: 'Generating summary and key points...', error: null });
 
-    // Generate summary and key points using Hugging Face API
+    // Generate summary and key points using Gemini API
     const summaryPrompt = `
 Analyze the following text and generate:
 1. A clear, concise summary (4-6 sentences)
 2. 10 key points that capture the most important information
 
 Text to analyze:
-${extractedText.slice(0, 10000)} // Limit text length for API
+${extractedText.slice(0, 20000)} // Limit text length for API
 
 Format your response exactly as follows:
 
@@ -157,40 +186,43 @@ Key Points:
 9. [Ninth key point]
 10. [Tenth key point]`;
 
-    const summaryResponse = await fetch(
-      'https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct',
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${huggingFaceApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          inputs: summaryPrompt,
-          parameters: {
-            max_length: 1000,
-            temperature: 0.3,
-            top_p: 0.9,
-            return_full_text: false
-          }
-        })
-      }
-    );
+    const summaryOptions = {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: summaryPrompt }] }],
+        generationConfig: {
+          temperature: 0.3,
+          topP: 0.9,
+          maxOutputTokens: 1000,
+        }
+      })
+    };
 
-    if (!summaryResponse.ok) {
+    const summaryResponse = await fetchWithRetry(geminiEndpoint, summaryOptions);
+    const summaryResponseText = await summaryResponse.text();
+    const summaryText = extractCandidateText(summaryResponseText);
+
+    if (!summaryText) {
       throw new Error('Failed to generate summary');
     }
 
-    const summaryResult = await summaryResponse.json();
-    const summaryText = summaryResult[0].generated_text;
-
     // Parse summary and key points
-    const summary = summaryText.split('Key Points:')[0].replace('Summary:', '').trim();
-    const keyPoints = summaryText
-      .split('Key Points:')[1]
-      .split('\n')
-      .filter(line => line.trim().match(/^\d+\./))
-      .map(point => point.replace(/^\d+\.\s*/, '').trim());
+    const summaryParts = summaryText.split('Key Points:');
+    const summary = summaryParts[0].replace('Summary:', '').trim();
+    
+    let keyPoints: string[] = [];
+    if (summaryParts.length > 1) {
+      keyPoints = summaryParts[1]
+        .split('\n')
+        .filter(line => line.trim().match(/^\d+\./))
+        .map(point => point.replace(/^\d+\.\s*/, '').trim());
+    }
+
+    // If we didn't get 10 key points, still proceed with what we have
+    if (keyPoints.length === 0) {
+      keyPoints = ['No key points extracted, please review the document manually.'];
+    }
 
     onProgress({ progress: 80, status: 'Generating study questions...', error: null });
 
@@ -211,53 +243,64 @@ Explanation: (Why this is the correct answer)
 
 Generate 11 questions in this exact format.`;
 
-    // Use the retry logic for the questions request
-    const questionsResponse = await fetchWithRetry(
-      'https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct',
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${huggingFaceApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          inputs: questionsPrompt,
-          parameters: {
-            max_length: 1000,
-            temperature: 0.3,
-            top_p: 0.9,
-            return_full_text: false
-          }
-        })
-      }
-    );
+    const questionsOptions = {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: questionsPrompt }] }],
+        generationConfig: {
+          temperature: 0.3,
+          topP: 0.9,
+          maxOutputTokens: 2000,
+        }
+      })
+    };
 
-    if (!questionsResponse.ok) {
+    // Use the retry logic for the questions request
+    const questionsResponse = await fetchWithRetry(geminiEndpoint, questionsOptions);
+    const questionsResponseText = await questionsResponse.text();
+    const questionsText = extractCandidateText(questionsResponseText);
+
+    if (!questionsText) {
       throw new Error('Failed to generate questions');
     }
-
-    const questionsResult = await questionsResponse.json();
-    const questionsText = questionsResult[0].generated_text;
 
     // Parse questions
     const questionBlocks = questionsText.split(/Question: /).filter(Boolean);
     let questions = questionBlocks.map(block => {
       const lines = block.split('\n').filter(Boolean);
       const question = lines[0].trim();
-      const options = lines.slice(1, 5).map(opt => opt.replace(/^[A-D]\)\s*/, '').trim());
-      const correctAnswer = lines.find(l => l.startsWith('Correct:'))?.replace('Correct:', '').trim();
-      const explanation = lines.find(l => l.startsWith('Explanation:'))?.replace('Explanation:', '').trim() || '';
+      
+      // Extract options
+      const optionLines = lines.filter(line => /^[A-D]\)/.test(line.trim()));
+      const options = optionLines.map(opt => opt.replace(/^[A-D]\)\s*/, '').trim());
+      
+      // Extract correct answer
+      const correctLine = lines.find(l => l.trim().startsWith('Correct:'));
+      const correctAnswer = correctLine ? correctLine.replace('Correct:', '').trim() : 'A';
+      
+      // Extract explanation
+      const explanationLine = lines.find(l => l.trim().startsWith('Explanation:'));
+      const explanation = explanationLine ? explanationLine.replace('Explanation:', '').trim() : '';
 
       return {
         question,
-        options,
+        options: options.length === 4 ? options : ['Option A', 'Option B', 'Option C', 'Option D'],
         correctAnswer: ['A', 'B', 'C', 'D'].indexOf(correctAnswer || 'A'),
         explanation
       };
     });
 
-    // Remove the first question (often contains mistakes)
+    // Remove the first question and make sure we have at least one
     questions = questions.slice(1);
+    if (questions.length === 0) {
+      questions = [{
+        question: 'No questions could be generated. Please review the document manually.',
+        options: ['Option A', 'Option B', 'Option C', 'Option D'],
+        correctAnswer: 0,
+        explanation: 'Please review the document manually.'
+      }];
+    }
 
     onProgress({ progress: 100, status: 'Processing complete!', error: null });
 

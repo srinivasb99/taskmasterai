@@ -1107,20 +1107,21 @@ return (
             remarkPlugins={[remarkMath, remarkGfm]}
             rehypePlugins={[rehypeKatex]}
             components={{
-              p: ({ children }) => <p className="mb-2">{children}</p>,
-              ul: ({ children }) => <ul className="list-disc ml-4 mb-2">{children}</ul>,
-              ol: ({ children }) => <ol className="list-decimal ml-4 mb-2">{children}</ol>,
-              li: ({ children }) => <li className="mb-1">{children}</li>,
-              code: ({ inline, children }) =>
+              p: ({ node, ...props }) => <p className="mb-2" {...props} />,
+              ul: ({ node, ...props }) => <ul className="list-disc ml-4 mb-2" {...props} />,
+              ol: ({ node, ...props }) => <ol className="list-decimal ml-4 mb-2" {...props} />,
+              li: ({ node, ...props }) => <li className="mb-1" {...props} />,
+              code: ({ node, inline, className, children, ...props }) =>
                 inline ? (
                   <code
-                    className={
+                    className={`${
                       isBlackoutEnabled
                         ? 'bg-gray-800 px-1 rounded'
                         : isIlluminateEnabled
                         ? 'bg-gray-300 px-1 rounded'
                         : 'bg-gray-800 px-1 rounded'
-                    }
+                    } ${className || ''}`}
+                    {...props}
                   >
                     {children}
                   </code>
@@ -1134,7 +1135,9 @@ return (
                         : 'bg-gray-800 p-2 rounded-lg overflow-x-auto'
                     }
                   >
-                    <code>{children}</code>
+                    <code className={className} {...props}>
+                      {children}
+                    </code>
                   </pre>
                 ),
             }}
@@ -1199,7 +1202,47 @@ return (
   {streamingAssistantContent && (
     <div className="flex justify-start">
       <div className={`max-w-[80%] rounded-lg px-4 py-2 ${assistantBubble}`}>
-        <ReactMarkdown>{streamingAssistantContent}</ReactMarkdown>
+        <ReactMarkdown
+          remarkPlugins={[remarkMath, remarkGfm]}
+          rehypePlugins={[rehypeKatex]}
+          components={{
+            p: ({ node, ...props }) => <p className="mb-2" {...props} />,
+            ul: ({ node, ...props }) => <ul className="list-disc ml-4 mb-2" {...props} />,
+            ol: ({ node, ...props }) => <ol className="list-decimal ml-4 mb-2" {...props} />,
+            li: ({ node, ...props }) => <li className="mb-1" {...props} />,
+            code: ({ node, inline, className, children, ...props }) =>
+              inline ? (
+                <code
+                  className={`${
+                    isBlackoutEnabled
+                      ? 'bg-gray-800 px-1 rounded'
+                      : isIlluminateEnabled
+                      ? 'bg-gray-300 px-1 rounded'
+                      : 'bg-gray-800 px-1 rounded'
+                  } ${className || ''}`}
+                  {...props}
+                >
+                  {children}
+                </code>
+              ) : (
+                <pre
+                  className={
+                    isBlackoutEnabled
+                      ? 'bg-gray-800 p-2 rounded-lg overflow-x-auto'
+                      : isIlluminateEnabled
+                      ? 'bg-gray-300 p-2 rounded-lg overflow-x-auto'
+                      : 'bg-gray-800 p-2 rounded-lg overflow-x-auto'
+                  }
+                >
+                  <code className={className} {...props}>
+                    {children}
+                  </code>
+                </pre>
+              ),
+          }}
+        >
+          {streamingAssistantContent}
+        </ReactMarkdown>
       </div>
     </div>
   )}
@@ -1220,26 +1263,25 @@ return (
   <div ref={chatEndRef} />
 </div>
 
-
-          {/* Chat Input */}
-          <form onSubmit={handleChatSubmit} className={`p-4 border-t ${headerBorder}`}>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={chatMessage}
-                onChange={(e) => setChatMessage(e.target.value)}
-                placeholder="Ask TaskMaster about your items or set a timer..."
-                className={`flex-1 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputBg}`}
-              />
-              <button
-                type="submit"
-                disabled={isChatLoading}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Send className="w-5 h-5" />
-              </button>
-            </div>
-          </form>
+{/* Chat Input */}
+<form onSubmit={handleChatSubmit} className={`p-4 border-t ${headerBorder}`}>
+  <div className="flex gap-2">
+    <input
+      type="text"
+      value={chatMessage}
+      onChange={(e) => setChatMessage(e.target.value)}
+      placeholder="Ask TaskMaster about your items or set a timer..."
+      className={`flex-1 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputBg}`}
+    />
+    <button
+      type="submit"
+      disabled={isChatLoading}
+      className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+    >
+      <Send className="w-5 h-5" />
+    </button>
+  </div>
+</form>
         </div>
       )}
     </main>

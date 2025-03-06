@@ -717,12 +717,7 @@ const handleChatSubmit = async (e: React.FormEvent) => {
     // Additionally, remove any leftover empty JSON/code blocks (i.e. empty triple-backticks).
     assistantReply = assistantReply.replace(/```(?:json)?\s*```/g, '').trim();
 
-    // Also, remove any extra empty lines.
-    assistantReply = assistantReply
-      .split('\n')
-      .filter(line => line.trim() !== '')
-      .join('\n')
-      .trim();
+
 
     // Save the assistant's final message with educational content if available.
     if (educationalContent) {

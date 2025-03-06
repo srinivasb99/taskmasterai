@@ -61,7 +61,7 @@ import { NewNoteModal } from './NewNoteModal';
 import { SplitView } from './SplitView';
 import { NoteChat } from './NoteChat';
 import { getCurrentUser } from '../lib/settings-firebase';
-
+import { geminiApiKey } from '../lib/dashboard-firebase';
 
 // Types
 interface Note {
@@ -90,7 +90,8 @@ interface UploadProgressState {
   error: string | null;
 }
 
-const huggingFaceApiKey = "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";
+// Replace Hugging Face API key with Gemini API
+// const huggingFaceApiKey = "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";
 
 export function Notes() {
   const navigate = useNavigate();
@@ -112,33 +113,32 @@ export function Notes() {
     return stored ? JSON.parse(stored) : false;
   });
 
-useEffect(() => {
-  const firebaseUser = getCurrentUser();
-  if (firebaseUser) {
-    // List of authorized developer emails
-    const devEmails = [
-      'srinibaj10@gmail.com',
-      'bajinsrinivasr@lexington1.net',
-      'fugegate@gmail.com'
-    ];
-    
-    // If the user's email is not in the developer list, redirect to the outage page
-    if (!devEmails.includes(firebaseUser.email)) {
-      navigate('/notes');
-      return;
+  useEffect(() => {
+    const firebaseUser = getCurrentUser();
+    if (firebaseUser) {
+      // List of authorized developer emails
+      const devEmails = [
+        'srinibaj10@gmail.com',
+        'bajinsrinivasr@lexington1.net',
+        'fugegate@gmail.com'
+      ];
+      
+      // If the user's email is not in the developer list, redirect to the outage page
+      if (!devEmails.includes(firebaseUser.email)) {
+        navigate('/notes');
+        return;
+      }
+      
+      // User is authenticated and is a developer
+      setUser(firebaseUser);
+      setUserName(firebaseUser.displayName || "User");
+    } else {
+      navigate('/login');
     }
-    
-    // User is authenticated and is a developer
-    setUser(firebaseUser);
-    setUserName(firebaseUser.displayName || "User");
-  } else {
-    navigate('/login');
-  }
-  setLoading(false);
-}, [navigate]);
+    setLoading(false);
+  }, [navigate]);
 
-
-    // Editing state
+  // Editing state
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editContent, setEditContent] = useState('');
@@ -164,8 +164,7 @@ useEffect(() => {
   // Question answers state
   const [questionAnswers, setQuestionAnswers] = useState<{[key: string]: number | null}>({});
 
-
-   // Handle window resize
+  // Handle window resize
   useEffect(() => {
     const handleResize = () => {
       const mobile = window.innerWidth < 768;
@@ -177,7 +176,6 @@ useEffect(() => {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
-
   
   // Update localStorage whenever the sidebar state changes
   useEffect(() => {
@@ -235,7 +233,7 @@ useEffect(() => {
     setShowChatModal(true);
   };
 
-    const handleEditNote = () => {
+  const handleEditNote = () => {
     if (!selectedNote) return;
     setEditTitle(selectedNote.title);
     setEditContent(selectedNote.content);
@@ -243,29 +241,23 @@ useEffect(() => {
     setIsEditing(true);
   };
 
-
-   const handleSaveEdit = async () => {
+  const handleSaveEdit = async () => {
     if (!selectedNote || !editTitle.trim() || !editContent.trim()) return;
 
     setIsSaving(true);
-     try {
-
-     await updateNote(selectedNote.id, {
+    try {
+      await updateNote(selectedNote.id, {
         title: editTitle.trim(),
         content: editContent.trim(),
         tags: editTags,
         updatedAt: Timestamp.now()
       });
       setIsEditing(false);
-
-       } catch (error) {
-
-       console.error('Error saving note:', error);
-
-       setUploadProgress(prev => ({
+    } catch (error) {
+      console.error('Error saving note:', error);
+      setUploadProgress(prev => ({
         ...prev,
-
-          error: 'Failed to save note'
+        error: 'Failed to save note'
       }));
     } finally {
       setIsSaving(false);
@@ -307,7 +299,7 @@ useEffect(() => {
     }
   };
 
-    const handleCancelEdit = () => {
+  const handleCancelEdit = () => {
     setIsEditing(false);
     setEditTitle('');
     setEditContent('');
@@ -335,27 +327,23 @@ useEffect(() => {
     }
   };
 
-   const handleRemoveTag = (tagToRemove: string) => {
+  const handleRemoveTag = (tagToRemove: string) => {
     setEditTags(editTags.filter(tag => tag !== tagToRemove));
   };
 
-    const handleRegenerateQuestions = async () => {
+  const handleRegenerateQuestions = async () => {
     if (!selectedNote) return;
 
-        setIsRegeneratingQuestions(true);
+    setIsRegeneratingQuestions(true);
     try {
-
-      await regenerateStudyQuestions(selectedNote.id, selectedNote.content, huggingFaceApiKey);
+      // Updated to use Gemini API key instead of HuggingFace
+      await regenerateStudyQuestions(selectedNote.id, selectedNote.content, geminiApiKey);
     } catch (error) {
-
       console.error('Error regenerating questions:', error);
-
       setUploadProgress(prev => ({
         ...prev,
-
         error: 'Failed to regenerate questions'
-
-              }));
+      }));
     } finally {
       setIsRegeneratingQuestions(false);
     }
@@ -371,7 +359,8 @@ useEffect(() => {
         error: null
       });
 
-      const processedText = await processTextToAINote(text, user.uid, huggingFaceApiKey);
+      // Updated to use Gemini API key instead of HuggingFace
+      const processedText = await processTextToAINote(text, user.uid, geminiApiKey);
 
       setUploadProgress({
         progress: 80,
@@ -404,10 +393,10 @@ useEffect(() => {
   const handlePDFUpload = async (file: File) => {
     if (!user) return;
     try {
+      // Updated to use Gemini API key instead of HuggingFace
       const processedPDF = await processPDF(
         file,
         user.uid,
-        huggingFaceApiKey,
         setUploadProgress
       );
 
@@ -437,10 +426,10 @@ useEffect(() => {
   const handleYoutubeLink = async (url: string) => {
     if (!user) return;
     try {
+      // Updated to use Gemini API key instead of HuggingFace
       const processedYouTube = await processYouTube(
         url,
         user.uid,
-        huggingFaceApiKey,
         setUploadProgress
       );
 
@@ -473,6 +462,7 @@ useEffect(() => {
       [questionIndex]: selectedOption
     }));
   };
+}
 
 
 

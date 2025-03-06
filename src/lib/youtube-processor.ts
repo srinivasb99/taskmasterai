@@ -1,6 +1,7 @@
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { storage } from './firebase';
 import { v4 as uuidv4 } from 'uuid';
+import { geminiApiKey } from './dashboard-firebase';
 
 interface ProcessingProgress {
   progress: number;
@@ -22,6 +23,55 @@ interface ProcessedYouTube {
 }
 
 const YOUTUBE_API_KEY = 'AIzaSyD4iosX8Y1X4bOThSGhYyUfCmWKBEkc6x4';
+const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`;
+
+// Helper function to delay execution
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Helper function to retry fetch requests
+async function fetchWithRetry(url: string, options: RequestInit, retries = 3, delayMs = 2000): Promise<Response> {
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      const response = await fetch(url, options);
+      if (response.ok) {
+        return response;
+      }
+      // Retry only on timeout-related status codes (503, 504)
+      if (response.status === 503 || response.status === 504) {
+        await sleep(delayMs);
+      } else {
+        throw new Error(`Request failed with status: ${response.status}`);
+      }
+    } catch (error) {
+      if (attempt === retries - 1) throw error;
+      await sleep(delayMs);
+    }
+  }
+  throw new Error(`Max retries reached for: ${url}`);
+}
+
+// Extract the "candidate text" from the Gemini JSON response
+const extractCandidateText = (text: string): string => {
+  let candidateText = text;
+  try {
+    const jsonResponse = JSON.parse(text);
+    if (
+      jsonResponse &&
+      jsonResponse.candidates &&
+      jsonResponse.candidates[0] &&
+      jsonResponse.candidates[0].content &&
+      jsonResponse.candidates[0].content.parts &&
+      jsonResponse.candidates[0].content.parts[0]
+    ) {
+      candidateText = jsonResponse.candidates[0].content.parts[0].text;
+    }
+  } catch (err) {
+    console.error('Error parsing Gemini response:', err);
+  }
+  return candidateText;
+};
 
 // Extract video ID from YouTube URL
 function getVideoId(url: string): string | null {
@@ -33,12 +83,16 @@ function getVideoId(url: string): string | null {
 export async function processYouTube(
   url: string,
   userId: string,
-  huggingFaceApiKey: string,
+  apiKey: string,
+  apiType: 'huggingface' | 'gemini' = 'gemini',
   onProgress: (progress: ProcessingProgress) => void
 ): Promise<ProcessedYouTube> {
   try {
+    // Ensure onProgress is a function
+    const safeProgress = typeof onProgress === 'function' ? onProgress : () => {};
+    
     // Initial progress update
-    onProgress({ progress: 0, status: 'Starting YouTube processing...', error: null });
+    safeProgress({ progress: 0, status: 'Starting YouTube processing...', error: null });
 
     // Extract video ID
     const videoId = getVideoId(url);
@@ -46,7 +100,7 @@ export async function processYouTube(
       throw new Error('Invalid YouTube URL');
     }
 
-    onProgress({ progress: 20, status: 'Fetching video data...', error: null });
+    safeProgress({ progress: 20, status: 'Fetching video data...', error: null });
 
     // Fetch video data from YouTube API
     const videoResponse = await fetch(
@@ -63,7 +117,7 @@ export async function processYouTube(
     }
 
     const videoInfo = videoData.items[0].snippet;
-    onProgress({ progress: 40, status: 'Retrieving transcript...', error: null });
+    safeProgress({ progress: 40, status: 'Retrieving transcript...', error: null });
 
     // Fetch video transcript
     const transcriptResponse = await fetch(
@@ -86,9 +140,9 @@ export async function processYouTube(
       }
     }
 
-    onProgress({ progress: 60, status: 'Generating summary...', error: null });
+    safeProgress({ progress: 60, status: 'Generating summary...', error: null });
 
-    // Generate summary using Hugging Face API
+    // Create summary prompt
     const summaryPrompt = `
 Analyze the following YouTube video content and generate:
 1. A clear, concise summary (4-6 sentences)
@@ -115,46 +169,93 @@ Key Points:
 9. [Ninth key point]
 10. [Tenth key point]`;
 
-    const summaryResponse = await fetch(
-      'https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct',
-      {
+    let summaryText = '';
+    
+    // Generate summary using the selected API
+    if (apiType === 'huggingface') {
+      // Hugging Face API implementation
+      const summaryResponse = await fetch(
+        'https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct',
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            inputs: summaryPrompt,
+            parameters: {
+              max_length: 1000,
+              temperature: 0.3,
+              top_p: 0.9,
+              return_full_text: false
+            }
+          })
+        }
+      );
+
+      if (!summaryResponse.ok) {
+        throw new Error('Failed to generate summary with Hugging Face API');
+      }
+
+      const summaryResult = await summaryResponse.json();
+      summaryText = summaryResult[0].generated_text;
+    } else {
+      // Gemini API implementation
+      const summaryOptions = {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${huggingFaceApiKey}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          inputs: summaryPrompt,
-          parameters: {
-            max_length: 1000,
+          contents: [{ parts: [{ text: summaryPrompt }] }],
+          generationConfig: {
             temperature: 0.3,
-            top_p: 0.9,
-            return_full_text: false
+            topP: 0.9,
+            maxOutputTokens: 1000,
           }
         })
-      }
-    );
+      };
 
-    if (!summaryResponse.ok) {
-      throw new Error('Failed to generate summary');
+      try {
+        const summaryResponse = await fetchWithRetry(GEMINI_ENDPOINT, summaryOptions);
+        const summaryResponseText = await summaryResponse.text();
+        summaryText = extractCandidateText(summaryResponseText);
+        
+        if (!summaryText) {
+          throw new Error('Failed to generate summary with Gemini API');
+        }
+      } catch (summaryError) {
+        console.error('Summary generation error:', summaryError);
+        safeProgress({
+          progress: 70,
+          status: 'Failed to generate summary, continuing with default placeholder...',
+          error: summaryError instanceof Error ? summaryError.message : 'Unknown summary generation error'
+        });
+        summaryText = 'Summary:\nUnable to generate summary for this video.\n\nKey Points:\n1. Please review the video manually.\n';
+      }
     }
 
-    const summaryResult = await summaryResponse.json();
-    const summaryText = summaryResult[0].generated_text;
-
     // Parse summary and key points
-    const summary = summaryText.split('Key Points:')[0].replace('Summary:', '').trim();
-    const keyPoints = summaryText
-      .split('Key Points:')[1]
-      .split('\n')
-      .filter(line => line.trim().match(/^\d+\./))
-      .map(point => point.replace(/^\d+\.\s*/, '').trim());
+    const summaryParts = summaryText.split('Key Points:');
+    const summary = summaryParts[0].replace('Summary:', '').trim();
+    
+    let keyPoints: string[] = [];
+    if (summaryParts.length > 1) {
+      keyPoints = summaryParts[1]
+        .split('\n')
+        .filter(line => line.trim().match(/^\d+\./))
+        .map(point => point.replace(/^\d+\.\s*/, '').trim());
+    }
 
-    onProgress({ progress: 80, status: 'Generating study questions...', error: null });
+    // If we didn't get key points, still proceed with a placeholder
+    if (keyPoints.length === 0) {
+      keyPoints = ['No key points extracted, please review the video manually.'];
+    }
 
-    // Generate study questions (generate 11 so we can remove the first question)
+    safeProgress({ progress: 80, status: 'Generating study questions...', error: null });
+
+    // Create questions prompt
     const questionsPrompt = `
-Based on the following key points from a YouTube video, generate 11 multiple-choice questions:
+Based on the following key points from a YouTube video, generate 5 multiple-choice questions:
 
 ${keyPoints.join('\n')}
 
@@ -167,56 +268,127 @@ D) (Fourth option)
 Correct: (Letter of correct answer)
 Explanation: (Why this is the correct answer)
 
-Generate 11 questions in this exact format.`;
+Generate 5 questions in this exact format.`;
 
-    const questionsResponse = await fetch(
-      'https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct',
-      {
+    let questions = [];
+    
+    // Generate questions using the selected API
+    if (apiType === 'huggingface') {
+      // Hugging Face API implementation
+      const questionsResponse = await fetch(
+        'https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct',
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            inputs: questionsPrompt,
+            parameters: {
+              max_length: 1000,
+              temperature: 0.3,
+              top_p: 0.9,
+              return_full_text: false
+            }
+          })
+        }
+      );
+
+      if (!questionsResponse.ok) {
+        throw new Error('Failed to generate questions with Hugging Face API');
+      }
+
+      const questionsResult = await questionsResponse.json();
+      const questionsText = questionsResult[0].generated_text;
+
+      // Parse questions
+      const questionBlocks = questionsText.split(/Question: /).filter(Boolean);
+      questions = questionBlocks.map(block => {
+        const lines = block.split('\n').filter(Boolean);
+        const question = lines[0].trim();
+        const options = lines.slice(1, 5).map(opt => opt.replace(/^[A-D]\)\s*/, '').trim());
+        const correctAnswer = lines.find(l => l.startsWith('Correct:'))?.replace('Correct:', '').trim();
+        const explanation = lines.find(l => l.startsWith('Explanation:'))?.replace('Explanation:', '').trim() || '';
+
+        return {
+          question,
+          options,
+          correctAnswer: ['A', 'B', 'C', 'D'].indexOf(correctAnswer || 'A'),
+          explanation
+        };
+      });
+    } else {
+      // Gemini API implementation
+      const questionsOptions = {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${huggingFaceApiKey}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          inputs: questionsPrompt,
-          parameters: {
-            max_length: 1000,
+          contents: [{ parts: [{ text: questionsPrompt }] }],
+          generationConfig: {
             temperature: 0.3,
-            top_p: 0.9,
-            return_full_text: false
+            topP: 0.9,
+            maxOutputTokens: 2000,
           }
         })
-      }
-    );
+      };
 
-    if (!questionsResponse.ok) {
-      throw new Error('Failed to generate questions');
+      try {
+        // Use the retry logic for the questions request
+        const questionsResponse = await fetchWithRetry(GEMINI_ENDPOINT, questionsOptions);
+        const questionsResponseText = await questionsResponse.text();
+        const questionsText = extractCandidateText(questionsResponseText);
+
+        if (!questionsText) {
+          throw new Error('Failed to generate questions with Gemini API');
+        }
+
+        // Parse questions
+        const questionBlocks = questionsText.split(/Question: /).filter(Boolean);
+        questions = questionBlocks.map(block => {
+          const lines = block.split('\n').filter(Boolean);
+          const question = lines[0].trim();
+          
+          // Extract options
+          const optionLines = lines.filter(line => /^[A-D]\)/.test(line.trim()));
+          const options = optionLines.map(opt => opt.replace(/^[A-D]\)\s*/, '').trim());
+          
+          // Extract correct answer
+          const correctLine = lines.find(l => l.trim().startsWith('Correct:'));
+          const correctAnswer = correctLine ? correctLine.replace('Correct:', '').trim() : 'A';
+          
+          // Extract explanation
+          const explanationLine = lines.find(l => l.trim().startsWith('Explanation:'));
+          const explanation = explanationLine ? explanationLine.replace('Explanation:', '').trim() : '';
+
+          return {
+            question,
+            options: options.length === 4 ? options : ['Option A', 'Option B', 'Option C', 'Option D'],
+            correctAnswer: ['A', 'B', 'C', 'D'].indexOf(correctAnswer || 'A'),
+            explanation
+          };
+        });
+      } catch (questionsError) {
+        console.error('Questions generation error:', questionsError);
+        safeProgress({
+          progress: 90,
+          status: 'Failed to generate questions, continuing with placeholder...',
+          error: questionsError instanceof Error ? questionsError.message : 'Unknown questions generation error'
+        });
+      }
     }
 
-    const questionsResult = await questionsResponse.json();
-    const questionsText = questionsResult[0].generated_text;
+    // Make sure we have at least one question
+    if (!questions || questions.length === 0) {
+      questions = [{
+        question: 'No questions could be generated. Please review the video manually.',
+        options: ['Option A', 'Option B', 'Option C', 'Option D'],
+        correctAnswer: 0,
+        explanation: 'Please review the video manually.'
+      }];
+    }
 
-    // Parse questions
-    const questionBlocks = questionsText.split(/Question: /).filter(Boolean);
-    let questions = questionBlocks.map(block => {
-      const lines = block.split('\n').filter(Boolean);
-      const question = lines[0].trim();
-      const options = lines.slice(1, 5).map(opt => opt.replace(/^[A-D]\)\s*/, '').trim());
-      const correctAnswer = lines.find(l => l.startsWith('Correct:'))?.replace('Correct:', '').trim();
-      const explanation = lines.find(l => l.startsWith('Explanation:'))?.replace('Explanation:', '').trim() || '';
-
-      return {
-        question,
-        options,
-        correctAnswer: ['A', 'B', 'C', 'D'].indexOf(correctAnswer || 'A'),
-        explanation
-      };
-    });
-
-    // Remove the first question (usually contains mistakes)
-    questions = questions.slice(1);
-
-    onProgress({ progress: 100, status: 'Processing complete!', error: null });
+    safeProgress({ progress: 100, status: 'Processing complete!', error: null });
 
     // Return processed data
     return {
@@ -229,11 +401,13 @@ Generate 11 questions in this exact format.`;
 
   } catch (error) {
     console.error('YouTube processing error:', error);
-    onProgress({
-      progress: 0,
-      status: 'Error processing YouTube video',
-      error: error instanceof Error ? error.message : 'Unknown error occurred'
-    });
+    if (typeof onProgress === 'function') {
+      onProgress({
+        progress: 0,
+        status: 'Error processing YouTube video',
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
+      });
+    }
     throw error;
   }
 }

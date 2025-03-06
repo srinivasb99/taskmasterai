@@ -1093,116 +1093,138 @@ return (
             </div>
           </div>
 
-          {/* Chat Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={chatEndRef}>
-            {chatHistory.map((message, index) => (
-  <div key={index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-    <div className={`max-w-[80%] rounded-lg px-4 py-2 ${message.role === 'user' ? userBubble : assistantBubble}`}>
-      {message.role === 'assistant' ? (
-        <MathJaxRenderer content={message.content} />
-      ) : (
-                  <ReactMarkdown
-                    remarkPlugins={[remarkMath, remarkGfm]}
-                    rehypePlugins={[rehypeKatex]}
-                    components={{
-                      p: ({ children }) => <p className="mb-2">{children}</p>,
-                      ul: ({ children }) => <ul className="list-disc ml-4 mb-2">{children}</ul>,
-                      ol: ({ children }) => <ol className="list-decimal ml-4 mb-2">{children}</ol>,
-                      li: ({ children }) => <li className="mb-1">{children}</li>,
-                      code: ({ inline, children }) =>
-                        inline ? (
-                          <code
-                            className={
-                              isBlackoutEnabled
-                                ? 'bg-gray-800 px-1 rounded'
-                                : (isIlluminateEnabled
-                                  ? 'bg-gray-300 px-1 rounded'
-                                  : 'bg-gray-800 px-1 rounded')
-                            }
-                          >
-                            {children}
-                          </code>
-                        ) : (
-                          <pre
-                            className={
-                              isBlackoutEnabled
-                                ? 'bg-gray-800 p-2 rounded-lg overflow-x-auto'
-                                : (isIlluminateEnabled
-                                  ? 'bg-gray-300 p-2 rounded-lg overflow-x-auto'
-                                  : 'bg-gray-800 p-2 rounded-lg overflow-x-auto')
-                            }
-                          >
-                            <code>{children}</code>
-                          </pre>
-                        ),
-                    }}
+{/* Chat Messages */}
+<div className="flex-1 overflow-y-auto p-4 space-y-4" ref={chatEndRef}>
+  {chatHistory.map((message, index) => (
+    <div
+      key={index}
+      className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+    >
+      <div
+        className={`max-w-[80%] rounded-lg px-4 py-2 ${
+          message.role === 'user' ? userBubble : assistantBubble
+        }`}
+      >
+        {message.role === 'assistant' ? (
+          <MathJaxRenderer content={message.content} />
+        ) : (
+          <ReactMarkdown
+            remarkPlugins={[remarkMath, remarkGfm]}
+            rehypePlugins={[rehypeKatex]}
+            components={{
+              p: ({ children }) => <p className="mb-2">{children}</p>,
+              ul: ({ children }) => <ul className="list-disc ml-4 mb-2">{children}</ul>,
+              ol: ({ children }) => <ol className="list-decimal ml-4 mb-2">{children}</ol>,
+              li: ({ children }) => <li className="mb-1">{children}</li>,
+              code: ({ inline, children }) =>
+                inline ? (
+                  <code
+                    className={
+                      isBlackoutEnabled
+                        ? 'bg-gray-800 px-1 rounded'
+                        : isIlluminateEnabled
+                        ? 'bg-gray-300 px-1 rounded'
+                        : 'bg-gray-800 px-1 rounded'
+                    }
                   >
-                    {message.content}
-                  </ReactMarkdown>
+                    {children}
+                  </code>
+                ) : (
+                  <pre
+                    className={
+                      isBlackoutEnabled
+                        ? 'bg-gray-800 p-2 rounded-lg overflow-x-auto'
+                        : isIlluminateEnabled
+                        ? 'bg-gray-300 p-2 rounded-lg overflow-x-auto'
+                        : 'bg-gray-800 p-2 rounded-lg overflow-x-auto'
+                    }
+                  >
+                    <code>{children}</code>
+                  </pre>
+                ),
+            }}
+          >
+            {message.content}
+          </ReactMarkdown>
+        )}
 
-                  {message.timer && (
-                    <div className="mt-2">
-                      <div className={`flex items-center space-x-2 rounded-lg px-4 py-2 ${
-                        isBlackoutEnabled
-                          ? 'bg-gray-800'
-                          : (isIlluminateEnabled ? 'bg-gray-100' : 'bg-gray-900')
-                      }`}>
-                        <TimerIcon className={`w-5 h-5 ${isBlackoutEnabled ? 'text-blue-400' : (isIlluminateEnabled ? 'text-blue-600' : 'text-blue-400')}`} />
-                        <Timer
-                          key={message.timer.id}
-                          initialDuration={message.timer.duration}
-                          onComplete={() => handleTimerComplete(message.timer!.id)}
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {message.flashcard && (
-                    <div className="mt-2">
-                      <FlashcardsQuestions
-                        type="flashcard"
-                        data={message.flashcard.data}
-                        onComplete={() => {}}
-                      />
-                    </div>
-                  )}
-                  {message.question && (
-                    <div className="mt-2">
-                      <FlashcardsQuestions
-                        type="question"
-                        data={message.question.data}
-                        onComplete={() => {}}
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-
-            {/* Streaming partial content */}
-            {streamingAssistantContent && (
-              <div className="flex justify-start">
-                <div className={`max-w-[80%] rounded-lg px-4 py-2 ${assistantBubble}`}>
-                  <ReactMarkdown>{streamingAssistantContent}</ReactMarkdown>
-                </div>
-              </div>
-            )}
-
-            {/* Loading dots */}
-            {isChatLoading && !streamingAssistantContent && (
-              <div className="flex justify-start">
-                <div className={`max-w-[80%] rounded-lg px-4 py-2 ${assistantBubble}`}>
-                  <div className="flex space-x-2">
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100"></div>
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200"></div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div ref={chatEndRef} />
+        {message.timer && (
+          <div className="mt-2">
+            <div
+              className={`flex items-center space-x-2 rounded-lg px-4 py-2 ${
+                isBlackoutEnabled
+                  ? 'bg-gray-800'
+                  : isIlluminateEnabled
+                  ? 'bg-gray-100'
+                  : 'bg-gray-900'
+              }`}
+            >
+              <TimerIcon
+                className={`w-5 h-5 ${
+                  isBlackoutEnabled
+                    ? 'text-blue-400'
+                    : isIlluminateEnabled
+                    ? 'text-blue-600'
+                    : 'text-blue-400'
+                }`}
+              />
+              <Timer
+                key={message.timer.id}
+                initialDuration={message.timer.duration}
+                onComplete={() => handleTimerComplete(message.timer.id)}
+              />
+            </div>
           </div>
+        )}
+
+        {message.flashcard && (
+          <div className="mt-2">
+            <FlashcardsQuestions
+              type="flashcard"
+              data={message.flashcard.data}
+              onComplete={() => {}}
+            />
+          </div>
+        )}
+
+        {message.question && (
+          <div className="mt-2">
+            <FlashcardsQuestions
+              type="question"
+              data={message.question.data}
+              onComplete={() => {}}
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  ))}
+
+  {/* Streaming partial content */}
+  {streamingAssistantContent && (
+    <div className="flex justify-start">
+      <div className={`max-w-[80%] rounded-lg px-4 py-2 ${assistantBubble}`}>
+        <ReactMarkdown>{streamingAssistantContent}</ReactMarkdown>
+      </div>
+    </div>
+  )}
+
+  {/* Loading dots */}
+  {isChatLoading && !streamingAssistantContent && (
+    <div className="flex justify-start">
+      <div className={`max-w-[80%] rounded-lg px-4 py-2 ${assistantBubble}`}>
+        <div className="flex space-x-2">
+          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100"></div>
+          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200"></div>
+        </div>
+      </div>
+    </div>
+  )}
+
+  <div ref={chatEndRef} />
+</div>
+
 
           {/* Chat Input */}
           <form onSubmit={handleChatSubmit} className={`p-4 border-t ${headerBorder}`}>

@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import MathJaxRenderer from './MathJaxRenderer';
 import {
   Send,
   Timer as TimerIcon,
@@ -496,88 +495,85 @@ const conversationActive = isBlackoutEnabled
     };
 
     return `
-[CONTEXT]  
-User's Name: ${userName}  
-Current Date: ${currentDateTime.date}  
-Current Time: ${currentDateTime.time}  
+[CONTEXT]
+User's Name: ${userName}
+Current Date: ${currentDateTime.date}
+Current Time: ${currentDateTime.time}
 
-${itemsText}  
+${itemsText}
 
-[CONVERSATION SO FAR]  
-${conversationSoFar}  
+[CONVERSATION SO FAR]
+${conversationSoFar}
 
-[NEW USER MESSAGE]  
-${userName}: ${userMessage}  
+[NEW USER MESSAGE]
+${userName}: ${userMessage}
 
-You are TaskMaster, a friendly and versatile AI productivity assistant. Engage in casual conversation, provide productivity advice, and discuss ${userName}'s items only when explicitly asked by ${userName}.  
+You are TaskMaster, a friendly and versatile AI productivity assistant. Engage in casual conversation, provide productivity advice, and discuss ${userName}'s items only when explicitly asked by ${userName}.
 
-Guidelines:  
+Guidelines:
 
-1. General Conversation: 
-   - Respond in a friendly, natural tone matching ${userName}'s style.  
-   - Do not include any internal instructions, meta commentary, or explanations of your process.  
-   - Do not include phrases such as "Here's my response to continue the conversation:" or similar wording that introduces your reply.  
-   - Do not include or reference code blocks for languages like Python, Bash, or any other unless explicitly requested by ${userName}.  
-   - Only reference ${userName}'s items if ${userName} explicitly asks about them.  
+1. General Conversation:
+   - Respond in a friendly, natural tone matching ${userName}'s style.
+   - Do not include any internal instructions, meta commentary, or explanations of your process.
+   - Do not include phrases such as "Here's my response to continue the conversation:" or similar wording that introduces your reply.
+   - Do not include or reference code blocks for languages like Python, Bash, or any other unless explicitly requested by ${userName}.
+   - Only reference ${userName}'s items if ${userName} explicitly asks about them.
 
-2. Educational Content (JSON): 
-   - If ${userName} explicitly requests educational content (flashcards or quiz questions), return exactly one JSON object.  
-   - The JSON must be wrapped in a single code block using triple backticks and the "json" language identifier.  
-   - Return only the JSON object with no additional text or extra lines.  
-   - IMPORTANT: Use MathJax formatting for all math-related content. 
-     - Wrap inline math expressions in **\\( ... \\)**.  
-     - Wrap block math expressions in **\\[ ... \\]**.  
-   - Use one of the following formats:  
+2. Educational Content (JSON):
+   - If ${userName} explicitly requests educational content (flashcards or quiz questions), return exactly one JSON object.
+   - The JSON must be wrapped in a single code block using triple backticks and the "json" language identifier.
+   - Return only the JSON object with no additional text or extra lines.
+   - Use one of the following formats:
 
-     **For flashcards:**  
-     \`\`\`json  
+     For flashcards:
+     \`\`\`json
      {
        "type": "flashcard",
        "data": [
          {
            "id": "unique-id-1",
-           "question": "What is the derivative of \\(x^2\\)?",
-           "answer": "The derivative of \\(x^2\\) is \\(2x\\).",
-           "topic": "Calculus"
+           "question": "Question 1",
+           "answer": "Answer 1",
+           "topic": "Subject area"
          },
          {
            "id": "unique-id-2",
-           "question": "Solve for \\(x\\): \\(2x + 3 = 7\\).",
-           "answer": "Subtract 3 from both sides and divide by 2: \\(x = 2\\).",
-           "topic": "Algebra"
+           "question": "Question 2",
+           "answer": "Answer 2",
+           "topic": "Subject area"
          }
        ]
      }
-     \`\`\`  
+     \`\`\`
 
-     **For quiz questions:**  
-     \`\`\`json  
+     For quiz questions:
+     \`\`\`json
      {
        "type": "question",
        "data": [
          {
            "id": "unique-id-1",
-           "question": "What is the integral of \\( \\sin x \\) with respect to \\( x \\)?",
-           "options": ["\\( \\cos x \\)", "\\( -\\cos x \\)", "\\( \\sin x \\)", "\\( -\\sin x \\)"],
-           "correctAnswer": 1,
-           "explanation": "The integral of \\( \\sin x \\) is \\( -\\cos x \\), since differentiation of \\( -\\cos x \\) gives \\( \\sin x \\)."
+           "question": "Question 1",
+           "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
+           "correctAnswer": 0,
+           "explanation": "Explanation 1"
          },
          {
            "id": "unique-id-2",
-           "question": "What is the value of \\( \\frac{1}{2} + \\frac{1}{3} \\)?",
-           "options": ["\\( \\frac{2}{5} \\)", "\\( \\frac{3}{5} \\)", "\\( \\frac{5}{6} \\)", "\\( \\frac{1}{6} \\)"],
-           "correctAnswer": 2,
-           "explanation": "Find a common denominator (6): \\( \\frac{3}{6} + \\frac{2}{6} = \\frac{5}{6} \\)."
+           "question": "Question 2",
+           "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
+           "correctAnswer": 1,
+           "explanation": "Explanation 2"
          }
        ]
      }
-     \`\`\`  
+     \`\`\`
 
 3. Data Modifications (JSON):
-   - When ${userName} provides a command to create or update an item (e.g., "add a task to buy a dog by tomorrow", "create a goal to exercise daily", etc.), you must respond by first stating the action you will do and then create a JSON block that specifies the action and its payload.  
-   - The JSON block must be wrapped in triple backticks with the "json" language identifier and returned as the only content for that modification.  
-   - For example:  
-   \`\`\`json  
+   - When ${userName} provides a command to create or update an item (e.g., "add a task to buy a dog by tomorrow", "create a goal to exercise daily", etc.), you must respond by first stating the action you will do and then create a JSON block that specifies the action and its payload.
+   - The JSON block must be wrapped in triple backticks with the "json" language identifier and returned as the only content for that modification.
+   - For example:
+   \`\`\`json
    {
      "action": "createTask",
      "payload": {
@@ -585,16 +581,17 @@ Guidelines:
        "dueDate": "2025-03-03"
      }
    }
-   \`\`\`  
-   - You may return multiple JSON blocks if multiple items are to be created or updated.  
-   - Do not include any additional text with the JSON block; it should be the sole output for that command.  
+   \`\`\`
+   - You may return multiple JSON blocks if multiple items are to be created or updated.
+   - Do not include any additional text with the JSON block; it should be the sole output for that command.
 
-4. Response Structure: 
-   - Provide a direct, natural response to ${userName} without extraneous meta-text.  
-   - Do not mix JSON with regular text. If you return JSON (for educational content or data modifications), return it as the only content (i.e. no additional text or empty lines).  
-   - Always address ${userName} in a friendly and helpful tone.  
+4. Response Structure:
+   - Provide a direct, natural response to ${userName} without extraneous meta-text.
+   - Do not mix JSON with regular text. If you return JSON (for educational content or data modifications), return it as the only content (i.e. no additional text or empty lines).
+   - Always address ${userName} in a friendly and helpful tone.
 
-**Follow these instructions strictly.**  
+Follow these instructions strictly.
+
 `;
   };
 
@@ -719,6 +716,13 @@ const handleChatSubmit = async (e: React.FormEvent) => {
 
     // Additionally, remove any leftover empty JSON/code blocks (i.e. empty triple-backticks).
     assistantReply = assistantReply.replace(/```(?:json)?\s*```/g, '').trim();
+
+    // Also, remove any extra empty lines.
+    assistantReply = assistantReply
+      .split('\n')
+      .filter(line => line.trim() !== '')
+      .join('\n')
+      .trim();
 
     // Save the assistant's final message with educational content if available.
     if (educationalContent) {
@@ -1088,200 +1092,140 @@ return (
             </div>
           </div>
 
-{/* Chat Messages */}
-<div className="flex-1 overflow-y-auto p-4 space-y-4" ref={chatEndRef}>
-  {chatHistory.map((message, index) => (
-    <div
-      key={index}
-      className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-    >
-      <div
-        className={`max-w-[80%] rounded-lg px-4 py-2 ${
-          message.role === 'user' ? userBubble : assistantBubble
-        }`}
-      >
-        {message.role === 'assistant' ? (
-          <MathJaxRenderer content={message.content} />
-        ) : (
-          <ReactMarkdown
-            remarkPlugins={[remarkMath, remarkGfm]}
-            rehypePlugins={[rehypeKatex]}
-            components={{
-              p: ({ node, ...props }) => <p className="mb-2" {...props} />,
-              ul: ({ node, ...props }) => <ul className="list-disc ml-4 mb-2" {...props} />,
-              ol: ({ node, ...props }) => <ol className="list-decimal ml-4 mb-2" {...props} />,
-              li: ({ node, ...props }) => <li className="mb-1" {...props} />,
-              code: ({ node, inline, className, children, ...props }) =>
-                inline ? (
-                  <code
-                    className={`${
-                      isBlackoutEnabled
-                        ? 'bg-gray-800 px-1 rounded'
-                        : isIlluminateEnabled
-                        ? 'bg-gray-300 px-1 rounded'
-                        : 'bg-gray-800 px-1 rounded'
-                    } ${className || ''}`}
-                    {...props}
+          {/* Chat Messages */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={chatEndRef}>
+            {chatHistory.map((message, index) => (
+              <div
+                key={index}
+                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              >
+                <div
+                  className={`max-w-[80%] rounded-lg px-4 py-2 ${
+                    message.role === 'user' ? userBubble : assistantBubble
+                  }`}
+                >
+                  <ReactMarkdown
+                    remarkPlugins={[remarkMath, remarkGfm]}
+                    rehypePlugins={[rehypeKatex]}
+                    components={{
+                      p: ({ children }) => <p className="mb-2">{children}</p>,
+                      ul: ({ children }) => <ul className="list-disc ml-4 mb-2">{children}</ul>,
+                      ol: ({ children }) => <ol className="list-decimal ml-4 mb-2">{children}</ol>,
+                      li: ({ children }) => <li className="mb-1">{children}</li>,
+                      code: ({ inline, children }) =>
+                        inline ? (
+                          <code
+                            className={
+                              isBlackoutEnabled
+                                ? 'bg-gray-800 px-1 rounded'
+                                : (isIlluminateEnabled
+                                  ? 'bg-gray-300 px-1 rounded'
+                                  : 'bg-gray-800 px-1 rounded')
+                            }
+                          >
+                            {children}
+                          </code>
+                        ) : (
+                          <pre
+                            className={
+                              isBlackoutEnabled
+                                ? 'bg-gray-800 p-2 rounded-lg overflow-x-auto'
+                                : (isIlluminateEnabled
+                                  ? 'bg-gray-300 p-2 rounded-lg overflow-x-auto'
+                                  : 'bg-gray-800 p-2 rounded-lg overflow-x-auto')
+                            }
+                          >
+                            <code>{children}</code>
+                          </pre>
+                        ),
+                    }}
                   >
-                    {children}
-                  </code>
-                ) : (
-                  <pre
-                    className={
-                      isBlackoutEnabled
-                        ? 'bg-gray-800 p-2 rounded-lg overflow-x-auto'
-                        : isIlluminateEnabled
-                        ? 'bg-gray-300 p-2 rounded-lg overflow-x-auto'
-                        : 'bg-gray-800 p-2 rounded-lg overflow-x-auto'
-                    }
-                  >
-                    <code className={className} {...props}>
-                      {children}
-                    </code>
-                  </pre>
-                ),
-            }}
-          >
-            {message.content}
-          </ReactMarkdown>
-        )}
+                    {message.content}
+                  </ReactMarkdown>
 
-        {message.timer && (
-          <div className="mt-2">
-            <div
-              className={`flex items-center space-x-2 rounded-lg px-4 py-2 ${
-                isBlackoutEnabled
-                  ? 'bg-gray-800'
-                  : isIlluminateEnabled
-                  ? 'bg-gray-100'
-                  : 'bg-gray-900'
-              }`}
-            >
-              <TimerIcon
-                className={`w-5 h-5 ${
-                  isBlackoutEnabled
-                    ? 'text-blue-400'
-                    : isIlluminateEnabled
-                    ? 'text-blue-600'
-                    : 'text-blue-400'
-                }`}
+                  {message.timer && (
+                    <div className="mt-2">
+                      <div className={`flex items-center space-x-2 rounded-lg px-4 py-2 ${
+                        isBlackoutEnabled
+                          ? 'bg-gray-800'
+                          : (isIlluminateEnabled ? 'bg-gray-100' : 'bg-gray-900')
+                      }`}>
+                        <TimerIcon className={`w-5 h-5 ${isBlackoutEnabled ? 'text-blue-400' : (isIlluminateEnabled ? 'text-blue-600' : 'text-blue-400')}`} />
+                        <Timer
+                          key={message.timer.id}
+                          initialDuration={message.timer.duration}
+                          onComplete={() => handleTimerComplete(message.timer!.id)}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {message.flashcard && (
+                    <div className="mt-2">
+                      <FlashcardsQuestions
+                        type="flashcard"
+                        data={message.flashcard.data}
+                        onComplete={() => {}}
+                      />
+                    </div>
+                  )}
+                  {message.question && (
+                    <div className="mt-2">
+                      <FlashcardsQuestions
+                        type="question"
+                        data={message.question.data}
+                        onComplete={() => {}}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+
+            {/* Streaming partial content */}
+            {streamingAssistantContent && (
+              <div className="flex justify-start">
+                <div className={`max-w-[80%] rounded-lg px-4 py-2 ${assistantBubble}`}>
+                  <ReactMarkdown>{streamingAssistantContent}</ReactMarkdown>
+                </div>
+              </div>
+            )}
+
+            {/* Loading dots */}
+            {isChatLoading && !streamingAssistantContent && (
+              <div className="flex justify-start">
+                <div className={`max-w-[80%] rounded-lg px-4 py-2 ${assistantBubble}`}>
+                  <div className="flex space-x-2">
+                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100"></div>
+                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200"></div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div ref={chatEndRef} />
+          </div>
+
+          {/* Chat Input */}
+          <form onSubmit={handleChatSubmit} className={`p-4 border-t ${headerBorder}`}>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={chatMessage}
+                onChange={(e) => setChatMessage(e.target.value)}
+                placeholder="Ask TaskMaster about your items or set a timer..."
+                className={`flex-1 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputBg}`}
               />
-              <Timer
-                key={message.timer.id}
-                initialDuration={message.timer.duration}
-                onComplete={() => handleTimerComplete(message.timer.id)}
-              />
+              <button
+                type="submit"
+                disabled={isChatLoading}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Send className="w-5 h-5" />
+              </button>
             </div>
-          </div>
-        )}
-
-        {message.flashcard && (
-          <div className="mt-2">
-            <FlashcardsQuestions
-              type="flashcard"
-              data={message.flashcard.data}
-              onComplete={() => {}}
-            />
-          </div>
-        )}
-
-        {message.question && (
-          <div className="mt-2">
-            <FlashcardsQuestions
-              type="question"
-              data={message.question.data}
-              onComplete={() => {}}
-            />
-          </div>
-        )}
-      </div>
-    </div>
-  ))}
-
-  {/* Streaming partial content */}
-  {streamingAssistantContent && (
-    <div className="flex justify-start">
-      <div className={`max-w-[80%] rounded-lg px-4 py-2 ${assistantBubble}`}>
-        <ReactMarkdown
-          remarkPlugins={[remarkMath, remarkGfm]}
-          rehypePlugins={[rehypeKatex]}
-          components={{
-            p: ({ node, ...props }) => <p className="mb-2" {...props} />,
-            ul: ({ node, ...props }) => <ul className="list-disc ml-4 mb-2" {...props} />,
-            ol: ({ node, ...props }) => <ol className="list-decimal ml-4 mb-2" {...props} />,
-            li: ({ node, ...props }) => <li className="mb-1" {...props} />,
-            code: ({ node, inline, className, children, ...props }) =>
-              inline ? (
-                <code
-                  className={`${
-                    isBlackoutEnabled
-                      ? 'bg-gray-800 px-1 rounded'
-                      : isIlluminateEnabled
-                      ? 'bg-gray-300 px-1 rounded'
-                      : 'bg-gray-800 px-1 rounded'
-                  } ${className || ''}`}
-                  {...props}
-                >
-                  {children}
-                </code>
-              ) : (
-                <pre
-                  className={
-                    isBlackoutEnabled
-                      ? 'bg-gray-800 p-2 rounded-lg overflow-x-auto'
-                      : isIlluminateEnabled
-                      ? 'bg-gray-300 p-2 rounded-lg overflow-x-auto'
-                      : 'bg-gray-800 p-2 rounded-lg overflow-x-auto'
-                  }
-                >
-                  <code className={className} {...props}>
-                    {children}
-                  </code>
-                </pre>
-              ),
-          }}
-        >
-          {streamingAssistantContent}
-        </ReactMarkdown>
-      </div>
-    </div>
-  )}
-
-  {/* Loading dots */}
-  {isChatLoading && !streamingAssistantContent && (
-    <div className="flex justify-start">
-      <div className={`max-w-[80%] rounded-lg px-4 py-2 ${assistantBubble}`}>
-        <div className="flex space-x-2">
-          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100"></div>
-          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200"></div>
-        </div>
-      </div>
-    </div>
-  )}
-
-  <div ref={chatEndRef} />
-</div>
-
-{/* Chat Input */}
-<form onSubmit={handleChatSubmit} className={`p-4 border-t ${headerBorder}`}>
-  <div className="flex gap-2">
-    <input
-      type="text"
-      value={chatMessage}
-      onChange={(e) => setChatMessage(e.target.value)}
-      placeholder="Ask TaskMaster about your items or set a timer..."
-      className={`flex-1 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputBg}`}
-    />
-    <button
-      type="submit"
-      disabled={isChatLoading}
-      className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-    >
-      <Send className="w-5 h-5" />
-    </button>
-  </div>
-</form>
+          </form>
         </div>
       )}
     </main>

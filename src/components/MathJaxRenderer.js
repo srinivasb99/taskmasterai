@@ -1,17 +1,17 @@
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
+import { MathJax, MathJaxContext } from 'better-react-mathjax';
 
 const MathJaxRenderer = ({ content }) => {
-  const containerRef = useRef(null);
+  const config = {
+    loader: { load: ['input/tex', 'output/chtml'] },
+    tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] },
+  };
 
-  useEffect(() => {
-    if (window.MathJax && containerRef.current) {
-      window.MathJax.typesetPromise([containerRef.current]).catch((err) =>
-        console.error('MathJax typeset failed:', err)
-      );
-    }
-  }, [content]);
-
-  return <div ref={containerRef} dangerouslySetInnerHTML={{ __html: content }} />;
+  return (
+    <MathJaxContext version={3} config={config}>
+      <MathJax dynamic>{content}</MathJax>
+    </MathJaxContext>
+  );
 };
 
 export default MathJaxRenderer;

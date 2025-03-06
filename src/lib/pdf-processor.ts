@@ -84,15 +84,18 @@ export async function processPDF(
   onProgress: (progress: ProcessingProgress) => void
 ): Promise<ProcessedPDF> {
   try {
+    // Ensure onProgress is a function
+    const safeProgress = typeof onProgress === 'function' ? onProgress : () => {};
+    
     // Initial progress update
-    onProgress({ progress: 0, status: 'Starting PDF processing...', error: null });
+    safeProgress({ progress: 0, status: 'Starting PDF processing...', error: null });
 
     // Upload PDF to Firebase Storage
     const fileRef = ref(storage, `pdfs/${userId}/${uuidv4()}-${file.name}`);
     await uploadBytes(fileRef, file);
     const pdfUrl = await getDownloadURL(fileRef);
 
-    onProgress({ progress: 10, status: 'PDF uploaded, extracting text...', error: null });
+    safeProgress({ progress: 10, status: 'PDF uploaded, extracting text...', error: null });
 
     // Load PDF document
     const arrayBuffer = await file.arrayBuffer();
@@ -104,13 +107,21 @@ export async function processPDF(
     
     for (let pageNum = 1; pageNum <= numPages; pageNum++) {
       const page = await pdf.getPage(pageNum);
-      const content = await page.getTextContent();
-      const pageText = content.items.map(item => ('str' in item ? item.str : '')).join(' ');
-      extractedText += pageText + '\n';
+      // Safer text content extraction with error handling
+      try {
+        const content = await page.getTextContent();
+        const pageText = content.items
+          .map(item => ('str' in item ? item.str : ''))
+          .join(' ');
+        extractedText += pageText + '\n';
+      } catch (e) {
+        console.warn(`Error extracting text from page ${pageNum}:`, e);
+        extractedText += `[Text extraction failed for page ${pageNum}]\n`;
+      }
 
       // Update progress for text extraction
       const extractionProgress = 10 + (pageNum / numPages) * 30;
-      onProgress({
+      safeProgress({
         progress: extractionProgress,
         status: `Extracting text from page ${pageNum} of ${numPages}...`,
         error: null
@@ -119,46 +130,55 @@ export async function processPDF(
 
     // Check for scanned pages using OCR
     if (extractedText.trim().length < 100) {
-      onProgress({ progress: 40, status: 'Detected scanned PDF, performing OCR...', error: null });
+      safeProgress({ progress: 40, status: 'Detected scanned PDF, performing OCR...', error: null });
       
-      const worker = await createWorker();
-      
-      for (let pageNum = 1; pageNum <= numPages; pageNum++) {
-        const page = await pdf.getPage(pageNum);
-        const viewport = page.getViewport({ scale: 2.0 });
+      try {
+        const worker = await createWorker();
         
-        // Create canvas and render PDF page
-        const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d');
-        if (!context) {
-          throw new Error('Failed to get canvas context');
+        for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+          const page = await pdf.getPage(pageNum);
+          const viewport = page.getViewport({ scale: 2.0 });
+          
+          // Create canvas and render PDF page
+          const canvas = document.createElement('canvas');
+          const context = canvas.getContext('2d');
+          if (!context) {
+            throw new Error('Failed to get canvas context');
+          }
+          
+          canvas.height = viewport.height;
+          canvas.width = viewport.width;
+          
+          await page.render({
+            canvasContext: context,
+            viewport: viewport
+          }).promise;
+          
+          // Perform OCR on the rendered page
+          const { data: { text } } = await worker.recognize(canvas);
+          extractedText += text + '\n';
+          
+          // Update progress for OCR
+          const ocrProgress = 40 + (pageNum / numPages) * 20;
+          safeProgress({
+            progress: ocrProgress,
+            status: `Performing OCR on page ${pageNum} of ${numPages}...`,
+            error: null
+          });
         }
         
-        canvas.height = viewport.height;
-        canvas.width = viewport.width;
-        
-        await page.render({
-          canvasContext: context,
-          viewport: viewport
-        }).promise;
-        
-        // Perform OCR on the rendered page
-        const { data: { text } } = await worker.recognize(canvas);
-        extractedText += text + '\n';
-        
-        // Update progress for OCR
-        const ocrProgress = 40 + (pageNum / numPages) * 20;
-        onProgress({
-          progress: ocrProgress,
-          status: `Performing OCR on page ${pageNum} of ${numPages}...`,
-          error: null
+        await worker.terminate();
+      } catch (ocrError) {
+        console.error('OCR processing error:', ocrError);
+        safeProgress({
+          progress: 50,
+          status: 'OCR processing failed, continuing with available text...',
+          error: ocrError instanceof Error ? ocrError.message : 'Unknown OCR error'
         });
       }
-      
-      await worker.terminate();
     }
 
-    onProgress({ progress: 60, status: 'Generating summary and key points...', error: null });
+    safeProgress({ progress: 60, status: 'Generating summary and key points...', error: null });
 
     // Generate summary and key points using Gemini API
     const summaryPrompt = `
@@ -199,12 +219,23 @@ Key Points:
       })
     };
 
-    const summaryResponse = await fetchWithRetry(geminiEndpoint, summaryOptions);
-    const summaryResponseText = await summaryResponse.text();
-    const summaryText = extractCandidateText(summaryResponseText);
-
-    if (!summaryText) {
-      throw new Error('Failed to generate summary');
+    let summaryText = '';
+    try {
+      const summaryResponse = await fetchWithRetry(geminiEndpoint, summaryOptions);
+      const summaryResponseText = await summaryResponse.text();
+      summaryText = extractCandidateText(summaryResponseText);
+      
+      if (!summaryText) {
+        throw new Error('Failed to generate summary');
+      }
+    } catch (summaryError) {
+      console.error('Summary generation error:', summaryError);
+      safeProgress({
+        progress: 70,
+        status: 'Failed to generate summary, continuing with default placeholder...',
+        error: summaryError instanceof Error ? summaryError.message : 'Unknown summary generation error'
+      });
+      summaryText = 'Summary:\nUnable to generate summary for this document.\n\nKey Points:\n1. Please review the document manually.\n';
     }
 
     // Parse summary and key points
@@ -219,16 +250,16 @@ Key Points:
         .map(point => point.replace(/^\d+\.\s*/, '').trim());
     }
 
-    // If we didn't get 10 key points, still proceed with what we have
+    // If we didn't get key points, still proceed with a placeholder
     if (keyPoints.length === 0) {
       keyPoints = ['No key points extracted, please review the document manually.'];
     }
 
-    onProgress({ progress: 80, status: 'Generating study questions...', error: null });
+    safeProgress({ progress: 80, status: 'Generating study questions...', error: null });
 
-    // Generate study questions (generate 11 so we can remove the first)
+    // Generate study questions
     const questionsPrompt = `
-Based on the following key points, generate 11 multiple-choice questions:
+Based on the following key points, generate 5 multiple-choice questions:
 
 ${keyPoints.join('\n')}
 
@@ -241,7 +272,7 @@ D) (Fourth option)
 Correct: (Letter of correct answer)
 Explanation: (Why this is the correct answer)
 
-Generate 11 questions in this exact format.`;
+Generate 5 questions in this exact format.`;
 
     const questionsOptions = {
       method: 'POST',
@@ -256,44 +287,53 @@ Generate 11 questions in this exact format.`;
       })
     };
 
-    // Use the retry logic for the questions request
-    const questionsResponse = await fetchWithRetry(geminiEndpoint, questionsOptions);
-    const questionsResponseText = await questionsResponse.text();
-    const questionsText = extractCandidateText(questionsResponseText);
+    let questions = [];
+    try {
+      // Use the retry logic for the questions request
+      const questionsResponse = await fetchWithRetry(geminiEndpoint, questionsOptions);
+      const questionsResponseText = await questionsResponse.text();
+      const questionsText = extractCandidateText(questionsResponseText);
 
-    if (!questionsText) {
-      throw new Error('Failed to generate questions');
+      if (!questionsText) {
+        throw new Error('Failed to generate questions');
+      }
+
+      // Parse questions
+      const questionBlocks = questionsText.split(/Question: /).filter(Boolean);
+      questions = questionBlocks.map(block => {
+        const lines = block.split('\n').filter(Boolean);
+        const question = lines[0].trim();
+        
+        // Extract options
+        const optionLines = lines.filter(line => /^[A-D]\)/.test(line.trim()));
+        const options = optionLines.map(opt => opt.replace(/^[A-D]\)\s*/, '').trim());
+        
+        // Extract correct answer
+        const correctLine = lines.find(l => l.trim().startsWith('Correct:'));
+        const correctAnswer = correctLine ? correctLine.replace('Correct:', '').trim() : 'A';
+        
+        // Extract explanation
+        const explanationLine = lines.find(l => l.trim().startsWith('Explanation:'));
+        const explanation = explanationLine ? explanationLine.replace('Explanation:', '').trim() : '';
+
+        return {
+          question,
+          options: options.length === 4 ? options : ['Option A', 'Option B', 'Option C', 'Option D'],
+          correctAnswer: ['A', 'B', 'C', 'D'].indexOf(correctAnswer || 'A'),
+          explanation
+        };
+      });
+    } catch (questionsError) {
+      console.error('Questions generation error:', questionsError);
+      safeProgress({
+        progress: 90,
+        status: 'Failed to generate questions, continuing with placeholder...',
+        error: questionsError instanceof Error ? questionsError.message : 'Unknown questions generation error'
+      });
     }
 
-    // Parse questions
-    const questionBlocks = questionsText.split(/Question: /).filter(Boolean);
-    let questions = questionBlocks.map(block => {
-      const lines = block.split('\n').filter(Boolean);
-      const question = lines[0].trim();
-      
-      // Extract options
-      const optionLines = lines.filter(line => /^[A-D]\)/.test(line.trim()));
-      const options = optionLines.map(opt => opt.replace(/^[A-D]\)\s*/, '').trim());
-      
-      // Extract correct answer
-      const correctLine = lines.find(l => l.trim().startsWith('Correct:'));
-      const correctAnswer = correctLine ? correctLine.replace('Correct:', '').trim() : 'A';
-      
-      // Extract explanation
-      const explanationLine = lines.find(l => l.trim().startsWith('Explanation:'));
-      const explanation = explanationLine ? explanationLine.replace('Explanation:', '').trim() : '';
-
-      return {
-        question,
-        options: options.length === 4 ? options : ['Option A', 'Option B', 'Option C', 'Option D'],
-        correctAnswer: ['A', 'B', 'C', 'D'].indexOf(correctAnswer || 'A'),
-        explanation
-      };
-    });
-
-    // Remove the first question and make sure we have at least one
-    questions = questions.slice(1);
-    if (questions.length === 0) {
+    // Make sure we have at least one question
+    if (!questions || questions.length === 0) {
       questions = [{
         question: 'No questions could be generated. Please review the document manually.',
         options: ['Option A', 'Option B', 'Option C', 'Option D'],
@@ -302,7 +342,7 @@ Generate 11 questions in this exact format.`;
       }];
     }
 
-    onProgress({ progress: 100, status: 'Processing complete!', error: null });
+    safeProgress({ progress: 100, status: 'Processing complete!', error: null });
 
     // Return processed data
     return {
@@ -315,11 +355,13 @@ Generate 11 questions in this exact format.`;
 
   } catch (error) {
     console.error('PDF processing error:', error);
-    onProgress({
-      progress: 0,
-      status: 'Error processing PDF',
-      error: error instanceof Error ? error.message : 'Unknown error occurred'
-    });
+    if (typeof onProgress === 'function') {
+      onProgress({
+        progress: 0,
+        status: 'Error processing PDF',
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
+      });
+    }
     throw error;
   }
 }

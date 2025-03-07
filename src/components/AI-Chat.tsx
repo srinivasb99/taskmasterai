@@ -235,7 +235,8 @@ export function AIChat() {
 
   // Chat style state
   const [activeStyle, setActiveStyle] = useState<string | null>(null);
-  const [customStyles, setCustomStyles] = useState<Array<{ name: string; description: string }>>([]);
+  const [activePrompt, setActivePrompt] = useState<string | null>(null);
+  const [customStyles, setCustomStyles] = useState<Record<string, { description: string; prompt: string }>>({});
 
   // Collections
   const [tasks, setTasks] = useState<Array<{ id: string; data: any }>>([]);
@@ -372,84 +373,22 @@ export function AIChat() {
     }
   }, [chatHistory]);
 
-  // ----- Chat Controls Handlers -----
-  const handleFileSelect = async (file: File) => {
-    if (!file) return;
-
-    // Convert file to base64
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = async () => {
-      const base64Data = reader.result as string;
-      
-      // Add user message about the file
-      const userMsg: ChatMessageData = {
-        role: 'user',
-        content: `I'm sharing a file named "${file.name}" for analysis.`,
-      };
-      
-      if (!conversationId) {
-        const newConvId = await createChatConversation(user!.uid, "File Analysis");
-        setConversationId(newConvId);
-      }
-      
-      await saveChatMessage(conversationId!, userMsg);
-
-      // Send to Gemini with the file
-      const prompt = `Please analyze this file and provide insights: ${file.name}`;
-      const options = {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                { text: prompt },
-                {
-                  inline_data: {
-                    mime_type: file.type,
-                    data: base64Data.split(',')[1]
-                  }
-                }
-              ]
-            }
-          ]
-        })
-      };
-
-      setIsChatLoading(true);
-      try {
-        const response = await streamResponse(
-          geminiEndpoint,
-          options,
-          (chunk) => setStreamingAssistantContent(chunk),
-          45000
-        );
-        const assistantReply = extractCandidateText(response);
-        await saveChatMessage(conversationId!, {
-          role: 'assistant',
-          content: assistantReply
-        });
-      } catch (err) {
-        console.error('Error analyzing file:', err);
-        await saveChatMessage(conversationId!, {
-          role: 'assistant',
-          content: 'Sorry, I had trouble analyzing that file. Please try again.'
-        });
-      } finally {
-        setIsChatLoading(false);
-        setStreamingAssistantContent('');
-      }
-    };
-  };
-
-  const handleStyleSelect = (style: string) => {
+  // ----- Style Handlers -----
+  const handleStyleSelect = (style: string, prompt: string) => {
     setActiveStyle(style);
+    setActivePrompt(prompt);
   };
 
-  const handleCustomStyleCreate = (style: { name: string; description: string }) => {
-    setCustomStyles((prev) => [...prev, style]);
+  const handleCustomStyleCreate = (style: { name: string; description: string; prompt: string }) => {
+    setCustomStyles(prev => ({
+      ...prev,
+      [style.name]: {
+        description: style.description,
+        prompt: style.prompt
+      }
+    }));
     setActiveStyle(style.name);
+    setActivePrompt(style.prompt);
   };
 
   // ----- UI Toggles -----
@@ -538,20 +477,16 @@ export function AIChat() {
     };
 
     let styleInstruction = '';
-    if (activeStyle) {
-      const customStyle = customStyles.find((s) => s.name === activeStyle);
-      if (customStyle) {
-        styleInstruction = `\nActive Style: Custom - ${customStyle.name}\nStyle Description: ${customStyle.description}`;
-      } else {
-        styleInstruction = `\nActive Style: ${activeStyle}`;
-      }
+    if (activeStyle && activePrompt) {
+      styleInstruction = `\n\n${activePrompt}\n`;
     }
 
     return `
 [CONTEXT]
 User's Name: ${userName}
 Current Date: ${currentDateTime.date}
-Current Time: ${currentDateTime.time}${styleInstruction}
+Current Time: ${currentDateTime.time}
+${styleInstruction}
 
 ${itemsText}
 
@@ -890,7 +825,7 @@ Return ONLY the title, with no extra commentary.
     'Create a Checklist': <ListChecks className={iconClass + " inline-block"} />,
     'Prioritize My Tasks': <SortAsc className={iconClass + " inline-block"} />,
     'Find a Solution': <Search className={iconClass + " inline-block"} />,
-    'Log My Activity': <ClipboardList className={iconClass + " inline-block"} />,
+    'Log 'Log My Activity': <ClipboardList className={iconClass + " inline-block"} />,
     'Plan My Day': <Sun className={iconClass + " inline-block"} />,
     'Break Down a Project': <Layers className={iconClass + " inline-block"} />,
     'Summarize Information': <AlignLeft className={iconClass + " inline-block"} />,
@@ -1111,11 +1046,11 @@ Return ONLY the title, with no extra commentary.
             <form onSubmit={handleChatSubmit} className="mt-8 w-full max-w-lg">
               <div className="flex gap-2">
                 <ChatControls
-                  onFileSelect={handleFileSelect}
                   onStyleSelect={handleStyleSelect}
                   onCustomStyleCreate={handleCustomStyleCreate}
                   isBlackoutEnabled={isBlackoutEnabled}
                   isIlluminateEnabled={isIlluminateEnabled}
+                  activeStyle={activeStyle}
                 />
                 <input
                   type="text"
@@ -1295,11 +1230,11 @@ Return ONLY the title, with no extra commentary.
             <form onSubmit={handleChatSubmit} className={`p-4 border-t ${headerBorder}`}>
               <div className="flex gap-2">
                 <ChatControls
-                  onFileSelect={handleFileSelect}
                   onStyleSelect={handleStyleSelect}
                   onCustomStyleCreate={handleCustomStyleCreate}
                   isBlackoutEnabled={isBlackoutEnabled}
                   isIlluminateEnabled={isIlluminateEnabled}
+                  activeStyle={activeStyle}
                 />
                 <input
                   type="text"

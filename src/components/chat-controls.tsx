@@ -9,7 +9,7 @@ import { auth } from '../lib/firebase';
 // Chat style categories and their prompts
 const chatStyles = {
   'Normal': {
-    description: 'Default conversation without any specific style',
+    description: 'Default conversation',
     color: '',
     hoverColor: '',
     lightBg: '',

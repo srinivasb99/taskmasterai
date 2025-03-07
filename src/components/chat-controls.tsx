@@ -9,10 +9,10 @@ import { auth } from '../lib/firebase';
 // Chat style categories and their prompts
 const chatStyles = {
   'Normal': {
-    description: 'Default conversation',
+    description: 'Default conversation without any specific style',
     color: '',
     hoverColor: '',
-    lightBg: 'bg-gray-100',
+    lightBg: '',
     prompt: ''
   },
   'Formal & Professional': {
@@ -291,7 +291,7 @@ export function ChatControls({
 
             {/* Built-in Styles */}
             <div className="space-y-1">
-              {Object.entries(chatStyles).map(([style, { description, prompt, color, lightBg }]) => (
+              {Object.entries(chatStyles).map(([style, { description, prompt, color }]) => (
                 <button
                   key={style}
                   className={`w-full text-left px-3 py-2 rounded-lg transition-all duration-200 ${
@@ -299,7 +299,9 @@ export function ChatControls({
                       ? style === 'Normal'
                         ? 'bg-gray-600 text-white'
                         : `${color} text-white`
-                      : `hover:${lightBg} ${textClass}`
+                      : style === 'Normal'
+                        ? textClass
+                        : `hover:${chatStyles[style].lightBg} ${textClass}`
                   }`}
                   onClick={() => onStyleSelect(style, prompt)}
                 >

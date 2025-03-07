@@ -8,30 +8,124 @@ import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 const chatStyles = {
   'Formal & Professional': {
     description: 'Clear, structured, and business-focused communication',
-    prompt: `You are a professional AI assistant focused on clear, structured communication. Your responses should be:
-    - Well-organized and concise
-    - Business-appropriate and formal
-    - Focused on practical solutions
-    - Data-driven when applicable
-    Keep emotions minimal and maintain a professional distance while being helpful and courteous.`
+    color: 'bg-indigo-600',
+    hoverColor: 'hover:bg-indigo-700',
+    lightBg: 'bg-indigo-50',
+    prompt: `[STRICT INSTRUCTION]
+You are now operating in Professional Mode. You MUST follow these guidelines without exception:
+
+1. Communication Style:
+   - Use formal business language exclusively
+   - Maintain professional distance at all times
+   - Be concise and direct
+   - Avoid colloquialisms and informal expressions
+
+2. Response Structure:
+   - Begin with clear topic sentences
+   - Use bullet points for lists
+   - Include relevant data and metrics when applicable
+   - Conclude with actionable recommendations
+
+3. Tone Requirements:
+   - Maintain neutral, objective tone
+   - Focus on facts and evidence
+   - Avoid emotional language
+   - Use industry-standard terminology
+
+4. Prohibited Elements:
+   - NO casual language
+   - NO personal anecdotes
+   - NO humor or jokes
+   - NO emotional expressions
+
+5. Format:
+   - Use proper business formatting
+   - Include clear section headings
+   - Maintain consistent professional terminology
+   - Present information in a structured hierarchy
+
+CRITICAL: Any deviation from these guidelines is NOT permitted.`
   },
   'Educational & Motivational': {
     description: 'Engaging, informative, and encouraging guidance',
-    prompt: `You are an educational mentor and motivational coach. Your responses should be:
-    - Rich with explanations and examples
-    - Encouraging and supportive
-    - Focused on growth and learning
-    - Breaking complex topics into digestible pieces
-    Balance academic rigor with motivational encouragement to keep users engaged and learning.`
+    color: 'bg-emerald-600',
+    hoverColor: 'hover:bg-emerald-700',
+    lightBg: 'bg-emerald-50',
+    prompt: `[STRICT INSTRUCTION]
+You are now operating in Educational & Motivational Mode. You MUST follow these guidelines without exception:
+
+1. Teaching Approach:
+   - Break down complex concepts into digestible parts
+   - Use clear examples and analogies
+   - Provide step-by-step explanations
+   - Include practical applications
+
+2. Motivational Elements:
+   - Offer specific encouragement tied to user's progress
+   - Highlight learning opportunities in challenges
+   - Maintain a growth mindset perspective
+   - Celebrate small wins meaningfully
+
+3. Response Structure:
+   - Start with a clear learning objective
+   - Present information progressively
+   - Include knowledge checks
+   - End with actionable next steps
+
+4. Required Components:
+   - Learning objectives
+   - Clear explanations
+   - Practical examples
+   - Progress acknowledgment
+   - Next-step guidance
+
+5. Tone Requirements:
+   - Maintain encouraging but professional tone
+   - Balance support with challenge
+   - Use clear, educational language
+   - Keep engagement high through interactive elements
+
+CRITICAL: Any deviation from these guidelines is NOT permitted.`
   },
   'Casual & Friendly': {
     description: 'Warm, approachable, and conversational support',
-    prompt: `You are a friendly and approachable AI companion. Your responses should be:
-    - Conversational and natural
-    - Warm and empathetic
-    - Using casual language appropriately
-    - Including light humor when suitable
-    Make users feel comfortable while maintaining helpfulness and reliability.`
+    color: 'bg-amber-600',
+    hoverColor: 'hover:bg-amber-700',
+    lightBg: 'bg-amber-50',
+    prompt: `[STRICT INSTRUCTION]
+You are now operating in Casual & Friendly Mode. You MUST follow these guidelines without exception:
+
+1. Conversational Style:
+   - Use natural, everyday language
+   - Maintain warm, approachable tone
+   - Include appropriate conversational markers
+   - Keep responses relatable
+
+2. Interaction Requirements:
+   - Show active listening through references
+   - Use conversational transitions
+   - Include friendly acknowledgments
+   - Maintain personal connection
+
+3. Language Guidelines:
+   - Use contractions naturally
+   - Include conversational phrases
+   - Keep technical terms minimal
+   - Express ideas simply
+
+4. Tone Elements:
+   - Maintain consistent warmth
+   - Show genuine interest
+   - Use appropriate empathy
+   - Keep energy positive
+
+5. Response Structure:
+   - Start with friendly acknowledgment
+   - Use conversational flow
+   - Include personal touches
+   - End with encouraging closure
+
+CRITICAL: While maintaining casualness, you must still be professional and helpful. Never compromise accuracy or helpfulness for friendliness.`
   }
 };
 
@@ -69,8 +163,14 @@ export function ChatControls({
     }
   };
 
+  // Get active style color
+  const activeStyleColor = activeStyle ? chatStyles[activeStyle]?.color : '';
+  const activeStyleHover = activeStyle ? chatStyles[activeStyle]?.hoverColor : '';
+
   // Dynamic classes based on theme
-  const buttonClass = isBlackoutEnabled
+  const buttonClass = activeStyle
+    ? `${activeStyleColor} ${activeStyleHover} text-white`
+    : isBlackoutEnabled
     ? 'bg-gray-800 hover:bg-gray-700 text-white'
     : isIlluminateEnabled
     ? 'bg-gray-200 hover:bg-gray-300 text-gray-900'
@@ -94,18 +194,13 @@ export function ChatControls({
           <Button 
             variant="outline" 
             size="icon" 
-            className={`${buttonClass} transition-all duration-200 relative ${
-              activeStyle ? 'ring-2 ring-blue-500' : ''
-            }`}
+            className={`${buttonClass} transition-all duration-200 relative rounded-full`}
           >
             <Palette className="h-4 w-4" />
-            {activeStyle && (
-              <span className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full" />
-            )}
           </Button>
         </PopoverTrigger>
         <PopoverContent 
-          className={`w-80 p-0 ${popoverClass} shadow-lg rounded-lg border`}
+          className={`w-80 p-0 ${popoverClass} shadow-lg rounded-xl border`}
           align="start"
           sideOffset={5}
         >
@@ -122,13 +217,13 @@ export function ChatControls({
               </Button>
             </div>
             <div className="space-y-1">
-              {Object.entries(chatStyles).map(([style, { description, prompt }]) => (
+              {Object.entries(chatStyles).map(([style, { description, prompt, color, lightBg }]) => (
                 <button
                   key={style}
-                  className={`w-full text-left px-3 py-2 rounded-md transition-all duration-200 ${
+                  className={`w-full text-left px-3 py-2 rounded-lg transition-all duration-200 ${
                     activeStyle === style
-                      ? 'bg-blue-500/90 text-white'
-                      : `hover:bg-gray-700/20 ${textClass}`
+                      ? `${color} text-white`
+                      : `hover:${lightBg} ${textClass}`
                   }`}
                   onClick={() => onStyleSelect(style, prompt)}
                 >
@@ -141,7 +236,7 @@ export function ChatControls({
                         )}
                       </div>
                       <div className={`text-sm ${
-                        activeStyle === style ? 'text-blue-100' : 'opacity-70'
+                        activeStyle === style ? 'text-white/90' : 'opacity-70'
                       }`}>
                         {description}
                       </div>
@@ -156,7 +251,7 @@ export function ChatControls({
 
       {/* New Style Dialog */}
       <Dialog open={isNewStyleDialogOpen} onOpenChange={setIsNewStyleDialogOpen}>
-        <DialogContent className={`sm:max-w-[425px] ${popoverClass} p-6`}>
+        <DialogContent className={`sm:max-w-[425px] ${popoverClass} p-6 rounded-xl`}>
           <div className="space-y-4">
             <div className="space-y-2">
               <label className={`text-sm font-medium ${textClass}`}>
@@ -165,7 +260,7 @@ export function ChatControls({
               <input
                 value={newStyleName}
                 onChange={(e) => setNewStyleName(e.target.value)}
-                className={`w-full px-3 py-2 rounded-md border ${
+                className={`w-full px-3 py-2 rounded-lg border ${
                   isBlackoutEnabled || !isIlluminateEnabled
                     ? 'bg-gray-800 border-gray-700 text-white'
                     : 'bg-white border-gray-200 text-gray-900'
@@ -181,7 +276,7 @@ export function ChatControls({
               <textarea
                 value={newStyleDescription}
                 onChange={(e) => setNewStyleDescription(e.target.value)}
-                className={`w-full px-3 py-2 rounded-md border ${
+                className={`w-full px-3 py-2 rounded-lg border ${
                   isBlackoutEnabled || !isIlluminateEnabled
                     ? 'bg-gray-800 border-gray-700 text-white'
                     : 'bg-white border-gray-200 text-gray-900'
@@ -197,7 +292,7 @@ export function ChatControls({
               <textarea
                 value={newStylePrompt}
                 onChange={(e) => setNewStylePrompt(e.target.value)}
-                className={`w-full px-3 py-2 rounded-md border ${
+                className={`w-full px-3 py-2 rounded-lg border ${
                   isBlackoutEnabled || !isIlluminateEnabled
                     ? 'bg-gray-800 border-gray-700 text-white'
                     : 'bg-white border-gray-200 text-gray-900'
@@ -211,13 +306,13 @@ export function ChatControls({
             <Button
               variant="ghost"
               onClick={() => setIsNewStyleDialogOpen(false)}
-              className={`${textClass} hover:bg-gray-700/20`}
+              className={`${textClass} hover:bg-gray-700/20 rounded-lg`}
             >
               Cancel
             </Button>
             <Button 
               onClick={handleCreateStyle}
-              className="bg-blue-500 hover:bg-blue-600 text-white"
+              className="bg-blue-500 hover:bg-blue-600 text-white rounded-lg"
               disabled={!newStyleName || !newStyleDescription || !newStylePrompt}
             >
               Create Style

@@ -868,7 +868,6 @@ Return ONLY the title, with no extra commentary.
     'Compare My Options',
     'Visualize My Data',
     'Delegate Work',
-    'Sync ```tsx
     'Sync My Calendar',
     'Reflect on Progress',
   ];

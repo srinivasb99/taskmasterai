@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Paperclip, Palette, Plus, Check } from 'lucide-react';
+import { Palette, Plus, Check } from 'lucide-react';
 import { Button } from './ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
+import { Dialog, DialogContent } from './ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 
 // Chat style categories and their prompts
@@ -36,7 +36,6 @@ const chatStyles = {
 };
 
 interface ChatControlsProps {
-  onFileSelect: (file: File) => void;
   onStyleSelect: (style: string, prompt: string) => void;
   onCustomStyleCreate: (style: { name: string; description: string; prompt: string }) => void;
   isBlackoutEnabled: boolean;
@@ -45,7 +44,6 @@ interface ChatControlsProps {
 }
 
 export function ChatControls({
-  onFileSelect,
   onStyleSelect,
   onCustomStyleCreate,
   isBlackoutEnabled,
@@ -56,13 +54,6 @@ export function ChatControls({
   const [newStyleName, setNewStyleName] = useState('');
   const [newStyleDescription, setNewStyleDescription] = useState('');
   const [newStylePrompt, setNewStylePrompt] = useState('');
-
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      onFileSelect(file);
-    }
-  };
 
   const handleCreateStyle = () => {
     if (newStyleName && newStyleDescription && newStylePrompt) {
@@ -97,72 +88,64 @@ export function ChatControls({
 
   return (
     <div className="flex gap-2">
-      {/* File Attachment Button */}
-      <Button
-        variant="outline"
-        size="icon"
-        className={`${buttonClass} transition-all duration-200`}
-        onClick={() => document.getElementById('file-input')?.click()}
-      >
-        <Paperclip className="h-4 w-4" />
-        <input
-          type="file"
-          id="file-input"
-          className="hidden"
-          onChange={handleFileChange}
-          accept="image/*,.pdf,.doc,.docx,.txt"
-        />
-      </Button>
-
       {/* Style Selection Button */}
       <Popover>
         <PopoverTrigger asChild>
           <Button 
             variant="outline" 
             size="icon" 
-            className={`${buttonClass} transition-all duration-200 ${
+            className={`${buttonClass} transition-all duration-200 relative ${
               activeStyle ? 'ring-2 ring-blue-500' : ''
             }`}
           >
             <Palette className="h-4 w-4" />
+            {activeStyle && (
+              <span className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full" />
+            )}
           </Button>
         </PopoverTrigger>
-        <PopoverContent className={`w-80 p-0 ${popoverClass} shadow-lg rounded-lg border`}>
-          <div className="p-4 space-y-4">
-            <div className="flex items-center justify-between">
-              <h4 className={`font-medium leading-none ${textClass}`}>Chat Styles</h4>
+        <PopoverContent 
+          className={`w-80 p-0 ${popoverClass} shadow-lg rounded-lg border`}
+          align="start"
+          sideOffset={5}
+        >
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-4">
+              <h4 className={`font-medium ${textClass}`}>Chat Styles</h4>
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-8 w-8 p-0 hover:bg-gray-700/50"
+                className="h-8 w-8 p-0 hover:bg-gray-700/50 rounded-full"
                 onClick={() => setIsNewStyleDialogOpen(true)}
               >
                 <Plus className="h-4 w-4" />
               </Button>
             </div>
-            <div className="space-y-3">
-              {Object.entries(chatStyles).map(([style, { description }]) => (
+            <div className="space-y-1">
+              {Object.entries(chatStyles).map(([style, { description, prompt }]) => (
                 <button
                   key={style}
-                  className={`w-full text-left p-3 rounded-lg transition-all duration-200 ${
+                  className={`w-full text-left px-3 py-2 rounded-md transition-all duration-200 ${
                     activeStyle === style
-                      ? 'bg-blue-500 text-white'
-                      : `hover:bg-gray-700/50 ${textClass}`
+                      ? 'bg-blue-500/90 text-white'
+                      : `hover:bg-gray-700/20 ${textClass}`
                   }`}
-                  onClick={() => onStyleSelect(style, chatStyles[style].prompt)}
+                  onClick={() => onStyleSelect(style, prompt)}
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <div className="font-medium">{style}</div>
+                      <div className="font-medium flex items-center gap-2">
+                        {style}
+                        {activeStyle === style && (
+                          <Check className="h-4 w-4 text-white" />
+                        )}
+                      </div>
                       <div className={`text-sm ${
                         activeStyle === style ? 'text-blue-100' : 'opacity-70'
                       }`}>
                         {description}
                       </div>
                     </div>
-                    {activeStyle === style && (
-                      <Check className="h-5 w-5 text-white" />
-                    )}
                   </div>
                 </button>
               ))}
@@ -173,57 +156,69 @@ export function ChatControls({
 
       {/* New Style Dialog */}
       <Dialog open={isNewStyleDialogOpen} onOpenChange={setIsNewStyleDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Create Custom Style</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <label htmlFor="name" className="text-sm font-medium">
+        <DialogContent className={`sm:max-w-[425px] ${popoverClass} p-6`}>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className={`text-sm font-medium ${textClass}`}>
                 Style Name
               </label>
               <input
-                id="name"
                 value={newStyleName}
                 onChange={(e) => setNewStyleName(e.target.value)}
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus:ring-2 focus:ring-blue-500"
+                className={`w-full px-3 py-2 rounded-md border ${
+                  isBlackoutEnabled || !isIlluminateEnabled
+                    ? 'bg-gray-800 border-gray-700 text-white'
+                    : 'bg-white border-gray-200 text-gray-900'
+                } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                placeholder="e.g., Technical Expert"
               />
             </div>
-            <div className="grid gap-2">
-              <label htmlFor="description" className="text-sm font-medium">
+
+            <div className="space-y-2">
+              <label className={`text-sm font-medium ${textClass}`}>
                 Description
               </label>
               <textarea
-                id="description"
                 value={newStyleDescription}
                 onChange={(e) => setNewStyleDescription(e.target.value)}
-                className="flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:ring-2 focus:ring-blue-500"
+                className={`w-full px-3 py-2 rounded-md border ${
+                  isBlackoutEnabled || !isIlluminateEnabled
+                    ? 'bg-gray-800 border-gray-700 text-white'
+                    : 'bg-white border-gray-200 text-gray-900'
+                } focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[80px] resize-none`}
+                placeholder="Brief description of how this style communicates..."
               />
             </div>
-            <div className="grid gap-2">
-              <label htmlFor="prompt" className="text-sm font-medium">
+
+            <div className="space-y-2">
+              <label className={`text-sm font-medium ${textClass}`}>
                 AI Prompt
               </label>
               <textarea
-                id="prompt"
                 value={newStylePrompt}
                 onChange={(e) => setNewStylePrompt(e.target.value)}
-                className="flex min-h-[100px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:ring-2 focus:ring-blue-500"
+                className={`w-full px-3 py-2 rounded-md border ${
+                  isBlackoutEnabled || !isIlluminateEnabled
+                    ? 'bg-gray-800 border-gray-700 text-white'
+                    : 'bg-white border-gray-200 text-gray-900'
+                } focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[120px] resize-none`}
                 placeholder="Define how the AI should behave in this style..."
               />
             </div>
           </div>
-          <div className="flex justify-end gap-3">
+
+          <div className="flex justify-end gap-2 mt-6">
             <Button
               variant="ghost"
               onClick={() => setIsNewStyleDialogOpen(false)}
-              className="hover:bg-gray-700/50"
+              className={`${textClass} hover:bg-gray-700/20`}
             >
               Cancel
             </Button>
             <Button 
               onClick={handleCreateStyle}
               className="bg-blue-500 hover:bg-blue-600 text-white"
+              disabled={!newStyleName || !newStyleDescription || !newStylePrompt}
             >
               Create Style
             </Button>

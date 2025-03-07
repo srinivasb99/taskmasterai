@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Palette, Plus, Check, Trash2 } from 'lucide-react';
+import { Palette, Plus, Check, Trash2, Edit2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Dialog, DialogContent } from './ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
-import { createCustomStyle, deleteCustomStyle, onCustomStylesSnapshot, type CustomStyle } from '../lib/chat-controls-firebase';
+import { createCustomStyle, deleteCustomStyle, updateCustomStyle, onCustomStylesSnapshot, type CustomStyle } from '../lib/chat-controls-firebase';
 import { auth } from '../lib/firebase';
 
 // Chat style categories and their prompts
@@ -151,10 +151,13 @@ export function ChatControls({
   isIlluminateEnabled,
   activeStyle,
 }: ChatControlsProps) {
-  const [isNewStyleDialogOpen, setIsNewStyleDialogOpen] = useState(false);
-  const [newStyleName, setNewStyleName] = useState('');
-  const [newStyleDescription, setNewStyleDescription] = useState('');
-  const [newStylePrompt, setNewStylePrompt] = useState('');
+  const [isStyleDialogOpen, setIsStyleDialogOpen] = useState(false);
+  const [editingStyle, setEditingStyle] = useState<CustomStyle | null>(null);
+  const [styleFormData, setStyleFormData] = useState({
+    name: '',
+    description: '',
+    prompt: '',
+  });
   const [customStyles, setCustomStyles] = useState<CustomStyle[]>([]);
   const [user, setUser] = useState(auth.currentUser);
 
@@ -185,22 +188,47 @@ export function ChatControls({
     return () => unsubscribe();
   }, []);
 
-  const handleCreateStyle = async () => {
-    if (!user || !newStyleName || !newStyleDescription || !newStylePrompt) return;
+  const handleOpenStyleDialog = (style?: CustomStyle) => {
+    if (style) {
+      setEditingStyle(style);
+      setStyleFormData({
+        name: style.name,
+        description: style.description,
+        prompt: style.prompt,
+      });
+    } else {
+      setEditingStyle(null);
+      setStyleFormData({
+        name: '',
+        description: '',
+        prompt: '',
+      });
+    }
+    setIsStyleDialogOpen(true);
+  };
+
+  const handleCloseStyleDialog = () => {
+    setIsStyleDialogOpen(false);
+    setEditingStyle(null);
+    setStyleFormData({
+      name: '',
+      description: '',
+      prompt: '',
+    });
+  };
+
+  const handleSaveStyle = async () => {
+    if (!user || !styleFormData.name || !styleFormData.description || !styleFormData.prompt) return;
 
     try {
-      await createCustomStyle(user.uid, {
-        name: newStyleName,
-        description: newStyleDescription,
-        prompt: newStylePrompt,
-      });
-
-      setNewStyleName('');
-      setNewStyleDescription('');
-      setNewStylePrompt('');
-      setIsNewStyleDialogOpen(false);
+      if (editingStyle) {
+        await updateCustomStyle(editingStyle.id, styleFormData);
+      } else {
+        await createCustomStyle(user.uid, styleFormData);
+      }
+      handleCloseStyleDialog();
     } catch (error) {
-      console.error('Error creating style:', error);
+      console.error('Error saving style:', error);
     }
   };
 
@@ -276,108 +304,123 @@ export function ChatControls({
           align="start"
           sideOffset={5}
         >
-          <div className="p-4">
-            <div className="flex items-center justify-between mb-4">
-              <h4 className={`font-medium ${textClass}`}>Chat Styles</h4>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 w-8 p-0 hover:bg-gray-700/50 rounded-full"
-                onClick={() => setIsNewStyleDialogOpen(true)}
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
+          <div className="flex flex-col h-[400px]">
+            <div className="p-4 border-b border-gray-700">
+              <div className="flex items-center justify-between">
+                <h4 className={`font-medium ${textClass}`}>Chat Styles</h4>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 hover:bg-gray-700/50 rounded-full"
+                  onClick={() => handleOpenStyleDialog()}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
 
-            {/* Built-in Styles */}
-            <div className="space-y-1">
-              {Object.entries(chatStyles).map(([style, { description, prompt, color }]) => (
-                <button
-                  key={style}
-                  className={`w-full text-left px-3 py-2 rounded-lg transition-all duration-200 ${
-                    activeStyle === style
-                      ? style === 'Normal'
-                        ? 'bg-gray-600 text-white'
-                        : `${color} text-white`
-                      : style === 'Normal'
-                        ? textClass
-                        : `hover:${chatStyles[style].lightBg} ${textClass}`
-                  }`}
-                  onClick={() => onStyleSelect(style, prompt)}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="font-medium flex items-center gap-2">
-                        {style}
-                        {activeStyle === style && (
-                          <Check className="h-4 w-4 text-white" />
-                        )}
-                      </div>
-                      <div className={`text-sm ${
-                        activeStyle === style ? 'text-white/90' : 'opacity-70'
-                      }`}>
-                        {description}
+            <div className="overflow-y-auto flex-1 p-2">
+              {/* Built-in Styles */}
+              <div className="space-y-1 mb-4">
+                {Object.entries(chatStyles).map(([style, { description, prompt, color }]) => (
+                  <button
+                    key={style}
+                    className={`w-full text-left px-3 py-2 rounded-lg transition-all duration-200 ${
+                      activeStyle === style
+                        ? style === 'Normal'
+                          ? 'bg-gray-600 text-white'
+                          : `${color} text-white`
+                        : style === 'Normal'
+                          ? textClass
+                          : `hover:${chatStyles[style].lightBg} ${textClass}`
+                    }`}
+                    onClick={() => onStyleSelect(style, prompt)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-medium flex items-center gap-2">
+                          {style}
+                          {activeStyle === style && (
+                            <Check className="h-4 w-4 text-white" />
+                          )}
+                        </div>
+                        <div className={`text-sm ${
+                          activeStyle === style ? 'text-white/90' : 'opacity-70'
+                        }`}>
+                          {description}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </button>
-              ))}
-            </div>
+                  </button>
+                ))}
+              </div>
 
-            {/* Custom Styles */}
-            {customStyles.length > 0 && (
-              <div className="mt-4">
-                <h5 className={`text-sm font-medium mb-2 ${textClass}`}>Custom Styles</h5>
-                <div className="space-y-1">
-                  {customStyles.map((style) => (
-                    <button
-                      key={style.id}
-                      className={`w-full text-left px-3 py-2 rounded-lg transition-all duration-200 group ${
-                        activeStyle === style.name
-                          ? `${style.color} text-white`
-                          : `hover:${style.lightBg} ${textClass}`
-                      }`}
-                      onClick={() => onStyleSelect(style.name, style.prompt)}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="font-medium flex items-center gap-2">
-                            {style.name}
-                            {activeStyle === style.name && (
-                              <Check className="h-4 w-4 text-white" />
-                            )}
+              {/* Custom Styles */}
+              {customStyles.length > 0 && (
+                <div>
+                  <h5 className={`text-sm font-medium px-2 mb-2 ${textClass}`}>Custom Styles</h5>
+                  <div className="space-y-1">
+                    {customStyles.map((style) => (
+                      <button
+                        key={style.id}
+                        className={`w-full text-left px-3 py-2 rounded-lg transition-all duration-200 group ${
+                          activeStyle === style.name
+                            ? `${style.color} text-white`
+                            : `hover:${style.lightBg} ${textClass}`
+                        }`}
+                        onClick={() => onStyleSelect(style.name, style.prompt)}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium flex items-center gap-2">
+                              {style.name}
+                              {activeStyle === style.name && (
+                                <Check className="h-4 w-4 text-white" />
+                              )}
+                            </div>
+                            <div className={`text-sm ${
+                              activeStyle === style.name ? 'text-white/90' : 'opacity-70'
+                            }`}>
+                              {style.description}
+                            </div>
                           </div>
-                          <div className={`text-sm ${
-                            activeStyle === style.name ? 'text-white/90' : 'opacity-70'
-                          }`}>
-                            {style.description}
+                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className={activeStyle === style.name ? 'text-white' : textClass}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenStyleDialog(style);
+                              }}
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className={activeStyle === style.name ? 'text-white' : textClass}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteStyle(style.id);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           </div>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className={`opacity-0 group-hover:opacity-100 transition-opacity ${
-                            activeStyle === style.name ? 'text-white' : textClass
-                          }`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteStyle(style.id);
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </button>
-                  ))}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </PopoverContent>
       </Popover>
 
-      {/* New Style Dialog */}
-      <Dialog open={isNewStyleDialogOpen} onOpenChange={setIsNewStyleDialogOpen}>
+      {/* Style Dialog (Create/Edit) */}
+      <Dialog open={isStyleDialogOpen} onOpenChange={handleCloseStyleDialog}>
         <DialogContent className={`sm:max-w-[425px] ${popoverClass} p-6 rounded-xl`}>
           <div className="space-y-4">
             <div className="space-y-2">
@@ -385,8 +428,8 @@ export function ChatControls({
                 Style Name
               </label>
               <input
-                value={newStyleName}
-                onChange={(e) => setNewStyleName(e.target.value)}
+                value={styleFormData.name}
+                onChange={(e) => setStyleFormData(prev => ({ ...prev, name: e.target.value }))}
                 className={`w-full px-3 py-2 rounded-lg border ${
                   isBlackoutEnabled || !isIlluminateEnabled
                     ? 'bg-gray-800 border-gray-700 text-white'
@@ -401,8 +444,8 @@ export function ChatControls({
                 Description
               </label>
               <textarea
-                value={newStyleDescription}
-                onChange={(e) => setNewStyleDescription(e.target.value)}
+                value={styleFormData.description}
+                onChange={(e) => setStyleFormData(prev => ({ ...prev, description: e.target.value }))}
                 className={`w-full px-3 py-2 rounded-lg border ${
                   isBlackoutEnabled || !isIlluminateEnabled
                     ? 'bg-gray-800 border-gray-700 text-white'
@@ -417,8 +460,8 @@ export function ChatControls({
                 AI Prompt
               </label>
               <textarea
-                value={newStylePrompt}
-                onChange={(e) => setNewStylePrompt(e.target.value)}
+                value={styleFormData.prompt}
+                onChange={(e) => setStyleFormData(prev => ({ ...prev, prompt: e.target.value }))}
                 className={`w-full px-3 py-2 rounded-lg border ${
                   isBlackoutEnabled || !isIlluminateEnabled
                     ? 'bg-gray-800 border-gray-700 text-white'
@@ -432,17 +475,17 @@ export function ChatControls({
           <div className="flex justify-end gap-2 mt-6">
             <Button
               variant="ghost"
-              onClick={() => setIsNewStyleDialogOpen(false)}
+              onClick={handleCloseStyleDialog}
               className={`${textClass} hover:bg-gray-700/20 rounded-lg`}
             >
               Cancel
             </Button>
             <Button 
-              onClick={handleCreateStyle}
+              onClick={handleSaveStyle}
               className="bg-blue-500 hover:bg-blue-600 text-white rounded-lg"
-              disabled={!newStyleName || !newStyleDescription || !newStylePrompt}
+              disabled={!styleFormData.name || !styleFormData.description || !styleFormData.prompt}
             >
-              Create Style
+              {editingStyle ? 'Update Style' : 'Create Style'}
             </Button>
           </div>
         </DialogContent>

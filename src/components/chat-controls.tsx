@@ -8,6 +8,13 @@ import { auth } from '../lib/firebase';
 
 // Chat style categories and their prompts
 const chatStyles = {
+  'Normal': {
+    description: 'Default conversation',
+    color: '',
+    hoverColor: '',
+    lightBg: 'bg-gray-100',
+    prompt: ''
+  },
   'Formal & Professional': {
     description: 'Clear, structured, and business-focused communication',
     color: 'bg-indigo-600',
@@ -151,6 +158,13 @@ export function ChatControls({
   const [customStyles, setCustomStyles] = useState<CustomStyle[]>([]);
   const [user, setUser] = useState(auth.currentUser);
 
+  // Set Normal style as default on mount
+  useEffect(() => {
+    if (activeStyle === null) {
+      onStyleSelect('Normal', chatStyles.Normal.prompt);
+    }
+  }, [activeStyle, onStyleSelect]);
+
   // Listen for custom styles
   useEffect(() => {
     if (!user) return;
@@ -201,6 +215,7 @@ export function ChatControls({
   // Get active style color
   const getStyleColor = () => {
     if (!activeStyle) return '';
+    if (activeStyle === 'Normal') return '';
     
     // Check built-in styles
     if (chatStyles[activeStyle]) {
@@ -214,6 +229,7 @@ export function ChatControls({
 
   const getStyleHoverColor = () => {
     if (!activeStyle) return '';
+    if (activeStyle === 'Normal') return '';
     
     if (chatStyles[activeStyle]) {
       return chatStyles[activeStyle].hoverColor;
@@ -224,7 +240,7 @@ export function ChatControls({
   };
 
   // Dynamic classes based on theme
-  const buttonClass = activeStyle
+  const buttonClass = activeStyle && activeStyle !== 'Normal'
     ? `${getStyleColor()} ${getStyleHoverColor()} text-white`
     : isBlackoutEnabled
     ? 'bg-gray-800 hover:bg-gray-700 text-white'
@@ -280,7 +296,9 @@ export function ChatControls({
                   key={style}
                   className={`w-full text-left px-3 py-2 rounded-lg transition-all duration-200 ${
                     activeStyle === style
-                      ? `${color} text-white`
+                      ? style === 'Normal'
+                        ? 'bg-gray-600 text-white'
+                        : `${color} text-white`
                       : `hover:${lightBg} ${textClass}`
                   }`}
                   onClick={() => onStyleSelect(style, prompt)}

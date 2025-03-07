@@ -76,6 +76,7 @@ import {
 import { Sidebar } from './Sidebar';
 import { Timer } from './Timer';
 import { FlashcardsQuestions } from './FlashcardsQuestions';
+import { ChatControls } from './chat-controls';
 
 // ----- Types -----
 interface TimerMessage {
@@ -210,7 +211,6 @@ function extractJsonBlocks(text: string): string[] {
   if (blocks.length > 0) return blocks;
 
   // 2) Fallback: look for { ... } blocks
-  // This is simplistic—doesn't handle nested braces—but good enough for single-level JSON.
   const curlyRegex = /(\{[^{}]+\})/g;
   let curlyMatch = curlyRegex.exec(text);
   while (curlyMatch) {
@@ -224,18 +224,18 @@ function extractJsonBlocks(text: string): string[] {
 export function AIChat() {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
-
-  /**
-   * We'll store the user's full display name in `userName`,
-   * but for the greeting, we only show the first name.
-   */
   const [userName, setUserName] = useState<string>('Loading...');
-  const truncatedName = userName.split(' ')[0] || userName; // e.g. "Srinivas" from "Srinivas Byin"
+  const truncatedName = userName.split(' ')[0] || userName;
 
   const [chatMessage, setChatMessage] = useState('');
   const [chatHistory, setChatHistory] = useState<ChatMessageData[]>([]);
   const [isChatLoading, setIsChatLoading] = useState(false);
+  const [streamingAssistantContent, setStreamingAssistantContent] = useState('');
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Chat style state
+  const [activeStyle, setActiveStyle] = useState<string | null>(null);
+  const [customStyles, setCustomStyles] = useState<Array<{ name: string; description: string }>>([]);
 
   // Collections
   const [tasks, setTasks] = useState<Array<{ id: string; data: any }>>([]);
@@ -253,24 +253,37 @@ export function AIChat() {
     const stored = localStorage.getItem('isSidebarCollapsed');
     return stored ? JSON.parse(stored) : false;
   });
-  useEffect(() => {
-    localStorage.setItem('isSidebarCollapsed', JSON.stringify(isSidebarCollapsed));
-  }, [isSidebarCollapsed]);
 
-  // Blackout mode
   const [isBlackoutEnabled, setIsBlackoutEnabled] = useState(() => {
     const stored = localStorage.getItem('isBlackoutEnabled');
     return stored ? JSON.parse(stored) : false;
   });
-  // Sidebar blackout option
+
   const [isSidebarBlackoutEnabled, setIsSidebarBlackoutEnabled] = useState(() => {
     const stored = localStorage.getItem('isSidebarBlackoutEnabled');
     return stored ? JSON.parse(stored) : false;
   });
+
+  const [isIlluminateEnabled, setIsIlluminateEnabled] = useState(() => {
+    const stored = localStorage.getItem('isIlluminateEnabled');
+    return stored ? JSON.parse(stored) : false;
+  });
+
+  const [isSidebarIlluminateEnabled, setIsSidebarIlluminateEnabled] = useState(() => {
+    const stored = localStorage.getItem('isSidebarIlluminateEnabled');
+    return stored ? JSON.parse(stored) : false;
+  });
+
+  // ----- Effects -----
+  useEffect(() => {
+    localStorage.setItem('isSidebarCollapsed', JSON.stringify(isSidebarCollapsed));
+  }, [isSidebarCollapsed]);
+
   useEffect(() => {
     localStorage.setItem('isBlackoutEnabled', JSON.stringify(isBlackoutEnabled));
     document.body.classList.toggle('blackout-mode', isBlackoutEnabled);
   }, [isBlackoutEnabled]);
+
   useEffect(() => {
     localStorage.setItem(
       'isSidebarBlackoutEnabled',
@@ -278,16 +291,6 @@ export function AIChat() {
     );
   }, [isSidebarBlackoutEnabled]);
 
-  // Illuminate (light) mode
-  const [isIlluminateEnabled, setIsIlluminateEnabled] = useState(() => {
-    const stored = localStorage.getItem('isIlluminateEnabled');
-    return stored ? JSON.parse(stored) : false;
-  });
-  // Sidebar illuminate option
-  const [isSidebarIlluminateEnabled, setIsSidebarIlluminateEnabled] = useState(() => {
-    const stored = localStorage.getItem('isSidebarIlluminateEnabled');
-    return stored ? JSON.parse(stored) : false;
-  });
   useEffect(() => {
     localStorage.setItem('isIlluminateEnabled', JSON.stringify(isIlluminateEnabled));
     if (isIlluminateEnabled) {
@@ -296,6 +299,7 @@ export function AIChat() {
       document.body.classList.remove('illuminate-mode');
     }
   }, [isIlluminateEnabled]);
+
   useEffect(() => {
     localStorage.setItem(
       'isSidebarIlluminateEnabled',
@@ -303,49 +307,7 @@ export function AIChat() {
     );
   }, [isSidebarIlluminateEnabled]);
 
-// Define theming classes that take both illuminate and blackout modes into account.
-const containerBg = isBlackoutEnabled 
-  ? 'bg-gray-950' 
-  : (isIlluminateEnabled ? 'bg-white' : 'bg-gray-900');
-
-const headerBorder = isBlackoutEnabled 
-  ? 'border-gray-700' 
-  : (isIlluminateEnabled ? 'border-gray-300' : 'border-gray-800');
-
-const headerBg = isBlackoutEnabled 
-  ? 'bg-gray-950' 
-  : (isIlluminateEnabled ? 'bg-white' : '');
-
-const userBubble = isBlackoutEnabled 
-  ? 'bg-blue-500 text-white' 
-  : (isIlluminateEnabled ? 'bg-blue-200 text-gray-900' : 'bg-blue-600 text-white');
-
-const assistantBubble = isBlackoutEnabled 
-  ? 'bg-gray-800 text-white' 
-  : (isIlluminateEnabled ? 'bg-gray-200 text-gray-900' : 'bg-gray-700 text-gray-200');
-
-const inputBg = isBlackoutEnabled 
-  ? 'bg-gray-800 text-white' 
-  : (isIlluminateEnabled ? 'bg-gray-200 text-gray-900' : 'bg-gray-700 text-gray-200');
-
-const asideBg = isBlackoutEnabled 
-  ? 'bg-gray-950' 
-  : (isIlluminateEnabled ? 'bg-gray-50' : 'bg-gray-800');
-
-const asideBorder = isBlackoutEnabled 
-  ? 'border-gray-700' 
-  : (isIlluminateEnabled ? 'border-gray-300' : 'border-gray-800');
-
-const conversationInactive = isBlackoutEnabled 
-  ? 'bg-gray-800 text-white hover:bg-gray-700' 
-  : (isIlluminateEnabled ? 'bg-gray-200 text-gray-900 hover:bg-gray-300' : 'bg-gray-700 text-gray-200 hover:bg-gray-600');
-
-const conversationActive = isBlackoutEnabled 
-  ? 'bg-blue-500 text-white' 
-  : (isIlluminateEnabled ? 'bg-blue-200 text-gray-900' : 'bg-blue-600 text-white');
-
-
-  // ----- Auth & Firestore Listeners -----
+  // Auth effect
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
@@ -356,6 +318,7 @@ const conversationActive = isBlackoutEnabled
     return () => unsubscribe();
   }, []);
 
+  // Initial auth check
   useEffect(() => {
     const firebaseUser = getCurrentUser();
     if (firebaseUser) {
@@ -366,7 +329,7 @@ const conversationActive = isBlackoutEnabled
     }
   }, [navigate]);
 
-  // Listen for user tasks/goals/projects/plans
+  // Collection listeners
   useEffect(() => {
     if (!user) return;
     const unsubTasks = onCollectionSnapshot('tasks', user.uid, (items) => setTasks(items));
@@ -381,7 +344,7 @@ const conversationActive = isBlackoutEnabled
     };
   }, [user]);
 
-  // Listen for conversation list
+  // Conversation list listener
   useEffect(() => {
     if (!user) return;
     const unsubscribe = onChatConversationsSnapshot(user.uid, (conversations) => {
@@ -390,7 +353,7 @@ const conversationActive = isBlackoutEnabled
     return () => unsubscribe();
   }, [user]);
 
-  // Listen for messages in the selected conversation
+  // Messages listener
   useEffect(() => {
     if (!conversationId) {
       setChatHistory([]);
@@ -408,6 +371,86 @@ const conversationActive = isBlackoutEnabled
       chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [chatHistory]);
+
+  // ----- Chat Controls Handlers -----
+  const handleFileSelect = async (file: File) => {
+    if (!file) return;
+
+    // Convert file to base64
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = async () => {
+      const base64Data = reader.result as string;
+      
+      // Add user message about the file
+      const userMsg: ChatMessageData = {
+        role: 'user',
+        content: `I'm sharing a file named "${file.name}" for analysis.`,
+      };
+      
+      if (!conversationId) {
+        const newConvId = await createChatConversation(user!.uid, "File Analysis");
+        setConversationId(newConvId);
+      }
+      
+      await saveChatMessage(conversationId!, userMsg);
+
+      // Send to Gemini with the file
+      const prompt = `Please analyze this file and provide insights: ${file.name}`;
+      const options = {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                { text: prompt },
+                {
+                  inline_data: {
+                    mime_type: file.type,
+                    data: base64Data.split(',')[1]
+                  }
+                }
+              ]
+            }
+          ]
+        })
+      };
+
+      setIsChatLoading(true);
+      try {
+        const response = await streamResponse(
+          geminiEndpoint,
+          options,
+          (chunk) => setStreamingAssistantContent(chunk),
+          45000
+        );
+        const assistantReply = extractCandidateText(response);
+        await saveChatMessage(conversationId!, {
+          role: 'assistant',
+          content: assistantReply
+        });
+      } catch (err) {
+        console.error('Error analyzing file:', err);
+        await saveChatMessage(conversationId!, {
+          role: 'assistant',
+          content: 'Sorry, I had trouble analyzing that file. Please try again.'
+        });
+      } finally {
+        setIsChatLoading(false);
+        setStreamingAssistantContent('');
+      }
+    };
+  };
+
+  const handleStyleSelect = (style: string) => {
+    setActiveStyle(style);
+  };
+
+  const handleCustomStyleCreate = (style: { name: string; description: string }) => {
+    setCustomStyles((prev) => [...prev, style]);
+    setActiveStyle(style.name);
+  };
 
   // ----- UI Toggles -----
   const handleToggleSidebar = () => setIsSidebarCollapsed((prev) => !prev);
@@ -494,11 +537,21 @@ const conversationActive = isBlackoutEnabled
       }),
     };
 
+    let styleInstruction = '';
+    if (activeStyle) {
+      const customStyle = customStyles.find((s) => s.name === activeStyle);
+      if (customStyle) {
+        styleInstruction = `\nActive Style: Custom - ${customStyle.name}\nStyle Description: ${customStyle.description}`;
+      } else {
+        styleInstruction = `\nActive Style: ${activeStyle}`;
+      }
+    }
+
     return `
 [CONTEXT]
 User's Name: ${userName}
 Current Date: ${currentDateTime.date}
-Current Time: ${currentDateTime.time}
+Current Time: ${currentDateTime.time}${styleInstruction}
 
 ${itemsText}
 
@@ -591,7 +644,6 @@ Guidelines:
    - Always address ${userName} in a friendly and helpful tone.
 
 Follow these instructions strictly.
-
 `;
   };
 
@@ -623,141 +675,133 @@ Return ONLY the title, with no extra commentary.
   };
 
   // ----- Chat Submission -----
-  const [streamingAssistantContent, setStreamingAssistantContent] = useState('');
+  const handleChatSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatMessage.trim() || !user) return;
 
-// Send the user's message to Gemini, get streaming response, and save the final assistant message.
-const handleChatSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  if (!chatMessage.trim() || !user) return;
-
-  // If no conversation is selected, create one.
-  let convId = conversationId;
-  if (!convId) {
-    convId = await createChatConversation(user.uid, "New Chat");
-    setConversationId(convId);
-  }
-
-  // Save user's message.
-  const userMsg: ChatMessageData = { role: 'user', content: chatMessage };
-  await saveChatMessage(convId!, userMsg);
-  const updatedHistory = [...chatHistory, userMsg];
-
-  // Clear user input.
-  setChatMessage('');
-
-  // Check if it's a timer request.
-  const timerDuration = parseTimerRequest(userMsg.content);
-  if (timerDuration) {
-    const timerId = Math.random().toString(36).substr(2, 9);
-    const timerMsg: ChatMessageData = {
-      role: 'assistant',
-      content: `Starting a timer for ${timerDuration} seconds.`,
-      timer: { type: 'timer', duration: timerDuration, id: timerId }
-    };
-    await saveChatMessage(convId!, timerMsg);
-    return;
-  }
-
-  setIsChatLoading(true);
-  setStreamingAssistantContent(''); // Start fresh for streaming
-
-  // Build prompt for Gemini.
-  const prompt = createPrompt(userMsg.content);
-  const geminiOptions = {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }]
-    })
-  };
-
-  try {
-    // Stream response from Gemini.
-    let finalResponse = '';
-    await streamResponse(geminiEndpoint, geminiOptions, (chunk) => {
-      setStreamingAssistantContent(chunk);
-      finalResponse = chunk;
-    }, 45000);
-
-    // Extract final text.
-    let assistantReply = extractCandidateText(finalResponse).trim() || '';
-    setStreamingAssistantContent(''); // Clear streaming content
-
-    // --- Process JSON Blocks ---
-    // Use extractJsonBlocks to find all JSON blocks in the reply.
-    const jsonBlocks = extractJsonBlocks(assistantReply);
-    let educationalContent: any = null; // To store flashcard or question JSON.
-    for (const block of jsonBlocks) {
-      try {
-        const parsed = JSON.parse(block);
-        // If this is an AI action block.
-        if (parsed.action && parsed.payload) {
-          if (parsed.action === 'createTask') {
-            await createUserTask(user.uid, parsed.payload);
-          } else if (parsed.action === 'createGoal') {
-            await createUserGoal(user.uid, parsed.payload);
-          } else if (parsed.action === 'createPlan') {
-            await createUserPlan(user.uid, parsed.payload);
-          } else if (parsed.action === 'createProject') {
-            await createUserProject(user.uid, parsed.payload);
-          }
-        }
-        // If this is educational content.
-        else if (parsed.type && parsed.data && (parsed.type === 'flashcard' || parsed.type === 'question')) {
-          educationalContent = parsed;
-        }
-      } catch (err) {
-        console.error('Failed to parse or execute JSON block:', err);
-      }
-      // Remove this block from the reply so it doesn't show up.
-      // This replaces any occurrence of the block content.
-      assistantReply = assistantReply.replace(block, '').trim();
+    // If no conversation is selected, create one.
+    let convId = conversationId;
+    if (!convId) {
+      convId = await createChatConversation(user.uid, "New Chat");
+      setConversationId(convId);
     }
 
-    // Additionally, remove any leftover empty JSON/code blocks (i.e. empty triple-backticks).
-    assistantReply = assistantReply.replace(/```(?:json)?\s*```/g, '').trim();
+    // Save user's message.
+    const userMsg: ChatMessageData = { role: 'user', content: chatMessage };
+    await saveChatMessage(convId!, userMsg);
+    const updatedHistory = [...chatHistory, userMsg];
 
+    // Clear user input.
+    setChatMessage('');
 
-
-    // Save the assistant's final message with educational content if available.
-    if (educationalContent) {
-      const message = {
+    // Check if it's a timer request.
+    const timerDuration = parseTimerRequest(userMsg.content);
+    if (timerDuration) {
+      const timerId = Math.random().toString(36).substr(2, 9);
+      const timerMsg: ChatMessageData = {
         role: 'assistant',
-        content: assistantReply,
-        ...(educationalContent.type === 'flashcard'
-          ? { flashcard: educationalContent }
-          : { question: educationalContent })
+        content: `Starting a timer for ${timerDuration} seconds.`,
+        timer: { type: 'timer', duration: timerDuration, id: timerId }
       };
-      await saveChatMessage(convId!, message);
-    } else {
-      await saveChatMessage(convId!, { role: 'assistant', content: assistantReply });
+      await saveChatMessage(convId!, timerMsg);
+      return;
     }
 
-    // Generate a dynamic chat name after 3 user messages.
-    const totalUserMessages = updatedHistory.filter((m) => m.role === 'user').length;
-    if (!hasGeneratedChatName && totalUserMessages === 3) {
-      const conversationText = updatedHistory
-        .map((m) =>
-          m.role === 'user'
-            ? `${userName}: ${m.content}`
-            : `Assistant: ${m.content}`
-        )
-        .join('\n');
-      await generateChatName(convId!, conversationText);
-      setHasGeneratedChatName(true);
+    setIsChatLoading(true);
+    setStreamingAssistantContent(''); // Start fresh for streaming
+
+    // Build prompt for Gemini.
+    const prompt = createPrompt(userMsg.content);
+    const geminiOptions = {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }]
+      })
+    };
+
+    try {
+      // Stream response from Gemini.
+      let finalResponse = '';
+      await streamResponse(geminiEndpoint, geminiOptions, (chunk) => {
+        setStreamingAssistantContent(chunk);
+        finalResponse = chunk;
+      }, 45000);
+
+      // Extract final text.
+      let assistantReply = extractCandidateText(finalResponse).trim() || '';
+      setStreamingAssistantContent(''); // Clear streaming content
+
+      // --- Process JSON Blocks ---
+      // Use extractJsonBlocks to find all JSON blocks in the reply.
+      const jsonBlocks = extractJsonBlocks(assistantReply);
+      let educationalContent: any = null; // To store flashcard or question JSON.
+      for (const block of jsonBlocks) {
+        try {
+          const parsed = JSON.parse(block);
+          // If this is an AI action block.
+          if (parsed.action && parsed.payload) {
+            if (parsed.action === 'createTask') {
+              await createUserTask(user.uid, parsed.payload);
+            } else if (parsed.action === 'createGoal') {
+              await createUserGoal(user.uid, parsed.payload);
+            } else if (parsed.action === 'createPlan') {
+              await createUserPlan(user.uid, parsed.payload);
+            } else if (parsed.action === 'createProject') {
+              await createUserProject(user.uid, parsed.payload);
+            }
+          }
+          // If this is educational content.
+          else if (parsed.type && parsed.data && (parsed.type === 'flashcard' || parsed.type === 'question')) {
+            educationalContent = parsed;
+          }
+        } catch (err) {
+          console.error('Failed to parse or execute JSON block:', err);
+        }
+        // Remove this block from the reply so it doesn't show up.
+        assistantReply = assistantReply.replace(block, '').trim();
+      }
+
+      // Additionally, remove any leftover empty JSON/code blocks.
+      assistantReply = assistantReply.replace(/```(?:json)?\s*```/g, '').trim();
+
+      // Save the assistant's final message with educational content if available.
+      if (educationalContent) {
+        const message = {
+          role: 'assistant',
+          content: assistantReply,
+          ...(educationalContent.type === 'flashcard'
+            ? { flashcard: educationalContent }
+            : { question: educationalContent })
+        };
+        await saveChatMessage(convId!, message);
+      } else {
+        await saveChatMessage(convId!, { role: 'assistant', content: assistantReply });
+      }
+
+      // Generate a dynamic chat name after 3 user messages.
+      const totalUserMessages = updatedHistory.filter((m) => m.role === 'user').length;
+      if (!hasGeneratedChatName && totalUserMessages === 3) {
+        const conversationText = updatedHistory
+          .map((m) =>
+            m.role === 'user'
+              ? `${userName}: ${m.content}`
+              : `Assistant: ${m.content}`
+          )
+          .join('\n');
+        await generateChatName(convId!, conversationText);
+        setHasGeneratedChatName(true);
+      }
+    } catch (err) {
+      console.error('Chat error:', err);
+      await saveChatMessage(convId!, {
+        role: 'assistant',
+        content: 'Sorry, I had an issue responding. Please try again in a moment.'
+      });
+    } finally {
+      setIsChatLoading(false);
     }
-  } catch (err) {
-    console.error('Chat error:', err);
-    await saveChatMessage(convId!, {
-      role: 'assistant',
-      content: 'Sorry, I had an issue responding. Please try again in a moment.'
-    });
-  } finally {
-    setIsChatLoading(false);
-  }
-};
-
-
+  };
 
   // ----- Conversation Management -----
   const handleNewConversation = async () => {
@@ -796,542 +840,598 @@ const handleChatSubmit = async (e: React.FormEvent) => {
   const iconClass = "w-6 h-6"; // Use consistent size for all icons
   
   // ----- Quick Actions for "no conversation selected" -----
- const quickActions = [
-  'Create a Task',
-  'Create a Goal',
-  'Create a Plan',
-  'Create a Project',
-  'Analyze my items',
-  'Schedule a plan for me',
-  'Set a Reminder',
-  'Track My Progress',
-  'Brainstorm Ideas',
-  'Review My Goals',
-  'Generate a Report',
-  'Organize My Notes',
-  'Suggest Improvements',
-  'Create a Checklist',
-  'Prioritize My Tasks',
-  'Find a Solution',
-  'Start a Timer',
-  'Log My Activity',
-  'Plan My Day',
-  'Break Down a Project',
-  'Summarize Information',
-  'Assign a Task',
-  'Set a Deadline',
-  'Optimize My Workflow',
-  'Compare My Options',
-  'Visualize My Data',
-  'Delegate Work',
-  'Sync My Calendar',
-  'Reflect on Progress',
-];
+  const quickActions = [
+    'Create a Task',
+    'Create a Goal',
+    'Create a Plan',
+    'Create a Project',
+    'Analyze my items',
+    'Schedule a plan for me',
+    'Set a Reminder',
+    'Track My Progress',
+    'Brainstorm Ideas',
+    'Review My Goals',
+    'Generate a Report',
+    'Organize My Notes',
+    'Suggest Improvements',
+    'Create a Checklist',
+    'Prioritize My Tasks',
+    'Find a Solution',
+    'Start a Timer',
+    'Log My Activity',
+    'Plan My Day',
+    'Break Down a Project',
+    'Summarize Information',
+    'Assign a Task',
+    'Set a Deadline',
+    'Optimize My Workflow',
+    'Compare My Options',
+    'Visualize My Data',
+    'Delegate Work',
+    'Sync ```tsx
+    'Sync My Calendar',
+    'Reflect on Progress',
+  ];
 
-const quickActionIcons: Record<string, JSX.Element> = {
-  'Create a Task': <CheckCircle className={iconClass + " inline-block"} />,
-  'Create a Goal': <Goal className={iconClass + " inline-block"} />,
-  'Create a Plan': <Calendar className={iconClass + " inline-block"} />,
-  'Create a Project': <Folder className={iconClass + " inline-block"} />,
-  'Analyze my items': <BarChart2 className={iconClass + " inline-block"} />,
-  'Schedule a plan for me': <Clock className={iconClass + " inline-block"} />,
-  'Set a Reminder': <Bell className={iconClass + " inline-block"} />,
-  'Start a Timer': <TimerIcon className={iconClass + " inline-block"} />,
-  'Track My Progress': <TrendingUp className={iconClass + " inline-block"} />,
-  'Brainstorm Ideas': <Lightbulb className={iconClass + " inline-block"} />,
-  'Review My Goals': <Target className={iconClass + " inline-block"} />,
-  'Generate a Report': <FileText className={iconClass + " inline-block"} />,
-  'Organize My Notes': <Notebook className={iconClass + " inline-block"} />,
-  'Suggest Improvements': <Wand className={iconClass + " inline-block"} />,
-  'Create a Checklist': <ListChecks className={iconClass + " inline-block"} />,
-  'Prioritize My Tasks': <SortAsc className={iconClass + " inline-block"} />,
-  'Find a Solution': <Search className={iconClass + " inline-block"} />,
-  'Log My Activity': <ClipboardList className={iconClass + " inline-block"} />,
-  'Plan My Day': <Sun className={iconClass + " inline-block"} />,
-  'Break Down a Project': <Layers className={iconClass + " inline-block"} />,
-  'Summarize Information': <AlignLeft className={iconClass + " inline-block"} />,
-  'Assign a Task': <UserCheck className={iconClass + " inline-block"} />,
-  'Set a Deadline': <Hourglass className={iconClass + " inline-block"} />,
-  'Optimize My Workflow': <Settings className={iconClass + " inline-block"} />,
-  'Compare My Options': <Columns className={iconClass + " inline-block"} />,
-  'Visualize My Data': <PieChart className={iconClass + " inline-block"} />,
-  'Delegate Work': <Users className={iconClass + " inline-block"} />,
-  'Sync My Calendar': <CalendarCheck className={iconClass + " inline-block"} />,
-  'Reflect on Progress': <Eye className={iconClass + " inline-block"} />,
-};
-
+  const quickActionIcons: Record<string, JSX.Element> = {
+    'Create a Task': <CheckCircle className={iconClass + " inline-block"} />,
+    'Create a Goal': <Goal className={iconClass + " inline-block"} />,
+    'Create a Plan': <Calendar className={iconClass + " inline-block"} />,
+    'Create a Project': <Folder className={iconClass + " inline-block"} />,
+    'Analyze my items': <BarChart2 className={iconClass + " inline-block"} />,
+    'Schedule a plan for me': <Clock className={iconClass + " inline-block"} />,
+    'Set a Reminder': <Bell className={iconClass + " inline-block"} />,
+    'Start a Timer': <TimerIcon className={iconClass + " inline-block"} />,
+    'Track My Progress': <TrendingUp className={iconClass + " inline-block"} />,
+    'Brainstorm Ideas': <Lightbulb className={iconClass + " inline-block"} />,
+    'Review My Goals': <Target className={iconClass + " inline-block"} />,
+    'Generate a Report': <FileText className={iconClass + " inline-block"} />,
+    'Organize My Notes': <Notebook className={iconClass + " inline-block"} />,
+    'Suggest Improvements': <Wand className={iconClass + " inline-block"} />,
+    'Create a Checklist': <ListChecks className={iconClass + " inline-block"} />,
+    'Prioritize My Tasks': <SortAsc className={iconClass + " inline-block"} />,
+    'Find a Solution': <Search className={iconClass + " inline-block"} />,
+    'Log My Activity': <ClipboardList className={iconClass + " inline-block"} />,
+    'Plan My Day': <Sun className={iconClass + " inline-block"} />,
+    'Break Down a Project': <Layers className={iconClass + " inline-block"} />,
+    'Summarize Information': <AlignLeft className={iconClass + " inline-block"} />,
+    'Assign a Task': <UserCheck className={iconClass + " inline-block"} />,
+    'Set a Deadline': <Hourglass className={iconClass + " inline-block"} />,
+    'Optimize My Workflow': <Settings className={iconClass + " inline-block"} />,
+    'Compare My Options': <Columns className={iconClass + " inline-block"} />,
+    'Visualize My Data': <PieChart className={iconClass + " inline-block"} />,
+    'Delegate Work': <Users className={iconClass + " inline-block"} />,
+    'Sync My Calendar': <CalendarCheck className={iconClass + " inline-block"} />,
+    'Reflect on Progress': <Eye className={iconClass + " inline-block"} />,
+  };
 
   const handleQuickActionClick = (action: string) => {
     setChatMessage(action);
   };
 
+  // Compute gradient overlay classes based on theme modes
+  const leftOverlayClass = isIlluminateEnabled
+    ? "absolute left-0 top-0 h-full w-16 z-10 pointer-events-none bg-gradient-to-r from-gray-50 to-transparent"
+    : isBlackoutEnabled
+      ? "absolute left-0 top-0 h-full w-16 z-10 pointer-events-none bg-gradient-to-r from-gray-950 to-transparent"
+      : "absolute left-0 top-0 h-full w-16 z-10 pointer-events-none bg-gradient-to-r from-gray-900 to-transparent";
 
-// Compute gradient overlay classes based on theme modes.
-const leftOverlayClass = isIlluminateEnabled
-  ? "absolute left-0 top-0 h-full w-16 z-10 pointer-events-none bg-gradient-to-r from-gray-50 to-transparent"
-  : isBlackoutEnabled
-    ? "absolute left-0 top-0 h-full w-16 z-10 pointer-events-none bg-gradient-to-r from-gray-950 to-transparent"
-    : "absolute left-0 top-0 h-full w-16 z-10 pointer-events-none bg-gradient-to-r from-gray-900 to-transparent";
+  const rightOverlayClass = isIlluminateEnabled
+    ? "absolute right-0 top-0 h-full w-16 z-10 pointer-events-none bg-gradient-to-l from-gray-50 to-transparent"
+    : isBlackoutEnabled
+      ? "absolute right-0 top-0 h-full w-16 z-10 pointer-events-none bg-gradient-to-l from-gray-950 to-transparent"
+      : "absolute right-0 top-0 h-full w-16 z-10 pointer-events-none bg-gradient-to-l from-gray-900 to-transparent";
 
-const rightOverlayClass = isIlluminateEnabled
-  ? "absolute right-0 top-0 h-full w-16 z-10 pointer-events-none bg-gradient-to-l from-gray-50 to-transparent"
-  : isBlackoutEnabled
-    ? "absolute right-0 top-0 h-full w-16 z-10 pointer-events-none bg-gradient-to-l from-gray-950 to-transparent"
-    : "absolute right-0 top-0 h-full w-16 z-10 pointer-events-none bg-gradient-to-l from-gray-900 to-transparent";
+  // Define theming classes that take both illuminate and blackout modes into account
+  const containerBg = isBlackoutEnabled 
+    ? 'bg-gray-950' 
+    : (isIlluminateEnabled ? 'bg-white' : 'bg-gray-900');
+
+  const headerBorder = isBlackoutEnabled 
+    ? 'border-gray-700' 
+    : (isIlluminateEnabled ? 'border-gray-300' : 'border-gray-800');
+
+  const headerBg = isBlackoutEnabled 
+    ? 'bg-gray-950' 
+    : (isIlluminateEnabled ? 'bg-white' : '');
+
+  const userBubble = isBlackoutEnabled 
+    ? 'bg-blue-500 text-white' 
+    : (isIlluminateEnabled ? 'bg-blue-200 text-gray-900' : 'bg-blue-600 text-white');
+
+  const assistantBubble = isBlackoutEnabled 
+    ? 'bg-gray-800 text-white' 
+    : (isIlluminateEnabled ? 'bg-gray-200 text-gray-900' : 'bg-gray-700 text-gray-200');
+
+  const inputBg = isBlackoutEnabled 
+    ? 'bg-gray-800 text-white' 
+    : (isIlluminateEnabled ? 'bg-gray-200 text-gray-900' : 'bg-gray-700 text-gray-200');
+
+  const asideBg = isBlackoutEnabled 
+    ? 'bg-gray-950' 
+    : (isIlluminateEnabled ? 'bg-gray-50' : 'bg-gray-800');
+
+  const asideBorder = isBlackoutEnabled 
+    ? 'border-gray-700' 
+    : (isIlluminateEnabled ? 'border-gray-300' : 'border-gray-800');
+
+  const conversationInactive = isBlackoutEnabled 
+    ? 'bg-gray-800 text-white hover:bg-gray-700' 
+    : (isIlluminateEnabled ? 'bg-gray-200 text-gray-900 hover:bg-gray-300' : 'bg-gray-700 text-gray-200 hover:bg-gray-600');
+
+  const conversationActive = isBlackoutEnabled 
+    ? 'bg-blue-500 text-white' 
+    : (isIlluminateEnabled ? 'bg-blue-200 text-gray-900' : 'bg-blue-600 text-white');
 
   // ----- Render -----
-return (
-  <div className={`flex h-screen ${containerBg}`}>
-    {/* Left Sidebar */}
-    <Sidebar
-      isCollapsed={isSidebarCollapsed}
-      onToggle={handleToggleSidebar}
-      userName={userName}
-      // Pass both blackout and illuminate props to Sidebar:
-      isBlackoutEnabled={isBlackoutEnabled && isSidebarBlackoutEnabled}
-      isIlluminateEnabled={isIlluminateEnabled && isSidebarIlluminateEnabled}
-    />
+  return (
+    <div className={`flex h-screen ${containerBg}`}>
+      {/* Left Sidebar */}
+      <Sidebar
+        isCollapsed={isSidebarCollapsed}
+        onToggle={handleToggleSidebar}
+        userName={userName}
+        isBlackoutEnabled={isBlackoutEnabled && isSidebarBlackoutEnabled}
+        isIlluminateEnabled={isIlluminateEnabled && isSidebarIlluminateEnabled}
+      />
 
-    {/* Main Chat Area */}
-    <main
-      className={`flex-1 overflow-hidden transition-all duration-300 ${
-        isSidebarCollapsed ? 'ml-16' : 'ml-64'
-      }`}
-    >
-      {/* If no conversation is selected, show a "welcome" area */}
-      {!conversationId ? (
-  <div className="h-full flex flex-col items-center justify-center text-center p-8">
-    <h1
-      className={`text-3xl font-semibold mb-4 ${
-        isIlluminateEnabled ? 'text-gray-900' : (isBlackoutEnabled ? 'text-white' : 'text-white')
-      }`}
-    >
-      Hey {truncatedName}, how can I help you be productive today?
-    </h1>
-    <p
-      className={`mb-8 ${
-        isIlluminateEnabled ? 'text-gray-600' : (isBlackoutEnabled ? 'text-gray-400' : 'text-gray-400')
-      }`}
-    >
-      Select one of the quick actions below or start a new conversation.
-    </p>
-    
-    {/* Improved marquee container with gradient overlays */}
-<div className="relative w-full overflow-hidden my-4">
-  {/* Left gradient overlay */}
-  <div className={leftOverlayClass} />
-  {/* Right gradient overlay */}
-  <div className={rightOverlayClass} />
-  
-  <div className="flex relative overflow-hidden">
-    {/* Animated container with 6 sets of buttons */}
-    <motion.div
-      className="flex space-x-4 whitespace-nowrap"
-      animate={{
-        x: [0, -100 * quickActions.length],
-      }}
-      transition={{
-        x: {
-          repeat: Infinity,
-          repeatType: "loop",
-          duration: 60,
-          ease: "linear",
-        },
-      }}
-      style={{
-        width: `calc(${quickActions.length} * 100%)`,
-        display: 'flex',
-        justifyContent: 'space-around',
-      }}
-    >
-      {/* First set of buttons */}
-      {quickActions.map((action, index) => (
-        <motion.button
-          key={`set1-${index}`}
-          whileHover={{ scale: 1.05, transition: { duration: 0.2 } }}
-          className="flex items-center space-x-2 bg-blue-600 px-4 py-2 rounded-lg text-white whitespace-nowrap"
-          onClick={() => handleQuickActionClick(action)}
-        >
-          {quickActionIcons[action]}
-          <span className="whitespace-nowrap">{action}</span>
-        </motion.button>
-      ))}
-      
-      {/* Second set of buttons */}
-      {quickActions.map((action, index) => (
-        <motion.button
-          key={`set2-${index}`}
-          whileHover={{ scale: 1.05, transition: { duration: 0.2 } }}
-          className="flex items-center space-x-2 bg-blue-600 px-4 py-2 rounded-lg text-white whitespace-nowrap"
-          onClick={() => handleQuickActionClick(action)}
-        >
-          {quickActionIcons[action]}
-          <span className="whitespace-nowrap">{action}</span>
-        </motion.button>
-      ))}
+      {/* Main Chat Area */}
+      <main
+        className={`flex-1 overflow-hidden transition-all duration-300 ${
+          isSidebarCollapsed ? 'ml-16' : 'ml-64'
+        }`}
+      >
+        {/* If no conversation is selected, show a "welcome" area */}
+        {!conversationId ? (
+          <div className="h-full flex flex-col items-center justify-center text-center p-8">
+            <h1
+              className={`text-3xl font-semibold mb-4 ${
+                isIlluminateEnabled ? 'text-gray-900' : (isBlackoutEnabled ? 'text-white' : 'text-white')
+              }`}
+            >
+              Hey {truncatedName}, how can I help you be productive today?
+            </h1>
+            <p
+              className={`mb-8 ${
+                isIlluminateEnabled ? 'text-gray-600' : (isBlackoutEnabled ? 'text-gray-400' : 'text-gray-400')
+              }`}
+            >
+              Select one of the quick actions below or start a new conversation.
+            </p>
+            
+            {/* Improved marquee container with gradient overlays */}
+            <div className="relative w-full overflow-hidden my-4">
+              {/* Left gradient overlay */}
+              <div className={leftOverlayClass} />
+              {/* Right gradient overlay */}
+              <div className={rightOverlayClass} />
+              
+              <div className="flex relative overflow-hidden">
+                {/* Animated container with 6 sets of buttons */}
+                <motion.div
+                  className="flex space-x-4 whitespace-nowrap"
+                  animate={{
+                    x: [0, -100 * quickActions.length],
+                  }}
+                  transition={{
+                    x: {
+                      repeat: Infinity,
+                      repeatType: "loop",
+                      duration: 60,
+                      ease: "linear",
+                    },
+                  }}
+                  style={{
+                    width: `calc(${quickActions.length} * 100%)`,
+                    display: 'flex',
+                    justifyContent: 'space-around',
+                  }}
+                >
+                  {/* First set of buttons */}
+                  {quickActions.map((action, index) => (
+                    <motion.button
+                      key={`set1-${index}`}
+                      whileHover={{ scale: 1.05, transition: { duration: 0.2 } }}
+                      className="flex items-center space-x-2 bg-blue-600 px-4 py-2 rounded-lg text-white whitespace-nowrap"
+                      onClick={() => handleQuickActionClick(action)}
+                    >
+                      {quickActionIcons[action]}
+                      <span className="whitespace-nowrap">{action}</span>
+                    </motion.button>
+                  ))}
+                  
+                  {/* Second set of buttons */}
+                  {quickActions.map((action, index) => (
+                    <motion.button
+                      key={`set2-${index}`}
+                      whileHover={{ scale: 1.05, transition: { duration: 0.2 } }}
+                      className="flex items-center space-x-2 bg-blue-600 px-4 py-2 rounded-lg text-white whitespace-nowrap"
+                      onClick={() => handleQuickActionClick(action)}
+                    >
+                      {quickActionIcons[action]}
+                      <span className="whitespace-nowrap">{action}</span>
+                    </motion.button>
+                  ))}
 
-      {/* Third set of buttons */}
-      {quickActions.map((action, index) => (
-        <motion.button
-          key={`set3-${index}`}
-          whileHover={{ scale: 1.05, transition: { duration: 0.2 } }}
-          className="flex items-center space-x-2 bg-blue-600 px-4 py-2 rounded-lg text-white whitespace-nowrap"
-          onClick={() => handleQuickActionClick(action)}
-        >
-          {quickActionIcons[action]}
-          <span className="whitespace-nowrap">{action}</span>
-        </motion.button>
-      ))}
+                  {/* Third set of buttons */}
+                  {quickActions.map((action, index) => (
+                    <motion.button
+                      key={`set3-${index}`}
+                      whileHover={{ scale: 1.05, transition: { duration: 0.2 } }}
+                      className="flex items-center space-x-2 bg-blue-600 px-4 py-2 rounded-lg text-white whitespace-nowrap"
+                      onClick={() => handleQuickActionClick(action)}
+                    >
+                      {quickActionIcons[action]}
+                      <span className="whitespace-nowrap">{action}</span>
+                    </motion.button>
+                  ))}
 
-      {/* Fourth set of buttons */}
-      {quickActions.map((action, index) => (
-        <motion.button
-          key={`set4-${index}`}
-          whileHover={{ scale: 1.05, transition: { duration: 0.2 } }}
-          className="flex items-center space-x-2 bg-blue-600 px-4 py-2 rounded-lg text-white whitespace-nowrap"
-          onClick={() => handleQuickActionClick(action)}
-        >
-          {quickActionIcons[action]}
-          <span className="whitespace-nowrap">{action}</span>
-        </motion.button>
-      ))}
+                  {/* Fourth set of buttons */}
+                  {quickActions.map((action, index) => (
+                    <motion.button
+                      key={`set4-${index}`}
+                      whileHover={{ scale: 1.05, transition: { duration: 0.2 } }}
+                      className="flex items-center space-x-2 bg-blue-600 px-4 py-2 rounded-lg text-white whitespace-nowrap"
+                      onClick={() => handleQuickActionClick(action)}
+                    >
+                      {quickActionIcons[action]}
+                      <span className="whitespace-nowrap">{action}</span>
+                    </motion.button>
+                  ))}
 
-      {/* Fifth set of buttons */}
-      {quickActions.map((action, index) => (
-        <motion.button
-          key={`set5-${index}`}
-          whileHover={{ scale: 1.05, transition: { duration: 0.2 } }}
-          className="flex items-center space-x-2 bg-blue-600 px-4 py-2 rounded-lg text-white whitespace-nowrap"
-          onClick={() => handleQuickActionClick(action)}
-        >
-          {quickActionIcons[action]}
-          <span className="whitespace-nowrap">{action}</span>
-        </motion.button>
-      ))}
+                  {/* Fifth set of buttons */}
+                  {quickActions.map((action, index) => (
+                    <motion.button
+                      key={`set5-${index}`}
+                      whileHover={{ scale: 1.05, transition: { duration: 0.2 } }}
+                      className="flex items-center space-x-2 bg-blue-600 px-4 py-2 rounded-lg text-white whitespace-nowrap"
+                      onClick={() => handleQuickActionClick(action)}
+                    >
+                      {quickActionIcons[action]}
+                      <span className="whitespace-nowrap">{action}</span>
+                    </motion.button>
+                  ))}
 
-      {/* Sixth set of buttons */}
-      {quickActions.map((action, index) => (
-        <motion.button
-          key={`set6-${index}`}
-          whileHover={{ scale: 1.05, transition: { duration: 0.2 } }}
-          className="flex items-center space-x-2 bg-blue-600 px-4 py-2 rounded-lg text-white whitespace-nowrap"
-          onClick={() => handleQuickActionClick(action)}
-        >
-          {quickActionIcons[action]}
-          <span className="whitespace-nowrap">{action}</span>
-        </motion.button>
-      ))}
-    </motion.div>
-  </div>
-</div>
-    
-    {/* Optional: chat input */}
-    <form onSubmit={handleChatSubmit} className="mt-8 w-full max-w-lg">
-      <div className="flex gap-2">
-        <input
-          type="text"
-          value={chatMessage}
-          onChange={(e) => setChatMessage(e.target.value)}
-          placeholder="Ask anything..."
-          className={`flex-1 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-            isBlackoutEnabled 
-              ? 'bg-gray-800 text-white'
-              : (isIlluminateEnabled ? 'bg-gray-200 text-gray-900' : 'bg-gray-700 text-gray-200')
-          }`}
-        />
-        <button
-          type="submit"
-          disabled={isChatLoading}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <Send className="w-5 h-5" />
-        </button>
-      </div>
-    </form>
-  </div>
-      ) : (
-        // Otherwise, show the chat interface
-        <div className="h-full flex flex-col">
-          {/* Header */}
-          <div className={`p-4 border-b ${headerBorder} ${headerBg}`}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Bot className="w-6 h-6 text-blue-400" />
-                <div>
-                  <h1
-                    className={`text-xl font-semibold ${
-                      isIlluminateEnabled ? 'text-gray-900' : (isBlackoutEnabled ? 'text-white' : 'text-white')
-                    }`}
-                  >
-                    AI Assistant
-                  </h1>
-                  <p
-                    className={`text-sm ${
-                      isIlluminateEnabled ? 'text-gray-600' : (isBlackoutEnabled ? 'text-gray-400' : 'text-gray-400')
-                    }`}
-                  >
-                    Chat with TaskMaster
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2 text-xs">
-                  <AlertTriangle className="w-4 h-4 text-yellow-400" />
-                  <span
-                    className={isIlluminateEnabled ? 'text-gray-600' : (isBlackoutEnabled ? 'text-gray-400' : 'text-gray-400')}
-                  >
-                    TaskMaster can make mistakes. Verify details.
-                  </span>
-                </div>
+                  {/* Sixth set of buttons */}
+                  {quickActions.map((action, index) => (
+                    <motion.button
+                      key={`set6-${index}`}
+                      whileHover={{ scale: 1.05, transition: { duration: 0.2 } }}
+                      className="flex items-center space-x-2 bg-blue-600 px-4 py-2 rounded-lg text-white whitespace-nowrap"
+                      onClick={() => handleQuickActionClick(action)}
+                    >
+                      {quickActionIcons[action]}
+                      <span className="whitespace-nowrap">{action}</span>
+                    </motion.button>
+                  ))}
+                </motion.div>
               </div>
             </div>
-          </div>
-
-          {/* Chat Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={chatEndRef}>
-            {chatHistory.map((message, index) => (
-              <div
-                key={index}
-                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                <div
-                  className={`max-w-[80%] rounded-lg px-4 py-2 ${
-                    message.role === 'user' ? userBubble : assistantBubble
+            
+            {/* Optional: chat input */}
+            <form onSubmit={handleChatSubmit} className="mt-8 w-full max-w-lg">
+              <div className="flex gap-2">
+                <ChatControls
+                  onFileSelect={handleFileSelect}
+                  onStyleSelect={handleStyleSelect}
+                  onCustomStyleCreate={handleCustomStyleCreate}
+                  isBlackoutEnabled={isBlackoutEnabled}
+                  isIlluminateEnabled={isIlluminateEnabled}
+                />
+                <input
+                  type="text"
+                  value={chatMessage}
+                  onChange={(e) => setChatMessage(e.target.value)}
+                  placeholder="Ask anything..."
+                  className={`flex-1 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    isBlackoutEnabled 
+                      ? 'bg-gray-800 text-white'
+                      : (isIlluminateEnabled ? 'bg-gray-200 text-gray-900' : 'bg-gray-700 text-gray-200')
                   }`}
+                />
+                <button
+                  type="submit"
+                  disabled={isChatLoading}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <ReactMarkdown
-                    remarkPlugins={[remarkMath, remarkGfm]}
-                    rehypePlugins={[rehypeKatex]}
-                    components={{
-                      p: ({ children }) => <p className="mb-2">{children}</p>,
-                      ul: ({ children }) => <ul className="list-disc ml-4 mb-2">{children}</ul>,
-                      ol: ({ children }) => <ol className="list-decimal ml-4 mb-2">{children}</ol>,
-                      li: ({ children }) => <li className="mb-1">{children}</li>,
-                      code: ({ inline, children }) =>
-                        inline ? (
-                          <code
-                            className={
-                              isBlackoutEnabled
-                                ? 'bg-gray-800 px-1 rounded'
-                                : (isIlluminateEnabled
-                                  ? 'bg-gray-300 px-1 rounded'
-                                  : 'bg-gray-800 px-1 rounded')
-                            }
-                          >
-                            {children}
-                          </code>
-                        ) : (
-                          <pre
-                            className={
-                              isBlackoutEnabled
-                                ? 'bg-gray-800 p-2 rounded-lg overflow-x-auto'
-                                : (isIlluminateEnabled
-                                  ? 'bg-gray-300 p-2 rounded-lg overflow-x-auto'
-                                  : 'bg-gray-800 p-2 rounded-lg overflow-x-auto')
-                            }
-                          >
-                            <code>{children}</code>
-                          </pre>
-                        ),
-                    }}
-                  >
-                    {message.content}
-                  </ReactMarkdown>
-
-                  {message.timer && (
-                    <div className="mt-2">
-                      <div className={`flex items-center space-x-2 rounded-lg px-4 py-2 ${
-                        isBlackoutEnabled
-                          ? 'bg-gray-800'
-                          : (isIlluminateEnabled ? 'bg-gray-100' : 'bg-gray-900')
-                      }`}>
-                        <TimerIcon className={`w-5 h-5 ${isBlackoutEnabled ? 'text-blue-400' : (isIlluminateEnabled ? 'text-blue-600' : 'text-blue-400')}`} />
-                        <Timer
-                          key={message.timer.id}
-                          initialDuration={message.timer.duration}
-                          onComplete={() => handleTimerComplete(message.timer!.id)}
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {message.flashcard && (
-                    <div className="mt-2">
-                      <FlashcardsQuestions
-                        type="flashcard"
-                        data={message.flashcard.data}
-                        onComplete={() => {}}
-                      />
-                    </div>
-                  )}
-                  {message.question && (
-                    <div className="mt-2">
-                      <FlashcardsQuestions
-                        type="question"
-                        data={message.question.data}
-                        onComplete={() => {}}
-                      />
-                    </div>
-                  )}
-                </div>
+                  <Send className="w-5 h-5" />
+                </button>
               </div>
-            ))}
-
-            {/* Streaming partial content */}
-            {streamingAssistantContent && (
-              <div className="flex justify-start">
-                <div className={`max-w-[80%] rounded-lg px-4 py-2 ${assistantBubble}`}>
-                  <ReactMarkdown>{streamingAssistantContent}</ReactMarkdown>
+            </form>
+          </div>
+        ) : (
+          // Otherwise, show the chat interface
+          <div className="h-full flex flex-col">
+            {/* Header */}
+            <div className={`p-4 border-b ${headerBorder} ${headerBg}`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Bot className="w-6 h-6 text-blue-400" />
+                  <div>
+                    <h1
+                      className={`text-xl font-semibold ${
+                        isIlluminateEnabled ? 'text-gray-900' : (isBlackoutEnabled ? 'text-white' : 'text-white')
+                      }`}
+                    >
+                      AI Assistant
+                    </h1>
+                    <p
+                      className={`text-sm ${
+                        isIlluminateEnabled ? 'text-gray-600' : (isBlackoutEnabled ? 'text-gray-400' : 'text-gray-400')
+                      }`}
+                    >
+                      Chat with TaskMaster
+                    </p>
+                  </div>
                 </div>
-              </div>
-            )}
-
-            {/* Loading dots */}
-            {isChatLoading && !streamingAssistantContent && (
-              <div className="flex justify-start">
-                <div className={`max-w-[80%] rounded-lg px-4 py-2 ${assistantBubble}`}>
-                  <div className="flex space-x-2">
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100"></div>
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200"></div>
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2 text-xs">
+                    <AlertTriangle className="w-4 h-4 text-yellow-400" />
+                    <span
+                      className={isIlluminateEnabled ? 'text-gray-600' : (isBlackoutEnabled ? 'text-gray-400' : 'text-gray-400')}
+                    >
+                      TaskMaster can make mistakes. Verify details.
+                    </span>
                   </div>
                 </div>
               </div>
-            )}
-
-            <div ref={chatEndRef} />
-          </div>
-
-          {/* Chat Input */}
-          <form onSubmit={handleChatSubmit} className={`p-4 border-t ${headerBorder}`}>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={chatMessage}
-                onChange={(e) => setChatMessage(e.target.value)}
-                placeholder="Ask TaskMaster about your items or set a timer..."
-                className={`flex-1 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputBg}`}
-              />
-              <button
-                type="submit"
-                disabled={isChatLoading}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Send className="w-5 h-5" />
-              </button>
             </div>
-          </form>
-        </div>
-      )}
-    </main>
-{/* Right Sidebar: Chat Conversations */}
-<aside className={`w-105 border-l ${asideBorder} ${asideBg}`}>
-  <div className="p-4 flex flex-col h-full">
-    {/* Header */}
-    <div className="flex items-center justify-between mb-4">
-      <h2 className={`text-lg font-bold ${isIlluminateEnabled ? 'text-gray-900' : (isBlackoutEnabled ? 'text-white' : 'text-white')}`}>
-        Conversations
-      </h2>
-      <button
-        onClick={handleNewConversation}
-        className="flex items-center justify-center p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors"
-      >
-        <Plus className="w-4 h-4" />
-      </button>
-    </div>
-    {/* New Conversation Button (moved below header) */}
-    <button
-      onClick={handleNewConversation}
-      className="mb-4 w-full flex items-center justify-center gap-2 bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 transition-colors"
-    >
-      <PlusCircle className="w-5 h-5" />
-      <span>New Conversation</span>
-    </button>
-    {/* Scrollable Conversation List */}
-    <div className="flex-1 overflow-y-auto space-y-2">
-      {conversationList.map((conv) => (
-        <div
-          key={conv.id}
-          className={`flex items-center justify-between cursor-pointer p-3 rounded-lg transition-all ${
-            conversationId === conv.id ? conversationActive : conversationInactive
-          }`}
-        >
-          <div
-            className="flex items-center gap-2 flex-1 min-w-0"
-            onClick={() => handleSelectConversation(conv.id)}
-          >
-            <MessageSquare className="w-4 h-4 flex-shrink-0" />
-            <span className="truncate overflow-hidden text-ellipsis w-full">
-              {conv.chatName}
-            </span>
+
+            {/* Chat Messages */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={chatEndRef}>
+              {chatHistory.map((message, index) => (
+                <div
+                  key={index}
+                  className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                >
+                  <div
+                    className={`max-w-[80%] rounded-lg px-4 py-2 ${
+                      message.role === 'user' ? userBubble : assistantBubble
+                    }`}
+                  >
+                    <ReactMarkdown
+                      remarkPlugins={[remarkMath, remarkGfm]}
+                      rehypePlugins={[rehypeKatex]}
+                      components={{
+                        p: ({ children }) => <p className="mb-2">{children}</p>,
+                        ul: ({ children }) => <ul className="list-disc ml-4 mb-2">{children}</ul>,
+                        ol: ({ children }) => <ol className="list-decimal ml-4 mb-2">{children}</ol>,
+                        li: ({ children }) => <li className="mb-1">{children}</li>,
+                        code: ({ inline, children }) =>
+                          inline ? (
+                            <code
+                              className={
+                                isBlackoutEnabled
+                                  ? 'bg-gray-800 px-1 rounded'
+                                  : (isIlluminateEnabled
+                                    ? 'bg-gray-300 px-1 rounded'
+                                    : 'bg-gray-800 px-1 rounded')
+                              }
+                            >
+                              {children}
+                            </code>
+                          ) : (
+                            <pre
+                              className={
+                                isBlackoutEnabled
+                                  ? 'bg-gray-800 p-2 rounded-lg overflow-x-auto'
+                                  : (isIlluminateEnabled
+                                    ? 'bg-gray-300 p-2 rounded-lg overflow-x-auto'
+                                    : 'bg-gray-800 p-2 rounded-lg overflow-x-auto')
+                              }
+                            >
+                              <code>{children}</code>
+                            </pre>
+                          ),
+                      }}
+                    >
+                      {message.content}
+                    </ReactMarkdown>
+
+                    {message.timer && (
+                      <div className="mt-2">
+                        <div className={`flex items-center space-x-2 rounded-lg px-4 py-2 ${
+                          isBlackoutEnabled
+                            ? 'bg-gray-800'
+                            : (isIlluminateEnabled ? 'bg-gray-100' : 'bg-gray-900')
+                        }`}>
+                          <TimerIcon className={`w-5 h-5 ${isBlackoutEnabled ? 'text-blue-400' : (isIlluminateEnabled ? 'text-blue-600' : 'text-blue-400')}`} />
+                          <Timer
+                            key={message.timer.id}
+                            initialDuration={message.timer.duration}
+                            onComplete={() => handleTimerComplete(message.timer!.id)}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {message.flashcard && (
+                      <div className="mt-2">
+                        <FlashcardsQuestions
+                          type="flashcard"
+                          data={message.flashcard.data}
+                          onComplete={() => {}}
+                        />
+                      </div>
+                    )}
+                    {message.question && (
+                      <div className="mt-2">
+                        <FlashcardsQuestions
+                          type="question"
+                          data={message.question.data}
+                          onComplete={() => {}}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {/* Streaming partial content */}
+              {streamingAssistantContent && (
+                <div className="flex justify-start">
+                  <div className={`max-w-[80%] rounded-lg px-4 py-2 ${assistantBubble}`}>
+                    <ReactMarkdown>{streamingAssistantContent}</ReactMarkdown>
+                  </div>
+                </div>
+              )}
+
+              {/* Loading dots */}
+              {isChatLoading && !streamingAssistantContent && (
+                <div className="flex justify-start">
+                  <div className={`max-w-[80%] rounded-lg px-4 py-2 ${assistantBubble}`}>
+                    <div className="flex space-x-2">
+                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100"></div>
+                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200"></div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div ref={chatEndRef} />
+            </div>
+
+            {/* Chat Input */}
+            <form onSubmit={handleChatSubmit} className={`p-4 border-t ${headerBorder}`}>
+              <div className="flex gap-2">
+                <ChatControls
+                  onFileSelect={handleFileSelect}
+                  onStyleSelect={handleStyleSelect}
+                  onCustomStyleCreate={handleCustomStyleCreate}
+                  isBlackoutEnabled={isBlackoutEnabled}
+                  isIlluminateEnabled={isIlluminateEnabled}
+                />
+                <input
+                  type="text"
+                  value={chatMessage}
+                  onChange={(e) => setChatMessage(e.target.value)}
+                  placeholder="Ask TaskMaster about your items or set a timer..."
+                  className={`flex-1 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputBg}`}
+                />
+                <button
+                  type="submit"
+                  disabled={isChatLoading}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Send className="w-5 h-5" />
+                </button>
+              </div>
+            </form>
           </div>
-          {/* More actions dropdown */}
-          <div className="relative flex-shrink-0">
+        )}
+      </main>
+
+      {/* Right Sidebar: Chat Conversations */}
+      <aside className={`w-105 border-l ${asideBorder} ${asideBg}`}>
+        <div className="p-4 flex flex-col h-full">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-4">
+            <h2 className={`text-lg font-bold ${isIlluminateEnabled ? 'text-gray-900' : (isBlackoutEnabled ? 'text-white' : 'text-white')}`}>
+              Conversations
+            </h2>
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                const menu = document.getElementById(`conv-menu-${conv.id}`);
-                if (menu) {
-                  menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
-                }
-              }}
-              className={`p-1 rounded-full ${isIlluminateEnabled || isBlackoutEnabled ? 'hover:bg-gray-300' : 'hover:bg-gray-600'} transition-colors`}
+              onClick={handleNewConversation}
+              className="flex items-center justify-center p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors"
             >
-              <MoreHorizontal className="w-4 h-4" />
+              <Plus className="w-4 h-4" />
             </button>
-            <div
-              id={`conv-menu-${conv.id}`}
-              className="hidden absolute top-8 right-0 rounded-lg shadow-lg z-50"
-              style={{
-                minWidth: '160px',
-                backgroundColor: isIlluminateEnabled || isBlackoutEnabled ? '#f3f4f6' : '#374151',
-              }}
-            >
-              <button
-                className="flex items-center w-full text-left px-4 py-2 hover:bg-gray-600 rounded-t-lg"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const menu = document.getElementById(`conv-menu-${conv.id}`);
-                  if (menu) menu.style.display = 'none';
-                  handleRenameConversation(conv);
-                }}
+          </div>
+
+          {/* New Conversation Button */}
+          <button
+            onClick={handleNewConversation}
+            className="mb-4 w-full flex items-center justify-center gap-2 bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <PlusCircle className="w-5 h-5" />
+            <span>New Conversation</span>
+          </button>
+
+          {/* Scrollable Conversation List */}
+          <div className="flex-1 overflow-y-auto space-y-2">
+            {conversationList.map((conv) => (
+              <div
+                key={conv.id}
+                className={`flex items-center justify-between cursor-pointer p-3 rounded-lg transition-all ${
+                  conversationId === conv.id ? conversationActive : conversationInactive
+                }`}
               >
-                <Edit2 className="w-4 h-4 mr-2" />
-                Rename
-              </button>
-              <button
-                className="flex items-center w-full text-left px-4 py-2 hover:bg-gray-600"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const menu = document.getElementById(`conv-menu-${conv.id}`);
-                  if (menu) menu.style.display = 'none';
-                  handleShareConversation(conv);
-                }}
-              >
-                <Share className="w-4 h-4 mr-2" />
-                Share
-              </button>
-              <button
-                className="flex items-center w-full text-left px-4 py-2 hover:bg-gray-600 text-red-400 rounded-b-lg"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const menu = document.getElementById(`conv-menu-${conv.id}`);
-                  if (menu) menu.style.display = 'none';
-                  handleDeleteConversationClick(conv);
-                }}
-              >
-                <Trash2 className="w-4 h-4 mr-2" />
-                Delete
-              </button>
-            </div>
+                <div
+                  className="flex items-center gap-2 flex-1 min-w-0"
+                  onClick={() => handleSelectConversation(conv.id)}
+                >
+                  <MessageSquare className="w-4 h-4 flex-shrink-0" />
+                  <span className="truncate overflow-hidden text-ellipsis w-full">
+                    {conv.chatName}
+                  </span>
+                </div>
+                {/* More actions dropdown */}
+                <div className="relative flex-shrink-0">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const menu = document.getElementById(`conv-menu-${conv.id}`);
+                      if (menu) {
+                        menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+                      }
+                    }}
+                    className={`p-1 rounded-full ${isIlluminateEnabled || isBlackoutEnabled ? 'hover:bg-gray-300' : 'hover:bg-gray-600'} transition-colors`}
+                  >
+                    <MoreHorizontal className="w-4 h-4" />
+                  </button>
+                  <div
+                    id={`conv-menu-${conv.id}`}
+                    className="hidden absolute top-8 right-0 rounded-lg shadow-lg z-50"
+                    style={{
+                      minWidth: '160px',
+                      backgroundColor: isIlluminateEnabled || isBlackoutEnabled ? '#f3f4f6' : '#374151',
+                    }}
+                  >
+                    <button
+                      className="flex items-center w-full text-left px-4 py-2 hover:bg-gray-600 rounded-t-lg"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const menu = document.getElementById(`conv-menu-${conv.id}`);
+                        if (menu) menu.style.display = 'none';
+                        handleRenameConversation(conv);
+                      }}
+                    >
+                      <Edit2 className="w-4 h-4 mr-2" />
+                      Rename
+                    </button>
+                    <button
+                      className="flex items-center w-full text-left px-4 py-2 hover:bg-gray-600"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const menu = document.getElementById(`conv-menu-${conv.id}`);
+                        if (menu) menu.style.display = 'none';
+                        handleShareConversation(conv);
+                      }}
+                    >
+                      <Share className="w-4 h-4 mr-2" />
+                      Share
+                    </button>
+                    <button
+                      className="flex items-center w-full text-left px-4 py-2 hover:bg-gray-600 text-red-400 rounded-b-lg"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const menu = document.getElementById(`conv-menu-${conv.id}`);
+                        if (menu) menu.style.display = 'none';
+                        handleDeleteConversationClick(conv);
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
-      ))}
+      </aside>
     </div>
-  </div>
-</aside>
-  </div>
-);
+  );
 }
 
 export default AIChat;

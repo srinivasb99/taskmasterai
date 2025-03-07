@@ -1,5 +1,5 @@
 import { db } from './firebase';
-import { collection, addDoc, query, where, onSnapshot, deleteDoc, doc, DocumentData } from 'firebase/firestore';
+import { collection, addDoc, query, where, onSnapshot, deleteDoc, doc, DocumentData, updateDoc } from 'firebase/firestore';
 
 export interface CustomStyle {
   id: string;
@@ -66,6 +66,25 @@ export const createCustomStyle = async (
     return docRef.id;
   } catch (error) {
     console.error('Error creating custom style:', error);
+    throw error;
+  }
+};
+
+/**
+ * Update an existing custom chat style
+ */
+export const updateCustomStyle = async (
+  styleId: string,
+  style: { name: string; description: string; prompt: string }
+): Promise<void> => {
+  try {
+    const styleRef = doc(db, 'chatStyles', styleId);
+    await updateDoc(styleRef, {
+      ...style,
+      updatedAt: new Date(),
+    });
+  } catch (error) {
+    console.error('Error updating custom style:', error);
     throw error;
   }
 };

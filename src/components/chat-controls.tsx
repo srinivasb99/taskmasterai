@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
-import { Palette, Plus, Check } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Palette, Plus, Check, Trash2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Dialog, DialogContent } from './ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { createCustomStyle, deleteCustomStyle, onCustomStylesSnapshot, type CustomStyle } from '../lib/chat-controls-firebase';
+import { auth } from '../lib/firebase';
 
 // Chat style categories and their prompts
 const chatStyles = {
@@ -131,7 +133,6 @@ CRITICAL: While maintaining casualness, you must still be professional and helpf
 
 interface ChatControlsProps {
   onStyleSelect: (style: string, prompt: string) => void;
-  onCustomStyleCreate: (style: { name: string; description: string; prompt: string }) => void;
   isBlackoutEnabled: boolean;
   isIlluminateEnabled: boolean;
   activeStyle: string | null;
@@ -139,7 +140,6 @@ interface ChatControlsProps {
 
 export function ChatControls({
   onStyleSelect,
-  onCustomStyleCreate,
   isBlackoutEnabled,
   isIlluminateEnabled,
   activeStyle,
@@ -148,28 +148,84 @@ export function ChatControls({
   const [newStyleName, setNewStyleName] = useState('');
   const [newStyleDescription, setNewStyleDescription] = useState('');
   const [newStylePrompt, setNewStylePrompt] = useState('');
+  const [customStyles, setCustomStyles] = useState<CustomStyle[]>([]);
+  const [user, setUser] = useState(auth.currentUser);
 
-  const handleCreateStyle = () => {
-    if (newStyleName && newStyleDescription && newStylePrompt) {
-      onCustomStyleCreate({
+  // Listen for custom styles
+  useEffect(() => {
+    if (!user) return;
+
+    const unsubscribe = onCustomStylesSnapshot(user.uid, (styles) => {
+      setCustomStyles(styles);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  // Auth state listener
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      setUser(user);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const handleCreateStyle = async () => {
+    if (!user || !newStyleName || !newStyleDescription || !newStylePrompt) return;
+
+    try {
+      await createCustomStyle(user.uid, {
         name: newStyleName,
         description: newStyleDescription,
         prompt: newStylePrompt,
       });
+
       setNewStyleName('');
       setNewStyleDescription('');
       setNewStylePrompt('');
       setIsNewStyleDialogOpen(false);
+    } catch (error) {
+      console.error('Error creating style:', error);
+    }
+  };
+
+  const handleDeleteStyle = async (styleId: string) => {
+    try {
+      await deleteCustomStyle(styleId);
+    } catch (error) {
+      console.error('Error deleting style:', error);
     }
   };
 
   // Get active style color
-  const activeStyleColor = activeStyle ? chatStyles[activeStyle]?.color : '';
-  const activeStyleHover = activeStyle ? chatStyles[activeStyle]?.hoverColor : '';
+  const getStyleColor = () => {
+    if (!activeStyle) return '';
+    
+    // Check built-in styles
+    if (chatStyles[activeStyle]) {
+      return chatStyles[activeStyle].color;
+    }
+    
+    // Check custom styles
+    const customStyle = customStyles.find(s => s.name === activeStyle);
+    return customStyle?.color || '';
+  };
+
+  const getStyleHoverColor = () => {
+    if (!activeStyle) return '';
+    
+    if (chatStyles[activeStyle]) {
+      return chatStyles[activeStyle].hoverColor;
+    }
+    
+    const customStyle = customStyles.find(s => s.name === activeStyle);
+    return customStyle?.hoverColor || '';
+  };
 
   // Dynamic classes based on theme
   const buttonClass = activeStyle
-    ? `${activeStyleColor} ${activeStyleHover} text-white`
+    ? `${getStyleColor()} ${getStyleHoverColor()} text-white`
     : isBlackoutEnabled
     ? 'bg-gray-800 hover:bg-gray-700 text-white'
     : isIlluminateEnabled
@@ -216,6 +272,8 @@ export function ChatControls({
                 <Plus className="h-4 w-4" />
               </Button>
             </div>
+
+            {/* Built-in Styles */}
             <div className="space-y-1">
               {Object.entries(chatStyles).map(([style, { description, prompt, color, lightBg }]) => (
                 <button
@@ -245,6 +303,55 @@ export function ChatControls({
                 </button>
               ))}
             </div>
+
+            {/* Custom Styles */}
+            {customStyles.length > 0 && (
+              <div className="mt-4">
+                <h5 className={`text-sm font-medium mb-2 ${textClass}`}>Custom Styles</h5>
+                <div className="space-y-1">
+                  {customStyles.map((style) => (
+                    <button
+                      key={style.id}
+                      className={`w-full text-left px-3 py-2 rounded-lg transition-all duration-200 group ${
+                        activeStyle === style.name
+                          ? `${style.color} text-white`
+                          : `hover:${style.lightBg} ${textClass}`
+                      }`}
+                      onClick={() => onStyleSelect(style.name, style.prompt)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="font-medium flex items-center gap-2">
+                            {style.name}
+                            {activeStyle === style.name && (
+                              <Check className="h-4 w-4 text-white" />
+                            )}
+                          </div>
+                          <div className={`text-sm ${
+                            activeStyle === style.name ? 'text-white/90' : 'opacity-70'
+                          }`}>
+                            {style.description}
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className={`opacity-0 group-hover:opacity-100 transition-opacity ${
+                            activeStyle === style.name ? 'text-white' : textClass
+                          }`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteStyle(style.id);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </PopoverContent>
       </Popover>

@@ -507,16 +507,23 @@ const handleVoteOnDeepInsight = async (vote: 'up' | 'down') => {
 
 const handleAcceptDeepInsight = async () => {
   if (!currentDeepInsight || !user) return;
-  await handleDeepInsightAccept(currentDeepInsight.id, currentDeepInsight);
+  await handleDeepInsightAccept(currentDeepInsight.id, {
+    ...currentDeepInsight,
+    userId: user.uid
+  });
   setCurrentDeepInsight(null);
-  generateDeepInsight(); // Generate next insight if under limit
+  if (deepInsightCount < MAX_DEEP_INSIGHTS) {
+    generateDeepInsight();
+  }
 };
 
 const handleDeclineDeepInsight = async () => {
   if (!currentDeepInsight) return;
   await handleDeepInsightDecline(currentDeepInsight.id);
   setCurrentDeepInsight(null);
-  generateDeepInsight(); // Generate next insight if under limit
+  if (deepInsightCount < MAX_DEEP_INSIGHTS) {
+    generateDeepInsight();
+  }
 };
 
   // ----- Style Handlers -----
@@ -1287,7 +1294,6 @@ Return ONLY the title, with no extra commentary.
 
 
             
-            {/* Optional: chat input */}
             <form onSubmit={handleChatSubmit} className="mt-8 w-full max-w-lg">
               <div className="flex gap-2">
                 <ChatControls

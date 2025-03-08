@@ -41,11 +41,7 @@ import {
   PieChart,
   Users,
   CalendarCheck,
-  Eye,
-  Brain,
-  ThumbsUp,
-  XCircle,
-  ThumbsDown
+  Eye
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
@@ -67,8 +63,6 @@ import {
   onChatConversationsSnapshot,
   updateChatConversationName,
   deleteChatConversation,
-  extractJsonFromResponse, 
-  processAiActions
 } from '../lib/ai-chat-firebase';
 
 // Firestore item CRUD helpers
@@ -79,25 +73,10 @@ import {
   createUserProject,
 } from '../lib/ai-actions-firebase';
 
-// Context and DeepInsight functions
-import {
-  saveUserContext,
-  getUserContext,
-  onUserContextChange,
-  createDeepInsightAction,
-  updateDeepInsightActionStatus,
-  voteOnDeepInsightAction,
-  onDeepInsightActionsChange,
-  type UserContext,
-  type DeepInsightAction
-} from '../lib/ai-context-firebase';
-
 import { Sidebar } from './Sidebar';
 import { Timer } from './Timer';
 import { FlashcardsQuestions } from './FlashcardsQuestions';
 import { ChatControls } from './chat-controls';
-import { ContextDialog } from './context-dialog';
-import { DeepInsightDialog } from './deep-insight-dialog';
 
 // ----- Types -----
 interface TimerMessage {
@@ -221,42 +200,22 @@ const extractCandidateText = (text: string): string => {
 function extractJsonBlocks(text: string): string[] {
   const blocks: string[] = [];
 
-  // 1) Find and clean JSON blocks within triple backticks
-  const tripleBacktickRegex = /```(?:json)?\s*([\s\S]*?)```/g;
+  // 1) Attempt to find triple-backtick code blocks
+  const tripleBacktickRegex = /```json\s*([\s\S]*?)```/g;
   let match = tripleBacktickRegex.exec(text);
-  
   while (match) {
-    try {
-      // Validate that the content is actually JSON by parsing it
-      const jsonContent = match[1].trim();
-      JSON.parse(jsonContent); // This will throw if invalid
-      blocks.push(jsonContent);
-    } catch (err) {
-      console.error('Invalid JSON in backtick block:', err);
-    }
+    blocks.push(match[1]);
     match = tripleBacktickRegex.exec(text);
   }
 
-  // 2) If no valid JSON found in backticks, look for standalone JSON objects
-  if (blocks.length === 0) {
-    try {
-      // Find potential JSON objects
-      const jsonRegex = /(\{[\s\S]*?\})/g;
-      let jsonMatch;
-      
-      while ((jsonMatch = jsonRegex.exec(text)) !== null) {
-        try {
-          const jsonContent = jsonMatch[1].trim();
-          JSON.parse(jsonContent); // Validate JSON
-          blocks.push(jsonContent);
-        } catch (err) {
-          // Skip invalid JSON
-          continue;
-        }
-      }
-    } catch (err) {
-      console.error('Error extracting standalone JSON:', err);
-    }
+  if (blocks.length > 0) return blocks;
+
+  // 2) Fallback: look for { ... } blocks
+  const curlyRegex = /(\{[^{}]+\})/g;
+  let curlyMatch = curlyRegex.exec(text);
+  while (curlyMatch) {
+    blocks.push(curlyMatch[1]);
+    curlyMatch = curlyRegex.exec(text);
   }
 
   return blocks;
@@ -273,19 +232,6 @@ export function AIChat() {
   const [isChatLoading, setIsChatLoading] = useState(false);
   const [streamingAssistantContent, setStreamingAssistantContent] = useState('');
   const chatEndRef = useRef<HTMLDivElement>(null);
-
-  // Context state
-  const [isContextDialogOpen, setIsContextDialogOpen] = useState(false);
-  const [userContext, setUserContext] = useState<UserContext | null>(null);
-
-  // DeepInsight state
-  const [isDeepInsightDialogOpen, setIsDeepInsightDialogOpen] = useState(false);
-  const [selectedDeepInsightAction, setSelectedDeepInsightAction] = useState<DeepInsightAction | null>(null);
-  const [deepInsightActions, setDeepInsightActions] = useState<DeepInsightAction[]>([]);
-
-  const [deepInsightCount, setDeepInsightCount] = useState(0);
-  const [currentDeepInsight, setCurrentDeepInsight] = useState<DeepInsightAction | null>(null);
-  const MAX_DEEP_INSIGHTS = 10;
 
   // Chat style state
   const [activeStyle, setActiveStyle] = useState<string | null>(null);
@@ -399,24 +345,6 @@ export function AIChat() {
     };
   }, [user]);
 
-  // Context listener
-  useEffect(() => {
-    if (!user) return;
-    const unsubscribe = onUserContextChange(user.uid, (context) => {
-      setUserContext(context);
-    });
-    return () => unsubscribe();
-  }, [user]);
-
-  // DeepInsight actions listener
-  useEffect(() => {
-    if (!user) return;
-    const unsubscribe = onDeepInsightActionsChange(user.uid, (actions) => {
-      setDeepInsightActions(actions);
-    });
-    return () => unsubscribe();
-  }, [user]);
-
   // Conversation list listener
   useEffect(() => {
     if (!user) return;
@@ -444,126 +372,6 @@ export function AIChat() {
       chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [chatHistory]);
-
-  // ----- Context Handlers -----
-  const handleSaveContext = async (context: Partial<UserContext>) => {
-    if (!user) return;
-    await saveUserContext(user.uid, context);
-  };
-
-  // ----- DeepInsight Handlers -----
-const generateDeepInsight = async () => {
-  if (!user || deepInsightCount >= MAX_DEEP_INSIGHTS) return;
-
-  try {
-    const prompt = `Based on the following context and chat history, generate a deep insight:
-      ${JSON.stringify(userContext)}
-      ${chatHistory.map(msg => `${msg.role}: ${msg.content}`).join('\n')}
-      
-      Return ONLY a JSON object in this exact format:
-      {
-        "action": "deepInsight",
-        "payload": {
-          "type": "task|goal|project|plan",
-          "description": "Clear description of the suggested action",
-          "reasoning": "Why this action is important",
-          "impact": "Expected impact of this action",
-          "actionPayload": {
-            "action": "createTask|createGoal|createProject|createPlan",
-            "payload": {
-              "specific fields based on type"
-            }
-          }
-        }
-      }`;
-
-    const response = await fetch(geminiEndpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }]
-      })
-    });
-
-    const data = await response.json();
-    const text = data.candidates[0].content.parts[0].text;
-    const actions = extractJsonFromResponse(text);
-    
-    if (actions[0]?.action === 'deepInsight') {
-      const newInsight = await createDeepInsightAction(user.uid, actions[0].payload);
-      setCurrentDeepInsight(newInsight);
-      setDeepInsightCount(prev => prev + 1);
-    }
-  } catch (error) {
-    console.error('Error generating DeepInsight:', error);
-  }
-};
-
-
-// ----- DeepInsight Handlers -----
-const handleDeepInsightVote = async (actionId: string, vote: 'up' | 'down') => {
-  if (!user) return;
-  try {
-    await handleDeepInsightVote(actionId, vote);
-  } catch (error) {
-    console.error('Error voting on DeepInsight:', error);
-  }
-};
-
-const handleDeepInsightAccept = async (actionId: string, action: DeepInsightAction) => {
-  if (!user) return;
-  try {
-    await handleDeepInsightAccept(actionId, {
-      ...action,
-      userId: user.uid
-    });
-    setCurrentDeepInsight(null);
-    if (deepInsightCount < MAX_DEEP_INSIGHTS) {
-      generateDeepInsight();
-    }
-  } catch (error) {
-    console.error('Error accepting DeepInsight:', error);
-  }
-};
-
-const handleDeepInsightDecline = async (actionId: string) => {
-  try {
-    await handleDeepInsightDecline(actionId);
-    setCurrentDeepInsight(null);
-    if (deepInsightCount < MAX_DEEP_INSIGHTS) {
-      generateDeepInsight();
-    }
-  } catch (error) {
-    console.error('Error declining DeepInsight:', error);
-  }
-};
-
-
-const handleVoteOnDeepInsight = async (vote: 'up' | 'down') => {
-  if (!currentDeepInsight) return;
-  await handleDeepInsightVote(currentDeepInsight.id, vote);
-};
-
-const handleAcceptDeepInsight = async () => {
-  if (!currentDeepInsight || !user) return;
-  await handleDeepInsightAccept(currentDeepInsight.id, {
-    ...currentDeepInsight,
-    userId: user.uid
-  });
-  setCurrentDeepInsight(null);
-  if (deepInsightCount < MAX_DEEP_INSIGHTS) {
-    generateDeepInsight();
-  }
-};
-
-const handleDeclineDeepInsight = async () => {
-  if (!currentDeepInsight) return;
-  await handleDeepInsightDecline(currentDeepInsight.id);
-  setCurrentDeepInsight(null);
-  if (deepInsightCount < MAX_DEEP_INSIGHTS) {
-    generateDeepInsight();
-  }
-};
 
   // ----- Style Handlers -----
   const handleStyleSelect = (style: string, prompt: string) => {
@@ -673,24 +481,12 @@ const handleDeclineDeepInsight = async () => {
       styleInstruction = `\n\n${activePrompt}\n`;
     }
 
-    let contextSection = '';
-    if (userContext) {
-      contextSection = `
-User Context:
-- Work: ${userContext.workDescription}
-- Short-term Focus: ${userContext.shortTermFocus}
-- Long-term Goals: ${userContext.longTermGoals}
-- Additional Context: ${userContext.otherContext}
-`;
-    }
-
     return `
 [CONTEXT]
 User's Name: ${userName}
 Current Date: ${currentDateTime.date}
 Current Time: ${currentDateTime.time}
 ${styleInstruction}
-${contextSection}
 
 ${itemsText}
 
@@ -1137,25 +933,6 @@ Return ONLY the title, with no extra commentary.
               Select one of the quick actions below or start a new conversation.
             </p>
             
-            {/* Context and DeepInsight buttons */}
-            <div className="flex gap-4 mb-8">
-              <button
-                onClick={() => setIsContextDialogOpen(true)}
-                className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                <Brain className="w-5 h-5" />
-                Update Context
-              </button>
-              <button
-                onClick={generateDeepInsight}
-                className="flex items-center gap-2 bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition-colors"
-                disabled={!userContext}
-              >
-                <Lightbulb className="w-5 h-5" />
-                Generate DeepInsight
-              </button>
-            </div>
-            
             {/* Improved marquee container with gradient overlays */}
             <div className="relative w-full overflow-hidden my-4">
               {/* Left gradient overlay */}
@@ -1184,95 +961,93 @@ Return ONLY the title, with no extra commentary.
                     justifyContent: 'space-around',
                   }}
                 >
-                  {/* Render 6 sets of quick action buttons */}
-                  {[1, 2, 3, 4, 5, 6].map((set) =>
-                    quickActions.map((action, index) => (
-                      <motion.button
-                        key={`set${set}-${index}`}
-                        whileHover={{ scale: 1.05, transition: { duration: 0.2 } }}
-                        className="flex items-center space-x-2 bg-blue-600 px-4 py-2 rounded-lg text-white whitespace-nowrap"
-                        onClick={() => handleQuickActionClick(action)}
-                      >
-                        {quickActionIcons[action]}
-                        <span className="whitespace-nowrap">{action}</span>
-                      </motion.button>
-                    ))
-                  )}
+                  {/* First set of buttons */}
+                  {quickActions.map((action, index) => (
+                    <motion.button
+                      key={`set1-${index}`}
+                      whileHover={{ scale: 1.05, transition: { duration: 0.2 } }}
+                      className="flex items-center space-x-2 bg-blue-600 px-4 py-2 rounded-lg text-white whitespace-nowrap"
+                      onClick={() => handleQuickActionClick(action)}
+                    >
+                      {quickActionIcons[action]}
+                      <span className="whitespace-nowrap">{action}</span>
+                    </motion.button>
+                  ))}
+                  
+                  {/* Second set of buttons */}
+                  {quickActions.map((action, index) => (
+                    <motion.button
+                      key={`set2-${index}`}
+                      whileHover={{ scale: 1.05, transition: { duration: 0.2 } }}
+                      className="flex items-center space-x-2 bg-blue-600 px-4 py-2 rounded-lg text-white whitespace-nowrap"
+                      onClick={() => handleQuickActionClick(action)}
+                    >
+                      {quickActionIcons[action]}
+                      <span className="whitespace-nowrap">{action}</span>
+                    </motion.button>
+                  ))}
+
+                  {/* Third set of buttons */}
+                  {quickActions.map((action, index) => (
+                    <motion.button
+                      key={`set3-${index}`}
+                      whileHover={{ scale: 1.05, transition: { duration: 0.2 } }}
+                      className="flex items-center space-x-2 bg-blue-600 px-4 py-2 rounded-lg text-white whitespace-nowrap"
+                      onClick={() => handleQuickActionClick(action)}
+                    >
+                      {quickActionIcons[action]}
+                      <span className="whitespace-nowrap">{action}</span>
+                    </motion.button>
+                  ))}
+
+                  {/* Fourth set of buttons */}
+                  {quickActions.map((action, index) => (
+                    <motion.button
+                      key={`set4-${index}`}
+                      whileHover={{ scale: 1.05, transition: { duration: 0.2 } }}
+                      className="flex items-center space-x-2 bg-blue-600 px-4 py-2 rounded-lg text-white whitespace-nowrap"
+                      onClick={() => handleQuickActionClick(action)}
+                    >
+                      {quickActionIcons[action]}
+                      <span className="whitespace-nowrap">{action}</span>
+                    </motion.button>
+                  ))}
+
+                  {/* Fifth set of buttons */}
+                  {quickActions.map((action, index) => (
+                    <motion.button
+                      key={`set5-${index}`}
+                      whileHover={{ scale: 1.05, transition: { duration: 0.2 } }}
+                      className="flex items-center space-x-2 bg-blue-600 px-4 py-2 rounded-lg text-white whitespace-nowrap"
+                      onClick={() => handleQuickActionClick(action)}
+                    >
+                      {quickActionIcons[action]}
+                      <span className="whitespace-nowrap">{action}</span>
+                    </motion.button>
+                  ))}
+
+                  {/* Sixth set of buttons */}
+                  {quickActions.map((action, index) => (
+                    <motion.button
+                      key={`set6-${index}`}
+                      whileHover={{ scale: 1.05, transition: { duration: 0.2 } }}
+                      className="flex items-center space-x-2 bg-blue-600 px-4 py-2 rounded-lg text-white whitespace-nowrap"
+                      onClick={() => handleQuickActionClick(action)}
+                    >
+                      {quickActionIcons[action]}
+                      <span className="whitespace-nowrap">{action}</span>
+                    </motion.button>
+                  ))}
                 </motion.div>
               </div>
             </div>
-
-            {/* DeepInsight Suggestion */}
-            {currentDeepInsight && (
-              <div className={`fixed bottom-20 right-4 w-96 rounded-lg shadow-lg p-4 ${
-                isBlackoutEnabled ? 'bg-gray-900 border-gray-700' : 
-                isIlluminateEnabled ? 'bg-white border-gray-200' : 'bg-gray-800 border-gray-700'
-              }`}>
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <Brain className="w-5 h-5 text-blue-500" />
-                    <h3 className={`font-medium ${
-                      isBlackoutEnabled || !isIlluminateEnabled ? 'text-white' : 'text-gray-900'
-                    }`}>
-                      DeepInsight Suggestion
-                    </h3>
-                  </div>
-                </div>
-                
-                <div className="space-y-2 mb-4">
-                  <p className={isBlackoutEnabled || !isIlluminateEnabled ? 'text-gray-300' : 'text-gray-700'}>
-                    {currentDeepInsight.description}
-                  </p>
-                  <p className={`text-sm ${
-                    isBlackoutEnabled || !isIlluminateEnabled ? 'text-gray-400' : 'text-gray-600'
-                  }`}>
-                    {currentDeepInsight.reasoning}
-                  </p>
-                  <p className={`text-sm ${
-                    isBlackoutEnabled || !isIlluminateEnabled ? 'text-gray-400' : 'text-gray-600'
-                  }`}>
-                    {currentDeepInsight.impact}
-                  </p>
-                </div>
-
-                <div className="flex justify-between items-center">
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleVoteOnDeepInsight('up')}
-                      className="p-1 hover:bg-gray-700 rounded"
-                    >
-                      <ThumbsUp className="w-4 h-4 text-gray-400" />
-                    </button>
-                    <button
-                      onClick={() => handleVoteOnDeepInsight('down')}
-                      className="p-1 hover:bg-gray-700 rounded"
-                    >
-                      <ThumbsDown className="w-4 h-4 text-gray-400" />
-                    </button>
-                  </div>
-                  
-                  <div className="flex gap-2">
-                    <button
-                      onClick={handleDeclineDeepInsight}
-                      className="p-1 hover:bg-gray-700 rounded"
-                    >
-                      <XCircle className="w-4 h-4 text-red-500" />
-                    </button>
-                    <button
-                      onClick={handleAcceptDeepInsight}
-                      className="p-1 hover:bg-gray-700 rounded"
-                    >
-                      <CheckCircle className="w-4 h-4 text-green-500" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
+            
+            {/* Optional: chat input */}
             <form onSubmit={handleChatSubmit} className="mt-8 w-full max-w-lg">
               <div className="flex gap-2">
                 <ChatControls
                   onStyleSelect={handleStyleSelect}
+                  onCustomStyleCreate={handleCustomStyleCreate}
                   isBlackoutEnabled={isBlackoutEnabled}
                   isIlluminateEnabled={isIlluminateEnabled}
                   activeStyle={activeStyle}
@@ -1324,22 +1099,6 @@ Return ONLY the title, with no extra commentary.
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
-                  {/* Context and DeepInsight buttons */}
-                  <button
-                    onClick={() => setIsContextDialogOpen(true)}
-                    className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    <Brain className="w-4 h-4" />
-                    Context
-                  </button>
-                  <button
-                    onClick={generateDeepInsight}
-                    className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors"
-                    disabled={!userContext}
-                  >
-                    <Lightbulb className="w-4 h-4" />
-                    DeepInsight
-                  </button>
                   <div className="flex items-center gap-2 text-xs">
                     <AlertTriangle className="w-4 h-4 text-yellow-400" />
                     <span
@@ -1414,7 +1173,7 @@ Return ONLY the title, with no extra commentary.
                           <Timer
                             key={message.timer.id}
                             initialDuration={message.timer.duration}
-                            onComplete={() => handleTimerComplete(message.timer.id)}
+                            onComplete={() => handleTimerComplete(message.timer!.id)}
                           />
                         </div>
                       </div>
@@ -1472,6 +1231,7 @@ Return ONLY the title, with no extra commentary.
               <div className="flex gap-2">
                 <ChatControls
                   onStyleSelect={handleStyleSelect}
+                  onCustomStyleCreate={handleCustomStyleCreate}
                   isBlackoutEnabled={isBlackoutEnabled}
                   isIlluminateEnabled={isIlluminateEnabled}
                   activeStyle={activeStyle}
@@ -1604,30 +1364,6 @@ Return ONLY the title, with no extra commentary.
           </div>
         </div>
       </aside>
-
-      {/* Context Dialog */}
-      <ContextDialog
-        isOpen={isContextDialogOpen}
-        onClose={() => setIsContextDialogOpen(false)}
-        onSave={handleSaveContext}
-        initialContext={userContext}
-        isBlackoutEnabled={isBlackoutEnabled}
-        isIlluminateEnabled={isIlluminateEnabled}
-      />
-
-{/* DeepInsight Dialog */}
-{currentDeepInsight && (
-  <DeepInsightDialog
-    isOpen={isDeepInsightDialogOpen}
-    onClose={() => setIsDeepInsightDialogOpen(false)}
-    action={currentDeepInsight}
-    onVote={(vote) => handleDeepInsightVote(currentDeepInsight.id, vote)}
-    onAccept={() => handleDeepInsightAccept(currentDeepInsight.id, currentDeepInsight)}
-    onDecline={() => handleDeepInsightDecline(currentDeepInsight.id)}
-    isBlackoutEnabled={isBlackoutEnabled}
-    isIlluminateEnabled={isIlluminateEnabled}
-  />
-)}
     </div>
   );
 }

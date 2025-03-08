@@ -1145,155 +1145,91 @@ Return ONLY the title, with no extra commentary.
                     justifyContent: 'space-around',
                   }}
                 >
-                  {/* First set of buttons */}
-                  {quickActions.map((action, index) => (
-                    <motion.button
-                      key={`set1-${index}`}
-                      whileHover={{ scale: 1.05, transition: { duration: 0.2 } }}
-                      className="flex items-center space-x-2 bg-blue-600 px-4 py-2 rounded-lg text-white whitespace-nowrap"
-                      onClick={() => handleQuickActionClick(action)}
-                    >
-                      {quickActionIcons[action]}
-                      <span className="whitespace-nowrap">{action}</span>
-                    </motion.button>
-                  ))}
-                  
-                  {/* Second set of buttons */}
-                  {quickActions.map((action, index) => (
-                    <motion.button
-                      key={`set2-${index}`}
-                      whileHover={{ scale: 1.05, transition: { duration: 0.2 } }}
-                      className="flex items-center space-x-2 bg-blue-600 px-4 py-2 rounded-lg text-white whitespace-nowrap"
-                      onClick={() => handleQuickActionClick(action)}
-                    >
-                      {quickActionIcons[action]}
-                      <span className="whitespace-nowrap">{action}</span>
-                    </motion.button>
-                  ))}
-
-                  {/* Third set of buttons */}
-                  {quickActions.map((action, index) => (
-                    <motion.button
-                      key={`set3-${index}`}
-                      whileHover={{ scale: 1.05, transition: { duration: 0.2 } }}
-                      className="flex items-center space-x-2 bg-blue-600 px-4 py-2 rounded-lg text-white whitespace-nowrap"
-                      onClick={() => handleQuickActionClick(action)}
-                    >
-                      {quickActionIcons[action]}
-                      <span className="whitespace-nowrap">{action}</span>
-                    </motion.button>
-                  ))}
-
-                  {/* Fourth set of buttons */}
-                  {quickActions.map((action, index) => (
-                    <motion.button
-                      key={`set4-${index}`}
-                      whileHover={{ scale: 1.05, transition: { duration: 0.2 } }}
-                      className="flex items-center space-x-2 bg-blue-600 px-4 py-2 rounded-lg text-white whitespace-nowrap"
-                      onClick={() => handleQuickActionClick(action)}
-                    >
-                      {quickActionIcons[action]}
-                      <span className="whitespace-nowrap">{action}</span>
-                    </motion.button>
-                  ))}
-
-                  {/* Fifth set of buttons */}
-                  {quickActions.map((action, index) => (
-                    <motion.button
-                      key={`set5-${index}`}
-                      whileHover={{ scale: 1.05, transition: { duration: 0.2 } }}
-                      className="flex items-center space-x-2 bg-blue-600 px-4 py-2 rounded-lg text-white whitespace-nowrap"
-                      onClick={() => handleQuickActionClick(action)}
-                    >
-                      {quickActionIcons[action]}
-                      <span className="whitespace-nowrap">{action}</span>
-                    </motion.button>
-                  ))}
-
-                  {/* Sixth set of buttons */}
-                  {quickActions.map((action, index) => (
-                    <motion.button
-                      key={`set6-${index}`}
-                      whileHover={{ scale: 1.05, transition: { duration: 0.2 } }}
-                      className="flex items-center space-x-2 bg-blue-600 px-4 py-2 rounded-lg text-white whitespace-nowrap"
-                      onClick={() => handleQuickActionClick(action)}
-                    >
-                      {quickActionIcons[action]}
-                      <span className="whitespace-nowrap">{action}</span>
-                    </motion.button>
-                  ))}
+                  {/* Render 6 sets of quick action buttons */}
+                  {[1, 2, 3, 4, 5, 6].map((set) =>
+                    quickActions.map((action, index) => (
+                      <motion.button
+                        key={`set${set}-${index}`}
+                        whileHover={{ scale: 1.05, transition: { duration: 0.2 } }}
+                        className="flex items-center space-x-2 bg-blue-600 px-4 py-2 rounded-lg text-white whitespace-nowrap"
+                        onClick={() => handleQuickActionClick(action)}
+                      >
+                        {quickActionIcons[action]}
+                        <span className="whitespace-nowrap">{action}</span>
+                      </motion.button>
+                    ))
+                  )}
                 </motion.div>
               </div>
             </div>
 
-{/* Add this just before the chat input form */}
-{currentDeepInsight && (
-  <div className={`fixed bottom-20 right-4 w-96 rounded-lg shadow-lg p-4 ${
-    isBlackoutEnabled ? 'bg-gray-900 border-gray-700' : 
-    isIlluminateEnabled ? 'bg-white border-gray-200' : 'bg-gray-800 border-gray-700'
-  }`}>
-    <div className="flex items-center justify-between mb-3">
-      <div className="flex items-center gap-2">
-        <Brain className="w-5 h-5 text-blue-500" />
-        <h3 className={`font-medium ${
-          isBlackoutEnabled || !isIlluminateEnabled ? 'text-white' : 'text-gray-900'
-        }`}>
-          DeepInsight Suggestion
-        </h3>
-      </div>
-    </div>
-    
-    <div className="space-y-2 mb-4">
-      <p className={isBlackoutEnabled || !isIlluminateEnabled ? 'text-gray-300' : 'text-gray-700'}>
-        {currentDeepInsight.description}
-      </p>
-      <p className={`text-sm ${
-        isBlackoutEnabled || !isIlluminateEnabled ? 'text-gray-400' : 'text-gray-600'
-      }`}>
-        {currentDeepInsight.reasoning}
-      </p>
-      <p className={`text-sm ${
-        isBlackoutEnabled || !isIlluminateEnabled ? 'text-gray-400' : 'text-gray-600'
-      }`}>
-        {currentDeepInsight.impact}
-      </p>
-    </div>
+            {/* DeepInsight Suggestion */}
+            {currentDeepInsight && (
+              <div className={`fixed bottom-20 right-4 w-96 rounded-lg shadow-lg p-4 ${
+                isBlackoutEnabled ? 'bg-gray-900 border-gray-700' : 
+                isIlluminateEnabled ? 'bg-white border-gray-200' : 'bg-gray-800 border-gray-700'
+              }`}>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Brain className="w-5 h-5 text-blue-500" />
+                    <h3 className={`font-medium ${
+                      isBlackoutEnabled || !isIlluminateEnabled ? 'text-white' : 'text-gray-900'
+                    }`}>
+                      DeepInsight Suggestion
+                    </h3>
+                  </div>
+                </div>
+                
+                <div className="space-y-2 mb-4">
+                  <p className={isBlackoutEnabled || !isIlluminateEnabled ? 'text-gray-300' : 'text-gray-700'}>
+                    {currentDeepInsight.description}
+                  </p>
+                  <p className={`text-sm ${
+                    isBlackoutEnabled || !isIlluminateEnabled ? 'text-gray-400' : 'text-gray-600'
+                  }`}>
+                    {currentDeepInsight.reasoning}
+                  </p>
+                  <p className={`text-sm ${
+                    isBlackoutEnabled || !isIlluminateEnabled ? 'text-gray-400' : 'text-gray-600'
+                  }`}>
+                    {currentDeepInsight.impact}
+                  </p>
+                </div>
 
-    <div className="flex justify-between items-center">
-      <div className="flex gap-2">
-        <button
-          onClick={() => handleVoteOnDeepInsight('up')}
-          className="p-1 hover:bg-gray-700 rounded"
-        >
-          <ThumbsUp className="w-4 h-4 text-gray-400" />
-        </button>
-        <button
-          onClick={() => handleVoteOnDeepInsight('down')}
-          className="p-1 hover:bg-gray-700 rounded"
-        >
-          <ThumbsDown className="w-4 h-4 text-gray-400" />
-        </button>
-      </div>
-      
-      <div className="flex gap-2">
-        <button
-          onClick={handleDeclineDeepInsight}
-          className="p-1 hover:bg-gray-700 rounded"
-        >
-          <XCircle className="w-4 h-4 text-red-500" />
-        </button>
-        <button
-          onClick={handleAcceptDeepInsight}
-          className="p-1 hover:bg-gray-700 rounded"
-        >
-          <CheckCircle className="w-4 h-4 text-green-500" />
-        </button>
-      </div>
-    </div>
-  </div>
+                <div className="flex justify-between items-center">
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleVoteOnDeepInsight('up')}
+                      className="p-1 hover:bg-gray-700 rounded"
+                    >
+                      <ThumbsUp className="w-4 h-4 text-gray-400" />
+                    </button>
+                    <button
+                      onClick={() => handleVoteOnDeepInsight('down')}
+                      className="p-1 hover:bg-gray-700 rounded"
+                    >
+                      <ThumbsDown className="w-4 h-4 text-gray-400" />
+                    </button>
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleDeclineDeepInsight}
+                      className="p-1 hover:bg-gray-700 rounded"
+                    >
+                      <XCircle className="w-4 h-4 text-red-500" />
+                    </button>
+                    <button
+                      onClick={handleAcceptDeepInsight}
+                      className="p-1 hover:bg-gray-700 rounded"
+                    >
+                      <CheckCircle className="w-4 h-4 text-green-500" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
-
-            
             <form onSubmit={handleChatSubmit} className="mt-8 w-full max-w-lg">
               <div className="flex gap-2">
                 <ChatControls
@@ -1439,7 +1375,7 @@ Return ONLY the title, with no extra commentary.
                           <Timer
                             key={message.timer.id}
                             initialDuration={message.timer.duration}
-                            onComplete={() => handleTimerComplete(message.timer!.id)}
+                            onComplete={() => handleTimerComplete(message.timer.id)}
                           />
                         </div>
                       </div>
@@ -1571,7 +1507,7 @@ Return ONLY the title, with no extra commentary.
                       e.stopPropagation();
                       const menu = document.getElementById(`conv-menu-${conv.id}`);
                       if (menu) {
-                        menu.style.display = menu.style.display ===  'block' ? 'none' : 'block';
+                        menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
                       }
                     }}
                     className={`p-1 rounded-full ${isIlluminateEnabled || isBlackoutEnabled ? 'hover:bg-gray-300' : 'hover:bg-gray-600'} transition-colors`}

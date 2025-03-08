@@ -41,7 +41,9 @@ import {
   PieChart,
   Users,
   CalendarCheck,
-  Eye
+  Eye,
+  Brain,
+  Sparkles
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
@@ -73,10 +75,25 @@ import {
   createUserProject,
 } from '../lib/ai-actions-firebase';
 
+// Context and DeepInsight functions
+import {
+  saveUserContext,
+  getUserContext,
+  onUserContextChange,
+  createDeepInsightAction,
+  updateDeepInsightActionStatus,
+  voteOnDeepInsightAction,
+  onDeepInsightActionsChange,
+  type UserContext,
+  type DeepInsightAction
+} from '../lib/ai-context-firebase';
+
 import { Sidebar } from './Sidebar';
 import { Timer } from './Timer';
 import { FlashcardsQuestions } from './FlashcardsQuestions';
 import { ChatControls } from './chat-controls';
+import { ContextDialog } from './context-dialog';
+import { DeepInsightDialog } from './deep-insight-dialog';
 
 // ----- Types -----
 interface TimerMessage {
@@ -244,6 +261,13 @@ export function AIChat() {
   const [projects, setProjects] = useState<Array<{ id: string; data: any }>>([]);
   const [plans, setPlans] = useState<Array<{ id: string; data: any }>>([]);
 
+  // Context and DeepInsight state
+  const [isContextDialogOpen, setIsContextDialogOpen] = useState(false);
+  const [userContext, setUserContext] = useState<UserContext | null>(null);
+  const [deepInsightActions, setDeepInsightActions] = useState<DeepInsightAction[]>([]);
+  const [selectedDeepInsightAction, setSelectedDeepInsightAction] = useState<DeepInsightAction | null>(null);
+  const [isDeepInsightDialogOpen, setIsDeepInsightDialogOpen] = useState(false);
+
   // Conversation management
   const [hasGeneratedChatName, setHasGeneratedChatName] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -345,6 +369,24 @@ export function AIChat() {
     };
   }, [user]);
 
+  // Context and DeepInsight listeners
+  useEffect(() => {
+    if (!user) return;
+    
+    const unsubContext = onUserContextChange(user.uid, (context) => {
+      setUserContext(context);
+    });
+    
+    const unsubDeepInsight = onDeepInsightActionsChange(user.uid, (actions) => {
+      setDeepInsightActions(actions);
+    });
+    
+    return () => {
+      unsubContext();
+      unsubDeepInsight();
+    };
+  }, [user]);
+
   // Conversation list listener
   useEffect(() => {
     if (!user) return;
@@ -372,6 +414,120 @@ export function AIChat() {
       chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [chatHistory]);
+
+  // ----- Context Handlers -----
+  const handleOpenContext = () => {
+    setIsContextDialogOpen(true);
+  };
+
+  const handleSaveContext = async (context: Partial<UserContext>) => {
+    if (!user) return;
+    await saveUserContext(user.uid, context);
+  };
+
+  // ----- DeepInsight Handlers -----
+  const handleRequestDeepInsight = async () => {
+    if (!user || !userContext) return;
+    
+    const prompt = `
+Based on the following context, analyze the user's situation and suggest meaningful improvements:
+
+Work Description:
+${userContext.workDescription}
+
+Short Term Focus:
+${userContext.shortTermFocus}
+
+Long Term Goals:
+${userContext.longTermGoals}
+
+Other Context:
+${userContext.otherContext}
+
+Current Items:
+${formatItemsForChat()}
+
+Please provide a strategic suggestion that will help improve the user's productivity or achieve their goals.
+Include:
+1. A clear action description
+2. Detailed reasoning for the suggestion
+3. Expected impact
+4. The type of action (task/goal/project/plan)
+5. Specific details for implementation
+
+Return the response in JSON format with the following structure:
+{
+  "type": "task|goal|project|plan",
+  "description": "Clear action description",
+  "reasoning": "Detailed explanation of why this action is suggested",
+  "impact": "Expected benefits and outcomes",
+  "actionPayload": {
+    // Specific details for implementation
+  }
+}
+`;
+
+    setIsChatLoading(true);
+    try {
+      const options = {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }]
+        })
+      };
+
+      const response = await fetchWithTimeout(geminiEndpoint, options, 45000);
+      const text = await response.text();
+      const suggestion = JSON.parse(extractCandidateText(text));
+      
+      const action = await createDeepInsightAction(user.uid, suggestion);
+      setSelectedDeepInsightAction(action);
+      setIsDeepInsightDialogOpen(true);
+    } catch (error) {
+      console.error('Error generating DeepInsight:', error);
+    } finally {
+      setIsChatLoading(false);
+    }
+  };
+
+  const handleVoteOnDeepInsight = async (actionId: string, vote: 'up' | 'down') => {
+    await voteOnDeepInsightAction(actionId, vote);
+  };
+
+  const handleAcceptDeepInsight = async (action: DeepInsightAction) => {
+    if (!user) return;
+    
+    try {
+      // Update action status
+      await updateDeepInsightActionStatus(action.id, 'accepted');
+      
+      // Implement the action based on its type
+      switch (action.type) {
+        case 'task':
+          await createUserTask(user.uid, action.actionPayload);
+          break;
+        case 'goal':
+          await createUserGoal(user.uid, action.actionPayload);
+          break;
+        case 'project':
+          await createUserProject(user.uid, action.actionPayload);
+          break;
+        case 'plan':
+          await createUserPlan(user.uid, action.actionPayload);
+          break;
+      }
+      
+      setIsDeepInsightDialogOpen(false);
+    } catch (error) {
+      console.error('Error implementing DeepInsight action:', error);
+    }
+  };
+
+  const handleDeclineDeepInsight = async (actionId: string) => {
+    await updateDeepInsightActionStatus(actionId, 'declined');
+    setIsDeepInsightDialogOpen(false);
+  };
 
   // ----- Style Handlers -----
   const handleStyleSelect = (style: string, prompt: string) => {
@@ -481,12 +637,24 @@ export function AIChat() {
       styleInstruction = `\n\n${activePrompt}\n`;
     }
 
+    let contextInformation = '';
+    if (userContext) {
+      contextInformation = `
+User Context:
+- Work: ${userContext.workDescription}
+- Short-term Focus: ${userContext.shortTermFocus}
+- Long-term Goals: ${userContext.longTermGoals}
+- Additional Context: ${userContext.otherContext}
+`;
+    }
+
     return `
 [CONTEXT]
 User's Name: ${userName}
 Current Date: ${currentDateTime.date}
 Current Time: ${currentDateTime.time}
 ${styleInstruction}
+${contextInformation}
 
 ${itemsText}
 
@@ -932,6 +1100,25 @@ Return ONLY the title, with no extra commentary.
             >
               Select one of the quick actions below or start a new conversation.
             </p>
+
+            {/* Context and DeepInsight buttons */}
+            <div className="flex gap-4 mb-8">
+              <button
+                onClick={handleOpenContext}
+                className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <Brain className="w-5 h-5" />
+                Update Context
+              </button>
+              <button
+                onClick={handleRequestDeepInsight}
+                disabled={!userContext}
+                className="flex items-center gap-2 bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Sparkles className="w-5 h-5" />
+                Request DeepInsight
+              </button>
+            </div>
             
             {/* Improved marquee container with gradient overlays */}
             <div className="relative w-full overflow-hidden my-4">
@@ -1099,6 +1286,23 @@ Return ONLY the title, with no extra commentary.
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleOpenContext}
+                      className="flex items-center gap-2 bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                    >
+                      <Brain className="w-4 h-4" />
+                      Context
+                    </button>
+                    <button
+                      onClick={handleRequestDeepInsight}
+                      disabled={!userContext}
+                      className="flex items-center gap-2 bg-purple-600 text-white px-3 py-1 rounded-lg hover:bg-purple-700 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Sparkles className="w-4 h-4" />
+                      DeepInsight
+                    </button>
+                  </div>
                   <div className="flex items-center gap-2 text-xs">
                     <AlertTriangle className="w-4 h-4 text-yellow-400" />
                     <span
@@ -1314,7 +1518,7 @@ Return ONLY the title, with no extra commentary.
                     <MoreHorizontal className="w-4 h-4" />
                   </button>
                   <div
-                    id={`conv-menu-${conv.id}`}
+                    id={`conv-menu-${conv.id}` }`}
                     className="hidden absolute top-8 right-0 rounded-lg shadow-lg z-50"
                     style={{
                       minWidth: '160px',
@@ -1364,6 +1568,30 @@ Return ONLY the title, with no extra commentary.
           </div>
         </div>
       </aside>
+
+      {/* Context Dialog */}
+      <ContextDialog
+        isOpen={isContextDialogOpen}
+        onClose={() => setIsContextDialogOpen(false)}
+        onSave={handleSaveContext}
+        initialContext={userContext}
+        isBlackoutEnabled={isBlackoutEnabled}
+        isIlluminateEnabled={isIlluminateEnabled}
+      />
+
+      {/* DeepInsight Dialog */}
+      {selectedDeepInsightAction && (
+        <DeepInsightDialog
+          isOpen={isDeepInsightDialogOpen}
+          onClose={() => setIsDeepInsightDialogOpen(false)}
+          action={selectedDeepInsightAction}
+          onVote={(vote) => handleVoteOnDeepInsight(selectedDeepInsightAction.id, vote)}
+          onAccept={() => handleAcceptDeepInsight(selectedDeepInsightAction)}
+          onDecline={() => handleDeclineDeepInsight(selectedDeepInsightAction.id)}
+          isBlackoutEnabled={isBlackoutEnabled}
+          isIlluminateEnabled={isIlluminateEnabled}
+        />
+      )}
     </div>
   );
 }

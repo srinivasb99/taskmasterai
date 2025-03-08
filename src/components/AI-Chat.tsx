@@ -500,6 +500,45 @@ const generateDeepInsight = async () => {
 };
 
 
+// ----- DeepInsight Handlers -----
+const handleDeepInsightVote = async (actionId: string, vote: 'up' | 'down') => {
+  if (!user) return;
+  try {
+    await handleDeepInsightVote(actionId, vote);
+  } catch (error) {
+    console.error('Error voting on DeepInsight:', error);
+  }
+};
+
+const handleDeepInsightAccept = async (actionId: string, action: DeepInsightAction) => {
+  if (!user) return;
+  try {
+    await handleDeepInsightAccept(actionId, {
+      ...action,
+      userId: user.uid
+    });
+    setCurrentDeepInsight(null);
+    if (deepInsightCount < MAX_DEEP_INSIGHTS) {
+      generateDeepInsight();
+    }
+  } catch (error) {
+    console.error('Error accepting DeepInsight:', error);
+  }
+};
+
+const handleDeepInsightDecline = async (actionId: string) => {
+  try {
+    await handleDeepInsightDecline(actionId);
+    setCurrentDeepInsight(null);
+    if (deepInsightCount < MAX_DEEP_INSIGHTS) {
+      generateDeepInsight();
+    }
+  } catch (error) {
+    console.error('Error declining DeepInsight:', error);
+  }
+};
+
+
 const handleVoteOnDeepInsight = async (vote: 'up' | 'down') => {
   if (!currentDeepInsight) return;
   await handleDeepInsightVote(currentDeepInsight.id, vote);
@@ -1576,19 +1615,19 @@ Return ONLY the title, with no extra commentary.
         isIlluminateEnabled={isIlluminateEnabled}
       />
 
-      {/* DeepInsight Dialog */}
-      {selectedDeepInsightAction && (
-        <DeepInsightDialog
-          isOpen={isDeepInsightDialogOpen}
-          onClose={() => setIsDeepInsightDialogOpen(false)}
-          action={selectedDeepInsightAction}
-          onVote={(vote) => handleVoteOnDeepInsight(selectedDeepInsightAction.id, vote)}
-          onAccept={() => handleAcceptDeepInsight(selectedDeepInsightAction)}
-          onDecline={() => handleDeclineDeepInsight(selectedDeepInsightAction.id)}
-          isBlackoutEnabled={isBlackoutEnabled}
-          isIlluminateEnabled={isIlluminateEnabled}
-        />
-      )}
+{/* DeepInsight Dialog */}
+{currentDeepInsight && (
+  <DeepInsightDialog
+    isOpen={isDeepInsightDialogOpen}
+    onClose={() => setIsDeepInsightDialogOpen(false)}
+    action={currentDeepInsight}
+    onVote={(vote) => handleDeepInsightVote(currentDeepInsight.id, vote)}
+    onAccept={() => handleDeepInsightAccept(currentDeepInsight.id, currentDeepInsight)}
+    onDecline={() => handleDeepInsightDecline(currentDeepInsight.id)}
+    isBlackoutEnabled={isBlackoutEnabled}
+    isIlluminateEnabled={isIlluminateEnabled}
+  />
+)}
     </div>
   );
 }

@@ -1437,7 +1437,6 @@ Return ONLY the title, with no extra commentary.
         isBlackoutEnabled={isBlackoutEnabled}
         isIlluminateEnabled={isIlluminateEnabled}
       />
-    )}
     </div>
   );
 }

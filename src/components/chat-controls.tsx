@@ -15,7 +15,7 @@ const chatStyles = {
     prompt: ''
   },
   'Formal & Professional': {
-    description: 'Direct, accurate, and business-focused communication designed to handle complex problems',
+    description: 'Clear, professional, and precise communication',
     color: 'bg-indigo-600',
     hoverColor: 'hover:bg-indigo-700',
     lightBg: 'bg-indigo-50',
@@ -52,7 +52,7 @@ You are now operating in Formal & Professional Mode. You MUST follow these guide
 CRITICAL: Any deviation from these guidelines is NOT permitted. You must directly communicate with the user, providing professional, accurate, and comprehensive guidance at all times.`
   },
   'Educational & Motivational': {
-    description: 'Engaging, informative, and encouraging guidance tailored for educational success',
+    description: 'Teaching-focused guidance with a tutor-like approach',
     color: 'bg-emerald-600',
     hoverColor: 'hover:bg-emerald-700',
     lightBg: 'bg-emerald-50',
@@ -88,7 +88,7 @@ You are now operating in Educational & Motivational Mode. You MUST follow these 
 CRITICAL: Any deviation from these guidelines is NOT permitted. You must serve as an expert teacher and tutor, directly addressing the user's educational needs with precise, accurate, and comprehensible guidance.`
   },
   'Casual & Friendly': {
-    description: 'Warm, approachable, and conversational support',
+    description: 'Warm and approachable conversation',
     color: 'bg-amber-600',
     hoverColor: 'hover:bg-amber-700',
     lightBg: 'bg-amber-50',

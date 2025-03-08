@@ -1090,13 +1090,6 @@ Return ONLY the title, with no extra commentary.
 {/* Optional: chat input */}
 <form onSubmit={handleChatSubmit} className="mt-8 w-full max-w-lg">
   <div className="flex gap-2 items-center">
-    <ChatControls
-      onStyleSelect={handleStyleSelect}
-      onCustomStyleCreate={handleCustomStyleCreate}
-      isBlackoutEnabled={isBlackoutEnabled}
-      isIlluminateEnabled={isIlluminateEnabled}
-      activeStyle={activeStyle}
-    />
     <button
       type="button"
       onClick={() => setIsContextDialogOpen(true)}
@@ -1104,6 +1097,13 @@ Return ONLY the title, with no extra commentary.
     >
       <Brain className="w-5 h-5" />
     </button>
+    <ChatControls
+      onStyleSelect={handleStyleSelect}
+      onCustomStyleCreate={handleCustomStyleCreate}
+      isBlackoutEnabled={isBlackoutEnabled}
+      isIlluminateEnabled={isIlluminateEnabled}
+      activeStyle={activeStyle}
+    />
     <input
       type="text"
       value={chatMessage}
@@ -1153,13 +1153,6 @@ Return ONLY the title, with no extra commentary.
                 </div>
                 <div className="flex items-center gap-4">
                   {/* Context and DeepInsight buttons */}
-                  <button
-                    onClick={() => setIsContextDialogOpen(true)}
-                    className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    <Brain className="w-4 h-4" />
-                    Context
-                  </button>
                   <div className="flex items-center gap-2 text-xs">
                     <AlertTriangle className="w-4 h-4 text-yellow-400" />
                     <span
@@ -1290,6 +1283,13 @@ Return ONLY the title, with no extra commentary.
             {/* Chat Input */}
             <form onSubmit={handleChatSubmit} className={`p-4 border-t ${headerBorder}`}>
               <div className="flex gap-2">
+    <button
+      type="button"
+      onClick={() => setIsContextDialogOpen(true)}
+      className="p-2 rounded-full bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+    >
+      <Brain className="w-5 h-5" />
+    </button>
                 <ChatControls
                   onStyleSelect={handleStyleSelect}
                   onCustomStyleCreate={handleCustomStyleCreate}

@@ -65,6 +65,14 @@ import {
   deleteChatConversation,
 } from '../lib/ai-chat-firebase';
 
+// Context and DeepInsight functions
+import {
+  saveUserContext,
+  getUserContext,
+  onUserContextChange,
+  type UserContext,
+} from '../lib/ai-context-firebase';
+
 // Firestore item CRUD helpers
 import {
   createUserTask,
@@ -77,6 +85,8 @@ import { Sidebar } from './Sidebar';
 import { Timer } from './Timer';
 import { FlashcardsQuestions } from './FlashcardsQuestions';
 import { ChatControls } from './chat-controls';
+import { ContextDialog } from './context-dialog';
+
 
 // ----- Types -----
 interface TimerMessage {
@@ -233,6 +243,10 @@ export function AIChat() {
   const [streamingAssistantContent, setStreamingAssistantContent] = useState('');
   const chatEndRef = useRef<HTMLDivElement>(null);
 
+  // Context state
+  const [isContextDialogOpen, setIsContextDialogOpen] = useState(false);
+  const [userContext, setUserContext] = useState<UserContext | null>(null);
+
   // Chat style state
   const [activeStyle, setActiveStyle] = useState<string | null>(null);
   const [activePrompt, setActivePrompt] = useState<string | null>(null);
@@ -345,6 +359,17 @@ export function AIChat() {
     };
   }, [user]);
 
+
+    // Context listener
+  useEffect(() => {
+    if (!user) return;
+    const unsubscribe = onUserContextChange(user.uid, (context) => {
+      setUserContext(context);
+    });
+    return () => unsubscribe();
+  }, [user]);
+
+  
   // Conversation list listener
   useEffect(() => {
     if (!user) return;
@@ -372,6 +397,13 @@ export function AIChat() {
       chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [chatHistory]);
+
+  // ----- Context Handlers -----
+  const handleSaveContext = async (context: Partial<UserContext>) => {
+    if (!user) return;
+    await saveUserContext(user.uid, context);
+  };
+
 
   // ----- Style Handlers -----
   const handleStyleSelect = (style: string, prompt: string) => {
@@ -481,12 +513,24 @@ export function AIChat() {
       styleInstruction = `\n\n${activePrompt}\n`;
     }
 
+   let contextSection = '';
+    if (userContext) {
+      contextSection = `
+User Context:
+- Work: ${userContext.workDescription}
+- Short-term Focus: ${userContext.shortTermFocus}
+- Long-term Goals: ${userContext.longTermGoals}
+- Additional Context: ${userContext.otherContext}
+`;
+    }
+
     return `
 [CONTEXT]
 User's Name: ${userName}
 Current Date: ${currentDateTime.date}
 Current Time: ${currentDateTime.time}
 ${styleInstruction}
+${contextSection}
 
 ${itemsText}
 
@@ -932,6 +976,17 @@ Return ONLY the title, with no extra commentary.
             >
               Select one of the quick actions below or start a new conversation.
             </p>
+
+            {/* Context and DeepInsight buttons */}
+            <div className="flex gap-4 mb-8">
+              <button
+                onClick={() => setIsContextDialogOpen(true)}
+                className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <Brain className="w-5 h-5" />
+                Update Context
+              </button>
+            </div>
             
             {/* Improved marquee container with gradient overlays */}
             <div className="relative w-full overflow-hidden my-4">
@@ -1099,6 +1154,14 @@ Return ONLY the title, with no extra commentary.
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
+                  {/* Context and DeepInsight buttons */}
+                  <button
+                    onClick={() => setIsContextDialogOpen(true)}
+                    className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    <Brain className="w-4 h-4" />
+                    Context
+                  </button>
                   <div className="flex items-center gap-2 text-xs">
                     <AlertTriangle className="w-4 h-4 text-yellow-400" />
                     <span
@@ -1364,6 +1427,17 @@ Return ONLY the title, with no extra commentary.
           </div>
         </div>
       </aside>
+
+      {/* Context Dialog */}
+      <ContextDialog
+        isOpen={isContextDialogOpen}
+        onClose={() => setIsContextDialogOpen(false)}
+        onSave={handleSaveContext}
+        initialContext={userContext}
+        isBlackoutEnabled={isBlackoutEnabled}
+        isIlluminateEnabled={isIlluminateEnabled}
+      />
+    )}
     </div>
   );
 }

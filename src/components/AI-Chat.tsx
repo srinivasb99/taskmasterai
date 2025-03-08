@@ -42,7 +42,10 @@ import {
   Users,
   CalendarCheck,
   Eye,
-  Brain
+  Brain,
+  ThumbsUp,
+  XCircle,
+  ThumbsDown
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
@@ -64,6 +67,8 @@ import {
   onChatConversationsSnapshot,
   updateChatConversationName,
   deleteChatConversation,
+  extractJsonFromResponse, 
+  processAiActions
 } from '../lib/ai-chat-firebase';
 
 // Firestore item CRUD helpers
@@ -278,6 +283,10 @@ export function AIChat() {
   const [selectedDeepInsightAction, setSelectedDeepInsightAction] = useState<DeepInsightAction | null>(null);
   const [deepInsightActions, setDeepInsightActions] = useState<DeepInsightAction[]>([]);
 
+  const [deepInsightCount, setDeepInsightCount] = useState(0);
+  const [currentDeepInsight, setCurrentDeepInsight] = useState<DeepInsightAction | null>(null);
+  const MAX_DEEP_INSIGHTS = 10;
+
   // Chat style state
   const [activeStyle, setActiveStyle] = useState<string | null>(null);
   const [activePrompt, setActivePrompt] = useState<string | null>(null);
@@ -443,95 +452,72 @@ export function AIChat() {
   };
 
   // ----- DeepInsight Handlers -----
-  const generateDeepInsight = async () => {
-    if (!user || !userContext) return;
+const generateDeepInsight = async () => {
+  if (!user || deepInsightCount >= MAX_DEEP_INSIGHTS) return;
 
-    const prompt = `
-Based on the following context and data, analyze the user's situation and suggest ONE specific, actionable improvement:
+  try {
+    const prompt = `Based on the following context and chat history, generate a deep insight:
+      ${JSON.stringify(userContext)}
+      ${chatHistory.map(msg => `${msg.role}: ${msg.content}`).join('\n')}
+      
+      Return ONLY a JSON object in this exact format:
+      {
+        "action": "deepInsight",
+        "payload": {
+          "type": "task|goal|project|plan",
+          "description": "Clear description of the suggested action",
+          "reasoning": "Why this action is important",
+          "impact": "Expected impact of this action",
+          "actionPayload": {
+            "action": "createTask|createGoal|createProject|createPlan",
+            "payload": {
+              "specific fields based on type"
+            }
+          }
+        }
+      }`;
 
-User Context:
-${JSON.stringify(userContext, null, 2)}
-
-Current Items:
-${formatItemsForChat()}
-
-Provide your suggestion in the following JSON format:
-{
-  "type": "task|goal|project|plan",
-  "description": "Clear description of the suggested action",
-  "reasoning": "Detailed explanation of why this action would be beneficial",
-  "impact": "Expected positive impact of implementing this suggestion",
-  "actionPayload": {
-    // Relevant data for creating the item (task, goal, etc.)
-  }
-}
-
-Focus on practical, high-impact suggestions that align with the user's context and current priorities.
-Return ONLY the JSON object, no additional text.
-`;
-
-    const options = {
+    const response = await fetch(geminiEndpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }]
       })
-    };
+    });
 
-    try {
-      const response = await fetchWithTimeout(geminiEndpoint, options, 30000);
-      const text = await response.text();
-      const candidateText = extractCandidateText(text);
-      
-      // Extract JSON from the response
-      const jsonBlocks = extractJsonBlocks(candidateText);
-      if (jsonBlocks.length > 0) {
-        const actionData = JSON.parse(jsonBlocks[0]);
-        const action = await createDeepInsightAction(user.uid, actionData);
-        setSelectedDeepInsightAction(action);
-        setIsDeepInsightDialogOpen(true);
-      } else {
-        console.error('No valid JSON found in DeepInsight response');
-      }
-    } catch (err) {
-      console.error('Error generating DeepInsight:', err);
+    const data = await response.json();
+    const text = data.candidates[0].content.parts[0].text;
+    const actions = extractJsonFromResponse(text);
+    
+    if (actions[0]?.action === 'deepInsight') {
+      const newInsight = await createDeepInsightAction(user.uid, actions[0].payload);
+      setCurrentDeepInsight(newInsight);
+      setDeepInsightCount(prev => prev + 1);
     }
-  };
+  } catch (error) {
+    console.error('Error generating DeepInsight:', error);
+  }
+};
 
-  const handleVoteOnDeepInsight = async (actionId: string, vote: 'up' | 'down') => {
-    await voteOnDeepInsightAction(actionId, vote);
-  };
 
-  const handleAcceptDeepInsight = async (action: DeepInsightAction) => {
-    try {
-      // Create the corresponding item based on the action type
-      switch (action.type) {
-        case 'task':
-          await createUserTask(user!.uid, action.actionPayload);
-          break;
-        case 'goal':
-          await createUserGoal(user!.uid, action.actionPayload);
-          break;
-        case 'project':
-          await createUserProject(user!.uid, action.actionPayload);
-          break;
-        case 'plan':
-          await createUserPlan(user!.uid, action.actionPayload);
-          break;
-      }
+const handleVoteOnDeepInsight = async (vote: 'up' | 'down') => {
+  if (!currentDeepInsight) return;
+  await handleDeepInsightVote(currentDeepInsight.id, vote);
+};
 
-      // Update action status
-      await updateDeepInsightActionStatus(action.id, 'accepted');
-      setIsDeepInsightDialogOpen(false);
-    } catch (err) {
-      console.error('Error accepting DeepInsight action:', err);
-    }
-  };
+const handleAcceptDeepInsight = async () => {
+  if (!currentDeepInsight || !user) return;
+  await handleDeepInsightAccept(currentDeepInsight.id, currentDeepInsight);
+  setCurrentDeepInsight(null);
+  generateDeepInsight(); // Generate next insight if under limit
+};
 
-  const handleDeclineDeepInsight = async (actionId: string) => {
-    await updateDeepInsightActionStatus(actionId, 'declined');
-    setIsDeepInsightDialogOpen(false);
-  };
+const handleDeclineDeepInsight = async () => {
+  if (!currentDeepInsight) return;
+  await handleDeepInsightDecline(currentDeepInsight.id);
+  setCurrentDeepInsight(null);
+  generateDeepInsight(); // Generate next insight if under limit
+};
 
   // ----- Style Handlers -----
   const handleStyleSelect = (style: string, prompt: string) => {

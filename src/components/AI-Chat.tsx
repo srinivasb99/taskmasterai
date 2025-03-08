@@ -42,8 +42,7 @@ import {
   Users,
   CalendarCheck,
   Eye,
-  Brain,
-  Sparkles
+  Brain
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
@@ -217,22 +216,42 @@ const extractCandidateText = (text: string): string => {
 function extractJsonBlocks(text: string): string[] {
   const blocks: string[] = [];
 
-  // 1) Attempt to find triple-backtick code blocks
-  const tripleBacktickRegex = /```json\s*([\s\S]*?)```/g;
+  // 1) Find and clean JSON blocks within triple backticks
+  const tripleBacktickRegex = /```(?:json)?\s*([\s\S]*?)```/g;
   let match = tripleBacktickRegex.exec(text);
+  
   while (match) {
-    blocks.push(match[1]);
+    try {
+      // Validate that the content is actually JSON by parsing it
+      const jsonContent = match[1].trim();
+      JSON.parse(jsonContent); // This will throw if invalid
+      blocks.push(jsonContent);
+    } catch (err) {
+      console.error('Invalid JSON in backtick block:', err);
+    }
     match = tripleBacktickRegex.exec(text);
   }
 
-  if (blocks.length > 0) return blocks;
-
-  // 2) Fallback: look for { ... } blocks
-  const curlyRegex = /(\{[^{}]+\})/g;
-  let curlyMatch = curlyRegex.exec(text);
-  while (curlyMatch) {
-    blocks.push(curlyMatch[1]);
-    curlyMatch = curlyRegex.exec(text);
+  // 2) If no valid JSON found in backticks, look for standalone JSON objects
+  if (blocks.length === 0) {
+    try {
+      // Find potential JSON objects
+      const jsonRegex = /(\{[\s\S]*?\})/g;
+      let jsonMatch;
+      
+      while ((jsonMatch = jsonRegex.exec(text)) !== null) {
+        try {
+          const jsonContent = jsonMatch[1].trim();
+          JSON.parse(jsonContent); // Validate JSON
+          blocks.push(jsonContent);
+        } catch (err) {
+          // Skip invalid JSON
+          continue;
+        }
+      }
+    } catch (err) {
+      console.error('Error extracting standalone JSON:', err);
+    }
   }
 
   return blocks;
@@ -250,6 +269,15 @@ export function AIChat() {
   const [streamingAssistantContent, setStreamingAssistantContent] = useState('');
   const chatEndRef = useRef<HTMLDivElement>(null);
 
+  // Context state
+  const [isContextDialogOpen, setIsContextDialogOpen] = useState(false);
+  const [userContext, setUserContext] = useState<UserContext | null>(null);
+
+  // DeepInsight state
+  const [isDeepInsightDialogOpen, setIsDeepInsightDialogOpen] = useState(false);
+  const [selectedDeepInsightAction, setSelectedDeepInsightAction] = useState<DeepInsightAction | null>(null);
+  const [deepInsightActions, setDeepInsightActions] = useState<DeepInsightAction[]>([]);
+
   // Chat style state
   const [activeStyle, setActiveStyle] = useState<string | null>(null);
   const [activePrompt, setActivePrompt] = useState<string | null>(null);
@@ -260,13 +288,6 @@ export function AIChat() {
   const [goals, setGoals] = useState<Array<{ id: string; data: any }>>([]);
   const [projects, setProjects] = useState<Array<{ id: string; data: any }>>([]);
   const [plans, setPlans] = useState<Array<{ id: string; data: any }>>([]);
-
-  // Context and DeepInsight state
-  const [isContextDialogOpen, setIsContextDialogOpen] = useState(false);
-  const [userContext, setUserContext] = useState<UserContext | null>(null);
-  const [deepInsightActions, setDeepInsightActions] = useState<DeepInsightAction[]>([]);
-  const [selectedDeepInsightAction, setSelectedDeepInsightAction] = useState<DeepInsightAction | null>(null);
-  const [isDeepInsightDialogOpen, setIsDeepInsightDialogOpen] = useState(false);
 
   // Conversation management
   const [hasGeneratedChatName, setHasGeneratedChatName] = useState(false);
@@ -369,22 +390,22 @@ export function AIChat() {
     };
   }, [user]);
 
-  // Context and DeepInsight listeners
+  // Context listener
   useEffect(() => {
     if (!user) return;
-    
-    const unsubContext = onUserContextChange(user.uid, (context) => {
+    const unsubscribe = onUserContextChange(user.uid, (context) => {
       setUserContext(context);
     });
-    
-    const unsubDeepInsight = onDeepInsightActionsChange(user.uid, (actions) => {
+    return () => unsubscribe();
+  }, [user]);
+
+  // DeepInsight actions listener
+  useEffect(() => {
+    if (!user) return;
+    const unsubscribe = onDeepInsightActionsChange(user.uid, (actions) => {
       setDeepInsightActions(actions);
     });
-    
-    return () => {
-      unsubContext();
-      unsubDeepInsight();
-    };
+    return () => unsubscribe();
   }, [user]);
 
   // Conversation list listener
@@ -416,78 +437,64 @@ export function AIChat() {
   }, [chatHistory]);
 
   // ----- Context Handlers -----
-  const handleOpenContext = () => {
-    setIsContextDialogOpen(true);
-  };
-
   const handleSaveContext = async (context: Partial<UserContext>) => {
     if (!user) return;
     await saveUserContext(user.uid, context);
   };
 
   // ----- DeepInsight Handlers -----
-  const handleRequestDeepInsight = async () => {
+  const generateDeepInsight = async () => {
     if (!user || !userContext) return;
-    
+
     const prompt = `
-Based on the following context, analyze the user's situation and suggest meaningful improvements:
+Based on the following context and data, analyze the user's situation and suggest ONE specific, actionable improvement:
 
-Work Description:
-${userContext.workDescription}
-
-Short Term Focus:
-${userContext.shortTermFocus}
-
-Long Term Goals:
-${userContext.longTermGoals}
-
-Other Context:
-${userContext.otherContext}
+User Context:
+${JSON.stringify(userContext, null, 2)}
 
 Current Items:
 ${formatItemsForChat()}
 
-Please provide a strategic suggestion that will help improve the user's productivity or achieve their goals.
-Include:
-1. A clear action description
-2. Detailed reasoning for the suggestion
-3. Expected impact
-4. The type of action (task/goal/project/plan)
-5. Specific details for implementation
-
-Return the response in JSON format with the following structure:
+Provide your suggestion in the following JSON format:
 {
   "type": "task|goal|project|plan",
-  "description": "Clear action description",
-  "reasoning": "Detailed explanation of why this action is suggested",
-  "impact": "Expected benefits and outcomes",
+  "description": "Clear description of the suggested action",
+  "reasoning": "Detailed explanation of why this action would be beneficial",
+  "impact": "Expected positive impact of implementing this suggestion",
   "actionPayload": {
-    // Specific details for implementation
+    // Relevant data for creating the item (task, goal, etc.)
   }
 }
+
+Focus on practical, high-impact suggestions that align with the user's context and current priorities.
+Return ONLY the JSON object, no additional text.
 `;
 
-    setIsChatLoading(true);
-    try {
-      const options = {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }]
-        })
-      };
+    const options = {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }]
+      })
+    };
 
-      const response = await fetchWithTimeout(geminiEndpoint, options, 45000);
+    try {
+      const response = await fetchWithTimeout(geminiEndpoint, options, 30000);
       const text = await response.text();
-      const suggestion = JSON.parse(extractCandidateText(text));
+      const candidateText = extractCandidateText(text);
       
-      const action = await createDeepInsightAction(user.uid, suggestion);
-      setSelectedDeepInsightAction(action);
-      setIsDeepInsightDialogOpen(true);
-    } catch (error) {
-      console.error('Error generating DeepInsight:', error);
-    } finally {
-      setIsChatLoading(false);
+      // Extract JSON from the response
+      const jsonBlocks = extractJsonBlocks(candidateText);
+      if (jsonBlocks.length > 0) {
+        const actionData = JSON.parse(jsonBlocks[0]);
+        const action = await createDeepInsightAction(user.uid, actionData);
+        setSelectedDeepInsightAction(action);
+        setIsDeepInsightDialogOpen(true);
+      } else {
+        console.error('No valid JSON found in DeepInsight response');
+      }
+    } catch (err) {
+      console.error('Error generating DeepInsight:', err);
     }
   };
 
@@ -496,31 +503,28 @@ Return the response in JSON format with the following structure:
   };
 
   const handleAcceptDeepInsight = async (action: DeepInsightAction) => {
-    if (!user) return;
-    
     try {
-      // Update action status
-      await updateDeepInsightActionStatus(action.id, 'accepted');
-      
-      // Implement the action based on its type
+      // Create the corresponding item based on the action type
       switch (action.type) {
         case 'task':
-          await createUserTask(user.uid, action.actionPayload);
+          await createUserTask(user!.uid, action.actionPayload);
           break;
         case 'goal':
-          await createUserGoal(user.uid, action.actionPayload);
+          await createUserGoal(user!.uid, action.actionPayload);
           break;
         case 'project':
-          await createUserProject(user.uid, action.actionPayload);
+          await createUserProject(user!.uid, action.actionPayload);
           break;
         case 'plan':
-          await createUserPlan(user.uid, action.actionPayload);
+          await createUserPlan(user!.uid, action.actionPayload);
           break;
       }
-      
+
+      // Update action status
+      await updateDeepInsightActionStatus(action.id, 'accepted');
       setIsDeepInsightDialogOpen(false);
-    } catch (error) {
-      console.error('Error implementing DeepInsight action:', error);
+    } catch (err) {
+      console.error('Error accepting DeepInsight action:', err);
     }
   };
 
@@ -637,9 +641,9 @@ Return the response in JSON format with the following structure:
       styleInstruction = `\n\n${activePrompt}\n`;
     }
 
-    let contextInformation = '';
+    let contextSection = '';
     if (userContext) {
-      contextInformation = `
+      contextSection = `
 User Context:
 - Work: ${userContext.workDescription}
 - Short-term Focus: ${userContext.shortTermFocus}
@@ -654,7 +658,7 @@ User's Name: ${userName}
 Current Date: ${currentDateTime.date}
 Current Time: ${currentDateTime.time}
 ${styleInstruction}
-${contextInformation}
+${contextSection}
 
 ${itemsText}
 
@@ -854,6 +858,9 @@ Return ONLY the title, with no extra commentary.
               await createUserProject(user.uid, parsed.payload);
             }
           }
+          // If this is educational content.
+          else if (parsed.type && parsed.data && (parsed.type Here's the continuation of the AI-Chat.tsx file from where it left off:
+
           // If this is educational content.
           else if (parsed.type && parsed.data && (parsed.type === 'flashcard' || parsed.type === 'question')) {
             educationalContent = parsed;
@@ -1100,23 +1107,23 @@ Return ONLY the title, with no extra commentary.
             >
               Select one of the quick actions below or start a new conversation.
             </p>
-
+            
             {/* Context and DeepInsight buttons */}
             <div className="flex gap-4 mb-8">
               <button
-                onClick={handleOpenContext}
+                onClick={() => setIsContextDialogOpen(true)}
                 className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
               >
                 <Brain className="w-5 h-5" />
                 Update Context
               </button>
               <button
-                onClick={handleRequestDeepInsight}
+                onClick={generateDeepInsight}
+                className="flex items-center gap-2 bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition-colors"
                 disabled={!userContext}
-                className="flex items-center gap-2 bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Sparkles className="w-5 h-5" />
-                Request DeepInsight
+                <Lightbulb className="w-5 h-5" />
+                Generate DeepInsight
               </button>
             </div>
             
@@ -1234,7 +1241,6 @@ Return ONLY the title, with no extra commentary.
               <div className="flex gap-2">
                 <ChatControls
                   onStyleSelect={handleStyleSelect}
-                  onCustomStyleCreate={handleCustomStyleCreate}
                   isBlackoutEnabled={isBlackoutEnabled}
                   isIlluminateEnabled={isIlluminateEnabled}
                   activeStyle={activeStyle}
@@ -1286,23 +1292,22 @@ Return ONLY the title, with no extra commentary.
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={handleOpenContext}
-                      className="flex items-center gap-2 bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700 transition-colors text-sm"
-                    >
-                      <Brain className="w-4 h-4" />
-                      Context
-                    </button>
-                    <button
-                      onClick={handleRequestDeepInsight}
-                      disabled={!userContext}
-                      className="flex items-center gap-2 bg-purple-600 text-white px-3 py-1 rounded-lg hover:bg-purple-700 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <Sparkles className="w-4 h-4" />
-                      DeepInsight
-                    </button>
-                  </div>
+                  {/* Context and DeepInsight buttons */}
+                  <button
+                    onClick={() => setIsContextDialogOpen(true)}
+                    className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    <Brain className="w-4 h-4" />
+                    Context
+                  </button>
+                  <button
+                    onClick={generateDeepInsight}
+                    className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors"
+                    disabled={!userContext}
+                  >
+                    <Lightbulb className="w-4 h-4" />
+                    DeepInsight
+                  </button>
                   <div className="flex items-center gap-2 text-xs">
                     <AlertTriangle className="w-4 h-4 text-yellow-400" />
                     <span
@@ -1435,7 +1440,6 @@ Return ONLY the title, with no extra commentary.
               <div className="flex gap-2">
                 <ChatControls
                   onStyleSelect={handleStyleSelect}
-                  onCustomStyleCreate={handleCustomStyleCreate}
                   isBlackoutEnabled={isBlackoutEnabled}
                   isIlluminateEnabled={isIlluminateEnabled}
                   activeStyle={activeStyle}
@@ -1510,7 +1514,7 @@ Return ONLY the title, with no extra commentary.
                       e.stopPropagation();
                       const menu = document.getElementById(`conv-menu-${conv.id}`);
                       if (menu) {
-                        menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+                        menu.style.display = menu.style.display ===  'block' ? 'none' : 'block';
                       }
                     }}
                     className={`p-1 rounded-full ${isIlluminateEnabled || isBlackoutEnabled ? 'hover:bg-gray-300' : 'hover:bg-gray-600'} transition-colors`}

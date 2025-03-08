@@ -5,6 +5,7 @@ import {
   Send,
   Timer as TimerIcon,
   Bot,
+  Brain,
   AlertTriangle,
   MoreHorizontal,
   Plus,

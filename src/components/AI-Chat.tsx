@@ -1518,7 +1518,7 @@ Return ONLY the title, with no extra commentary.
                     <MoreHorizontal className="w-4 h-4" />
                   </button>
                   <div
-                    id={`conv-menu-${conv.id}` }`}
+                    id={`conv-menu-${conv.id}`}
                     className="hidden absolute top-8 right-0 rounded-lg shadow-lg z-50"
                     style={{
                       minWidth: '160px',

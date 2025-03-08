@@ -859,9 +859,6 @@ Return ONLY the title, with no extra commentary.
             }
           }
           // If this is educational content.
-          else if (parsed.type && parsed.data && (parsed.type Here's the continuation of the AI-Chat.tsx file from where it left off:
-
-          // If this is educational content.
           else if (parsed.type && parsed.data && (parsed.type === 'flashcard' || parsed.type === 'question')) {
             educationalContent = parsed;
           }

@@ -1,3 +1,5 @@
+"use client"
+
 import { useState, useEffect, useRef, type ChangeEvent, type FormEvent } from "react"
 import { useNavigate } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
@@ -120,6 +122,7 @@ export function Friends() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const chatContainerRef = useRef<HTMLDivElement>(null)
   const emojiPickerRef = useRef<HTMLDivElement>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
 
   // Auth state
   const [user, setUser] = useState<any>(null)
@@ -196,6 +199,7 @@ export function Friends() {
   const [searchQuery, setSearchQuery] = useState("")
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
+  const [audioChunks, setAudioChunks] = useState<Blob[]>([])
   const [showChatOptions, setShowChatOptions] = useState(false)
   const [isStarred, setIsStarred] = useState(false)
   const [messageToDelete, setMessageToDelete] = useState<string | null>(null)
@@ -278,7 +282,7 @@ export function Friends() {
 
   // For message bubbles: your own and others
   const ownMessageClass = isIlluminateEnabled ? "bg-blue-500 text-white" : "bg-blue-600 text-white"
-  const otherMessageClass = isIlluminateEnabled ? "bg-gray-300 text-gray-900" : "bg-gray-600 text-white"
+  const otherMessageClass = isIlluminateEnabled ? "bg-gray-200 text-gray-900" : "bg-gray-700 text-gray-100"
 
   // Chat input container
   const chatInputContainerClass = isIlluminateEnabled ? "bg-gray-100" : "bg-gray-800"
@@ -539,12 +543,12 @@ export function Friends() {
 
       await sendMessage(selectedChat.id, "", user.uid, fileURL)
 
-      // Clear the file input
       if (fileInputRef.current) {
         fileInputRef.current.value = ""
       }
     } catch (err) {
       console.error("Error uploading file:", err)
+      setError("Failed to upload file. Please try again.")
     } finally {
       setTimeout(() => {
         setFileUploading(false)
@@ -646,13 +650,15 @@ export function Friends() {
 
   // Rename the current chat (only for group chats)
   const handleRenameChat = async () => {
-    if (!selectedChat || !newChatName.trim() || !selectedChat.isGroup) return
+    if (!selectedChat || !selectedChat.isGroup || !newChatName.trim()) return
 
     try {
       await renameChat(selectedChat.id, newChatName.trim())
       setIsEditingChatName(false)
-    } catch (err) {
-      console.error("Error renaming chat:", err)
+      setNewChatName("")
+      setSuccess("Group chat renamed successfully!")
+    } catch (err: any) {
+      setError(err.message || "Failed to rename group chat")
     }
   }
 
@@ -705,9 +711,54 @@ export function Friends() {
   }
 
   // Start/stop voice recording
-  const toggleVoiceRecording = () => {
-    setIsRecording(!isRecording)
-    // Implement actual voice recording logic here
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mediaRecorder = new MediaRecorder(stream)
+      mediaRecorderRef.current = mediaRecorder
+
+      const chunks: Blob[] = []
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          chunks.push(e.data)
+        }
+      }
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(chunks, { type: "audio/webm" })
+        setAudioChunks([])
+
+        if (selectedChat) {
+          setFileUploading(true)
+          try {
+            const file = new File([audioBlob], `audio_${Date.now()}.webm`, { type: "audio/webm" })
+            const fileURL = await uploadChatFile(selectedChat.id, file, (progress) => {
+              setUploadProgress(progress)
+            })
+            await sendMessage(selectedChat.id, "", user.uid, fileURL)
+          } catch (err) {
+            console.error("Error uploading audio:", err)
+            setError("Failed to upload audio message")
+          } finally {
+            setFileUploading(false)
+          }
+        }
+      }
+
+      mediaRecorder.start()
+      setIsRecording(true)
+    } catch (err) {
+      console.error("Error starting recording:", err)
+      setError("Failed to start recording. Please check your microphone permissions.")
+    }
+  }
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop()
+      mediaRecorderRef.current.stream.getTracks().forEach((track) => track.stop())
+      setIsRecording(false)
+    }
   }
 
   // Filter chats based on search query
@@ -836,19 +887,59 @@ export function Friends() {
                 </div>
               </div>
               <div className="flex gap-2 ml-2 flex-shrink-0">
-                {selectedChat.isGroup && selectedChat.createdBy === user?.uid && (
-                  <motion.button
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="text-blue-400 hover:text-blue-300 p-1.5 rounded-full hover:bg-gray-700/20"
-                    onClick={() => {
-                      setIsEditingChatName(true)
-                      setNewChatName(selectedChat.name || "")
-                    }}
-                    title="Rename Group"
-                  >
-                    <Edit className="w-5 h-5" />
-                  </motion.button>
+                {selectedChat?.isGroup && selectedChat.createdBy === user?.uid && (
+                  <div className="flex items-center gap-2">
+                    {isEditingChatName ? (
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault()
+                          handleRenameChat()
+                        }}
+                        className="flex items-center gap-2"
+                      >
+                        <input
+                          type="text"
+                          value={newChatName}
+                          onChange={(e) => setNewChatName(e.target.value)}
+                          className={`${inputBg} rounded px-2 py-1 text-sm`}
+                          placeholder="New group name"
+                          autoFocus
+                        />
+                        <motion.button
+                          type="submit"
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          className="text-green-500 hover:text-green-400"
+                        >
+                          <CheckCircle className="w-5 h-5" />
+                        </motion.button>
+                        <motion.button
+                          type="button"
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => {
+                            setIsEditingChatName(false)
+                            setNewChatName("")
+                          }}
+                          className="text-red-500 hover:text-red-400"
+                        >
+                          <XCircle className="w-5 h-5" />
+                        </motion.button>
+                      </form>
+                    ) : (
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => {
+                          setIsEditingChatName(true)
+                          setNewChatName(selectedChat.name || "")
+                        }}
+                        className="text-blue-400 hover:text-blue-300 p-1.5 rounded-full hover:bg-gray-700/20"
+                      >
+                        <Edit className="w-5 h-5" />
+                      </motion.button>
+                    )}
+                  </div>
                 )}
                 <motion.div className="relative">
                   <motion.button
@@ -924,27 +1015,42 @@ export function Friends() {
                         className={`mb-3 ${isOwn ? "self-end" : "self-start"} group`}
                       >
                         {showSender && (
-                          <div className="flex items-center mb-1 ml-2">
-                            {msg.senderPhotoURL ? (
-                              <img
-                                src={msg.senderPhotoURL || "/placeholder.svg"}
-                                alt="avatar"
-                                className="w-5 h-5 sm:w-6 sm:h-6 rounded-full mr-2"
+                          <div className="flex items-center mb-2 ml-2">
+                            <div className="relative">
+                              {msg.senderPhotoURL ? (
+                                <img
+                                  src={msg.senderPhotoURL || "/placeholder.svg"}
+                                  alt={msg.senderName || "User"}
+                                  className="w-8 h-8 rounded-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center">
+                                  <User className="w-5 h-5 text-gray-300" />
+                                </div>
+                              )}
+                              <div
+                                className={`absolute bottom-0 right-0 w-2 h-2 rounded-full ${
+                                  getUserStatus(msg.senderId) === "online"
+                                    ? "bg-green-500"
+                                    : getUserStatus(msg.senderId) === "away"
+                                      ? "bg-yellow-500"
+                                      : "bg-gray-500"
+                                } border-2 ${isIlluminateEnabled ? "border-white" : "border-gray-800"}`}
                               />
-                            ) : (
-                              <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-gray-600 mr-2 flex items-center justify-center">
-                                <User className="w-3 h-3 text-gray-300" />
-                              </div>
-                            )}
-                            <span className="text-xs sm:text-sm font-medium text-gray-400">
+                            </div>
+                            <span
+                              className={`ml-2 text-sm font-medium ${
+                                isIlluminateEnabled ? "text-gray-700" : "text-gray-300"
+                              }`}
+                            >
                               {msg.senderName || "User"}
                             </span>
                           </div>
                         )}
                         <div className="relative">
                           <div
-                            className={`p-2 sm:p-3 rounded-lg max-w-[75%] break-words ${
-                              isOwn ? `${ownMessageClass}` : `${otherMessageClass}`
+                            className={`relative p-3 rounded-lg max-w-[75%] shadow-sm ${
+                              isOwn ? ownMessageClass : otherMessageClass
                             }`}
                           >
                             {msg.text && <p className="text-sm sm:text-base">{msg.text}</p>}
@@ -1129,11 +1235,19 @@ export function Friends() {
                   type="button"
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  onClick={toggleVoiceRecording}
-                  className={`${isRecording ? "bg-red-500 hover:bg-red-600" : secondaryButtonClass} p-2 rounded-full focus:outline-none focus:ring-2 focus:ring-gray-500 flex-shrink-0`}
+                  onClick={() => {
+                    if (isRecording) {
+                      stopRecording()
+                    } else {
+                      startRecording()
+                    }
+                  }}
+                  className={`${
+                    isRecording ? "bg-red-500 hover:bg-red-600" : secondaryButtonClass
+                  } p-2 rounded-full focus:outline-none focus:ring-2 focus:ring-gray-500 flex-shrink-0`}
                 >
                   <Mic className="w-5 h-5" />
-                  <span className="sr-only">{isRecording ? "Stop recording" : "Record voice"}</span>
+                  <span className="sr-only">{isRecording ? "Stop recording" : "Record voice message"}</span>
                 </motion.button>
 
                 <motion.button

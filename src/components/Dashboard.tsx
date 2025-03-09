@@ -818,13 +818,13 @@ ${formattedData}
 
 Follow these guidelines exactly:
 1. Deliver the response as one short paragraph (2-3 sentences max)
-2. Summarize the items briefly (1 sentence)
-3. Include EXACTLY 3 actionable priorities based ONLY on the items provided
+2. Summarize the focus of the items briefly (1 sentence, no labels like "items" or "to-do list")
+3. Include EXACTLY 3 actionable priorities based ONLY on the data provided
 4. For each priority:
-   - Reference specific items from the data
-   - Include due dates if present
+   - Reference specific tasks from the data naturally
+   - Format due dates as "Month Day" (e.g., "March 7th") if present
    - Suggest ONE clear, actionable next step
-   - Integrate naturally into the paragraph
+   - Blend seamlessly into the paragraph
 5. Focus on practical execution, not description
 
 FORBIDDEN IN YOUR FINAL RESPONSE:
@@ -832,10 +832,12 @@ FORBIDDEN IN YOUR FINAL RESPONSE:
 - Meta-commentary about the conversation
 - Phrases like "I understand", "I see", "I notice"
 - Explaining the process
-- Using phrases like "Based on the context"
+- Using phrases like "Based on the context", "items", "to-do list"
+- Numeric date formats (e.g., 03/07/2025)
 
-Keep it brief, actionable, and impersonal.
-<</SYS>>[/INST]`;
+Keep it brief, actionable, impersonal, and readable.
+<</SYS>>[/INST]
+`;
 
         // 4. Call Gemini API
         const geminiOptions = {

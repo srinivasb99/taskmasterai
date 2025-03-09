@@ -812,28 +812,29 @@ Follow these instructions strictly.
         // Extract only the first name from the full userName
         const firstName = userName.split(" ")[0];
         const prompt = `[INST] <<SYS>>
-You are TaskMaster, an advanced AI productivity assistant. Analyze the following items and generate a Smart Overview:
+You are TaskMaster, an advanced AI productivity assistant. Analyze the following items and generate a concise Smart Overview:
 
 ${formattedData}
 
 Follow these guidelines exactly:
-1. Start with "Hello ${firstName}," followed by a VERY brief overview of what exists (1 sentence max)
-2. List EXACTLY 3 actionable priorities based ONLY on the actual items shown above
-3. For each priority:
-   - Start with a number (1., 2., 3.)
+1. Deliver the response as one short paragraph (3-4 sentences max)
+2. Start with "Hello ${firstName}," followed by a brief summary of the items (1 sentence)
+3. Include EXACTLY 3 actionable priorities based ONLY on the items provided
+4. For each priority:
    - Reference specific items from the data
-   - If the item has a due date, mention it
-   - Provide ONE specific, actionable next step or strategy
-   - Focus on HOW to achieve the item, not just restating it
+   - Include due dates if present
+   - Suggest ONE clear, actionable next step
+   - Weave into the paragraph naturally
+5. Focus on practical execution, not just description
 
 FORBIDDEN IN YOUR FINAL RESPONSE:
 - Meta-commentary about the conversation
 - Phrases like "I understand", "I see", "I notice"
-- Explaining what you're about to do
+- Explaining your process
 - Using phrases like "Based on the context"
 
-Remember: Focus on actionable strategies and specific next steps, not just describing the items.
-<</SYS>>[/INST]`;
+Keep it short, actionable, and user-friendly as a single paragraph.
+<</SYS>>[/INST]]`;
 
         // 4. Call Gemini API
         const geminiOptions = {

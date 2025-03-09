@@ -954,7 +954,7 @@ Return ONLY the title, with no extra commentary.
           isIlluminateEnabled={isIlluminateEnabled && isSidebarIlluminateEnabled}
         />
 
-  {/* Main Chat Area */}
+{/* Main Chat Area */}
   <main
     className={`flex-1 overflow-hidden transition-all duration-300 
       ${isSidebarCollapsed ? 'md:ml-20' : 'md:ml-64'}
@@ -1009,7 +1009,7 @@ Return ONLY the title, with no extra commentary.
                   className="flex items-center space-x-1.5 md:space-x-2 bg-blue-600 px-3 py-2 md:px-4 md:py-2 rounded-lg text-white whitespace-nowrap text-xs md:text-sm flex-shrink-0"
                   onClick={() => handleQuickActionClick(action)}
                 >
-                  <span className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0">{quickActionIcons[action]}</span>
+                  <span className="scale-75 md:scale-100 flex-shrink-0">{quickActionIcons[action]}</span>
                   <span className="whitespace-nowrap">{action}</span>
                 </motion.button>
               ))}
@@ -1023,7 +1023,7 @@ Return ONLY the title, with no extra commentary.
                   className="flex items-center space-x-1.5 md:space-x-2 bg-blue-600 px-3 py-2 md:px-4 md:py-2 rounded-lg text-white whitespace-nowrap text-xs md:text-sm flex-shrink-0"
                   onClick={() => handleQuickActionClick(action)}
                 >
-                  <span className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0">{quickActionIcons[action]}</span>
+                  <span className="scale-75 md:scale-100 flex-shrink-0">{quickActionIcons[action]}</span>
                   <span className="whitespace-nowrap">{action}</span>
                 </motion.button>
               ))}
@@ -1036,7 +1036,7 @@ Return ONLY the title, with no extra commentary.
                   className="flex items-center space-x-1.5 md:space-x-2 bg-blue-600 px-3 py-2 md:px-4 md:py-2 rounded-lg text-white whitespace-nowrap text-xs md:text-sm flex-shrink-0"
                   onClick={() => handleQuickActionClick(action)}
                 >
-                  <span className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0">{quickActionIcons[action]}</span>
+                  <span className="scale-75 md:scale-100 flex-shrink-0">{quickActionIcons[action]}</span>
                   <span className="whitespace-nowrap">{action}</span>
                 </motion.button>
               ))}
@@ -1049,7 +1049,7 @@ Return ONLY the title, with no extra commentary.
                   className="flex items-center space-x-1.5 md:space-x-2 bg-blue-600 px-3 py-2 md:px-4 md:py-2 rounded-lg text-white whitespace-nowrap text-xs md:text-sm flex-shrink-0"
                   onClick={() => handleQuickActionClick(action)}
                 >
-                  <span className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0">{quickActionIcons[action]}</span>
+                  <span className="scale-75 md:scale-100 flex-shrink-0">{quickActionIcons[action]}</span>
                   <span className="whitespace-nowrap">{action}</span>
                 </motion.button>
               ))}
@@ -1062,7 +1062,7 @@ Return ONLY the title, with no extra commentary.
                   className="flex items-center space-x-1.5 md:space-x-2 bg-blue-600 px-3 py-2 md:px-4 md:py-2 rounded-lg text-white whitespace-nowrap text-xs md:text-sm flex-shrink-0"
                   onClick={() => handleQuickActionClick(action)}
                 >
-                  <span className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0">{quickActionIcons[action]}</span>
+                  <span className="scale-75 md:scale-100 flex-shrink-0">{quickActionIcons[action]}</span>
                   <span className="whitespace-nowrap">{action}</span>
                 </motion.button>
               ))}
@@ -1075,7 +1075,7 @@ Return ONLY the title, with no extra commentary.
                   className="flex items-center space-x-1.5 md:space-x-2 bg-blue-600 px-3 py-2 md:px-4 md:py-2 rounded-lg text-white whitespace-nowrap text-xs md:text-sm flex-shrink-0"
                   onClick={() => handleQuickActionClick(action)}
                 >
-                  <span className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0">{quickActionIcons[action]}</span>
+                  <span className="scale-75 md:scale-100 flex-shrink-0">{quickActionIcons[action]}</span>
                   <span className="whitespace-nowrap">{action}</span>
                 </motion.button>
               ))}
@@ -1091,7 +1091,9 @@ Return ONLY the title, with no extra commentary.
               onClick={() => setIsContextDialogOpen(true)}
               className="p-2 rounded-full bg-blue-600 text-white hover:bg-blue-700 transition-colors flex-shrink-0"
             >
-              <Brain className="w-4 h-4 md:w-5 md:h-5" />
+              <span className="scale-75 md:scale-100 flex items-center justify-center">
+                <Brain className={iconClass} />
+              </span>
             </button>
             {/* Chat controls - visible on both mobile and desktop */}
             <div className="flex-shrink-0">
@@ -1119,7 +1121,9 @@ Return ONLY the title, with no extra commentary.
               disabled={isChatLoading}
               className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
             >
-              <Send className="w-4 h-4 md:w-5 md:h-5" />
+              <span className="scale-75 md:scale-100 flex items-center justify-center">
+                <Send className={iconClass} />
+              </span>
             </button>
           </div>
         </form>
@@ -1131,7 +1135,9 @@ Return ONLY the title, with no extra commentary.
         <div className={`p-3 md:p-4 border-b ${headerBorder} ${headerBg}`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 md:gap-3">
-              <Bot className="w-5 h-5 md:w-6 md:h-6 text-blue-400" />
+              <span className="scale-75 md:scale-100">
+                <Bot className={`${iconClass} text-blue-400`} />
+              </span>
               <div>
                 <h1
                   className={`text-lg md:text-xl font-semibold ${
@@ -1152,7 +1158,7 @@ Return ONLY the title, with no extra commentary.
             <div className="hidden md:flex items-center gap-4">
               {/* Context and DeepInsight buttons - Only visible on md and up */}
               <div className="flex items-center gap-2 text-xs">
-                <AlertTriangle className="w-4 h-4 text-yellow-400" />
+                <AlertTriangle className={iconClass} />
                 <span
                   className={isIlluminateEnabled ? 'text-gray-600' : (isBlackoutEnabled ? 'text-gray-400' : 'text-gray-400')}
                 >
@@ -1221,7 +1227,9 @@ Return ONLY the title, with no extra commentary.
                         ? 'bg-gray-800'
                         : (isIlluminateEnabled ? 'bg-gray-100' : 'bg-gray-900')
                     }`}>
-                      <TimerIcon className={`w-4 h-4 md:w-5 md:h-5 ${isBlackoutEnabled ? 'text-blue-400' : (isIlluminateEnabled ? 'text-blue-600' : 'text-blue-400')}`} />
+                      <span className="scale-75 md:scale-100">
+                        <TimerIcon className={`${iconClass} ${isBlackoutEnabled ? 'text-blue-400' : (isIlluminateEnabled ? 'text-blue-600' : 'text-blue-400')}`} />
+                      </span>
                       <Timer
                         key={message.timer.id}
                         initialDuration={message.timer.duration}
@@ -1286,7 +1294,9 @@ Return ONLY the title, with no extra commentary.
               onClick={() => setIsContextDialogOpen(true)}
               className="p-2 rounded-full bg-blue-600 text-white hover:bg-blue-700 transition-colors flex-shrink-0"
             >
-              <Brain className="w-4 h-4 md:w-5 md:h-5" />
+              <span className="scale-75 md:scale-100 flex items-center justify-center">
+                <Brain className={iconClass} />
+              </span>
             </button>
             {/* Chat controls - visible on both mobile and desktop */}
             <div className="flex-shrink-0">
@@ -1310,7 +1320,9 @@ Return ONLY the title, with no extra commentary.
               disabled={isChatLoading}
               className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
             >
-              <Send className="w-4 h-4 md:w-5 md:h-5" />
+              <span className="scale-75 md:scale-100 flex items-center justify-center">
+                <Send className={iconClass} />
+              </span>
             </button>
           </div>
         </form>
@@ -1330,7 +1342,9 @@ Return ONLY the title, with no extra commentary.
           onClick={handleNewConversation}
           className="flex items-center justify-center p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors"
         >
-          <Plus className="w-4 h-4" />
+          <span className="scale-75 md:scale-100 flex items-center justify-center">
+            <Plus className={iconClass} />
+          </span>
         </button>
       </div>
 
@@ -1339,7 +1353,9 @@ Return ONLY the title, with no extra commentary.
         onClick={handleNewConversation}
         className="mb-3 md:mb-4 w-full flex items-center justify-center gap-2 bg-blue-600 text-white p-2 md:p-3 rounded-lg hover:bg-blue-700 transition-colors text-sm md:text-base"
       >
-        <PlusCircle className="w-4 h-4 md:w-5 md:h-5" />
+        <span className="scale-75 md:scale-100">
+          <PlusCircle className={iconClass} />
+        </span>
         <span>New Conversation</span>
       </button>
 
@@ -1356,7 +1372,9 @@ Return ONLY the title, with no extra commentary.
               className="flex items-center gap-2 flex-1 min-w-0"
               onClick={() => handleSelectConversation(conv.id)}
             >
-              <MessageSquare className="w-4 h-4 flex-shrink-0" />
+              <span className="scale-75 md:scale-100 flex-shrink-0">
+                <MessageSquare className={iconClass} />
+              </span>
               <span className="truncate overflow-hidden text-ellipsis w-full">
                 {conv.chatName}
               </span>
@@ -1373,7 +1391,9 @@ Return ONLY the title, with no extra commentary.
                 }}
                 className={`p-1 rounded-full ${isIlluminateEnabled || isBlackoutEnabled ? 'hover:bg-gray-300' : 'hover:bg-gray-600'} transition-colors`}
               >
-                <MoreHorizontal className="w-4 h-4" />
+                <span className="scale-75 md:scale-100">
+                  <MoreHorizontal className={iconClass} />
+                </span>
               </button>
               <div
                 id={`conv-menu-${conv.id}`}
@@ -1392,7 +1412,9 @@ Return ONLY the title, with no extra commentary.
                     handleRenameConversation(conv);
                   }}
                 >
-                  <Edit2 className="w-4 h-4 mr-2" />
+                  <span className="scale-75 md:scale-100 mr-2">
+                    <Edit2 className={iconClass} />
+                  </span>
                   Rename
                 </button>
                 <button
@@ -1404,7 +1426,9 @@ Return ONLY the title, with no extra commentary.
                     handleShareConversation(conv);
                   }}
                 >
-                  <Share className="w-4 h-4 mr-2" />
+                  <span className="scale-75 md:scale-100 mr-2">
+                    <Share className={iconClass} />
+                  </span>
                   Share
                 </button>
                 <button
@@ -1416,7 +1440,9 @@ Return ONLY the title, with no extra commentary.
                     handleDeleteConversationClick(conv);
                   }}
                 >
-                  <Trash2 className="w-4 h-4 mr-2" />
+                  <span className="scale-75 md:scale-100 mr-2">
+                    <Trash2 className={iconClass} />
+                  </span>
                   Delete
                 </button>
               </div>

@@ -27,6 +27,7 @@
     "@vercel/node": "^3.0.24",
     "@xenova/transformers": "^2.2.0",
     "firebase": "^10.8.1",
+    "react-firebase-hooks": "^5.1.1",
     "katex": "^0.16.9",
     "date-fns": "^3.3.1",
     "pdfjs-dist": "^3.11.174",

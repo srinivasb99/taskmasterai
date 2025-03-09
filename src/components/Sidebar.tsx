@@ -124,7 +124,6 @@ export function Sidebar({
         </button>
         
         <div className={`flex-1 flex items-center justify-center gap-2 ${mobileHeaderText} font-medium`}>
-          <Logo className="w-6 h-6" />
           <span>{getCurrentPageTitle()}</span>
         </div>
         

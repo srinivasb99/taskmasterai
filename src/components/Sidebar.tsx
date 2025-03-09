@@ -117,7 +117,7 @@ export function Sidebar({
   // Mobile header text color
   const mobileHeaderText = isIlluminateEnabled ? "text-gray-900" : "text-gray-100"
 
-  // Get current page title (if you want to use it in the mobile header)
+  // Get current page title based on path
   const getCurrentPageTitle = () => {
     const currentItem = menuItems.find((item) => item.path === location.pathname)
     return currentItem ? currentItem.label : "Dashboard"
@@ -171,7 +171,7 @@ export function Sidebar({
             mt-14 md:mt-0 h-[calc(100%-3.5rem)] md:h-full
           `}
         >
-          {/* Logo Section - hidden on mobile (we use the header instead) */}
+          {/* Logo Section - Hide on mobile since we have the header */}
           <div className="mb-6 flex items-center pl-3 md:block hidden">
             {isCollapsed ? (
               <a href="/">
@@ -194,86 +194,7 @@ export function Sidebar({
             )}
           </div>
 
-          {/* TOP Section: Premium Button & User Profile (moved higher) */}
-          <div className="flex flex-col gap-4 mb-4">
-            {/* Premium Button - Always show when not on settings page */}
-            {!isSettingsPage && (
-              <button
-                onClick={handleUpgradeClick}
-                className={`
-                  mx-3 flex items-center justify-center
-                  text-white rounded-lg
-                  transition-all duration-200 bg-gradient-to-r from-violet-600 to-indigo-600
-                  hover:from-violet-500 hover:to-indigo-500 shadow-lg shadow-indigo-500/20
-                  hover:scale-[1.02]
-                  ${
-                    isCollapsed && !isMobileMenuOpen
-                      ? "aspect-square p-2.5"
-                      : "px-4 py-2.5"
-                  }
-                `}
-              >
-                <Crown
-                  className={`min-w-[1.25rem] ${
-                    isCollapsed && !isMobileMenuOpen ? "w-6 h-6" : "w-5 h-5 mr-2"
-                  }`}
-                  strokeWidth={2}
-                />
-                {(!isCollapsed || isMobileMenuOpen) && (
-                  <span className="text-sm font-medium whitespace-nowrap">Upgrade to Premium</span>
-                )}
-              </button>
-            )}
-
-            {/* User Profile with Basic Plan Badge */}
-            <button
-              onClick={() => navigate("/settings")}
-              className={`
-                mx-3 flex items-center gap-3 rounded-lg transition-colors
-                ${userProfileText}
-                ${userProfileHoverBg}
-                ${
-                  isCollapsed && !isMobileMenuOpen
-                    ? "justify-center aspect-square"
-                    : "px-4 py-2.5"
-                }
-                hover:scale-[1.02] transition-transform duration-200
-              `}
-            >
-              <div className="relative flex-shrink-0 w-8 h-8">
-                <div className="w-full h-full rounded-full overflow-hidden bg-gray-800">
-                  {currentUser?.photoURL ? (
-                    <img
-                      src={currentUser.photoURL || "/placeholder.svg"}
-                      alt={userName}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <CircleUserRound className="w-5 h-5 min-w-[1.25rem]" strokeWidth={2} />
-                    </div>
-                  )}
-                </div>
-              </div>
-              {(!isCollapsed || isMobileMenuOpen) && (
-                <div className="flex flex-col items-start min-w-0">
-                  <span className="text-left text-sm font-medium truncate max-w-[160px]">
-                    {userName || "Loading..."}
-                  </span>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs text-gray-500">Basic Plan</span>
-                    {isDev && (
-                      <span className="px-1 py-0.5 text-[9px] font-semibold bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-full leading-none">
-                        DEV
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
-            </button>
-          </div>
-
-          {/* MIDDLE Section: Menu Items and Toggle Button */}
+          {/* Upper Section: Menu Items and Toggle Button */}
           <div className="flex flex-col gap-1.5">
             {menuItems.map((item) => {
               const Icon = item.icon
@@ -310,6 +231,79 @@ export function Sidebar({
                 )}
               </button>
             )}
+          </div>
+
+          {/* Bottom Section: Premium Button and User Profile */}
+          <div className="mt-auto flex flex-col gap-4">
+            {/* Premium Button - Always show when not on settings page */}
+            {!isSettingsPage && (
+              <button
+                onClick={handleUpgradeClick}
+                className={`
+                  mx-3 flex items-center justify-center
+                  text-white rounded-lg
+                  transition-all duration-200 bg-gradient-to-r from-violet-600 to-indigo-600
+                  hover:from-violet-500 hover:to-indigo-500 shadow-lg shadow-indigo-500/20
+                  hover:scale-[1.02]
+                  ${isCollapsed && !isMobileMenuOpen ? "aspect-square p-2.5" : "px-4 py-2.5"}
+                `}
+              >
+                <Crown
+                  className={`min-w-[1.25rem] ${
+                    isCollapsed && !isMobileMenuOpen ? "w-6 h-6" : "w-5 h-5 mr-2"
+                  }`}
+                  strokeWidth={2}
+                />
+                {(!isCollapsed || isMobileMenuOpen) && (
+                  <span className="text-sm font-medium whitespace-nowrap">Upgrade to Premium</span>
+                )}
+              </button>
+            )}
+
+            {/* User Profile with Basic Plan Badge */}
+            <button
+              onClick={() => navigate("/settings")}
+              className={`
+                mx-3 flex items-center gap-3 rounded-lg transition-colors
+                ${userProfileText}
+                ${userProfileHoverBg}
+                ${isCollapsed && !isMobileMenuOpen ? "justify-center aspect-square" : "px-4 py-2.5"}
+                hover:scale-[1.02] transition-transform duration-200
+              `}
+            >
+              <div className="relative flex-shrink-0 w-8 h-8">
+                <div className="w-full h-full rounded-full overflow-hidden bg-gray-800">
+                  {currentUser?.photoURL ? (
+                    <img
+                      src={currentUser.photoURL || "/placeholder.svg"}
+                      alt={userName}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <CircleUserRound className="w-5 h-5 min-w-[1.25rem]" strokeWidth={2} />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Show name and plan only if not collapsed or in mobile menu */}
+              {(!isCollapsed || isMobileMenuOpen) && (
+                <div className="flex flex-col items-start min-w-0">
+                  <span className="text-left text-sm font-medium truncate max-w-[160px]">
+                    {userName || "Loading..."}
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-gray-500">Basic Plan</span>
+                    {isDev && (
+                      <span className="px-1 py-0.5 text-[9px] font-semibold bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-full leading-none">
+                        DEV
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </button>
           </div>
         </div>
       </div>

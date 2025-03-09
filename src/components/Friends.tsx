@@ -1,9 +1,36 @@
-import { useState, useEffect, useRef, type ChangeEvent, type FormEvent } from "react"
-import { useNavigate } from "react-router-dom"
-import { motion, AnimatePresence } from "framer-motion"
-import { User, Users2, MessageSquare, PlusCircle, Paperclip, Send, Users, CheckCircle, XCircle, Edit, Trash2, Search, Bell, UserPlus, Settings, ChevronRight, ChevronLeft, Image, Smile, Mic, MoreVertical, Star, Filter, X, LogOut, Clock } from 'lucide-react'
-import { Sidebar } from "./Sidebar"
-import { getCurrentUser } from "../lib/settings-firebase"
+import { useState, useEffect, useRef, ChangeEvent, FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  User,
+  Users2,
+  MessageSquare,
+  PlusCircle,
+  Paperclip,
+  Send,
+  Users,
+  CheckCircle,
+  XCircle,
+  Edit,
+  Trash2,
+  Search,
+  Bell,
+  UserPlus,
+  Settings,
+  ChevronRight,
+  ChevronLeft,
+  Image,
+  Smile,
+  Mic,
+  MoreVertical,
+  Star,
+  Filter,
+  X,
+  LogOut,
+  Clock,
+} from "lucide-react";
+import { Sidebar } from "./Sidebar";
+import { getCurrentUser } from "../lib/settings-firebase";
 import {
   listenToChatsRealtime,
   listenToMessagesRealtime,
@@ -26,70 +53,71 @@ import {
   listenToFriendsOnlineStatus,
   setTypingIndicator,
   listenToTypingIndicators,
-  getUserFriends
-} from "../lib/friends-firebase"
+  getUserFriends,
+} from "../lib/friends-firebase";
 
+// Interfaces
 interface Chat {
-  id: string
-  isGroup: boolean
-  members: string[]
-  memberNames?: Record<string, string>
-  name?: string
-  lastMessage?: string
-  updatedAt?: any
-  createdBy?: string
+  id: string;
+  isGroup: boolean;
+  members: string[];
+  memberNames?: Record<string, string>;
+  name?: string;
+  lastMessage?: string;
+  updatedAt?: any;
+  createdBy?: string;
 }
 
 interface Message {
-  id: string
-  text: string
-  senderId: string
-  senderName?: string
-  senderPhotoURL?: string
-  fileURL?: string
-  fileType?: string
-  fileName?: string
-  timestamp?: any
+  id: string;
+  text: string;
+  senderId: string;
+  senderName?: string;
+  senderPhotoURL?: string;
+  fileURL?: string;
+  fileType?: string;
+  fileName?: string;
+  timestamp?: any;
 }
 
 interface FriendRequest {
-  id: string
-  fromUserId: string
-  fromUserName: string
-  toUserId: string
-  status: "pending" | "accepted" | "rejected"
+  id: string;
+  fromUserId: string;
+  fromUserName: string;
+  toUserId: string;
+  status: "pending" | "accepted" | "rejected";
 }
 
 interface UserProfile {
-  id: string
-  name?: string
-  displayName?: string
-  email?: string
-  photoURL?: string
-  status?: "online" | "offline" | "away" | "busy"
-  lastSeen?: any
+  id: string;
+  name?: string;
+  displayName?: string;
+  email?: string;
+  photoURL?: string;
+  status?: "online" | "offline" | "away" | "busy";
+  lastSeen?: any;
 }
 
-// Animation variants
+// Animation Variants
 const slideUp = {
   hidden: { opacity: 0, y: 20 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.3 } },
-}
+};
 
 const slideRight = {
   hidden: { opacity: 0, x: -20 },
   visible: { opacity: 1, x: 0, transition: { duration: 0.3 } },
-}
+};
 
 const slideLeft = {
   hidden: { opacity: 0, x: 20 },
   visible: { opacity: 1, x: 0, transition: { duration: 0.3 } },
-}
+};
 
 const fadeIn = {
   hidden: { opacity: 0 },
   visible: { opacity: 1, transition: { duration: 0.2 } },
-}
+};
 
 const staggerChildren = {
   hidden: { opacity: 0 },
@@ -99,458 +127,435 @@ const staggerChildren = {
       staggerChildren: 0.07,
     },
   },
-}
+};
 
 export function Friends() {
-  const navigate = useNavigate()
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const messagesEndRef = useRef<HTMLDivElement>(null)
-  const chatContainerRef = useRef<HTMLDivElement>(null)
-  const emojiPickerRef = useRef<HTMLDivElement>(null)
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
-  const audioChunksRef = useRef<Blob[]>([])
+  const navigate = useNavigate();
 
-  // Auth state
-  const [user, setUser] = useState<any>(null)
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
+  // Refs
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const emojiPickerRef = useRef<HTMLDivElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
 
-  // Sidebar collapse state (persisted)
+  // Auth and profile states
+  const [user, setUser] = useState<any>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+
+  // Sidebar & mode states
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
-    const stored = localStorage.getItem("isSidebarCollapsed")
-    return stored ? JSON.parse(stored) : false
-  })
-
-  // Blackout mode state
+    const stored = localStorage.getItem("isSidebarCollapsed");
+    return stored ? JSON.parse(stored) : false;
+  });
   const [isBlackoutEnabled, setIsBlackoutEnabled] = useState(() => {
-    const stored = localStorage.getItem("isBlackoutEnabled")
-    return stored ? JSON.parse(stored) : false
-  })
-
-  // Sidebar Blackout option state
+    const stored = localStorage.getItem("isBlackoutEnabled");
+    return stored ? JSON.parse(stored) : false;
+  });
   const [isSidebarBlackoutEnabled, setIsSidebarBlackoutEnabled] = useState(() => {
-    const stored = localStorage.getItem("isSidebarBlackoutEnabled")
-    return stored ? JSON.parse(stored) : false
-  })
-
-  // Illuminate (light mode) state
+    const stored = localStorage.getItem("isSidebarBlackoutEnabled");
+    return stored ? JSON.parse(stored) : false;
+  });
   const [isIlluminateEnabled, setIsIlluminateEnabled] = useState(() => {
-    const stored = localStorage.getItem("isIlluminateEnabled")
-    return stored ? JSON.parse(stored) : false
-  })
-
-  // Sidebar Illuminate option state
+    const stored = localStorage.getItem("isIlluminateEnabled");
+    return stored ? JSON.parse(stored) : false;
+  });
   const [isSidebarIlluminateEnabled, setIsSidebarIlluminateEnabled] = useState(() => {
-    const stored = localStorage.getItem("isSidebarIlluminateEnabled")
-    return stored ? JSON.parse(stored) : false
-  })
+    const stored = localStorage.getItem("isSidebarIlluminateEnabled");
+    return stored ? JSON.parse(stored) : false;
+  });
 
-  // Right-hand panels state
-  const [chats, setChats] = useState<Chat[]>([])
-  const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([])
-  const [onlineFriends, setOnlineFriends] = useState<UserProfile[]>([])
-  const [typingUsers, setTypingUsers] = useState<any[]>([])
-  const [chatMembers, setChatMembers] = useState<Record<string, UserProfile[]>>({})
+  // Right-hand panels states
+  const [chats, setChats] = useState<Chat[]>([]);
+  const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
+  const [onlineFriends, setOnlineFriends] = useState<UserProfile[]>([]);
+  const [typingUsers, setTypingUsers] = useState<any[]>([]);
+  const [chatMembers, setChatMembers] = useState<Record<string, UserProfile[]>>({});
 
-  // Selected chat & messages
-  const [selectedChat, setSelectedChat] = useState<Chat | null>(null)
-  const [messages, setMessages] = useState<Message[]>([])
-  const [newMessage, setNewMessage] = useState("")
-  const [isTyping, setIsTyping] = useState(false)
-  const [typingTimeout, setTypingTimeout] = useState<NodeJS.Timeout | null>(null)
+  // Selected chat and messages
+  const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [newMessage, setNewMessage] = useState("");
+  const [isTyping, setIsTyping] = useState(false);
+  const [typingTimeout, setTypingTimeout] = useState<NodeJS.Timeout | null>(null);
 
-  // Renaming chat
-  const [isEditingChatName, setIsEditingChatName] = useState(false)
-  const [newChatName, setNewChatName] = useState("")
+  // Chat renaming
+  const [isEditingChatName, setIsEditingChatName] = useState(false);
+  const [newChatName, setNewChatName] = useState("");
 
-  // Adding friend by email
-  const [friendEmail, setFriendEmail] = useState("")
-  const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
+  // Friend request states
+  const [friendEmail, setFriendEmail] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
-  // Creating group chat
-  const [isGroupModalOpen, setIsGroupModalOpen] = useState(false)
-  const [groupName, setGroupName] = useState("")
-  const [groupEmails, setGroupEmails] = useState("") // comma-separated emails
+  // Group chat creation
+  const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
+  const [groupName, setGroupName] = useState("");
+  const [groupEmails, setGroupEmails] = useState("");
 
-  // File uploading
-  const [fileUploading, setFileUploading] = useState(false)
-  const [uploadProgress, setUploadProgress] = useState(0)
+  // File uploading state
+  const [fileUploading, setFileUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   // Mobile view state
-  const [isMobileView, setIsMobileView] = useState(false)
-  const [showMobileAside, setShowMobileAside] = useState(false)
+  const [isMobileView, setIsMobileView] = useState(false);
+  const [showMobileAside, setShowMobileAside] = useState(false);
 
-  // UI state
-  const [activeTab, setActiveTab] = useState<"chats" | "friends" | "requests">("chats")
-  const [searchQuery, setSearchQuery] = useState("")
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false)
-  const [isRecording, setIsRecording] = useState(false)
-  const [showChatOptions, setShowChatOptions] = useState(false)
-  const [isStarred, setIsStarred] = useState(false)
-  const [messageToDelete, setMessageToDelete] = useState<string | null>(null)
+  // UI states
+  const [activeTab, setActiveTab] = useState<"chats" | "friends" | "requests">("chats");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [showChatOptions, setShowChatOptions] = useState(false);
+  const [isStarred, setIsStarred] = useState(false);
+  const [messageToDelete, setMessageToDelete] = useState<string | null>(null);
 
-  // Update localStorage and document.body for modes
+  // NEW: Attachment states
+  const [attachedFile, setAttachedFile] = useState<File | null>(null);
+  const [attachedAudio, setAttachedAudio] = useState<File | null>(null);
+
+  // Update localStorage and body class for modes
   useEffect(() => {
-    localStorage.setItem("isBlackoutEnabled", JSON.stringify(isBlackoutEnabled))
-    document.body.classList.toggle("blackout-mode", isBlackoutEnabled)
-  }, [isBlackoutEnabled])
+    localStorage.setItem("isBlackoutEnabled", JSON.stringify(isBlackoutEnabled));
+    document.body.classList.toggle("blackout-mode", isBlackoutEnabled);
+  }, [isBlackoutEnabled]);
 
   useEffect(() => {
-    localStorage.setItem("isSidebarBlackoutEnabled", JSON.stringify(isSidebarBlackoutEnabled))
-  }, [isSidebarBlackoutEnabled])
+    localStorage.setItem("isSidebarBlackoutEnabled", JSON.stringify(isSidebarBlackoutEnabled));
+  }, [isSidebarBlackoutEnabled]);
 
   useEffect(() => {
-    localStorage.setItem("isIlluminateEnabled", JSON.stringify(isIlluminateEnabled))
+    localStorage.setItem("isIlluminateEnabled", JSON.stringify(isIlluminateEnabled));
     if (isIlluminateEnabled) {
-      document.body.classList.add("illuminate-mode")
+      document.body.classList.add("illuminate-mode");
     } else {
-      document.body.classList.remove("illuminate-mode")
+      document.body.classList.remove("illuminate-mode");
     }
-  }, [isIlluminateEnabled])
+  }, [isIlluminateEnabled]);
 
   useEffect(() => {
-    localStorage.setItem("isSidebarIlluminateEnabled", JSON.stringify(isSidebarIlluminateEnabled))
-  }, [isSidebarIlluminateEnabled])
+    localStorage.setItem("isSidebarIlluminateEnabled", JSON.stringify(isSidebarIlluminateEnabled));
+  }, [isSidebarIlluminateEnabled]);
 
-  // Check for mobile view
+  // Check mobile view
   useEffect(() => {
     const checkMobileView = () => {
-      setIsMobileView(window.innerWidth < 768)
-    }
-
-    checkMobileView()
-    window.addEventListener("resize", checkMobileView)
-
-    return () => {
-      window.removeEventListener("resize", checkMobileView)
-    }
-  }, [])
+      setIsMobileView(window.innerWidth < 768);
+    };
+    checkMobileView();
+    window.addEventListener("resize", checkMobileView);
+    return () => window.removeEventListener("resize", checkMobileView);
+  }, []);
 
   // Scroll to bottom when new messages arrive
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages])
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   // Close emoji picker when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target as Node)) {
-        setShowEmojiPicker(false)
+        setShowEmojiPicker(false);
       }
-    }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
-    document.addEventListener("mousedown", handleClickOutside)
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside)
-    }
-  }, [])
+  // ---------------------------
+  // Dynamic CSS Classes for Modes
+  // ---------------------------
+  const containerClass = isIlluminateEnabled
+    ? "bg-white text-gray-900"
+    : isBlackoutEnabled
+      ? "bg-gray-950 text-white"
+      : "bg-gray-900 text-white";
 
-// ---------------------------
-// Dynamic CSS Classes for Modes
-// ---------------------------
-const containerClass = isIlluminateEnabled
-  ? "bg-white text-gray-900"
-  : isBlackoutEnabled
-    ? "bg-gray-950 text-white"
-    : "bg-gray-900 text-white";
+  const headingClass = isIlluminateEnabled
+    ? "text-gray-900"
+    : isBlackoutEnabled
+      ? "text-white"
+      : "text-white";
 
-const headingClass = isIlluminateEnabled
-  ? "text-gray-900"
-  : isBlackoutEnabled
-    ? "text-white"
-    : "text-white";
+  const subheadingClass = isIlluminateEnabled
+    ? "text-gray-600"
+    : isBlackoutEnabled
+      ? "text-gray-400"
+      : "text-gray-400";
 
-const subheadingClass = isIlluminateEnabled
-  ? "text-gray-600"
-  : isBlackoutEnabled
-    ? "text-gray-400"
-    : "text-gray-400";
+  // For the main chat header background
+  const chatHeaderClass = isIlluminateEnabled
+    ? "bg-white border-b border-gray-300"
+    : isBlackoutEnabled
+      ? "bg-gray-950 border-b border-gray-800/50"
+      : "bg-gray-800 border-b border-gray-700";
 
-// For the main chat header background
-const chatHeaderClass = isIlluminateEnabled
-  ? "bg-white border-b border-gray-300"
-  : isBlackoutEnabled
-    ? "bg-gray-950 border-b border-gray-800/50"
-    : "bg-gray-800 border-b border-gray-700";
+  // For the chat messages area
+  const messageAreaClass = isIlluminateEnabled
+    ? "bg-white"
+    : isBlackoutEnabled
+      ? "bg-gray-950"
+      : "bg-gray-700";
 
-// For the chat messages area
-const messageAreaClass = isIlluminateEnabled
-  ? "bg-white"
-  : isBlackoutEnabled
-    ? "bg-gray-950"
-    : "bg-gray-700";
+  // For message bubbles: your own and others
+  const ownMessageClass = isIlluminateEnabled
+    ? "bg-blue-500 text-white"
+    : isBlackoutEnabled
+      ? "bg-blue-700 text-white"
+      : "bg-blue-600 text-white";
 
-// For message bubbles: your own and others
-const ownMessageClass = isIlluminateEnabled
-  ? "bg-blue-500 text-white"
-  : isBlackoutEnabled
-    ? "bg-blue-700 text-white"
-    : "bg-blue-600 text-white";
+  const otherMessageClass = isIlluminateEnabled
+    ? "bg-gray-300 text-gray-900"
+    : isBlackoutEnabled
+      ? "bg-gray-600 text-white"
+      : "bg-gray-600 text-white";
 
-const otherMessageClass = isIlluminateEnabled
-  ? "bg-gray-300 text-gray-900"
-  : isBlackoutEnabled
-    ? "bg-gray-600 text-white"
-    : "bg-gray-600 text-white";
+  // Chat input container
+  const chatInputContainerClass = isIlluminateEnabled
+    ? "bg-white"
+    : isBlackoutEnabled
+      ? "bg-gray-950"
+      : "bg-gray-800";
 
-// Chat input container
-const chatInputContainerClass = isIlluminateEnabled
-  ? "bg-white"
-  : isBlackoutEnabled
-    ? "bg-gray-950"
-    : "bg-gray-800";
+  // Input fields inside chat input area
+  const inputBg = isIlluminateEnabled
+    ? "bg-white border border-gray-300 text-gray-900"
+    : isBlackoutEnabled
+      ? "bg-gray-950 border border-gray-800 text-white"
+      : "bg-gray-700 border border-gray-600 text-white";
 
-// Input fields used inside chat input area
-const inputBg = isIlluminateEnabled
-  ? "bg-white border border-gray-300 text-gray-900"
-  : isBlackoutEnabled
-    ? "bg-gray-950 border border-gray-800 text-white"
-    : "bg-gray-700 border border-gray-600 text-white";
+  // Navigation buttons
+  const navButtonClass = isIlluminateEnabled
+    ? "text-gray-700 hover:text-gray-900 hover:bg-gray-200"
+    : isBlackoutEnabled
+      ? "text-gray-400 hover:text-white hover:bg-gray-950"
+      : "text-gray-400 hover:text-white hover:bg-gray-800";
 
-// Navigation buttons (e.g. for friend requests, etc.)
-const navButtonClass = isIlluminateEnabled
-  ? "text-gray-700 hover:text-gray-900 hover:bg-gray-200"
-  : isBlackoutEnabled
-    ? "text-gray-400 hover:text-white hover:bg-gray-950"
-    : "text-gray-400 hover:text-white hover:bg-gray-800";
+  // Aside background
+  const asideClass = isIlluminateEnabled
+    ? "bg-white border-l border-gray-300"
+    : isBlackoutEnabled
+      ? "bg-gray-950 border-l border-gray-800"
+      : "bg-gray-800 border-l border-gray-700";
 
-// Aside (right panel) background
-const asideClass = isIlluminateEnabled
-  ? "bg-white border-l border-gray-300"
-  : isBlackoutEnabled
-    ? "bg-gray-950 border-l border-gray-800"
-    : "bg-gray-800 border-l border-gray-700";
+  // Group Modal styling
+  const groupModalClass = isIlluminateEnabled
+    ? "bg-white shadow-xl border border-gray-200 text-gray-900"
+    : isBlackoutEnabled
+      ? "bg-gray-950 shadow-xl border border-gray-800 text-gray-300"
+      : "bg-gray-800 shadow-xl border border-gray-700 text-gray-300";
 
-// Group Modal styling
-const groupModalClass = isIlluminateEnabled
-  ? "bg-white shadow-xl border border-gray-200 text-gray-900"
-  : isBlackoutEnabled
-    ? "bg-gray-950 shadow-xl border border-gray-800 text-gray-300"
-    : "bg-gray-800 shadow-xl border border-gray-700 text-gray-300";
+  // Friend request buttons
+  const acceptButtonClass = isIlluminateEnabled
+    ? "text-green-600 hover:text-green-500"
+    : isBlackoutEnabled
+      ? "text-green-400 hover:text-green-300"
+      : "text-green-400 hover:text-green-300";
 
-// Friend request buttons
-const acceptButtonClass = isIlluminateEnabled
-  ? "text-green-600 hover:text-green-500"
-  : isBlackoutEnabled
-    ? "text-green-400 hover:text-green-300"
-    : "text-green-400 hover:text-green-300";
+  const rejectButtonClass = isIlluminateEnabled
+    ? "text-red-600 hover:text-red-500"
+    : isBlackoutEnabled
+      ? "text-red-400 hover:text-red-300"
+      : "text-red-400 hover:text-red-300";
 
-const rejectButtonClass = isIlluminateEnabled
-  ? "text-red-600 hover:text-red-500"
-  : isBlackoutEnabled
-    ? "text-red-400 hover:text-red-300"
-    : "text-red-400 hover:text-red-300";
+  // Chat list items (aside)
+  const selectedChatClass = isIlluminateEnabled
+    ? "bg-blue-500 text-white"
+    : isBlackoutEnabled
+      ? "bg-blue-700 text-white"
+      : "bg-blue-600 text-white";
 
-// Chat list items (in aside)
-const selectedChatClass = isIlluminateEnabled
-  ? "bg-blue-500 text-white"
-  : isBlackoutEnabled
-    ? "bg-blue-700 text-white"
-    : "bg-blue-600 text-white";
+  const chatListItemClass = isIlluminateEnabled
+    ? "bg-gray-200 text-gray-900 hover:bg-gray-300"
+    : isBlackoutEnabled
+      ? "bg-gray-950 text-white hover:bg-gray-900"
+      : "bg-gray-700 text-white hover:bg-gray-600";
 
-const chatListItemClass = isIlluminateEnabled
-  ? "bg-gray-200 text-gray-900 hover:bg-gray-300"
-  : isBlackoutEnabled
-    ? "bg-gray-950 text-white hover:bg-gray-900"
-    : "bg-gray-700 text-white hover:bg-gray-600";
+  // Button styling
+  const primaryButtonClass = isIlluminateEnabled
+    ? "bg-blue-500 hover:bg-blue-600 text-white"
+    : isBlackoutEnabled
+      ? "bg-blue-600 hover:bg-blue-700 text-white"
+      : "bg-blue-600 hover:bg-blue-700 text-white";
 
-// Button styling
-const primaryButtonClass = isIlluminateEnabled
-  ? "bg-blue-500 hover:bg-blue-600 text-white"
-  : isBlackoutEnabled
-    ? "bg-blue-600 hover:bg-blue-700 text-white"
-    : "bg-blue-600 hover:bg-blue-700 text-white";
+  const secondaryButtonClass = isIlluminateEnabled
+    ? "bg-gray-300 hover:bg-gray-400 text-gray-800"
+    : isBlackoutEnabled
+      ? "bg-gray-950 hover:bg-gray-900 text-white"
+      : "bg-gray-600 hover:bg-gray-500 text-white";
 
-const secondaryButtonClass = isIlluminateEnabled
-  ? "bg-gray-300 hover:bg-gray-400 text-gray-800"
-  : isBlackoutEnabled
-    ? "bg-gray-950 hover:bg-gray-900 text-white"
-    : "bg-gray-600 hover:bg-gray-500 text-white";
+  // Tab styling
+  const activeTabClass = isIlluminateEnabled
+    ? "border-blue-500 text-blue-600"
+    : isBlackoutEnabled
+      ? "border-blue-500 text-blue-400"
+      : "border-blue-500 text-blue-400";
 
-// Tab styling
-const activeTabClass = isIlluminateEnabled
-  ? "border-blue-500 text-blue-600"
-  : isBlackoutEnabled
-    ? "border-blue-500 text-blue-400"
-    : "border-blue-500 text-blue-400";
-
-const inactiveTabClass = isIlluminateEnabled
-  ? "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-  : isBlackoutEnabled
-    ? "border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-600"
-    : "border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-600";
+  const inactiveTabClass = isIlluminateEnabled
+    ? "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+    : isBlackoutEnabled
+      ? "border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-600"
+      : "border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-600";
 
   // ---------------------------
   // Auth & Real-time Listeners
   // ---------------------------
   useEffect(() => {
-    const currentUser = getCurrentUser()
+    const currentUser = getCurrentUser();
     if (!currentUser) {
-      navigate("/login")
-      return
+      navigate("/login");
+      return;
     }
-    setUser(currentUser)
+    setUser(currentUser);
 
     // Get user profile
     const fetchUserProfile = async () => {
-      const profile = await getUserProfile(currentUser.uid)
+      const profile = await getUserProfile(currentUser.uid);
       if (profile) {
         setUserProfile({
           id: currentUser.uid,
           ...profile,
-        })
+        });
       }
-    }
-    fetchUserProfile()
+    };
+    fetchUserProfile();
 
     // Set up presence system
-    const cleanupPresence = setupPresenceSystem(currentUser.uid)
+    const cleanupPresence = setupPresenceSystem(currentUser.uid);
 
     // Listen to chats
     const unsubscribeChats = listenToChatsRealtime(currentUser.uid, (newChats) => {
-      setChats(newChats)
-    })
+      setChats(newChats);
+    });
 
     // Listen to friend requests
     const unsubscribeRequests = listenToFriendRequests(currentUser.uid, (requests) => {
-      setFriendRequests(requests)
-    })
+      setFriendRequests(requests);
+    });
 
     // Get and listen to online friends
     const fetchFriends = async () => {
-      const friends = await getUserFriends(currentUser.uid)
-      const friendIds = friends.map((friend) => friend.id)
-
+      const friends = await getUserFriends(currentUser.uid);
+      const friendIds = friends.map((friend) => friend.id);
       if (friendIds.length > 0) {
         const unsubscribeFriendStatus = listenToFriendsOnlineStatus(friendIds, (statuses) => {
-          setOnlineFriends(statuses)
-        })
-
-        return unsubscribeFriendStatus
+          setOnlineFriends(statuses);
+        });
+        return unsubscribeFriendStatus;
       }
-      return () => {}
-    }
+      return () => {};
+    };
 
-    let unsubscribeFriendStatus: () => void
+    let unsubscribeFriendStatus: () => void;
     fetchFriends().then((unsub) => {
-      unsubscribeFriendStatus = unsub
-    })
+      unsubscribeFriendStatus = unsub;
+    });
 
     return () => {
-      unsubscribeChats()
-      unsubscribeRequests()
-      if (unsubscribeFriendStatus) unsubscribeFriendStatus()
-      cleanupPresence()
-    }
-  }, [navigate])
+      unsubscribeChats();
+      unsubscribeRequests();
+      if (unsubscribeFriendStatus) unsubscribeFriendStatus();
+      cleanupPresence();
+    };
+  }, [navigate]);
 
   // Listen to messages in selected chat
   useEffect(() => {
     if (!selectedChat) {
-      setMessages([])
-      setTypingUsers([])
-      return
+      setMessages([]);
+      setTypingUsers([]);
+      return;
     }
-
     const unsubscribeMessages = listenToMessagesRealtime(selectedChat.id, (msgs) => {
-      setMessages(msgs)
-    })
-
+      setMessages(msgs);
+    });
     // Listen to typing indicators
     const unsubscribeTyping = listenToTypingIndicators(selectedChat.id, user?.uid, (users) => {
-      setTypingUsers(users)
-    })
-
+      setTypingUsers(users);
+    });
     return () => {
-      unsubscribeMessages()
-      unsubscribeTyping()
-    }
-  }, [selectedChat, user?.uid])
+      unsubscribeMessages();
+      unsubscribeTyping();
+    };
+  }, [selectedChat, user?.uid]);
 
   // Format timestamp
   const formatTimestamp = (timestamp: any): string => {
-    if (!timestamp) return ""
-
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp)
-    const now = new Date()
-    const diffMs = now.getTime() - date.getTime()
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
-
+    if (!timestamp) return "";
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
     if (diffDays === 0) {
-      return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+      return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     } else if (diffDays === 1) {
-      return "Yesterday"
+      return "Yesterday";
     } else if (diffDays < 7) {
-      return date.toLocaleDateString([], { weekday: "short" })
+      return date.toLocaleDateString([], { weekday: "short" });
     } else {
-      return date.toLocaleDateString([], { month: "short", day: "numeric" })
+      return date.toLocaleDateString([], { month: "short", day: "numeric" });
     }
-  }
+  };
 
   // Format last seen
   const formatLastSeen = (timestamp: any): string => {
-    if (!timestamp) return "Never online"
-
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp)
-    const now = new Date()
-    const diffMs = now.getTime() - date.getTime()
-    const diffMins = Math.floor(diffMs / (1000 * 60))
-
+    if (!timestamp) return "Never online";
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / (1000 * 60));
     if (diffMins < 1) {
-      return "Just now"
+      return "Just now";
     } else if (diffMins < 60) {
-      return `${diffMins} ${diffMins === 1 ? "minute" : "minutes"} ago`
+      return `${diffMins} ${diffMins === 1 ? "minute" : "minutes"} ago`;
     } else {
-      const diffHours = Math.floor(diffMins / 60)
+      const diffHours = Math.floor(diffMins / 60);
       if (diffHours < 24) {
-        return `${diffHours} ${diffHours === 1 ? "hour" : "hours"} ago`
+        return `${diffHours} ${diffHours === 1 ? "hour" : "hours"} ago`;
       } else {
-        const diffDays = Math.floor(diffHours / 24)
+        const diffDays = Math.floor(diffHours / 24);
         if (diffDays < 7) {
-          return `${diffDays} ${diffDays === 1 ? "day" : "days"} ago`
+          return `${diffDays} ${diffDays === 1 ? "day" : "days"} ago`;
         } else {
-          return date.toLocaleDateString()
+          return date.toLocaleDateString();
         }
       }
     }
-  }
+  };
 
   // Get chat display name
   const getChatDisplayName = (chat: Chat): string => {
     if (chat.isGroup) {
-      return chat.name || "Group Chat"
+      return chat.name || "Group Chat";
     }
-
-    // For direct chats, show the other user's name
     if (user && chat.members.length === 2) {
-      const otherUserId = chat.members.find((id) => id !== user.uid)
+      const otherUserId = chat.members.find((id) => id !== user.uid);
       if (otherUserId && chat.memberNames && chat.memberNames[otherUserId]) {
-        return chat.memberNames[otherUserId]
+        return chat.memberNames[otherUserId];
       }
     }
-
-    return chat.name || ""
-  }
+    return chat.name || "";
+  };
 
   // Get other user ID in direct chat
   const getOtherUserId = (chat: Chat): string | null => {
-    if (!user || chat.isGroup) return null
-
-    return chat.members.find((id) => id !== user.uid) || null
-  }
+    if (!user || chat.isGroup) return null;
+    return chat.members.find((id) => id !== user.uid) || null;
+  };
 
   // Determine file type
   const getFileType = (fileURL: string): string => {
-    const extension = fileURL.split('.').pop()?.toLowerCase() || '';
-    
-    if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(extension)) {
-      return 'image';
-    } else if (['mp3', 'wav', 'ogg', 'webm'].includes(extension)) {
-      return 'audio';
-    } else if (['mp4', 'webm', 'ogg', 'mov'].includes(extension)) {
-      return 'video';
+    const extension = fileURL.split(".").pop()?.toLowerCase() || "";
+    if (["jpg", "jpeg", "png", "gif", "webp", "svg"].includes(extension)) {
+      return "image";
+    } else if (["mp3", "wav", "ogg", "webm"].includes(extension)) {
+      return "audio";
+    } else if (["mp4", "webm", "ogg", "mov"].includes(extension)) {
+      return "video";
     } else {
-      return 'file';
+      return "file";
     }
   };
 
@@ -558,256 +563,86 @@ const inactiveTabClass = isIlluminateEnabled
   const getFileName = (fileURL: string): string => {
     try {
       const url = new URL(fileURL);
-      const pathParts = url.pathname.split('/');
+      const pathParts = url.pathname.split("/");
       const fullFileName = pathParts[pathParts.length - 1];
-      
-      // Remove timestamp prefix if it exists (e.g., 1234567890_filename.jpg)
-      const fileNameParts = fullFileName.split('_');
+      const fileNameParts = fullFileName.split("_");
       if (fileNameParts.length > 1 && !isNaN(Number(fileNameParts[0]))) {
-        return fileNameParts.slice(1).join('_');
+        return fileNameParts.slice(1).join("_");
       }
-      
       return fullFileName;
     } catch (e) {
-      return 'file';
+      return "file";
     }
   };
 
-  // Handle sending a text message
+  // Handle sending a text message or attached file/audio
   const handleSendMessage = async (e: FormEvent) => {
-    e.preventDefault()
-    if (!selectedChat || (!newMessage.trim() && !fileInputRef.current?.files?.length)) return
+    e.preventDefault();
+    if (!selectedChat || (!newMessage.trim() && !attachedFile && !attachedAudio)) return;
 
-    try {
-      if (newMessage.trim()) {
-        await sendMessage(selectedChat.id, newMessage.trim(), user.uid)
-        setNewMessage("")
-      }
-
-      // If there's a file selected, upload it
-      if (fileInputRef.current?.files?.length) {
-        await handleFileUpload()
-      }
-
-      // Clear typing indicator
-      if (selectedChat) {
-        setTypingIndicator(selectedChat.id, user.uid, false)
-      }
-    } catch (err) {
-      console.error("Error sending message:", err)
-    }
-  }
-
-  // Handle file upload
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-    // Preview can be added here if needed
-    if (e.target.files?.length) {
-      // Auto-upload option could be toggled
-      // handleFileUpload();
-    }
-  }
-
-  // Handle file upload
-  const handleFileUpload = async () => {
-    const file = fileInputRef.current?.files?.[0];
-    if (!file || !selectedChat) return;
-
-    setFileUploading(true);
-    setUploadProgress(0);
-    
-    try {
-      const fileURL = await uploadChatFile(selectedChat.id, file, (progress) => {
-        setUploadProgress(progress);
-      });
-
-      // Determine file type
-      const fileType = file.type.split('/')[0]; // e.g., 'image', 'audio', 'video'
-      
-      await sendMessage(
-        selectedChat.id, 
-        '', 
-        user.uid, 
-        fileURL
-      );
-      
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    } catch (err) {
-      console.error('Error uploading file:', err);
-      setError('Failed to upload file. Please try again.');
-      
-      setTimeout(() => {
-        setError(null);
-      }, 3000);
-    } finally {
-      setTimeout(() => {
+    let fileURL = "";
+    if (attachedFile) {
+      setFileUploading(true);
+      try {
+        fileURL = await uploadChatFile(selectedChat.id, attachedFile, (progress) => {
+          setUploadProgress(progress);
+        });
+        setAttachedFile(null);
+      } catch (err) {
+        console.error("Error uploading file:", err);
+        setError("Failed to upload file. Please try again.");
+        setTimeout(() => setError(null), 3000);
+      } finally {
         setFileUploading(false);
         setUploadProgress(0);
-      }, 500);
+      }
+    } else if (attachedAudio) {
+      setFileUploading(true);
+      try {
+        fileURL = await uploadChatFile(selectedChat.id, attachedAudio, (progress) => {
+          setUploadProgress(progress);
+        });
+        setAttachedAudio(null);
+      } catch (err) {
+        console.error("Error uploading audio:", err);
+        setError("Failed to upload audio message.");
+        setTimeout(() => setError(null), 3000);
+      } finally {
+        setFileUploading(false);
+        setUploadProgress(0);
+      }
+    }
+
+    try {
+      if (newMessage.trim() || fileURL) {
+        await sendMessage(selectedChat.id, newMessage.trim(), user.uid, fileURL);
+        setNewMessage("");
+      }
+      if (selectedChat) {
+        setTypingIndicator(selectedChat.id, user.uid, false);
+      }
+    } catch (err) {
+      console.error("Error sending message:", err);
     }
   };
 
   // Handle typing indicator
   const handleTyping = (e: ChangeEvent<HTMLInputElement>) => {
-    setNewMessage(e.target.value)
-
-    if (!selectedChat) return
-
-    // Set typing indicator in Firebase
-    setTypingIndicator(selectedChat.id, user.uid, true)
-
-    // Clear previous timeout
-    if (typingTimeout) {
-      clearTimeout(typingTimeout)
-    }
-
-    // Set new timeout to clear typing indicator after 2 seconds
+    setNewMessage(e.target.value);
+    if (!selectedChat) return;
+    setTypingIndicator(selectedChat.id, user.uid, true);
+    if (typingTimeout) clearTimeout(typingTimeout);
     const timeout = setTimeout(() => {
-      if (selectedChat) {
-        setTypingIndicator(selectedChat.id, user.uid, false)
-      }
-    }, 2000)
-
-    setTypingTimeout(timeout)
-  }
-
-  // Send friend request
-  const handleSendFriendRequest = async () => {
-    setError(null)
-    setSuccess(null)
-    if (!friendEmail.trim()) return
-
-    try {
-      await sendFriendRequest(user.uid, friendEmail.trim())
-      setFriendEmail("")
-      setSuccess("Friend request sent successfully!")
-
-      // Clear success message after 3 seconds
-      setTimeout(() => {
-        setSuccess(null)
-      }, 3000)
-    } catch (err: any) {
-      console.error("Error sending friend request:", err)
-      setError(err.message || "Failed to send friend request")
-    }
-  }
-
-  const handleAcceptRequest = async (requestId: string) => {
-    try {
-      await acceptFriendRequest(requestId)
-      setSuccess("Friend request accepted!")
-
-      // Clear success message after 3 seconds
-      setTimeout(() => {
-        setSuccess(null)
-      }, 3000)
-    } catch (err) {
-      console.error("Error accepting request:", err)
-    }
-  }
-
-  const handleRejectRequest = async (requestId: string) => {
-    try {
-      await rejectFriendRequest(requestId)
-    } catch (err) {
-      console.error("Error rejecting request:", err)
-    }
-  }
-
-  // Create group chat
-  const handleCreateGroupChat = async () => {
-    if (!groupName.trim() || !groupEmails.trim()) return
-
-    try {
-      const emails = groupEmails
-        .split(",")
-        .map((email) => email.trim())
-        .filter((e) => e)
-      await createGroupChat(groupName.trim(), emails, user.uid)
-      setGroupName("")
-      setGroupEmails("")
-      setIsGroupModalOpen(false)
-      setSuccess("Group chat created successfully!")
-
-      // Clear success message after 3 seconds
-      setTimeout(() => {
-        setSuccess(null)
-      }, 3000)
-    } catch (err) {
-      console.error("Error creating group chat:", err)
-    }
-  }
-
-  // Rename the current chat (only for group chats)
-  const handleRenameChat = async () => {
-    if (!selectedChat || !newChatName.trim() || !selectedChat.isGroup) return;
-  
-    try {
-      await renameChat(selectedChat.id, newChatName.trim());
-      setIsEditingChatName(false);
-      setNewChatName('');
-      setSuccess('Group chat renamed successfully!');
-      
-      setTimeout(() => {
-        setSuccess(null);
-      }, 3000);
-    } catch (err: any) {
-      setError(err.message || 'Failed to rename group chat');
-      
-      setTimeout(() => {
-        setError(null);
-      }, 3000);
-    }
+      if (selectedChat) setTypingIndicator(selectedChat.id, user.uid, false);
+    }, 2000);
+    setTypingTimeout(timeout);
   };
-
-  // Leave group chat
-  const handleLeaveGroupChat = async () => {
-    if (!selectedChat || !selectedChat.isGroup) return
-
-    try {
-      await leaveGroupChat(selectedChat.id, user.uid)
-      setSelectedChat(null)
-      setShowChatOptions(false)
-      setSuccess("You have left the group chat")
-
-      // Clear success message after 3 seconds
-      setTimeout(() => {
-        setSuccess(null)
-      }, 3000)
-    } catch (err) {
-      console.error("Error leaving group chat:", err)
-    }
-  }
-
-  // Delete message
-  const handleDeleteMessage = async (messageId: string) => {
-    if (!selectedChat) return
-
-    try {
-      await deleteMessage(selectedChat.id, messageId, user.uid)
-      setMessageToDelete(null)
-    } catch (err: any) {
-      console.error("Error deleting message:", err)
-      setError(err.message || "Failed to delete message")
-
-      // Clear error message after 3 seconds
-      setTimeout(() => {
-        setError(null)
-      }, 3000)
-    }
-  }
-
-  // Toggle mobile aside
-  const toggleMobileAside = () => {
-    setShowMobileAside(!showMobileAside)
-  }
 
   // Add emoji to message
   const addEmoji = (emoji: string) => {
-    setNewMessage((prev) => prev + emoji)
-    setShowEmojiPicker(false)
-  }
+    setNewMessage((prev) => prev + emoji);
+    setShowEmojiPicker(false);
+  };
 
   // Start voice recording
   const startRecording = async () => {
@@ -815,49 +650,25 @@ const inactiveTabClass = isIlluminateEnabled
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
-      
       audioChunksRef.current = [];
-      
       mediaRecorder.ondataavailable = (e) => {
         if (e.data.size > 0) {
           audioChunksRef.current.push(e.data);
         }
       };
-      
-      mediaRecorder.onstop = async () => {
+      mediaRecorder.onstop = () => {
         if (selectedChat && audioChunksRef.current.length > 0) {
-          setFileUploading(true);
-          try {
-            const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-            const file = new File([audioBlob], `audio_${Date.now()}.webm`, { type: 'audio/webm' });
-            
-            const fileURL = await uploadChatFile(selectedChat.id, file, (progress) => {
-              setUploadProgress(progress);
-            });
-            
-            await sendMessage(selectedChat.id, '', user.uid, fileURL);
-          } catch (err) {
-            console.error('Error uploading audio:', err);
-            setError('Failed to upload audio message');
-            
-            setTimeout(() => {
-              setError(null);
-            }, 3000);
-          } finally {
-            setFileUploading(false);
-          }
+          const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+          const file = new File([audioBlob], `audio_${Date.now()}.webm`, { type: "audio/webm" });
+          setAttachedAudio(file);
         }
       };
-      
       mediaRecorder.start();
       setIsRecording(true);
     } catch (err) {
-      console.error('Error starting recording:', err);
-      setError('Failed to start recording. Please check your microphone permissions.');
-      
-      setTimeout(() => {
-        setError(null);
-      }, 3000);
+      console.error("Error starting recording:", err);
+      setError("Failed to start recording. Please check your microphone permissions.");
+      setTimeout(() => setError(null), 3000);
     }
   };
 
@@ -865,48 +676,50 @@ const inactiveTabClass = isIlluminateEnabled
   const stopRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
-      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+      mediaRecorderRef.current.stream.getTracks().forEach((track) => track.stop());
       setIsRecording(false);
     }
   };
 
+  // Toggle mobile aside
+  const toggleMobileAside = () => {
+    setShowMobileAside(!showMobileAside);
+  };
+
   // Filter chats based on search query
   const filteredChats = chats.filter((chat) => {
-    const chatName = getChatDisplayName(chat).toLowerCase()
-    return chatName.includes(searchQuery.toLowerCase())
-  })
+    const chatName = getChatDisplayName(chat).toLowerCase();
+    return chatName.includes(searchQuery.toLowerCase());
+  });
 
   // Get pending friend requests count
-  const pendingRequestsCount = friendRequests.filter((req) => req.status === "pending").length
+  const pendingRequestsCount = friendRequests.filter((req) => req.status === "pending").length;
 
   // Get other user's online status for direct chats
   const getOtherUserStatus = (chat: Chat): string => {
-    if (chat.isGroup) return ""
-
-    const otherUserId = getOtherUserId(chat)
-    if (!otherUserId) return ""
-
-    const friend = onlineFriends.find((f) => f.id === otherUserId)
-    return friend?.status || "offline"
-  }
+    if (chat.isGroup) return "";
+    const otherUserId = getOtherUserId(chat);
+    if (!otherUserId) return "";
+    const friend = onlineFriends.find((f) => f.id === otherUserId);
+    return friend?.status || "offline";
+  };
 
   const getUserStatus = (userId: string): string => {
-    const friend = onlineFriends.find((f) => f.id === userId)
-    return friend?.status || "offline"
-  }
+    const friend = onlineFriends.find((f) => f.id === userId);
+    return friend?.status || "offline";
+  };
 
   // Render file content based on file type
   const renderFileContent = (fileURL: string) => {
     const fileType = getFileType(fileURL);
     const fileName = getFileName(fileURL);
-    
     switch (fileType) {
-      case 'image':
+      case "image":
         return (
           <div className="mt-2 rounded-lg overflow-hidden max-w-xs">
-            <img 
-              src={fileURL || "/placeholder.svg"} 
-              alt="Shared image" 
+            <img
+              src={fileURL || "/placeholder.svg"}
+              alt="Shared image"
               className="max-w-full h-auto object-contain"
               onError={(e) => {
                 e.currentTarget.src = "/placeholder.svg?height=200&width=200";
@@ -914,7 +727,7 @@ const inactiveTabClass = isIlluminateEnabled
             />
           </div>
         );
-      case 'audio':
+      case "audio":
         return (
           <div className="mt-2">
             <audio controls className="max-w-full">
@@ -923,7 +736,7 @@ const inactiveTabClass = isIlluminateEnabled
             </audio>
           </div>
         );
-      case 'video':
+      case "video":
         return (
           <div className="mt-2 rounded-lg overflow-hidden max-w-xs">
             <video controls className="max-w-full">
@@ -942,7 +755,7 @@ const inactiveTabClass = isIlluminateEnabled
             download={fileName}
           >
             <Paperclip className="w-4 h-4" />
-            {fileName || 'Download file'}
+            {fileName || "Download file"}
           </a>
         );
     }
@@ -1270,151 +1083,171 @@ const inactiveTabClass = isIlluminateEnabled
             </div>
 
             {/* Message Input */}
-            <motion.form
-              onSubmit={handleSendMessage}
-              className={`${chatInputContainerClass} p-3 sm:p-4`}
-              variants={slideUp}
-            >
-              {fileUploading && (
-                <motion.div
-                  className="mb-2 bg-gray-700 rounded-lg overflow-hidden"
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                >
-                  <div className="px-3 py-2 text-xs flex items-center justify-between">
-                    <span>Uploading file...</span>
-                    <span>{Math.round(uploadProgress)}%</span>
-                  </div>
-                  <div className="h-1 bg-gray-600">
-                    <div
-                      className="h-full bg-blue-500 transition-all duration-300"
-                      style={{ width: `${uploadProgress}%` }}
-                    ></div>
-                  </div>
-                </motion.div>
-              )}
+<motion.form
+  onSubmit={handleSendMessage}
+  className={`${chatInputContainerClass} p-3 sm:p-4`}
+  variants={slideUp}
+>
+  {/* Notification area for attached file/audio */}
+  {(attachedFile || attachedAudio) && (
+    <div className="mb-2 text-xs text-gray-400">
+      {attachedFile && "File attached"}
+      {attachedAudio && " Audio attached"}
+    </div>
+  )}
 
-              <div className="flex items-center gap-2">
-                <div className="flex-1 relative">
-                  <input
-                    type="text"
-                    value={newMessage}
-                    onChange={handleTyping}
-                    placeholder="Type your message"
-                    className={`w-full ${inputBg} rounded-lg pl-3 pr-10 py-2 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                  />
-                  <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center gap-1">
-                    <motion.button
-                      type="button"
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                      className="text-gray-400 hover:text-gray-300 p-1 rounded-full"
-                    >
-                      <Smile className="w-5 h-5" />
-                    </motion.button>
-                  </div>
+  <div className="flex items-center gap-2">
+    {/* Left side: File and Audio buttons */}
+    <div className="flex items-center gap-2">
+      <motion.button
+        type="button"
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+        onClick={() => fileInputRef.current?.click()}
+        className={`
+          ${attachedFile ? "bg-green-500" : secondaryButtonClass} 
+          p-2 rounded-full focus:outline-none focus:ring-2 focus:ring-gray-500 flex-shrink-0
+        `}
+        disabled={fileUploading}
+      >
+        <Paperclip className="w-5 h-5" />
+        <span className="sr-only">Attach file</span>
+      </motion.button>
 
-                  {/* Emoji Picker */}
-                  <AnimatePresence>
-                    {showEmojiPicker && (
-                      <motion.div
-                        ref={emojiPickerRef}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 10 }}
-                        className={`absolute bottom-full mb-2 p-2 rounded-lg shadow-lg ${
-                          isIlluminateEnabled ? "bg-white border border-gray-200" : "bg-gray-800 border border-gray-700"
-                        } grid grid-cols-8 gap-1 z-10`}
-                      >
-                        {[
-                          "😊",
-                          "😂",
-                          "❤️",
-                          "👍",
-                          "🎉",
-                          "🔥",
-                          "👋",
-                          "😎",
-                          "🤔",
-                          "😢",
-                          "😍",
-                          "🙏",
-                          "👏",
-                          "💯",
-                          "🚀",
-                          "✨",
-                        ].map((emoji) => (
-                          <motion.button
-                            key={emoji}
-                            type="button"
-                            whileHover={{ scale: 1.2 }}
-                            whileTap={{ scale: 0.9 }}
-                            onClick={() => addEmoji(emoji)}
-                            className="w-8 h-8 flex items-center justify-center text-xl hover:bg-gray-700/20 rounded"
-                          >
-                            {emoji}
-                          </motion.button>
-                        ))}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
+      <motion.button
+        type="button"
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+        onClick={() => {
+          if (isRecording) {
+            stopRecording();
+          } else {
+            startRecording();
+          }
+        }}
+        className={`
+          ${(attachedAudio || isRecording) ? "bg-green-500" : secondaryButtonClass}
+          p-2 rounded-full focus:outline-none focus:ring-2 focus:ring-gray-500 flex-shrink-0
+        `}
+      >
+        <Mic className="w-5 h-5" />
+        <span className="sr-only">
+          {isRecording ? "Stop recording" : "Record voice message"}
+        </span>
+      </motion.button>
+    </div>
 
-                <motion.button
-                  type="button"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => fileInputRef.current?.click()}
-                  className={`${secondaryButtonClass} p-2 rounded-full focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50 flex-shrink-0`}
-                  disabled={fileUploading}
-                >
-                  <Paperclip className="w-5 h-5" />
-                  <span className="sr-only">Attach file</span>
-                </motion.button>
+    {/* Center: Message Input */}
+    <div className="flex-1 relative">
+      <input
+        type="text"
+        value={newMessage}
+        onChange={handleTyping}
+        placeholder="Type your message"
+        className={`w-full ${inputBg} rounded-full pl-3 pr-10 py-2 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-blue-500`}
+      />
+      <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center gap-1">
+        <motion.button
+          type="button"
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+          className="text-gray-400 hover:text-gray-300 p-1 rounded-full"
+        >
+          <Smile className="w-5 h-5" />
+        </motion.button>
+      </div>
 
-                <motion.button
-                  type="button"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => {
-                    if (isRecording) {
-                      stopRecording();
-                    } else {
-                      startRecording();
-                    }
-                  }}
-                  className={`${
-                    isRecording ? 'bg-red-500 hover:bg-red-600 text-white' : secondaryButtonClass
-                  } p-2 rounded-full focus:outline-none focus:ring-2 focus:ring-gray-500 flex-shrink-0`}
-                >
-                  <Mic className="w-5 h-5" />
-                  <span className="sr-only">
-                    {isRecording ? 'Stop recording' : 'Record voice message'}
-                  </span>
-                </motion.button>
+      <AnimatePresence>
+        {showEmojiPicker && (
+          <motion.div
+            ref={emojiPickerRef}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 10 }}
+            className={`absolute bottom-full mb-2 p-2 rounded-lg shadow-lg ${
+              isIlluminateEnabled
+                ? "bg-white border border-gray-200"
+                : "bg-gray-800 border border-gray-700"
+            } grid grid-cols-8 gap-1 z-10`}
+          >
+            {[
+              "😊",
+              "😂",
+              "❤️",
+              "👍",
+              "🎉",
+              "🔥",
+              "👋",
+              "😎",
+              "🤔",
+              "😢",
+              "😍",
+              "🙏",
+              "👏",
+              "💯",
+              "🚀",
+              "✨",
+            ].map((emoji) => (
+              <motion.button
+                key={emoji}
+                type="button"
+                whileHover={{ scale: 1.2 }}
+                whileTap={{ scale: 0.9 }}
+                onClick={() => addEmoji(emoji)}
+                className="w-8 h-8 flex items-center justify-center text-xl hover:bg-gray-700/20 rounded"
+              >
+                {emoji}
+              </motion.button>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
 
-                <motion.button
-                  type="submit"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className={`${primaryButtonClass} p-2 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 flex-shrink-0`}
-                >
-                  <Send className="w-5 h-5" />
-                  <span className="sr-only">Send</span>
-                </motion.button>
+    {/* Right side: Send button */}
+    <motion.button
+      type="submit"
+      whileHover={{ scale: 1.05 }}
+      whileTap={{ scale: 0.95 }}
+      className={`${primaryButtonClass} p-2 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 flex-shrink-0`}
+    >
+      <Send className="w-5 h-5" />
+      <span className="sr-only">Send</span>
+    </motion.button>
 
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="*/*"
-                  className="hidden"
-                  onChange={handleFileChange}
-                  disabled={fileUploading}
-                />
-              </div>
-            </motion.form>
+    {/* Hidden file input */}
+    <input
+      ref={fileInputRef}
+      type="file"
+      accept="*/*"
+      className="hidden"
+      onChange={handleFileChange}
+      disabled={fileUploading}
+    />
+  </div>
+
+  {/* File Upload Progress (if uploading) */}
+  {fileUploading && (
+    <motion.div
+      className="mb-2 bg-gray-700 rounded-lg overflow-hidden"
+      initial={{ opacity: 0, height: 0 }}
+      animate={{ opacity: 1, height: "auto" }}
+      exit={{ opacity: 0, height: 0 }}
+    >
+      <div className="px-3 py-2 text-xs flex items-center justify-between">
+        <span>Uploading file...</span>
+        <span>{Math.round(uploadProgress)}%</span>
+      </div>
+      <div className="h-1 bg-gray-600">
+        <div
+          className="h-full bg-blue-500 transition-all duration-300"
+          style={{ width: `${uploadProgress}%` }}
+        ></div>
+      </div>
+    </motion.div>
+  )}
+</motion.form>
           </>
         ) : (
           <motion.div

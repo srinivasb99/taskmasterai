@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, type ChangeEvent, type FormEvent } from "react"
 import { useNavigate } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
-import { User, MessageSquare, PlusCircle, Paperclip, Send, Users, CheckCircle, XCircle, Edit, Trash2, Search, Bell, UserPlus, Settings, ChevronRight, ChevronLeft, Image, Smile, Mic, MoreVertical, Star, Filter, X, LogOut, Clock } from 'lucide-react'
+import { User, Users2, MessageSquare, PlusCircle, Paperclip, Send, Users, CheckCircle, XCircle, Edit, Trash2, Search, Bell, UserPlus, Settings, ChevronRight, ChevronLeft, Image, Smile, Mic, MoreVertical, Star, Filter, X, LogOut, Clock } from 'lucide-react'
 import { Sidebar } from "./Sidebar"
 import { getCurrentUser } from "../lib/settings-firebase"
 import {
@@ -922,7 +922,7 @@ export function Friends() {
         >
           <div>
             <h1 className={`text-xl sm:text-3xl font-bold ${headingClass} flex items-center gap-2`}>
-              <User className="w-6 h-6 sm:w-8 sm:h-8 text-blue-400" />
+              <Users2 className="w-6 h-6 sm:w-8 sm:h-8 text-blue-400" />
               Friends
             </h1>
             <p className={`mt-1 text-xs sm:text-sm ${subheadingClass}`}>

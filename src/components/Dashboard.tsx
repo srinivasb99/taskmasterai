@@ -835,7 +835,7 @@ FORBIDDEN IN YOUR FINAL RESPONSE:
 - Explaining the process
 - Using phrases like "Based on the context", "items", "to-do list"
 - Numeric date formats (e.g., 03/07/2025)
-- Don't start of by saying something like "The tasks center on academic preparation and productivity enhancement." or other statements. 
+- Don't start of by saying something like "The tasks center on academic preparation and productivity enhancement." or "The focus is on..." or other statements. 
 
 Keep it brief, actionable, impersonal, and readable.
 <</SYS>>[/INST]

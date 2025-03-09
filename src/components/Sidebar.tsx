@@ -244,29 +244,28 @@ return (
               </button>
             )}
 
-            {/* User Profile with Basic Plan Badge */}
-            <button
-              onClick={() => navigate("/settings")}
-              className={`
-                mx-3 flex items-left gap-3 rounded-lg transition-colors
-                ${userProfileText}
-                ${userProfileHoverBg}
-                ${isCollapsed && !isMobileMenuOpen ? "justify-center aspect-square" : "px-4 py-2.5"}
-                hover:scale-[1.02] transition-transform duration-200
-              `}
-            >
-              <div className="relative flex-shrink-0 w-8 h-8">
-                <div className="w-full h-full rounded-full overflow-hidden bg-gray-800">
-                  {currentUser?.photoURL ? (
-                    <img
-                      src={currentUser.photoURL || "/placeholder.svg"}
-                      alt={userName}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <CircleUserRound className="w-5 h-5 min-w-[1.25rem]" strokeWidth={2} />
-                    </div>
+          {/* User Profile with Basic Plan Badge */}
+          <button
+            onClick={() => navigate('/settings')}
+            className={`
+              mx-3 flex items-center gap-3 rounded-lg transition-colors
+              ${userProfileText}
+              ${userProfileHoverBg}
+              ${isCollapsed ? 'justify-center aspect-square' : 'px-4 py-2.5'}
+            `}
+          >
+            <div className="relative flex-shrink-0 w-8 h-8">
+              <div className="w-full h-full rounded-full overflow-hidden bg-gray-800">
+                {currentUser?.photoURL ? (
+                  <img
+                    src={currentUser.photoURL}
+                    alt={userName}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <CircleUserRound className="w-5 h-5 min-w-[1.25rem]" strokeWidth={2} />
+                  </div>
                   )}
                 </div>
               </div>

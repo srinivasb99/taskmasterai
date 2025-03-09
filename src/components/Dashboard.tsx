@@ -829,11 +829,13 @@ Follow these guidelines exactly:
 
 FORBIDDEN IN YOUR FINAL RESPONSE:
 - Addressing the user directly (e.g., "Hello", "you")
+-
 - Meta-commentary about the conversation
 - Phrases like "I understand", "I see", "I notice"
 - Explaining the process
 - Using phrases like "Based on the context", "items", "to-do list"
 - Numeric date formats (e.g., 03/07/2025)
+- Don't start of by saying something like "The tasks center on academic preparation and productivity enhancement." or other statements. 
 
 Keep it brief, actionable, impersonal, and readable.
 <</SYS>>[/INST]

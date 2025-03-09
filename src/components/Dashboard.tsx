@@ -1273,7 +1273,7 @@ const illuminateTextYellow = "text-yellow-700"
 
 // Define breakpoint for mobile/desktop switch - using md (768px) instead of sm (640px)
 // This makes mobile mode activate on bigger devices and split screens
-const mobileBreakpoint = "md" // ADDED: Variable to control all breakpoints consistently
+const mobileBreakpoint = "lg" // ADDED: Variable to control all breakpoints consistently
 
 // Original dynamic classes
 const containerClass = isIlluminateEnabled

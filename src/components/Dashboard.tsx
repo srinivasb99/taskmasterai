@@ -2,7 +2,6 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBlackoutMode } from '../hooks/useBlackoutMode';
 import { useIlluminateMode } from '../hooks/useIlluminateMode';
-import { PageLayout } from './PageLayout';
 import {
   PlusCircle,
   Edit,
@@ -1288,7 +1287,6 @@ const inputBg = isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700';
 
 
 return (
-  <PageLayout>
   <div className={`${containerClass} min-h-screen w-full overflow-x-hidden`}>
     {/* Pass collapse state & toggle handler to Sidebar */}
     <Sidebar
@@ -2480,6 +2478,5 @@ return (
 </div>
 </main>
 </div>
-</PageLayout>
 );
 }

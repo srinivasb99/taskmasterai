@@ -1,3 +1,5 @@
+"use client"
+
 import { useState, useEffect, useRef, type ChangeEvent, type FormEvent } from "react"
 import { useNavigate } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
@@ -1116,9 +1118,9 @@ export function Friends() {
                         {showSender && (
                           <div className="flex items-center mb-2 ml-2">
                             <div className="relative">
-                              {friend.photoURL ? (
+                              {msg.senderPhotoURL ? (
                                 <img
-                                  src={friend.photoURL || "/placeholder.svg"}
+                                  src={msg.senderPhotoURL || "/placeholder.svg"}
                                   alt={msg.senderName || 'User'}
                                   className="w-8 h-8 rounded-full object-cover"
                                 />

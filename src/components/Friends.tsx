@@ -926,7 +926,7 @@ export function Friends() {
               Friends
             </h1>
             <p className={`mt-1 text-xs sm:text-sm ${subheadingClass}`}>
-              Manage friend requests and chat with your friends.
+              Chat with your friends and stay productive.
             </p>
           </div>
 
@@ -1237,6 +1237,41 @@ export function Friends() {
 
               <div className="flex items-center gap-2">
                 <div className="flex-1 relative">
+                <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center gap-1">
+                  <motion.button
+                  type="button"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => fileInputRef.current?.click()}
+                  className={`${secondaryButtonClass} p-2 rounded-full focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50 flex-shrink-0`}
+                  disabled={fileUploading}
+                >
+                  <Paperclip className="w-5 h-5" />
+                  <span className="sr-only">Attach file</span>
+                </motion.button>
+
+                <motion.button
+                  type="button"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => {
+                    if (isRecording) {
+                      stopRecording();
+                    } else {
+                      startRecording();
+                    }
+                  }}
+                  className={`${
+                    isRecording ? 'bg-red-500 hover:bg-red-600 text-white' : secondaryButtonClass
+                  } p-2 rounded-full focus:outline-none focus:ring-2 focus:ring-gray-500 flex-shrink-0`}
+                >
+                  <Mic className="w-5 h-5" />
+                  <span className="sr-only">
+                    {isRecording ? 'Stop recording' : 'Record voice message'}
+                  </span>
+                </motion.button>
+                </div>
+                  
                   <input
                     type="text"
                     value={newMessage}
@@ -1302,38 +1337,6 @@ export function Friends() {
                   </AnimatePresence>
                 </div>
 
-                <motion.button
-                  type="button"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => fileInputRef.current?.click()}
-                  className={`${secondaryButtonClass} p-2 rounded-full focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50 flex-shrink-0`}
-                  disabled={fileUploading}
-                >
-                  <Paperclip className="w-5 h-5" />
-                  <span className="sr-only">Attach file</span>
-                </motion.button>
-
-                <motion.button
-                  type="button"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => {
-                    if (isRecording) {
-                      stopRecording();
-                    } else {
-                      startRecording();
-                    }
-                  }}
-                  className={`${
-                    isRecording ? 'bg-red-500 hover:bg-red-600 text-white' : secondaryButtonClass
-                  } p-2 rounded-full focus:outline-none focus:ring-2 focus:ring-gray-500 flex-shrink-0`}
-                >
-                  <Mic className="w-5 h-5" />
-                  <span className="sr-only">
-                    {isRecording ? 'Stop recording' : 'Record voice message'}
-                  </span>
-                </motion.button>
 
                 <motion.button
                   type="submit"
@@ -1364,7 +1367,7 @@ export function Friends() {
             transition={{ delay: 0.2 }}
           >
             <div className="text-center p-4 max-w-md">
-              <Users className="w-16 h-16 text-blue-400 mx-auto mb-4" />
+              <Users2 className="w-16 h-16 text-blue-400 mx-auto mb-4" />
               <p className={`${subheadingClass} text-center mb-4`}>
                 {isMobileView ? "Tap the friends button to select a chat" : "Select a chat to start messaging"}
               </p>

@@ -938,7 +938,7 @@ export function Friends() {
               aria-label="Toggle friends panel"
               whileTap={{ scale: 0.95 }}
             >
-              <Users className="w-5 h-5" />
+              <Users2 className="w-5 h-5" />
             </motion.button>
           )}
         </motion.div>
@@ -1237,41 +1237,6 @@ export function Friends() {
 
               <div className="flex items-center gap-2">
                 <div className="flex-1 relative">
-                <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center gap-1">
-                  <motion.button
-                  type="button"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => fileInputRef.current?.click()}
-                  className={`${secondaryButtonClass} p-2 rounded-full focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50 flex-shrink-0`}
-                  disabled={fileUploading}
-                >
-                  <Paperclip className="w-5 h-5" />
-                  <span className="sr-only">Attach file</span>
-                </motion.button>
-
-                <motion.button
-                  type="button"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => {
-                    if (isRecording) {
-                      stopRecording();
-                    } else {
-                      startRecording();
-                    }
-                  }}
-                  className={`${
-                    isRecording ? 'bg-red-500 hover:bg-red-600 text-white' : secondaryButtonClass
-                  } p-2 rounded-full focus:outline-none focus:ring-2 focus:ring-gray-500 flex-shrink-0`}
-                >
-                  <Mic className="w-5 h-5" />
-                  <span className="sr-only">
-                    {isRecording ? 'Stop recording' : 'Record voice message'}
-                  </span>
-                </motion.button>
-                </div>
-                  
                   <input
                     type="text"
                     value={newMessage}
@@ -1337,6 +1302,38 @@ export function Friends() {
                   </AnimatePresence>
                 </div>
 
+                <motion.button
+                  type="button"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => fileInputRef.current?.click()}
+                  className={`${secondaryButtonClass} p-2 rounded-full focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50 flex-shrink-0`}
+                  disabled={fileUploading}
+                >
+                  <Paperclip className="w-5 h-5" />
+                  <span className="sr-only">Attach file</span>
+                </motion.button>
+
+                <motion.button
+                  type="button"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => {
+                    if (isRecording) {
+                      stopRecording();
+                    } else {
+                      startRecording();
+                    }
+                  }}
+                  className={`${
+                    isRecording ? 'bg-red-500 hover:bg-red-600 text-white' : secondaryButtonClass
+                  } p-2 rounded-full focus:outline-none focus:ring-2 focus:ring-gray-500 flex-shrink-0`}
+                >
+                  <Mic className="w-5 h-5" />
+                  <span className="sr-only">
+                    {isRecording ? 'Stop recording' : 'Record voice message'}
+                  </span>
+                </motion.button>
 
                 <motion.button
                   type="submit"

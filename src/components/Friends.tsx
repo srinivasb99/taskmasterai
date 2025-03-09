@@ -1,26 +1,9 @@
+"use client"
+
 import { useState, useEffect, useRef, type ChangeEvent, type FormEvent } from "react"
 import { useNavigate } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
-import {
-  User,
-  MessageSquare,
-  PlusCircle,
-  Paperclip,
-  Send,
-  Users,
-  CheckCircle,
-  XCircle,
-  Edit,
-  Trash2,
-  Search,
-  Bell,
-  UserPlus,
-  Smile,
-  Mic,
-  MoreVertical,
-  X,
-  Clock,
-} from "lucide-react"
+import { User, MessageSquare, PlusCircle, Paperclip, Send, Users, CheckCircle, XCircle, Edit, Trash2, Search, Bell, UserPlus, Settings, ChevronRight, ChevronLeft, Image, Smile, Mic, MoreVertical, Star, Filter, X, LogOut, Clock } from 'lucide-react'
 import { Sidebar } from "./Sidebar"
 import { getCurrentUser } from "../lib/settings-firebase"
 import {
@@ -37,11 +20,15 @@ import {
   leaveGroupChat,
   deleteMessage,
   getUserProfile,
-  getUserFriends,
-  listenToFriendsOnlineStatus,
+  getOtherUserInDirectChat,
+  getChatMembersProfiles,
   setupPresenceSystem,
+  setUserOnlineStatus,
+  listenToUserOnlineStatus,
+  listenToFriendsOnlineStatus,
   setTypingIndicator,
   listenToTypingIndicators,
+  getUserFriends
 } from "../lib/friends-firebase"
 
 interface Chat {
@@ -62,6 +49,8 @@ interface Message {
   senderName?: string
   senderPhotoURL?: string
   fileURL?: string
+  fileType?: string
+  fileName?: string
   timestamp?: any
 }
 
@@ -121,6 +110,7 @@ export function Friends() {
   const chatContainerRef = useRef<HTMLDivElement>(null)
   const emojiPickerRef = useRef<HTMLDivElement>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const audioChunksRef = useRef<Blob[]>([])
 
   // Auth state
   const [user, setUser] = useState<any>(null)
@@ -197,7 +187,6 @@ export function Friends() {
   const [searchQuery, setSearchQuery] = useState("")
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
-  const [audioChunks, setAudioChunks] = useState<Blob[]>([])
   const [showChatOptions, setShowChatOptions] = useState(false)
   const [isStarred, setIsStarred] = useState(false)
   const [messageToDelete, setMessageToDelete] = useState<string | null>(null)
@@ -280,7 +269,7 @@ export function Friends() {
 
   // For message bubbles: your own and others
   const ownMessageClass = isIlluminateEnabled ? "bg-blue-500 text-white" : "bg-blue-600 text-white"
-  const otherMessageClass = isIlluminateEnabled ? "bg-gray-200 text-gray-900" : "bg-gray-700 text-gray-100"
+  const otherMessageClass = isIlluminateEnabled ? "bg-gray-300 text-gray-900" : "bg-gray-600 text-white"
 
   // Chat input container
   const chatInputContainerClass = isIlluminateEnabled ? "bg-gray-100" : "bg-gray-800"
@@ -492,6 +481,40 @@ export function Friends() {
     return chat.members.find((id) => id !== user.uid) || null
   }
 
+  // Determine file type
+  const getFileType = (fileURL: string): string => {
+    const extension = fileURL.split('.').pop()?.toLowerCase() || '';
+    
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(extension)) {
+      return 'image';
+    } else if (['mp3', 'wav', 'ogg', 'webm'].includes(extension)) {
+      return 'audio';
+    } else if (['mp4', 'webm', 'ogg', 'mov'].includes(extension)) {
+      return 'video';
+    } else {
+      return 'file';
+    }
+  };
+
+  // Get file name from URL
+  const getFileName = (fileURL: string): string => {
+    try {
+      const url = new URL(fileURL);
+      const pathParts = url.pathname.split('/');
+      const fullFileName = pathParts[pathParts.length - 1];
+      
+      // Remove timestamp prefix if it exists (e.g., 1234567890_filename.jpg)
+      const fileNameParts = fullFileName.split('_');
+      if (fileNameParts.length > 1 && !isNaN(Number(fileNameParts[0]))) {
+        return fileNameParts.slice(1).join('_');
+      }
+      
+      return fullFileName;
+    } catch (e) {
+      return 'file';
+    }
+  };
+
   // Handle sending a text message
   const handleSendMessage = async (e: FormEvent) => {
     e.preventDefault()
@@ -528,32 +551,44 @@ export function Friends() {
 
   // Handle file upload
   const handleFileUpload = async () => {
-    const file = fileInputRef.current?.files?.[0]
-    if (!file || !selectedChat) return
+    const file = fileInputRef.current?.files?.[0];
+    if (!file || !selectedChat) return;
 
-    setFileUploading(true)
-    setUploadProgress(0)
-
+    setFileUploading(true);
+    setUploadProgress(0);
+    
     try {
       const fileURL = await uploadChatFile(selectedChat.id, file, (progress) => {
-        setUploadProgress(progress)
-      })
+        setUploadProgress(progress);
+      });
 
-      await sendMessage(selectedChat.id, "", user.uid, fileURL)
-
+      // Determine file type
+      const fileType = file.type.split('/')[0]; // e.g., 'image', 'audio', 'video'
+      
+      await sendMessage(
+        selectedChat.id, 
+        '', 
+        user.uid, 
+        fileURL
+      );
+      
       if (fileInputRef.current) {
-        fileInputRef.current.value = ""
+        fileInputRef.current.value = '';
       }
     } catch (err) {
-      console.error("Error uploading file:", err)
-      setError("Failed to upload file. Please try again.")
+      console.error('Error uploading file:', err);
+      setError('Failed to upload file. Please try again.');
+      
+      setTimeout(() => {
+        setError(null);
+      }, 3000);
     } finally {
       setTimeout(() => {
-        setFileUploading(false)
-        setUploadProgress(0)
-      }, 500)
+        setFileUploading(false);
+        setUploadProgress(0);
+      }, 500);
     }
-  }
+  };
 
   // Handle typing indicator
   const handleTyping = (e: ChangeEvent<HTMLInputElement>) => {
@@ -648,17 +683,25 @@ export function Friends() {
 
   // Rename the current chat (only for group chats)
   const handleRenameChat = async () => {
-    if (!selectedChat || !selectedChat.isGroup || !newChatName.trim()) return
-
+    if (!selectedChat || !newChatName.trim() || !selectedChat.isGroup) return;
+  
     try {
-      await renameChat(selectedChat.id, newChatName.trim())
-      setIsEditingChatName(false)
-      setNewChatName("")
-      setSuccess("Group chat renamed successfully!")
+      await renameChat(selectedChat.id, newChatName.trim());
+      setIsEditingChatName(false);
+      setNewChatName('');
+      setSuccess('Group chat renamed successfully!');
+      
+      setTimeout(() => {
+        setSuccess(null);
+      }, 3000);
     } catch (err: any) {
-      setError(err.message || "Failed to rename group chat")
+      setError(err.message || 'Failed to rename group chat');
+      
+      setTimeout(() => {
+        setError(null);
+      }, 3000);
     }
-  }
+  };
 
   // Leave group chat
   const handleLeaveGroupChat = async () => {
@@ -708,56 +751,66 @@ export function Friends() {
     setShowEmojiPicker(false)
   }
 
-  // Start/stop voice recording
+  // Start voice recording
   const startRecording = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const mediaRecorder = new MediaRecorder(stream)
-      mediaRecorderRef.current = mediaRecorder
-
-      const chunks: Blob[] = []
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      
+      audioChunksRef.current = [];
+      
       mediaRecorder.ondataavailable = (e) => {
         if (e.data.size > 0) {
-          chunks.push(e.data)
+          audioChunksRef.current.push(e.data);
         }
-      }
-
+      };
+      
       mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(chunks, { type: "audio/webm" })
-        setAudioChunks([])
-
-        if (selectedChat) {
-          setFileUploading(true)
+        if (selectedChat && audioChunksRef.current.length > 0) {
+          setFileUploading(true);
           try {
-            const file = new File([audioBlob], `audio_${Date.now()}.webm`, { type: "audio/webm" })
+            const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+            const file = new File([audioBlob], `audio_${Date.now()}.webm`, { type: 'audio/webm' });
+            
             const fileURL = await uploadChatFile(selectedChat.id, file, (progress) => {
-              setUploadProgress(progress)
-            })
-            await sendMessage(selectedChat.id, "", user.uid, fileURL)
+              setUploadProgress(progress);
+            });
+            
+            await sendMessage(selectedChat.id, '', user.uid, fileURL);
           } catch (err) {
-            console.error("Error uploading audio:", err)
-            setError("Failed to upload audio message")
+            console.error('Error uploading audio:', err);
+            setError('Failed to upload audio message');
+            
+            setTimeout(() => {
+              setError(null);
+            }, 3000);
           } finally {
-            setFileUploading(false)
+            setFileUploading(false);
           }
         }
-      }
-
-      mediaRecorder.start()
-      setIsRecording(true)
+      };
+      
+      mediaRecorder.start();
+      setIsRecording(true);
     } catch (err) {
-      console.error("Error starting recording:", err)
-      setError("Failed to start recording. Please check your microphone permissions.")
+      console.error('Error starting recording:', err);
+      setError('Failed to start recording. Please check your microphone permissions.');
+      
+      setTimeout(() => {
+        setError(null);
+      }, 3000);
     }
-  }
+  };
 
+  // Stop voice recording
   const stopRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop()
-      mediaRecorderRef.current.stream.getTracks().forEach((track) => track.stop())
-      setIsRecording(false)
+      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+      setIsRecording(false);
     }
-  }
+  };
 
   // Filter chats based on search query
   const filteredChats = chats.filter((chat) => {
@@ -783,6 +836,59 @@ export function Friends() {
     const friend = onlineFriends.find((f) => f.id === userId)
     return friend?.status || "offline"
   }
+
+  // Render file content based on file type
+  const renderFileContent = (fileURL: string) => {
+    const fileType = getFileType(fileURL);
+    const fileName = getFileName(fileURL);
+    
+    switch (fileType) {
+      case 'image':
+        return (
+          <div className="mt-2 rounded-lg overflow-hidden max-w-xs">
+            <img 
+              src={fileURL || "/placeholder.svg"} 
+              alt="Shared image" 
+              className="max-w-full h-auto object-contain"
+              onError={(e) => {
+                e.currentTarget.src = "/placeholder.svg?height=200&width=200";
+              }}
+            />
+          </div>
+        );
+      case 'audio':
+        return (
+          <div className="mt-2">
+            <audio controls className="max-w-full">
+              <source src={fileURL} />
+              Your browser does not support the audio element.
+            </audio>
+          </div>
+        );
+      case 'video':
+        return (
+          <div className="mt-2 rounded-lg overflow-hidden max-w-xs">
+            <video controls className="max-w-full">
+              <source src={fileURL} />
+              Your browser does not support the video element.
+            </video>
+          </div>
+        );
+      default:
+        return (
+          <a
+            href={fileURL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 text-xs sm:text-sm underline mt-2 hover:opacity-80"
+            download={fileName}
+          >
+            <Paperclip className="w-4 h-4" />
+            {fileName || 'Download file'}
+          </a>
+        );
+    }
+  };
 
   return (
     <div className={`flex h-screen ${containerClass} overflow-hidden`}>
@@ -888,13 +994,10 @@ export function Friends() {
                 {selectedChat?.isGroup && selectedChat.createdBy === user?.uid && (
                   <div className="flex items-center gap-2">
                     {isEditingChatName ? (
-                      <form
-                        onSubmit={(e) => {
-                          e.preventDefault()
-                          handleRenameChat()
-                        }}
-                        className="flex items-center gap-2"
-                      >
+                      <form onSubmit={(e) => {
+                        e.preventDefault();
+                        handleRenameChat();
+                      }} className="flex items-center gap-2">
                         <input
                           type="text"
                           value={newChatName}
@@ -916,8 +1019,8 @@ export function Friends() {
                           whileHover={{ scale: 1.05 }}
                           whileTap={{ scale: 0.95 }}
                           onClick={() => {
-                            setIsEditingChatName(false)
-                            setNewChatName("")
+                            setIsEditingChatName(false);
+                            setNewChatName('');
                           }}
                           className="text-red-500 hover:text-red-400"
                         >
@@ -929,8 +1032,8 @@ export function Friends() {
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
                         onClick={() => {
-                          setIsEditingChatName(true)
-                          setNewChatName(selectedChat.name || "")
+                          setIsEditingChatName(true);
+                          setNewChatName(selectedChat.name || '');
                         }}
                         className="text-blue-400 hover:text-blue-300 p-1.5 rounded-full hover:bg-gray-700/20"
                       >
@@ -1010,7 +1113,7 @@ export function Friends() {
                       <motion.div
                         key={msg.id}
                         variants={isOwn ? slideLeft : slideRight}
-                        className={`mb-3 ${isOwn ? "self-end" : "self-start"} group`}
+                        className={`mb-3 ${isOwn ? "self-end" : "self-start"} group max-w-[75%]`}
                       >
                         {showSender && (
                           <div className="flex items-center mb-2 ml-2">
@@ -1018,7 +1121,7 @@ export function Friends() {
                               {msg.senderPhotoURL ? (
                                 <img
                                   src={msg.senderPhotoURL || "/placeholder.svg"}
-                                  alt={msg.senderName || "User"}
+                                  alt={msg.senderName || 'User'}
                                   className="w-8 h-8 rounded-full object-cover"
                                 />
                               ) : (
@@ -1026,48 +1129,32 @@ export function Friends() {
                                   <User className="w-5 h-5 text-gray-300" />
                                 </div>
                               )}
-                              <div
-                                className={`absolute bottom-0 right-0 w-2 h-2 rounded-full ${
-                                  getUserStatus(msg.senderId) === "online"
-                                    ? "bg-green-500"
-                                    : getUserStatus(msg.senderId) === "away"
-                                      ? "bg-yellow-500"
-                                      : "bg-gray-500"
-                                } border-2 ${isIlluminateEnabled ? "border-white" : "border-gray-800"}`}
-                              />
+                              <div className={`absolute bottom-0 right-0 w-2 h-2 rounded-full ${
+                                getUserStatus(msg.senderId) === 'online' ? 'bg-green-500' :
+                                getUserStatus(msg.senderId) === 'away' ? 'bg-yellow-500' :
+                                'bg-gray-500'
+                              } border-2 ${isIlluminateEnabled ? 'border-white' : 'border-gray-800'}`} />
                             </div>
-                            <span
-                              className={`ml-2 text-sm font-medium ${
-                                isIlluminateEnabled ? "text-gray-700" : "text-gray-300"
-                              }`}
-                            >
-                              {msg.senderName || "User"}
+                            <span className={`ml-2 text-sm font-medium ${
+                              isIlluminateEnabled ? 'text-gray-700' : 'text-gray-300'
+                            }`}>
+                              {msg.senderName || 'User'}
                             </span>
                           </div>
                         )}
                         <div className="relative">
                           <div
-                            className={`relative p-3 rounded-lg max-w-[75%] shadow-sm ${
+                            className={`relative p-3 rounded-lg shadow-sm ${
                               isOwn ? ownMessageClass : otherMessageClass
                             }`}
                           >
-                            {msg.text && <p className="text-sm sm:text-base">{msg.text}</p>}
-                            {msg.fileURL && (
-                              <a
-                                href={msg.fileURL}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className={`flex items-center gap-2 text-xs sm:text-sm underline break-all hover:opacity-80 ${
-                                  isOwn ? "text-blue-100" : "text-blue-400"
-                                }`}
-                              >
-                                <Paperclip className="w-4 h-4" />
-                                View File
-                              </a>
-                            )}
-                            <span className="text-xs opacity-70 mt-1 inline-block">
-                              {formatTimestamp(msg.timestamp)}
-                            </span>
+                            {msg.text && <p className="text-sm sm:text-base whitespace-pre-wrap">{msg.text}</p>}
+                            {msg.fileURL && renderFileContent(msg.fileURL)}
+                          </div>
+                          
+                          {/* Timestamp outside the bubble */}
+                          <div className={`text-xs ${subheadingClass} mt-1 ${isOwn ? 'text-right' : 'text-left'}`}>
+                            {formatTimestamp(msg.timestamp)}
                           </div>
 
                           {/* Message actions (only for own messages) */}
@@ -1235,17 +1322,19 @@ export function Friends() {
                   whileTap={{ scale: 0.95 }}
                   onClick={() => {
                     if (isRecording) {
-                      stopRecording()
+                      stopRecording();
                     } else {
-                      startRecording()
+                      startRecording();
                     }
                   }}
                   className={`${
-                    isRecording ? "bg-red-500 hover:bg-red-600" : secondaryButtonClass
+                    isRecording ? 'bg-red-500 hover:bg-red-600 text-white' : secondaryButtonClass
                   } p-2 rounded-full focus:outline-none focus:ring-2 focus:ring-gray-500 flex-shrink-0`}
                 >
                   <Mic className="w-5 h-5" />
-                  <span className="sr-only">{isRecording ? "Stop recording" : "Record voice message"}</span>
+                  <span className="sr-only">
+                    {isRecording ? 'Stop recording' : 'Record voice message'}
+                  </span>
                 </motion.button>
 
                 <motion.button
@@ -1741,4 +1830,3 @@ export function Friends() {
 }
 
 export default Friends
-

@@ -850,101 +850,107 @@ Keep it brief, actionable, impersonal, and readable.
           })
         };
 
-        const resultResponse = await streamResponse(geminiEndpoint, geminiOptions, (chunk) => {
-          // Optionally, you can update an overview streaming state here.
-        }, 45000);
+const resultResponse = await streamResponse(geminiEndpoint, geminiOptions, (chunk) => {
+  // Optionally, you can update an overview streaming state here.
+}, 45000);
 
-        // 5. Process and clean response
-        const rawText = extractCandidateText(resultResponse) || '';
+// 5. Process and clean response
+const rawText = extractCandidateText(resultResponse) || '';
 
-        const cleanAndValidate = (text: string) => {
-          const excludePhrases = [
-            "I see I made some minor errors",
-            "Here is the corrected response",
-            "was removed as per request",
-            "since I am forced to put something here",
-            "-> You are TaskMaster",
-            "The is:",
-            "Note:",
-            "You are TaskMaster, an advanced AI productivity assistant. Analyze the following items and generate a Smart Overview:",
-            "Follow these guidelines exactly:",
-            "- Start with a number"
-          ];
+const cleanAndValidate = (text: string) => {
+  const excludePhrases = [
+    "I see I made some minor errors",
+    "Here is the corrected response",
+    "was removed as per request",
+    "since I am forced to put something here",
+    "-> You are TaskMaster",
+    "The is:",
+    "Note:",
+    "You are TaskMaster, an advanced AI productivity assistant. Analyze the following items and generate a Smart Overview:",
+    "Follow these guidelines exactly:",
+    "- Start with a number"
+  ];
 
-          let cleanedText = text;
-          for (const phrase of excludePhrases) {
-            const index = cleanedText.indexOf(phrase);
-            if (index !== -1) {
-              cleanedText = cleanedText.substring(0, index).trim();
-            }
-          }
+  let cleanedText = text;
+  for (const phrase of excludePhrases) {
+    const index = cleanedText.indexOf(phrase);
+    if (index !== -1) {
+      cleanedText = cleanedText.substring(0, index).trim();
+    }
+  }
 
-          cleanedText = cleanedText
-            .replace(/\[\/?(INST|SYS)\]|<\/?s>|\[\/?(FONT|COLOR)\]/gi, '')
-            .replace(/(\*\*|###|boxed|final answer|step \d+:)/gi, '')
-            .replace(/\$\{.*?\}\$/g, '')
-            .replace(/\[\/?[^\]]+\]/g, '')
-            .replace(/\{.*?\}\}/g, '')
-            .replace(/📋|📅|🎯|📊/g, '')
-            .replace(/\b(TASKS?|GOALS?|PROJECTS?|PLANS?)\b:/gi, '')
-            .replace(/\n\s*\n/g, '\n');
+  cleanedText = cleanedText
+    .replace(/\[\/?(INST|SYS)\]|<\/?s>|\[\/?(FONT|COLOR)\]/gi, '')
+    .replace(/(\*\*|###|boxed|final answer|step \d+:)/gi, '')
+    .replace(/\$\{.*?\}\$/g, '')
+    .replace(/\[\/?[^\]]+\]/g, '')
+    .replace(/\{.*?\}\}/g, '')
+    .replace(/📋|📅|🎯|📊/g, '')
+    .replace(/\b(TASKS?|GOALS?|PROJECTS?|PLANS?)\b:/gi, '')
+    .replace(/\n\s*\n/g, '\n');
 
-          let lines = cleanedText
-            .split('\n')
-            .map(line => line.trim())
-            .filter(line => line.length > 0 && !/^[^a-zA-Z0-9]+$/.test(line));
+  let lines = cleanedText
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line.length > 0 && !/^[^a-zA-Z0-9]+$/.test(line));
 
-          let helloCount = 0;
-          const truncatedLines: string[] = [];
+  let helloCount = 0;
+  const truncatedLines: string[] = [];
 
-          for (const line of lines) {
-            if (!line.trim()) continue;
+  for (const line of lines) {
+    if (!line.trim()) continue;
 
-            if (line.trim().startsWith("The is:")) {
-              break;
-            }
+    if (line.trim().startsWith("The is:")) {
+      break;
+    }
 
-            if (line.trim().startsWith("<|reserved")) {
-              break;
-            }
+    if (line.trim().startsWith("<|reserved")) {
+      break;
+    }
 
-            if (line.indexOf("[/") !== -1) {
-              if (line.trim().startsWith("[/")) {
-                break;
-              } else {
-                const truncatedLine = line.substring(0, line.indexOf("[/")).trim();
-                if (truncatedLine) {
-                  truncatedLines.push(truncatedLine);
-                }
-                break;
-              }
-            }
-
-            if (line.trim().startsWith("I")) {
-              break;
-            }
-
-            if (/^\s*hello[\s,.!?]?/i.test(line)) {
-              helloCount++;
-              if (helloCount === 2) {
-                break;
-              }
-            }
-
-            truncatedLines.push(line);
-          }
-
-          return truncatedLines.join('\n');
-        };
-
-        const cleanedText = cleanAndValidate(rawText);
-        if (cleanedText === lastResponse) {
-          setOverviewLoading(false);
-          return;
+    if (line.indexOf("[/") !== -1) {
+      if (line.trim().startsWith("[/")) {
+        break;
+      } else {
+        const truncatedLine = line.substring(0, line.indexOf("[/")).trim();
+        if (truncatedLine) {
+          truncatedLines.push(truncatedLine);
         }
-        setLastResponse(cleanedText);
+        break;
+      }
+    }
 
-const cleanTextLines = cleanedText
+    if (line.trim().startsWith("I")) {
+      break;
+    }
+
+    if (/^\s*hello[\s,.!?]?/i.test(line)) {
+      helloCount++;
+      if (helloCount === 2) {
+        break;
+      }
+    }
+
+    truncatedLines.push(line);
+  }
+
+  return truncatedLines.join('\n');
+};
+
+const cleanedText = cleanAndValidate(rawText);
+
+// Remove the first sentence from the cleaned text.
+// This regex matches everything up to and including the first punctuation mark (. ! ?)
+// followed by any whitespace.
+const cleanedTextWithoutFirstSentence = cleanedText.replace(/^[^.!?]*[.!?]\s*/, '');
+
+if (cleanedTextWithoutFirstSentence === lastResponse) {
+  setOverviewLoading(false);
+  return;
+}
+setLastResponse(cleanedTextWithoutFirstSentence);
+
+const cleanTextLines = cleanedTextWithoutFirstSentence
   .split('\n')
   .filter(line => line.length > 0);
 
@@ -962,18 +968,18 @@ const formattedHtml = cleanTextLines
 
 setSmartOverview(formattedHtml);
 
-      } catch (error) {
-        console.error("Overview generation error:", error);
-        setSmartOverview(`
-          <div class="text-red-400">Error generating overview. Please try again.</div>
-        `);
-      } finally {
-        setOverviewLoading(false);
-      }
-    };
+} catch (error) {
+  console.error("Overview generation error:", error);
+  setSmartOverview(`
+    <div class="text-red-400">Error generating overview. Please try again.</div>
+  `);
+} finally {
+  setOverviewLoading(false);
+}
 
-    generateOverview();
-  }, [user, tasks, goals, projects, plans, userName, geminiApiKey]);
+generateOverview();
+}, [user, tasks, goals, projects, plans, userName, geminiApiKey]);
+
 
   // ---------------------
   // 11. CREATE & EDIT & DELETE

@@ -1,7 +1,9 @@
-import { useState, useEffect, useRef, type ChangeEvent, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect, useRef, type ChangeEvent, type FormEvent } from "react"
+import { useNavigate } from "react-router-dom"
 import {
+  User,
   MessageSquare,
+  PlusCircle,
   Paperclip,
   Send,
   Users,
@@ -9,724 +11,742 @@ import {
   XCircle,
   Edit,
   Trash2,
-  Menu,
-  X,
-} from "lucide-react";
-import { Sidebar } from "./Sidebar";
-import { getCurrentUser } from "../lib/settings-firebase";
+} from "lucide-react"
+import { Sidebar } from "./Sidebar"
+import { getCurrentUser } from "../lib/settings-firebase"
 import {
   listenToChatsRealtime,
   listenToMessagesRealtime,
   listenToFriendRequests,
   sendFriendRequest,
-  acceptFriendRequest as acceptFriendRequestFirebase,
-  rejectFriendRequest as rejectFriendRequestFirebase,
+  acceptFriendRequest,
+  rejectFriendRequest,
   createGroupChat,
   sendMessage,
   uploadChatFile,
-  renameChat as renameChatFirebase,
+  renameChat,
   deleteChat,
-} from "../lib/friends-firebase";
-
-// ------------------------------------------------------------
-// Inline shadcn UI component definitions
-// ------------------------------------------------------------
-
-// Button Component
-const Button = ({
-  children,
-  variant,
-  size,
-  onClick,
-  type,
-  className = "",
-  ...props
-}: {
-  children: React.ReactNode;
-  variant?: "ghost" | "secondary" | "outline" | "default";
-  size?: "icon" | "default";
-  onClick?: () => void;
-  type?: "button" | "submit" | "reset";
-  className?: string;
-  [x: string]: any;
-}) => {
-  let baseClass = "px-4 py-2 rounded focus:outline-none transition";
-  if (variant === "ghost") {
-    baseClass += " bg-transparent hover:bg-gray-100";
-  } else if (variant === "secondary") {
-    baseClass += " bg-gray-200 hover:bg-gray-300";
-  } else if (variant === "outline") {
-    baseClass += " border border-gray-400";
-  } else {
-    // default variant
-    baseClass += " bg-blue-500 text-white hover:bg-blue-600";
-  }
-  if (size === "icon") {
-    baseClass = "p-2 rounded-full";
-  }
-  return (
-    <button type={type || "button"} onClick={onClick} className={`${baseClass} ${className}`} {...props}>
-      {children}
-    </button>
-  );
-};
-
-// Input Component
-const Input = ({ className = "", ...props }: { className?: string; [x: string]: any }) => {
-  return <input className={`border p-2 rounded focus:outline-none ${className}`} {...props} />;
-};
-
-// Textarea Component
-const Textarea = ({ className = "", ...props }: { className?: string; [x: string]: any }) => {
-  return <textarea className={`border p-2 rounded focus:outline-none ${className}`} {...props} />;
-};
-
-// Dialog Components
-const Dialog = ({
-  open,
-  onOpenChange,
-  children,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  children: React.ReactNode;
-}) => {
-  if (!open) return null;
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
-      onClick={() => onOpenChange(false)}
-    >
-      <div onClick={(e) => e.stopPropagation()}>{children}</div>
-    </div>
-  );
-};
-
-const DialogContent = ({ children, className = "", ...props }: { children: React.ReactNode; className?: string; [x: string]: any }) => {
-  return (
-    <div className={`bg-white p-4 rounded shadow-md ${className}`} {...props}>
-      {children}
-    </div>
-  );
-};
-
-const DialogHeader = ({ children }: { children: React.ReactNode }) => {
-  return <div className="mb-4">{children}</div>;
-};
-
-const DialogTitle = ({ children }: { children: React.ReactNode }) => {
-  return <h2 className="text-xl font-semibold">{children}</h2>;
-};
-
-// ScrollArea Component
-const ScrollArea = ({ children, className = "", ...props }: { children: React.ReactNode; className?: string; [x: string]: any }) => {
-  return (
-    <div className={`overflow-y-auto ${className}`} {...props}>
-      {children}
-    </div>
-  );
-};
-
-// Card Components
-const Card = ({ children, className = "", ...props }: { children: React.ReactNode; className?: string; [x: string]: any }) => {
-  return (
-    <div className={`border rounded shadow ${className}`} {...props}>
-      {children}
-    </div>
-  );
-};
-
-const CardContent = ({ children, className = "", ...props }: { children: React.ReactNode; className?: string; [x: string]: any }) => {
-  return (
-    <div className={`p-4 ${className}`} {...props}>
-      {children}
-    </div>
-  );
-};
-
-// Avatar Components
-const Avatar = ({ children, className = "", ...props }: { children: React.ReactNode; className?: string; [x: string]: any }) => {
-  return (
-    <div className={`w-10 h-10 rounded-full overflow-hidden ${className}`} {...props}>
-      {children}
-    </div>
-  );
-};
-
-const AvatarImage = ({ src, alt = "avatar", className = "", ...props }: { src: string; alt?: string; className?: string; [x: string]: any }) => {
-  return <img src={src} alt={alt} className={`w-full h-full object-cover ${className}`} {...props} />;
-};
-
-const AvatarFallback = ({ children, className = "", ...props }: { children: React.ReactNode; className?: string; [x: string]: any }) => {
-  return (
-    <div className={`w-full h-full flex items-center justify-center bg-gray-300 ${className}`} {...props}>
-      {children}
-    </div>
-  );
-};
-
-// ------------------------------------------------------------
-// Friends Component
-// ------------------------------------------------------------
+  unfriendUser,
+  getUserProfile,
+} from "../lib/friends-firebase"
 
 interface Chat {
-  id: string;
-  isGroup: boolean;
-  members: string[];
-  name?: string;
+  id: string
+  isGroup: boolean
+  members: string[]
+  name?: string // For direct chats, this should be the other user's name; for groups, a custom name.
 }
 
 interface Message {
-  id: string;
-  text: string;
-  senderId: string;
-  senderName?: string;
-  senderPhotoURL?: string;
-  fileURL?: string;
-  timestamp?: any;
+  id: string
+  text: string
+  senderId: string
+  senderName?: string
+  senderPhotoURL?: string
+  fileURL?: string
+  timestamp?: any
 }
 
 interface FriendRequest {
-  id: string;
-  fromUserId: string;
-  fromUserName: string;
-  toUserId: string;
-  status: "pending" | "accepted" | "rejected";
+  id: string
+  fromUserId: string
+  fromUserName: string
+  toUserId: string
+  status: "pending" | "accepted" | "rejected"
 }
 
 export function Friends() {
-  const navigate = useNavigate();
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const navigate = useNavigate()
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Auth state
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<any>(null)
 
   // Sidebar collapse state (persisted)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
-    const stored = localStorage.getItem("isSidebarCollapsed");
-    return stored ? JSON.parse(stored) : false;
-  });
+    const stored = localStorage.getItem("isSidebarCollapsed")
+    return stored ? JSON.parse(stored) : false
+  })
 
   // Blackout mode state
   const [isBlackoutEnabled, setIsBlackoutEnabled] = useState(() => {
-    const stored = localStorage.getItem("isBlackoutEnabled");
-    return stored ? JSON.parse(stored) : false;
-  });
+    const stored = localStorage.getItem("isBlackoutEnabled")
+    return stored ? JSON.parse(stored) : false
+  })
 
   // Sidebar Blackout option state
   const [isSidebarBlackoutEnabled, setIsSidebarBlackoutEnabled] = useState(() => {
-    const stored = localStorage.getItem("isSidebarBlackoutEnabled");
-    return stored ? JSON.parse(stored) : false;
-  });
+    const stored = localStorage.getItem("isSidebarBlackoutEnabled")
+    return stored ? JSON.parse(stored) : false
+  })
 
   // Illuminate (light mode) state
   const [isIlluminateEnabled, setIsIlluminateEnabled] = useState(() => {
-    const stored = localStorage.getItem("isIlluminateEnabled");
-    return stored ? JSON.parse(stored) : false;
-  });
+    const stored = localStorage.getItem("isIlluminateEnabled")
+    return stored ? JSON.parse(stored) : false
+  })
 
   // Sidebar Illuminate option state
   const [isSidebarIlluminateEnabled, setIsSidebarIlluminateEnabled] = useState(() => {
-    const stored = localStorage.getItem("isSidebarIlluminateEnabled");
-    return stored ? JSON.parse(stored) : false;
-  });
+    const stored = localStorage.getItem("isSidebarIlluminateEnabled")
+    return stored ? JSON.parse(stored) : false
+  })
+
+  // Right-hand panels state
+  const [chats, setChats] = useState<Chat[]>([])
+  const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([])
+
+  // Selected chat & messages
+  const [selectedChat, setSelectedChat] = useState<Chat | null>(null)
+  const [messages, setMessages] = useState<Message[]>([])
+  const [newMessage, setNewMessage] = useState("")
+
+  // Renaming chat
+  const [isEditingChatName, setIsEditingChatName] = useState(false)
+  const [newChatName, setNewChatName] = useState("")
+
+  // Adding friend by email
+  const [friendEmail, setFriendEmail] = useState("")
+  const [error, setError] = useState<string | null>(null)
+
+  // Creating group chat
+  const [isGroupModalOpen, setIsGroupModalOpen] = useState(false)
+  const [groupName, setGroupName] = useState("")
+  const [groupEmails, setGroupEmails] = useState("") // comma-separated emails
+
+  // File uploading
+  const [fileUploading, setFileUploading] = useState(false)
+
+  // Mobile view state
+  const [isMobileView, setIsMobileView] = useState(false)
+  const [showMobileAside, setShowMobileAside] = useState(false)
 
   // Update localStorage and document.body for modes
   useEffect(() => {
-    localStorage.setItem("isBlackoutEnabled", JSON.stringify(isBlackoutEnabled));
-    document.body.classList.toggle("blackout-mode", isBlackoutEnabled);
-  }, [isBlackoutEnabled]);
+    localStorage.setItem("isBlackoutEnabled", JSON.stringify(isBlackoutEnabled))
+    document.body.classList.toggle("blackout-mode", isBlackoutEnabled)
+  }, [isBlackoutEnabled])
 
   useEffect(() => {
-    localStorage.setItem("isSidebarBlackoutEnabled", JSON.stringify(isSidebarBlackoutEnabled));
-  }, [isSidebarBlackoutEnabled]);
+    localStorage.setItem("isSidebarBlackoutEnabled", JSON.stringify(isSidebarBlackoutEnabled))
+  }, [isSidebarBlackoutEnabled])
 
   useEffect(() => {
-    localStorage.setItem("isIlluminateEnabled", JSON.stringify(isIlluminateEnabled));
+    localStorage.setItem("isIlluminateEnabled", JSON.stringify(isIlluminateEnabled))
     if (isIlluminateEnabled) {
-      document.body.classList.add("illuminate-mode");
+      document.body.classList.add("illuminate-mode")
     } else {
-      document.body.classList.remove("illuminate-mode");
+      document.body.classList.remove("illuminate-mode")
     }
-  }, [isIlluminateEnabled]);
+  }, [isIlluminateEnabled])
 
   useEffect(() => {
-    localStorage.setItem("isSidebarIlluminateEnabled", JSON.stringify(isSidebarIlluminateEnabled));
-  }, [isSidebarIlluminateEnabled]);
+    localStorage.setItem("isSidebarIlluminateEnabled", JSON.stringify(isSidebarIlluminateEnabled))
+  }, [isSidebarIlluminateEnabled])
 
-  // Right-hand panels state
-  const [chats, setChats] = useState<Chat[]>([]);
-  const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
-
-  // Selected chat & messages
-  const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [newMessage, setNewMessage] = useState("");
-
-  // Renaming chat
-  const [isEditingChatName, setIsEditingChatName] = useState(false);
-  const [newChatName, setNewChatName] = useState("");
-
-  // Adding friend by email
-  const [friendEmail, setFriendEmail] = useState("");
-  const [error, setError] = useState<string | null>(null);
-
-  // Creating group chat
-  const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
-  const [groupName, setGroupName] = useState("");
-  const [groupEmails, setGroupEmails] = useState(""); // comma-separated emails
-
-  // File uploading
-  const [fileUploading, setFileUploading] = useState(false);
-
-  // Add mobile menu state
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
-
-  // Check for mobile screen size
+  // Check for mobile view
   useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-      if (window.innerWidth >= 768) {
-        setIsMobileMenuOpen(false);
-      }
-    };
+    const checkMobileView = () => {
+      setIsMobileView(window.innerWidth < 768)
+    }
 
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
-  }, []);
+    checkMobileView()
+    window.addEventListener("resize", checkMobileView)
 
-  // Dynamic theme classes
+    return () => {
+      window.removeEventListener("resize", checkMobileView)
+    }
+  }, [])
+
+  // Scroll to bottom when new messages arrive
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [messages])
+
+  // ---------------------------
+  // Dynamic CSS Classes for Modes
+  // ---------------------------
   const containerClass = isIlluminateEnabled
-    ? "bg-background text-foreground"
+    ? "bg-white text-gray-900"
     : isBlackoutEnabled
-    ? "bg-black text-white"
-    : "bg-gray-900 text-white";
+      ? "bg-gray-950 text-white"
+      : "bg-gray-900 text-white"
 
-  const chatAreaClass = isIlluminateEnabled ? "bg-muted" : isBlackoutEnabled ? "bg-gray-950" : "bg-gray-800";
+  const headingClass = isIlluminateEnabled ? "text-gray-900" : "text-white"
+  const subheadingClass = isIlluminateEnabled ? "text-gray-600" : "text-gray-400"
 
-  const messageClass = (isOwn: boolean) => {
-    if (isIlluminateEnabled) {
-      return isOwn ? "bg-primary text-primary-foreground" : "bg-muted-foreground/10 text-foreground";
+  // For the main chat header background
+  const chatHeaderClass = isIlluminateEnabled
+    ? "bg-gray-100 border-b border-gray-300"
+    : "bg-gray-800 border-b border-gray-700"
+
+  // For the chat messages area
+  const messageAreaClass = isIlluminateEnabled ? "bg-gray-100" : "bg-gray-700"
+
+  // For message bubbles: your own and others
+  const ownMessageClass = isIlluminateEnabled ? "bg-blue-500 text-white" : "bg-blue-600 text-white"
+  const otherMessageClass = isIlluminateEnabled ? "bg-gray-300 text-gray-900" : "bg-gray-600 text-white"
+
+  // Chat input container
+  const chatInputContainerClass = isIlluminateEnabled ? "bg-gray-100" : "bg-gray-800"
+
+  // Input fields used inside chat input area
+  const inputBg = isIlluminateEnabled
+    ? "bg-white border border-gray-300 text-gray-900"
+    : "bg-gray-700 border border-gray-600 text-white"
+
+  // Navigation buttons (e.g. for friend requests, etc.)
+  const navButtonClass = isIlluminateEnabled
+    ? "text-gray-700 hover:text-gray-900 hover:bg-gray-200"
+    : "text-gray-400 hover:text-white hover:bg-gray-800"
+
+  // Aside (right panel) background
+  const asideClass = isIlluminateEnabled
+    ? "bg-gray-100 border-l border-gray-300"
+    : "bg-gray-800 border-l border-gray-700"
+
+  // Group Modal styling
+  const groupModalClass = isIlluminateEnabled
+    ? "bg-white shadow-xl border border-gray-200 text-gray-900"
+    : "bg-gray-800 shadow-xl border border-gray-700 text-gray-300"
+
+  // Friend request buttons
+  const acceptButtonClass = isIlluminateEnabled
+    ? "text-green-600 hover:text-green-500"
+    : "text-green-400 hover:text-green-300"
+  const rejectButtonClass = isIlluminateEnabled ? "text-red-600 hover:text-red-500" : "text-red-400 hover:text-red-300"
+
+  // Chat list items (in aside)
+  const selectedChatClass = isIlluminateEnabled ? "bg-blue-500 text-white" : "bg-blue-600 text-white"
+  const chatListItemClass = isIlluminateEnabled
+    ? "bg-gray-200 text-gray-900 hover:bg-gray-300"
+    : "bg-gray-700 text-white hover:bg-gray-600"
+
+  // Button styling
+  const primaryButtonClass = isIlluminateEnabled
+    ? "bg-blue-500 hover:bg-blue-600 text-white"
+    : "bg-blue-600 hover:bg-blue-700 text-white"
+
+  const secondaryButtonClass = isIlluminateEnabled
+    ? "bg-gray-300 hover:bg-gray-400 text-gray-800"
+    : "bg-gray-600 hover:bg-gray-500 text-white"
+
+  // ---------------------------
+  // Auth & Real-time Listeners
+  // ---------------------------
+  useEffect(() => {
+    const currentUser = getCurrentUser()
+    if (!currentUser) {
+      navigate("/login")
+      return
     }
-    return isOwn ? "bg-blue-600 text-white" : "bg-gray-700 text-white";
-  };
+    setUser(currentUser)
 
-  // Helper Functions
+    const unsubscribeChats = listenToChatsRealtime(currentUser.uid, (newChats) => {
+      setChats(newChats)
+    })
+    const unsubscribeRequests = listenToFriendRequests(currentUser.uid, (requests) => {
+      setFriendRequests(requests)
+    })
+
+    return () => {
+      unsubscribeChats()
+      unsubscribeRequests()
+    }
+  }, [navigate])
+
+  // Listen to messages in selected chat
+  useEffect(() => {
+    if (!selectedChat) {
+      setMessages([])
+      return
+    }
+    const unsubscribeMessages = listenToMessagesRealtime(selectedChat.id, (msgs) => {
+      setMessages(msgs)
+    })
+    return () => unsubscribeMessages()
+  }, [selectedChat])
+
+  // Helper to compute display name for a chat:
+  const getChatDisplayName = (chat: Chat): string => {
+    if (chat.isGroup) {
+      return chat.name || "Group Chat"
+    }
+    return chat.name || "Direct Chat"
+  }
+
+  // Handle sending a text message
+  const handleSendMessage = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!selectedChat || !newMessage.trim()) return
+
+    try {
+      let senderName: string | undefined
+      let senderPhotoURL: string | undefined
+      if (selectedChat.isGroup) {
+        const profile = await getUserProfile(user.uid)
+        senderName = profile?.name || profile?.displayName
+        senderPhotoURL = profile?.photoURL
+      }
+      await sendMessage(selectedChat.id, newMessage.trim(), user.uid, undefined, senderName, senderPhotoURL)
+      setNewMessage("")
+    } catch (err) {
+      console.error("Error sending message:", err)
+    }
+  }
+
+  // Handle file upload
+  const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !selectedChat) return
+
+    setFileUploading(true)
+    try {
+      const fileURL = await uploadChatFile(selectedChat.id, file)
+      let senderName: string | undefined
+      let senderPhotoURL: string | undefined
+      if (selectedChat.isGroup) {
+        const profile = await getUserProfile(user.uid)
+        senderName = profile?.name || profile?.displayName
+        senderPhotoURL = profile?.photoURL
+      }
+      await sendMessage(selectedChat.id, "", user.uid, fileURL, senderName, senderPhotoURL)
+    } catch (err) {
+      console.error("Error uploading file:", err)
+    } finally {
+      setFileUploading(false)
+    }
+  }
+
+  // Send friend request
+  const handleSendFriendRequest = async () => {
+    setError(null)
+    if (!friendEmail.trim()) return
+
+    try {
+      await sendFriendRequest(user.uid, friendEmail.trim())
+      setFriendEmail("")
+    } catch (err: any) {
+      console.error("Error sending friend request:", err)
+      setError(err.message || "Failed to send friend request")
+    }
+  }
+
   const handleAcceptRequest = async (requestId: string) => {
     try {
-      await acceptFriendRequestFirebase(requestId);
-    } catch (error) {
-      console.error("Error accepting friend request:", error);
+      await acceptFriendRequest(requestId)
+    } catch (err) {
+      console.error("Error accepting request:", err)
     }
-  };
+  }
 
   const handleRejectRequest = async (requestId: string) => {
     try {
-      await rejectFriendRequestFirebase(requestId);
-    } catch (error) {
-      console.error("Error rejecting friend request:", error);
+      await rejectFriendRequest(requestId)
+    } catch (err) {
+      console.error("Error rejecting request:", err)
     }
-  };
+  }
 
-  const handleSendFriendRequest = async () => {
-    setError(null);
-    if (!friendEmail) {
-      setError("Please enter an email address.");
-      return;
-    }
-
-    try {
-      await sendFriendRequest(user.uid, friendEmail);
-      setFriendEmail(""); // Clear the input after sending
-    } catch (err: any) {
-      setError(err.message || "Failed to send friend request.");
-    }
-  };
-
-  const getChatDisplayName = (chat: Chat): string => {
-    if (chat.isGroup && chat.name) {
-      return chat.name;
-    } else {
-      const otherUserId = chat.members.find((memberId) => memberId !== user.uid);
-      // Find the other user's name from the chats array or fetch it
-      const otherUser = chats.find((c) => c.id === chat.id)?.name;
-      return otherUser || "Unknown User"; // Fallback to "Unknown User" if name is not available
-    }
-  };
-
-  const handleRenameChat = async () => {
-    if (!selectedChat) return;
-
-    try {
-      await renameChatFirebase(selectedChat.id, newChatName);
-      setSelectedChat({ ...selectedChat, name: newChatName });
-      setIsEditingChatName(false);
-    } catch (error) {
-      console.error("Error renaming chat:", error);
-    }
-  };
-
-  const handleDeleteChat = async () => {
-    if (!selectedChat) return;
-
-    try {
-      await deleteChat(selectedChat.id);
-      setSelectedChat(null);
-      setMessages([]);
-    } catch (error) {
-      console.error("Error deleting chat:", error);
-    }
-  };
-
-  const handleSendMessage = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!newMessage.trim()) return;
-    if (!selectedChat) return;
-
-    try {
-      await sendMessage(selectedChat.id, newMessage);
-      setNewMessage("");
-    } catch (error) {
-      console.error("Error sending message:", error);
-    }
-  };
-
-  const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setFileUploading(true);
-    try {
-      if (!selectedChat) return;
-      await uploadChatFile(selectedChat.id, file);
-    } catch (error) {
-      console.error("Error uploading file:", error);
-    } finally {
-      setFileUploading(false);
-    }
-  };
-
+  // Create group chat
   const handleCreateGroupChat = async () => {
-    if (!groupName.trim() || !groupEmails.trim()) {
-      alert("Please enter a group name and member emails.");
-      return;
-    }
-
-    const emailsArray = groupEmails.split(",").map((email) => email.trim());
+    if (!groupName.trim() || !groupEmails.trim()) return
 
     try {
-      await createGroupChat(groupName, emailsArray);
-      setIsGroupModalOpen(false);
-      setGroupName("");
-      setGroupEmails("");
-    } catch (error) {
-      console.error("Error creating group chat:", error);
+      const emails = groupEmails
+        .split(",")
+        .map((email) => email.trim())
+        .filter((e) => e)
+      await createGroupChat(groupName.trim(), emails, user.uid)
+      setGroupName("")
+      setGroupEmails("")
+      setIsGroupModalOpen(false)
+    } catch (err) {
+      console.error("Error creating group chat:", err)
     }
-  };
+  }
 
-  useEffect(() => {
-    const fetchUser = async () => {
-      const currentUser = await getCurrentUser();
-      if (currentUser) {
-        setUser(currentUser);
+  // Rename the current chat
+  const handleRenameChat = async () => {
+    if (!selectedChat || !newChatName.trim()) return
+    try {
+      await renameChat(selectedChat.id, newChatName.trim())
+      setSelectedChat({ ...selectedChat, name: newChatName.trim() })
+      setIsEditingChatName(false)
+    } catch (err) {
+      console.error("Error renaming chat:", err)
+    }
+  }
+
+  // Delete or leave chat
+  const handleDeleteChat = async () => {
+    if (!selectedChat) return
+    try {
+      if (selectedChat.isGroup) {
+        await deleteChat(selectedChat.id, user.uid)
       } else {
-        navigate("/login");
+        await unfriendUser(selectedChat.id, user.uid)
       }
-    };
+      setSelectedChat(null)
+    } catch (err) {
+      console.error("Error deleting chat:", err)
+    }
+  }
 
-    fetchUser();
-  }, [navigate]);
-
-  useEffect(() => {
-    if (!user) return;
-
-    const unsubscribeChats = listenToChatsRealtime(user.uid, (updatedChats) => {
-      setChats(updatedChats);
-    });
-
-    const unsubscribeFriendRequests = listenToFriendRequests(user.uid, (requests) => {
-      setFriendRequests(requests);
-    });
-
-    return () => {
-      unsubscribeChats();
-      unsubscribeFriendRequests();
-    };
-  }, [user]);
-
-  useEffect(() => {
-    if (!selectedChat) return;
-
-    const unsubscribeMessages = listenToMessagesRealtime(selectedChat.id, (updatedMessages) => {
-      setMessages(updatedMessages);
-    });
-
-    return () => {
-      unsubscribeMessages();
-    };
-  }, [selectedChat]);
+  // Toggle mobile aside
+  const toggleMobileAside = () => {
+    setShowMobileAside(!showMobileAside)
+  }
 
   return (
-    <div className={`flex h-screen ${containerClass}`}>
-      {/* Sidebar - Hide on mobile */}
-      <div className="hidden md:block">
-        <Sidebar
-          isCollapsed={isSidebarCollapsed}
-          isBlackoutEnabled={isBlackoutEnabled && isSidebarBlackoutEnabled}
-          isIlluminateEnabled={isIlluminateEnabled && isSidebarIlluminateEnabled}
-          onToggle={() => setIsSidebarCollapsed((prev) => !prev)}
-          userName={user?.displayName || "User"}
-        />
-      </div>
+    <div className={`flex h-screen ${containerClass} overflow-hidden`}>
+      {/* Left: Navigation Sidebar */}
+      <Sidebar
+        isCollapsed={isSidebarCollapsed || isMobileView}
+        isBlackoutEnabled={isBlackoutEnabled && isSidebarBlackoutEnabled}
+        isIlluminateEnabled={isIlluminateEnabled && isSidebarIlluminateEnabled}
+        onToggle={() => {
+          if (!isMobileView) {
+            setIsSidebarCollapsed((prev) => {
+              localStorage.setItem("isSidebarCollapsed", JSON.stringify(!prev))
+              return !prev
+            })
+          }
+        }}
+        userName={user?.displayName || "User"}
+      />
 
-      {/* Mobile Header */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-50 h-16 px-4 flex items-center justify-between border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(true)}>
-          <Menu className="h-5 w-5" />
-        </Button>
-        <h1 className="font-semibold">Friends</h1>
-        <Button variant="ghost" size="icon" onClick={() => setIsGroupModalOpen(true)}>
-          <Users className="h-5 w-5" />
-        </Button>
-      </div>
-
-      {/* Mobile Menu */}
-      {isMobileMenuOpen && (
-        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm md:hidden">
-          <div className="fixed inset-y-0 left-0 w-full max-w-xs bg-background p-6 shadow-lg">
-            <div className="flex items-center justify-between mb-8">
-              <h2 className="font-semibold text-lg">Menu</h2>
-              <Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(false)}>
-                <X className="h-5 w-5" />
-              </Button>
-            </div>
-
-            <ScrollArea className="h-[calc(100vh-8rem)]">
-              {/* Friend Requests Section */}
-              <div className="space-y-4 mb-8">
-                <h3 className="font-medium text-sm">Friend Requests</h3>
-                {friendRequests.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No friend requests</p>
-                ) : (
-                  friendRequests.map((req) => (
-                    <Card key={req.id}>
-                      <CardContent className="p-4 flex items-center justify-between">
-                        <span className="text-sm">{req.fromUserName}</span>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleAcceptRequest(req.id)}
-                            className="text-green-500 hover:text-green-600"
-                          >
-                            <CheckCircle className="h-5 w-5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleRejectRequest(req.id)}
-                            className="text-red-500 hover:text-red-600"
-                          >
-                            <XCircle className="h-5 w-5" />
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))
-                )}
-              </div>
-
-              {/* Add Friend Section */}
-              <div className="space-y-4 mb-8">
-                <h3 className="font-medium text-sm">Add Friend</h3>
-                <div className="flex gap-2">
-                  <Input
-                    type="email"
-                    value={friendEmail}
-                    onChange={(e) => setFriendEmail(e.target.value)}
-                    placeholder="Friend's email"
-                    className="flex-1"
-                  />
-                  <Button onClick={handleSendFriendRequest}>Add</Button>
-                </div>
-                {error && <p className="text-sm text-destructive">{error}</p>}
-              </div>
-
-              {/* Chats Section */}
-              <div className="space-y-4">
-                <h3 className="font-medium text-sm">Your Chats</h3>
-                <div className="space-y-2">
-                  {chats.map((chat) => (
-                    <Button
-                      key={chat.id}
-                      variant={selectedChat?.id === chat.id ? "default" : "secondary"}
-                      className="w-full justify-start"
-                      onClick={() => {
-                        setSelectedChat(chat);
-                        setIsMobileMenuOpen(false);
-                      }}
-                    >
-                      <MessageSquare className="mr-2 h-4 w-4" />
-                      {getChatDisplayName(chat)}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            </ScrollArea>
-          </div>
-        </div>
-      )}
-
-      {/* Main Chat Area */}
+      {/* Center: Chat Area */}
       <main
-        className={`flex-1 flex flex-col ${isSidebarCollapsed ? "md:ml-20" : "md:ml-64"} ${isMobile ? "mt-16" : ""}`}
+        className={`flex-1 overflow-hidden transition-all duration-300 ${
+          isSidebarCollapsed || isMobileView ? "ml-16" : "ml-64"
+        } flex flex-col relative`}
       >
+        {/* Header */}
+        <div className={`${chatHeaderClass} px-4 sm:px-6 py-4 flex items-center justify-between`}>
+          <div>
+            <h1 className={`text-xl sm:text-3xl font-bold ${headingClass} flex items-center gap-2`}>
+              <User className="w-6 h-6 sm:w-8 sm:h-8 text-blue-400" />
+              Friends
+            </h1>
+            <p className={`mt-1 text-xs sm:text-sm ${subheadingClass}`}>
+              Manage friend requests and chat with your friends.
+            </p>
+          </div>
+
+          {/* Mobile toggle for aside */}
+          {isMobileView && (
+            <button
+              onClick={toggleMobileAside}
+              className={`${primaryButtonClass} p-2 rounded-lg`}
+              aria-label="Toggle friends panel"
+            >
+              <Users className="w-5 h-5" />
+            </button>
+          )}
+        </div>
+
+        {/* Chat Display */}
         {selectedChat ? (
           <>
-            {/* Chat Header */}
-            <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 p-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Avatar>
-                  <AvatarFallback>{getChatDisplayName(selectedChat).charAt(0)}</AvatarFallback>
-                </Avatar>
-                <div>
-                  {isEditingChatName ? (
-                    <Input
-                      value={newChatName}
-                      onChange={(e) => setNewChatName(e.target.value)}
-                      onBlur={handleRenameChat}
-                      onKeyDown={(e) => e.key === "Enter" && handleRenameChat()}
-                      className="max-w-[200px]"
-                      autoFocus
-                    />
-                  ) : (
-                    <h2 className="font-semibold">{getChatDisplayName(selectedChat)}</h2>
-                  )}
-                </div>
+            <div className={`${chatHeaderClass} p-3 sm:p-4 flex items-center justify-between`}>
+              <div className="flex-1 min-w-0">
+                {isEditingChatName ? (
+                  <input
+                    type="text"
+                    value={newChatName}
+                    onChange={(e) => setNewChatName(e.target.value)}
+                    onBlur={handleRenameChat}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleRenameChat()
+                    }}
+                    className={`${inputBg} rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 w-full max-w-xs`}
+                    autoFocus
+                  />
+                ) : (
+                  <h2 className={`text-lg sm:text-xl font-semibold ${headingClass} truncate`}>
+                    {getChatDisplayName(selectedChat)}
+                  </h2>
+                )}
               </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="ghost"
-                  size="icon"
+              <div className="flex gap-2 ml-2 flex-shrink-0">
+                <button
                   onClick={() => {
-                    setIsEditingChatName(true);
-                    setNewChatName(selectedChat.name || "");
+                    setIsEditingChatName(true)
+                    setNewChatName(selectedChat.name || "")
                   }}
+                  className="text-blue-400 hover:text-blue-300 p-1.5 rounded-full hover:bg-gray-700/20"
+                  title="Rename Chat"
                 >
-                  <Edit className="h-4 w-4" />
-                </Button>
-                <Button variant="ghost" size="icon" onClick={handleDeleteChat} className="text-destructive">
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                  <Edit className="w-4 h-4 sm:w-5 sm:h-5" />
+                </button>
+                <button
+                  onClick={handleDeleteChat}
+                  className="text-red-400 hover:text-red-300 p-1.5 rounded-full hover:bg-gray-700/20"
+                  title={selectedChat.isGroup ? "Leave Group Chat" : "Unfriend"}
+                >
+                  <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
+                </button>
               </div>
             </div>
 
-            {/* Messages Area */}
-            <ScrollArea className="flex-1 p-4">
-              <div className="space-y-4">
-                {messages.map((msg) => (
-                  <div key={msg.id} className={`flex ${msg.senderId === user.uid ? "justify-end" : "justify-start"}`}>
+            {/* Messages */}
+            <div className={`flex-1 p-3 sm:p-4 overflow-y-auto ${messageAreaClass} flex flex-col`}>
+              {messages.length === 0 ? (
+                <p className={`${subheadingClass} text-center my-auto`}>No messages yet. Start the conversation!</p>
+              ) : (
+                <>
+                  {messages.map((msg) => (
                     <div
-                      className={`rounded-lg p-3 max-w-[75%] break-words ${messageClass(msg.senderId === user.uid)}`}
+                      key={msg.id}
+                      className={`mb-3 p-2 sm:p-3 rounded-lg max-w-[75%] break-words ${
+                        msg.senderId === user.uid ? `${ownMessageClass} self-end` : `${otherMessageClass} self-start`
+                      }`}
                     >
                       {selectedChat.isGroup && msg.senderId !== user.uid && (
-                        <div className="flex items-center gap-2 mb-1">
-                          <Avatar className="h-6 w-6">
-                            <AvatarImage src={msg.senderPhotoURL || ""} />
-                            <AvatarFallback>{msg.senderName?.[0]}</AvatarFallback>
-                          </Avatar>
-                          <span className="text-xs font-medium">{msg.senderName}</span>
+                        <div className="flex items-center mb-1">
+                          {msg.senderPhotoURL && (
+                            <img
+                              src={msg.senderPhotoURL || "/placeholder.svg"}
+                              alt="avatar"
+                              className="w-5 h-5 sm:w-6 sm:h-6 rounded-full mr-2"
+                            />
+                          )}
+                          {msg.senderName && <span className="text-xs sm:text-sm font-medium">{msg.senderName}</span>}
                         </div>
                       )}
-                      {msg.text && <p className="text-sm">{msg.text}</p>}
+                      {msg.text && <p className="text-sm sm:text-base">{msg.text}</p>}
                       {msg.fileURL && (
                         <a
                           href={msg.fileURL}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-sm text-blue-400 hover:text-blue-300 underline break-all"
+                          className="text-xs sm:text-sm underline break-all hover:opacity-80"
                         >
                           View File
                         </a>
                       )}
                     </div>
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
+                  ))}
+                  <div ref={messagesEndRef} />
+                </>
+              )}
+            </div>
 
             {/* Message Input */}
-            <div className="border-t p-4 bg-background">
-              <form onSubmit={handleSendMessage} className="flex gap-2">
-                <Input
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  placeholder="Type your message"
-                  className="flex-1"
-                />
-                <Button type="submit" size="icon">
-                  <Send className="h-4 w-4" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="icon"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={fileUploading}
-                >
-                  <Paperclip className="h-4 w-4" />
-                </Button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="*/*"
-                  className="hidden"
-                  onChange={handleFileChange}
-                  disabled={fileUploading}
-                />
-              </form>
-            </div>
+            <form
+              onSubmit={handleSendMessage}
+              className={`${chatInputContainerClass} p-3 sm:p-4 flex items-center gap-2`}
+            >
+              <input
+                type="text"
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                placeholder="Type your message"
+                className={`flex-1 ${inputBg} rounded-lg px-3 py-2 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-blue-500`}
+              />
+              <button
+                type="submit"
+                className={`${primaryButtonClass} p-2 sm:px-4 sm:py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 flex-shrink-0`}
+              >
+                <Send className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span className="sr-only">Send</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className={`${secondaryButtonClass} p-2 sm:px-4 sm:py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50 flex-shrink-0`}
+                disabled={fileUploading}
+              >
+                <Paperclip className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span className="sr-only">Attach file</span>
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="*/*"
+                className="hidden"
+                onChange={handleFileChange}
+                disabled={fileUploading}
+              />
+            </form>
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center">
-            <p className="text-muted-foreground">Select a chat to start messaging</p>
+          <div className="flex-1 flex items-center justify-center bg-gray-700">
+            <p className={`${subheadingClass} text-center p-4`}>
+              {isMobileView ? "Tap the friends button to select a chat" : "Select a chat to start messaging"}
+            </p>
           </div>
         )}
       </main>
 
-      {/* Group Chat Creation Dialog */}
-      <Dialog open={isGroupModalOpen} onOpenChange={setIsGroupModalOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Create Group Chat</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 pt-4">
+      {/* Right: Friend Requests, Add Friend, Group Chat, and Chat List */}
+      <aside
+        className={`${asideClass} w-72 flex-shrink-0 flex flex-col transition-all duration-300 ${
+          isMobileView ? (showMobileAside ? "fixed inset-y-0 right-0 z-50" : "hidden") : "relative"
+        }`}
+      >
+        {/* Mobile close button */}
+        {isMobileView && showMobileAside && (
+          <button
+            onClick={toggleMobileAside}
+            className="absolute top-4 right-4 text-gray-400 hover:text-gray-300 p-1 rounded-full bg-gray-700/50"
+          >
+            <XCircle className="w-5 h-5" />
+          </button>
+        )}
+
+        {/* Friend Requests */}
+        <div className="p-4 border-b border-gray-700">
+          <h2 className={`text-lg sm:text-xl font-semibold ${headingClass} mb-3 flex items-center gap-2`}>
+            <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5" />
+            Friend Requests
+          </h2>
+          {friendRequests.length === 0 && <p className="text-gray-400 text-xs sm:text-sm">No friend requests.</p>}
+          <div className="space-y-2">
+            {friendRequests.map((req) =>
+              req.status === "pending" ? (
+                <div key={req.id} className="flex items-center justify-between bg-gray-700 px-3 py-2 rounded-lg">
+                  <div className="text-white text-xs sm:text-sm truncate mr-2">
+                    {req.fromUserName} wants to be your friend
+                  </div>
+                  <div className="flex gap-1 flex-shrink-0">
+                    <button
+                      onClick={() => handleAcceptRequest(req.id)}
+                      className={`${acceptButtonClass} p-1 rounded-full hover:bg-gray-600/30`}
+                      title="Accept"
+                    >
+                      <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5" />
+                    </button>
+                    <button
+                      onClick={() => handleRejectRequest(req.id)}
+                      className={`${rejectButtonClass} p-1 rounded-full hover:bg-gray-600/30`}
+                      title="Reject"
+                    >
+                      <XCircle className="w-4 h-4 sm:w-5 sm:h-5" />
+                    </button>
+                  </div>
+                </div>
+              ) : null,
+            )}
+          </div>
+        </div>
+
+        {/* Add Friend */}
+        <div className="p-4 border-b border-gray-700">
+          <h2 className={`text-lg sm:text-xl font-semibold ${headingClass} mb-3 flex items-center gap-2`}>
+            <PlusCircle className="w-4 h-4 sm:w-5 sm:h-5" />
+            Add Friend
+          </h2>
+          <div className="flex gap-2">
+            <input
+              type="email"
+              value={friendEmail}
+              onChange={(e) => setFriendEmail(e.target.value)}
+              placeholder="Friend's email"
+              className={`flex-1 ${inputBg} rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs sm:text-sm`}
+            />
+            <button
+              onClick={handleSendFriendRequest}
+              className={`${primaryButtonClass} px-2 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs sm:text-sm flex-shrink-0`}
+            >
+              Send
+            </button>
+          </div>
+          {error && <p className="text-red-400 text-xs sm:text-sm mt-2">{error}</p>}
+        </div>
+
+        {/* Group Chat Creation */}
+        <div className="p-4 border-b border-gray-700">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className={`text-lg sm:text-xl font-semibold ${headingClass} flex items-center gap-2`}>
+              <Users className="w-4 h-4 sm:w-5 sm:h-5" />
+              Group Chats
+            </h2>
+            <button
+              onClick={() => setIsGroupModalOpen(true)}
+              className={`text-xs sm:text-sm ${primaryButtonClass} px-2 py-1 rounded-lg`}
+            >
+              Create
+            </button>
+          </div>
+        </div>
+
+        {/* Chat List */}
+        <div className="p-4 flex-1 overflow-y-auto">
+          <h2 className={`text-lg sm:text-xl font-semibold ${headingClass} mb-3`}>Your Chats</h2>
+          {chats.length === 0 ? (
+            <p className="text-gray-400 text-xs sm:text-sm">No chats yet.</p>
+          ) : (
             <div className="space-y-2">
-              <label className="text-sm font-medium">Group Name</label>
-              <Input value={groupName} onChange={(e) => setGroupName(e.target.value)} placeholder="Enter group name" />
+              {chats.map((chat) => (
+                <button
+                  key={chat.id}
+                  onClick={() => {
+                    setSelectedChat(chat)
+                    if (isMobileView) {
+                      setShowMobileAside(false)
+                    }
+                  }}
+                  className={`w-full text-left px-3 py-2 rounded-lg ${
+                    selectedChat?.id === chat.id ? selectedChatClass : chatListItemClass
+                  } text-xs sm:text-sm transition-colors duration-200`}
+                >
+                  {getChatDisplayName(chat)}
+                </button>
+              ))}
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Member Emails (comma-separated)</label>
-              <Textarea
+          )}
+        </div>
+      </aside>
+
+      {/* Modal for Group Chat Creation */}
+      {isGroupModalOpen && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/50 p-4">
+          <div className={`${groupModalClass} p-4 sm:p-6 rounded-lg w-full max-w-md`}>
+            <h2 className="text-lg sm:text-xl font-semibold mb-4 flex items-center gap-2">
+              <Users className="w-4 h-4 sm:w-5 sm:h-5" />
+              Create Group Chat
+            </h2>
+            <div className="mb-4">
+              <label className="block text-xs sm:text-sm mb-1">Group Name</label>
+              <input
+                type="text"
+                value={groupName}
+                onChange={(e) => setGroupName(e.target.value)}
+                className={`w-full ${inputBg} rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs sm:text-sm`}
+              />
+            </div>
+            <div className="mb-4">
+              <label className="block text-xs sm:text-sm mb-1">Member Emails (comma-separated)</label>
+              <textarea
                 value={groupEmails}
                 onChange={(e) => setGroupEmails(e.target.value)}
-                placeholder="Enter email addresses"
-                rows={3}
+                className={`w-full ${inputBg} rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs sm:text-sm`}
+                rows={2}
               />
             </div>
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setIsGroupModalOpen(false)}>
+              <button
+                onClick={() => setIsGroupModalOpen(false)}
+                className={`px-3 py-1.5 text-xs sm:text-sm font-medium ${secondaryButtonClass} rounded-lg`}
+              >
                 Cancel
-              </Button>
-              <Button onClick={handleCreateGroupChat}>Create Group</Button>
+              </button>
+              <button
+                onClick={handleCreateGroupChat}
+                className={`px-3 py-1.5 text-xs sm:text-sm font-medium ${primaryButtonClass} rounded-lg`}
+              >
+                Create
+              </button>
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
     </div>
-  );
+  )
 }
 
-export default Friends;
+export default Friends
+

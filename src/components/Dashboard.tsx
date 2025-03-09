@@ -1287,7 +1287,7 @@ const inputBg = isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700';
 
 
 return (
-  <div className={`${containerClass} min-h-screen w-full overflow-hidden`}>
+  <div className={`${containerClass} min-h-screen w-full overflow-x-hidden`}>
     {/* Pass collapse state & toggle handler to Sidebar */}
     <Sidebar
       userName={userName}
@@ -1299,17 +1299,17 @@ return (
 
     <main
       className={`transition-all duration-300 ease-in-out min-h-screen
-        ${isSidebarCollapsed ? 'ml-20' : 'ml-64'}
-        p-4 lg:p-8 overflow-auto`}
+    ${isSidebarCollapsed ? 'ml-20 sm:ml-20' : 'ml-0 sm:ml-64'}
+    p-3 sm:p-4 lg:p-8 overflow-x-hidden`}
     >
-      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6 mb-6">
-        <header className="dashboard-header transform transition-all duration-500 ease-out translate-y-0 opacity-100 pt-16 lg:pt-0">
+      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 sm:gap-6 mb-4 sm:mb-6">
+        <header className="dashboard-header transform transition-all duration-500 ease-out translate-y-0 opacity-100 pt-4 sm:pt-16 lg:pt-0 w-full lg:w-auto">
           <h1
-            className={`text-2xl lg:text-4xl font-bold mb-2 ${headingClass} break-words`}
+            className={`text-xl sm:text-2xl lg:text-4xl font-bold mb-2 ${headingClass} break-words`}
           >
             {React.cloneElement(greeting.icon, {
               className:
-                'w-5 h-5 lg:w-6 lg:h-6 inline-block align-middle mr-2 -translate-y-0.5 ' +
+                'w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 inline-block align-middle mr-2 -translate-y-0.5 ' +
                 (greeting.icon.props.className ?? ''),
             })}
             {greeting.greeting},{' '}
@@ -1317,7 +1317,7 @@ return (
               {userName ? userName.split(' ')[0] : 'Loading...'}
             </span>
           </h1>
-          <p className={`italic text-base lg:text-lg ${subheadingClass}`}>
+          <p className={`italic text-sm sm:text-base lg:text-lg ${subheadingClass}`}>
             "{quote.text}" -{' '}
             {/* Darken the author color in illuminate mode */}
             <span
@@ -1332,7 +1332,7 @@ return (
 
         {/* Calendar Card */}
         <div
-          className={`${cardClass} rounded-xl p-2 min-w-[100px] max-w-[550px] w-full h-[80px] transform hover:scale-[1.02] transition-all duration-300 flex-shrink-0 lg:flex-shrink`}
+          className={`${cardClass} rounded-xl p-2 min-w-[100px] w-full max-w-full sm:max-w-[550px] h-[80px] transform hover:scale-[1.02] transition-all duration-300 flex-shrink-0 lg:flex-shrink overflow-hidden`}
         >
           <div className="grid grid-cols-9 gap-1 h-full">
             <button
@@ -1341,7 +1341,7 @@ return (
                 prevWeek.setDate(prevWeek.getDate() - 7);
                 setCurrentWeek(getWeekDates(prevWeek));
               }}
-              className="w-8 h-full flex items-center justify-center text-gray-400 hover:text-white transition-colors"
+              className="w-6 sm:w-8 h-full flex items-center justify-center text-gray-400 hover:text-white transition-colors"
             >
               ←
             </button>
@@ -1353,7 +1353,7 @@ return (
                     (day) => (
                       <div
                         key={day}
-                        className={`text-center text-[10px] font-medium ${subheadingClass}`}
+                        className={`text-center text-[8px] sm:text-[10px] font-medium ${subheadingClass}`}
                       >
                         {day}
                       </div>
@@ -1461,35 +1461,34 @@ return (
       </div>
 
       <div
-        className={`${cardClass} rounded-xl p-6 relative min-h-[200px] transform hover:shadow-lg hover:shadow-purple-500/10 transition-all duration-500 ease-out ${
+        className={`${cardClass} rounded-xl p-4 sm:p-6 relative min-h-[200px] transform hover:shadow-lg hover:shadow-purple-500/10 transition-all duration-500 ease-out ${
           cardVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
         }`}
       >
-        <div className="flex items-center mb-4">
+        <div className="flex flex-wrap items-center gap-2 mb-4">
           <h2
-            className={`text-xl font-semibold mr-2 flex items-center ${
+            className={`text-lg sm:text-xl font-semibold mr-2 flex items-center ${
               isIlluminateEnabled ? illuminateTextBlue : 'text-blue-300'
             }`}
           >
             <Sparkles
-              className="w-5 h-5 mr-2 text-yellow-400"
-              // In illuminate mode, we might want a darker star icon color
+              className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-yellow-400"
               style={{ color: isIlluminateEnabled ? '#D97706' : '' }}
             />
             Smart Overview
           </h2>
           <button
             onClick={() => setIsChatModalOpen(true)}
-            className={`p-2 ${
+            className={`p-1.5 sm:p-2 ${
               isIlluminateEnabled
                 ? 'text-blue-700 hover:text-blue-800 hover:bg-blue-200'
                 : 'text-blue-300 hover:text-blue-400 hover:bg-blue-500/10'
             } rounded-full transition-colors duration-200`}
             title="Chat with TaskMaster"
           >
-            <MessageCircle className="w-5 h-5" />
+            <MessageCircle className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
-          <span className="ml-2 text-xs bg-gradient-to-r from-pink-500 to-purple-500 text-white px-3 py-1 rounded-full font-medium">
+          <span className="text-xs bg-gradient-to-r from-pink-500 to-purple-500 text-white px-2 sm:px-3 py-0.5 sm:py-1 rounded-full font-medium">
             BETA
           </span>
         </div>
@@ -1515,30 +1514,30 @@ return (
 
       {/* Chat History Modal */}
       {isChatModalOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-0">
           <div
             className={`${
               isIlluminateEnabled ? 'bg-white text-gray-900' : 'bg-gray-800'
-            } rounded-xl w-full max-w-2xl mx-4 max-h-[80vh] flex flex-col`}
+            } rounded-xl w-full max-w-2xl mx-2 sm:mx-4 max-h-[80vh] flex flex-col`}
           >
             <div
-              className={`p-4 border-b ${
+              className={`p-3 sm:p-4 border-b ${
                 isIlluminateEnabled
                   ? 'border-gray-200'
                   : 'border-gray-700 text-gray-100'
               } flex justify-between items-center`}
             >
               <h3
-                className={`text-lg font-semibold flex items-center ${
+                className={`text-base sm:text-lg font-semibold flex items-center flex-wrap ${
                   isIlluminateEnabled ? 'text-blue-700' : 'text-blue-300'
                 }`}
               >
-                <MessageCircle className="w-5 h-5 mr-2" />
+                <MessageCircle className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
                 Chat with TaskMaster
                 <span className="ml-2 text-xs bg-gradient-to-r from-pink-500 to-purple-500 text-gray-300 px-2 py-0.5 rounded-full">
                   BETA
                 </span>
-                <span className="ml-2 text-xs bg-blue text-gray-300 px-2 py-0.5 rounded-full">
+                <span className="ml-0 mt-1 sm:ml-2 sm:mt-0 text-xs bg-blue text-gray-300 px-2 py-0.5 rounded-full">
                   Chat history is not saved.
                 </span>
               </h3>
@@ -1917,11 +1916,11 @@ return (
           <div
             className={`${cardClass} rounded-xl p-6 transform hover:scale-[1.02] transition-all duration-300`}
           >
-            <div className="flex space-x-3 mb-6">
+            <div className="flex flex-wrap gap-2 mb-6">
               {['tasks', 'goals', 'projects', 'plans'].map((tab) => (
                 <button
                   key={tab}
-                  className={`px-4 py-2 rounded-full transition-all duration-300 transform hover:scale-105 ${
+                  className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-full transition-all duration-300 transform hover:scale-105 text-sm sm:text-base ${
                     activeTab === tab
                       ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-lg'
                       : isIlluminateEnabled
@@ -1935,26 +1934,28 @@ return (
               ))}
             </div>
 
-            <div className="flex gap-2 mb-6">
+            <div className="flex flex-col sm:flex-row gap-2 mb-6">
               <input
                 type="text"
-                className={`flex-grow ${inputBg} border border-gray-700 rounded-full p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300`}
+                className={`flex-grow ${inputBg} border border-gray-700 rounded-full p-2 sm:p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300`}
                 placeholder={`Enter new ${activeTab}...`}
                 value={newItemText}
                 onChange={(e) => setNewItemText(e.target.value)}
               />
-              <input
-                type="date"
-                className={`${inputBg} border border-gray-700 rounded-full p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300`}
-                value={newItemDate}
-                onChange={(e) => setNewItemDate(e.target.value)}
-              />
-              <button
-                className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white px-6 py-3 rounded-full font-semibold hover:shadow-lg hover:shadow-purple-500/20 transition-all duration-300 transform hover:scale-105"
-                onClick={handleCreate}
-              >
-                Create {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
-              </button>
+              <div className="flex gap-2">
+                <input
+                  type="date"
+                  className={`${inputBg} border border-gray-700 rounded-full p-2 sm:p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 w-full sm:w-auto`}
+                  value={newItemDate}
+                  onChange={(e) => setNewItemDate(e.target.value)}
+                />
+                <button
+                  className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-full font-semibold hover:shadow-lg hover:shadow-purple-500/20 transition-all duration-300 transform hover:scale-105 whitespace-nowrap"
+                  onClick={handleCreate}
+                >
+                  Create {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
+                </button>
+              </div>
             </div>
 
             <ul className="space-y-3">
@@ -1981,30 +1982,30 @@ return (
                   return (
                     <li
                       key={item.id}
-                      className={`p-4 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3
-                        ${
-                          isCompleted
-                            ? isIlluminateEnabled
-                              ? 'bg-green-100 opacity-75'
-                              : 'bg-green-900/30 opacity-75'
-                            : overdue
-                            ? isIlluminateEnabled
-                              ? 'bg-red-100'
-                              : 'bg-red-900/50'
-                            : isIlluminateEnabled
-                            ? 'bg-gray-200'
-                            : 'bg-gray-700/50'
-                        }
-                        backdrop-blur-sm transform transition-all duration-300 hover:scale-[1.02] hover:shadow-lg animate-fadeIn
-                      `}
+                      className={`p-3 sm:p-4 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3
+    ${
+      isCompleted
+        ? isIlluminateEnabled
+          ? 'bg-green-100 opacity-75'
+          : 'bg-green-900/30 opacity-75'
+        : overdue
+        ? isIlluminateEnabled
+          ? 'bg-red-100'
+          : 'bg-red-900/50'
+        : isIlluminateEnabled
+        ? 'bg-gray-200'
+        : 'bg-gray-700/50'
+    }
+    backdrop-blur-sm transform transition-all duration-300 hover:scale-[1.02] hover:shadow-lg animate-fadeIn
+  `}
                       style={{
                         animationDelay: `${index * 100}ms`,
                       }}
                     >
                       {!isEditing ? (
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
                           <span
-                            className={`font-bold text-lg ${
+                            className={`font-bold text-base sm:text-lg ${
                               isCompleted
                                 ? 'line-through text-gray-400'
                                 : isIlluminateEnabled
@@ -2016,7 +2017,7 @@ return (
                           </span>
                           {dueDateStr && (
                             <span
-                              className={`text-sm font-medium px-3 py-1 rounded-full ${
+                              className={`text-xs sm:text-sm font-medium px-2 sm:px-3 py-0.5 sm:py-1 rounded-full ${
                                 isIlluminateEnabled
                                   ? 'bg-gray-300 text-gray-800'
                                   : 'bg-gray-600'
@@ -2027,7 +2028,7 @@ return (
                           )}
                           {isCompleted && (
                             <span
-                              className={`text-sm font-medium px-3 py-1 rounded-full ${
+                              className={`text-xs sm:text-sm font-medium px-2 sm:px-3 py-0.5 sm:py-1 rounded-full ${
                                 isIlluminateEnabled
                                   ? 'bg-green-300 text-green-800'
                                   : 'bg-green-600'
@@ -2038,56 +2039,56 @@ return (
                           )}
                         </div>
                       ) : (
-                        <div className="flex flex-col sm:flex-row gap-3 w-full">
+                        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full">
                           <input
-                            className={`flex-grow ${inputBg} border border-gray-600 rounded-full p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300`}
+                            className={`flex-grow ${inputBg} border border-gray-600 rounded-full p-2 sm:p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300`}
                             value={editingText}
                             onChange={(e) => setEditingText(e.target.value)}
                           />
                           <input
                             type="date"
-                            className={`${inputBg} border border-gray-600 rounded-full p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300`}
+                            className={`${inputBg} border border-gray-600 rounded-full p-2 sm:p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300`}
                             value={editingDate}
                             onChange={(e) => setEditingDate(e.target.value)}
                           />
                         </div>
                       )}
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 mt-2 sm:mt-0">
                         {!isEditing ? (
                           <>
                             {!isCompleted && (
                               <button
-                                className="bg-gradient-to-r from-green-400 to-green-600 px-4 py-2 rounded-full text-white flex items-center gap-2 hover:shadow-lg hover:shadow-green-500/20 transition-all duration-300 transform hover:scale-105"
+                                className="bg-gradient-to-r from-green-400 to-green-600 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-white flex items-center gap-2 hover:shadow-lg hover:shadow-green-500/20 transition-all duration-300 transform hover:scale-105"
                                 onClick={() => handleMarkComplete(itemId)}
                               >
-                                <CheckCircle className="w-4 h-4" />
+                                <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4" />
                               </button>
                             )}
                             <button
-                              className="bg-gradient-to-r from-blue-400 to-blue-600 px-4 py-2 rounded-full text-white flex items-center gap-2 hover:shadow-lg hover:shadow-blue-500/20 transition-all duration-300 transform hover:scale-105"
+                              className="bg-gradient-to-r from-blue-400 to-blue-600 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-white flex items-center gap-2 hover:shadow-lg hover:shadow-blue-500/20 transition-all duration-300 transform hover:scale-105"
                               onClick={() =>
                                 handleEditClick(itemId, textValue, item.data.dueDate)
                               }
                             >
-                              <Edit className="w-4 h-4" />
+                              <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
                             </button>
                             <button
-                              className="bg-gradient-to-r from-red-400 to-red-600 px-4 py-2 rounded-full text-white flex items-center gap-2 hover:shadow-lg hover:shadow-red-500/20 transition-all duration-300 transform hover:scale-105"
+                              className="bg-gradient-to-r from-red-400 to-red-600 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-white flex items-center gap-2 hover:shadow-lg hover:shadow-red-500/20 transition-all duration-300 transform hover:scale-105"
                               onClick={() => handleDelete(itemId)}
                             >
-                              <Trash className="w-4 h-4" />
+                              <Trash className="w-3 h-3 sm:w-4 sm:h-4" />
                             </button>
                           </>
                         ) : (
                           <>
                             <button
-                              className="bg-gradient-to-r from-green-400 to-green-600 px-4 py-2 rounded-full text-white hover:shadow-lg hover:shadow-green-500/20 transition-all duration-300 transform hover:scale-105"
+                              className="bg-gradient-to-r from-green-400 to-green-600 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-white hover:shadow-lg hover:shadow-green-500/20 transition-all duration-300 transform hover:scale-105 text-sm sm:text-base"
                               onClick={() => handleEditSave(itemId)}
                             >
                               Save
                             </button>
                             <button
-                              className="bg-gradient-to-r from-gray-400 to-gray-600 px-4 py-2 rounded-full text-white hover:shadow-lg hover:shadow-gray-500/20 transition-all duration-300 transform hover:scale-105"
+                              className="bg-gradient-to-r from-gray-400 to-gray-600 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-white hover:shadow-lg hover:shadow-gray-500/20 transition-all duration-300 transform hover:scale-105 text-sm sm:text-base"
                               onClick={() => {
                                 setEditingItemId(null);
                                 setEditingText('');
@@ -2110,17 +2111,16 @@ return (
 {/* RIGHT COLUMN */}
 <div className="flex flex-col gap-6">
   {/* ADVANCED WEATHER CARD */}
-  <div className={`${cardClass} rounded-xl p-6 transform hover:scale-[1.02] transition-all duration-300`}>
-    <h2 className={`text-xl font-semibold mb-4 ${headingClass}`}>
+  <div className={`${cardClass} rounded-xl p-4 sm:p-6 transform hover:scale-[1.02] transition-all duration-300`}>
+    <h2 className={`text-lg sm:text-xl font-semibold mb-4 ${headingClass}`}>
       Weather & Forecast
     </h2>
     {weatherData ? (
       <>
         {/* Current weather */}
-        <div className="space-y-3 mb-6">
-          {/* Use a conditional gradient text if you want a darker gradient in Illuminate mode */}
+        <div className="space-y-2 sm:space-y-3 mb-4 sm:mb-6">
           <p
-            className={`text-2xl font-bold bg-clip-text text-transparent ${
+            className={`text-xl sm:text-2xl font-bold bg-clip-text text-transparent ${
               isIlluminateEnabled
                 ? 'bg-gradient-to-r from-blue-600 to-purple-800'
                 : 'bg-gradient-to-r from-blue-400 to-purple-600'
@@ -2129,31 +2129,31 @@ return (
             {weatherData.location.name}
           </p>
 
-          <p className={`flex items-center gap-2 text-lg ${subheadingClass}`}>
+          <p className={`flex items-center gap-2 text-base sm:text-lg ${subheadingClass}`}>
             <img
-              src={weatherData.current.condition.icon}
+              src={weatherData.current.condition.icon || "/placeholder.svg"}
               alt={weatherData.current.condition.text}
-              className="w-10 h-10"
+              className="w-8 h-8 sm:w-10 sm:h-10"
             />
             {weatherData.current.condition.text} - {weatherData.current.temp_f}°F
-            <span className={`ml-2 text-base ${subheadingClass}`}>
+            <span className={`ml-2 text-sm sm:text-base ${subheadingClass}`}>
               Feels like {weatherData.current.feelslike_f}°F
             </span>
           </p>
-          <div className="flex gap-4 text-sm">
+          <div className="flex flex-wrap gap-2 sm:gap-4 text-xs sm:text-sm">
             <div className="flex items-center">
               <strong>Wind:</strong>
-              <span className="ml-2">
+              <span className="ml-1 sm:ml-2">
                 {Math.round(weatherData.current.wind_mph)} mph
               </span>
             </div>
             <div className="flex items-center">
               <strong>Humidity:</strong>
-              <span className="ml-2">{weatherData.current.humidity}%</span>
+              <span className="ml-1 sm:ml-2">{weatherData.current.humidity}%</span>
             </div>
             <div className="flex items-center">
               <strong>UV Index:</strong>
-              <span className="ml-2">{weatherData.current.uv}</span>
+              <span className="ml-1 sm:ml-2">{weatherData.current.uv}</span>
             </div>
           </div>
         </div>
@@ -2203,7 +2203,7 @@ return (
                   >
                     <div className="absolute inset-0 bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 opacity-10 pointer-events-none" />
                     <img
-                      src={icon}
+                      src={icon || "/placeholder.svg"}
                       alt={day.day.condition.text}
                       className="w-10 h-10 z-10"
                     />
@@ -2273,21 +2273,21 @@ return (
   </div>
 
   {/* MAIN POMODORO TIMER */}
-  <div className={`${cardClass} rounded-xl p-6 transform hover:scale-[1.02] transition-all duration-300`}>
+  <div className={`${cardClass} rounded-xl p-4 sm:p-6 transform hover:scale-[1.02] transition-all duration-300`}>
     <div className="flex items-center justify-between mb-4">
-      <h2 className={`text-xl font-semibold ${headingClass}`}>
+      <h2 className={`text-lg sm:text-xl font-semibold ${headingClass}`}>
         Pomodoro Timer
       </h2>
       <button
-        className="bg-gradient-to-r from-purple-400 to-purple-600 text-white px-4 py-2 rounded-full font-bold flex items-center gap-2 hover:shadow-lg hover:shadow-purple-500/20 transition-all duration-300 transform hover:scale-105"
+        className="bg-gradient-to-r from-purple-400 to-purple-600 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-full font-bold flex items-center gap-1 sm:gap-2 hover:shadow-lg hover:shadow-purple-500/20 transition-all duration-300 transform hover:scale-105 text-xs sm:text-sm"
         onClick={handleAddCustomTimer}
       >
-        <PlusCircle className="w-4 h-4" /> New Timer
+        <PlusCircle className="w-3 h-3 sm:w-4 sm:h-4" /> New Timer
       </button>
     </div>
     {/* If you want a different gradient for the big timer in illuminate mode, define conditionally */}
     <div
-      className={`text-6xl font-bold mb-6 text-center bg-clip-text text-transparent ${
+      className={`text-4xl sm:text-6xl font-bold mb-4 sm:mb-6 text-center bg-clip-text text-transparent ${
         isIlluminateEnabled
           ? 'bg-gradient-to-r from-blue-600 to-purple-800'
           : 'bg-gradient-to-r from-blue-400 to-purple-600'
@@ -2295,21 +2295,21 @@ return (
     >
       {formatPomodoroTime(pomodoroTimeLeft)}
     </div>
-    <div className="flex justify-center space-x-4">
+    <div className="flex justify-center flex-wrap gap-2 sm:space-x-4">
       <button
-        className="bg-gradient-to-r from-green-400 to-green-600 px-6 py-3 rounded-full font-semibold hover:shadow-lg hover:shadow-green-500/20 transition-all duration-300 transform hover:scale-105"
+        className="bg-gradient-to-r from-green-400 to-green-600 px-4 sm:px-6 py-2 sm:py-3 rounded-full font-semibold hover:shadow-lg hover:shadow-green-500/20 transition-all duration-300 transform hover:scale-105 text-sm sm:text-base"
         onClick={handlePomodoroStart}
       >
         Start
       </button>
       <button
-        className="bg-gradient-to-r from-yellow-400 to-yellow-600 px-6 py-3 rounded-full font-semibold hover:shadow-lg hover:shadow-yellow-500/20 transition-all duration-300 transform hover:scale-105"
+        className="bg-gradient-to-r from-yellow-400 to-yellow-600 px-4 sm:px-6 py-2 sm:py-3 rounded-full font-semibold hover:shadow-lg hover:shadow-yellow-500/20 transition-all duration-300 transform hover:scale-105 text-sm sm:text-base"
         onClick={handlePomodoroPause}
       >
         Pause
       </button>
       <button
-        className="bg-gradient-to-r from-red-400 to-red-600 px-6 py-3 rounded-full font-semibold hover:shadow-lg hover:shadow-red-500/20 transition-all duration-300 transform hover:scale-105"
+        className="bg-gradient-to-r from-red-400 to-red-600 px-4 sm:px-6 py-2 sm:py-3 rounded-full font-semibold hover:shadow-lg hover:shadow-red-500/20 transition-all duration-300 transform hover:scale-105 text-sm sm:text-base"
         onClick={handlePomodoroReset}
       >
         Reset
@@ -2365,11 +2365,11 @@ return (
           return (
             <li
               key={timerId}
-              className={`p-4 rounded-lg backdrop-blur-sm transform transition-all duration-300 hover:scale-[1.02] hover:shadow-lg animate-fadeIn ${itemBgClass}`}
+              className={`p-3 sm:p-4 rounded-lg backdrop-blur-sm transform transition-all duration-300 hover:scale-[1.02] hover:shadow-lg animate-fadeIn ${itemBgClass}`}
               style={{ animationDelay: `${index * 100}ms` }}
             >
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div className="flex flex-col items-center sm:items-start">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
+                <div className="flex flex-col items-center sm:items-start w-full sm:w-auto">
                   {isEditing ? (
                     <div className="flex flex-col gap-2 w-full">
                       <input
@@ -2387,15 +2387,15 @@ return (
                         placeholder="Minutes"
                         min="1"
                       />
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 mt-2">
                         <button
-                          className="bg-gradient-to-r from-green-400 to-green-600 px-4 py-2 rounded-full text-white hover:shadow-lg hover:shadow-green-500/20 transition-all duration-300"
+                          className="bg-gradient-to-r from-green-400 to-green-600 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-white hover:shadow-lg hover:shadow-green-500/20 transition-all duration-300 text-sm"
                           onClick={() => handleEditTimerSave(timerId)}
                         >
                           Save
                         </button>
                         <button
-                          className="bg-gradient-to-r from-gray-400 to-gray-600 px-4 py-2 rounded-full text-white hover:shadow-lg hover:shadow-gray-500/20 transition-all duration-300"
+                          className="bg-gradient-to-r from-gray-400 to-gray-600 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-white hover:shadow-lg hover:shadow-gray-500/20 transition-all duration-300 text-sm"
                           onClick={() => setEditingTimerId(null)}
                         >
                           Cancel
@@ -2404,31 +2404,33 @@ return (
                     </div>
                   ) : (
                     <>
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="font-bold text-lg">
+                      <div className="flex items-center gap-2 mb-2 flex-wrap justify-center sm:justify-start">
+                        <span className="font-bold text-base sm:text-lg text-center sm:text-left">
                           {timer.data.name}
                         </span>
-                        <button
-                          className="bg-gradient-to-r from-blue-400 to-blue-600 p-2 rounded-full text-white hover:shadow-lg hover:shadow-blue-500/20 transition-all duration-300 transform hover:scale-105"
-                          onClick={() =>
-                            handleEditTimerClick(
-                              timerId,
-                              timer.data.name,
-                              timer.data.time
-                            )
-                          }
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button
-                          className="bg-gradient-to-r from-red-400 to-red-600 p-2 rounded-full text-white hover:shadow-lg hover:shadow-red-500/20 transition-all duration-300 transform hover:scale-105"
-                          onClick={() => handleDeleteTimer(timerId)}
-                        >
-                          <Trash className="w-4 h-4" />
-                        </button>
+                        <div className="flex gap-1 sm:gap-2">
+                          <button
+                            className="bg-gradient-to-r from-blue-400 to-blue-600 p-1.5 sm:p-2 rounded-full text-white hover:shadow-lg hover:shadow-blue-500/20 transition-all duration-300 transform hover:scale-105"
+                            onClick={() =>
+                              handleEditTimerClick(
+                                timerId,
+                                timer.data.name,
+                                timer.data.time
+                              )
+                            }
+                          >
+                            <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
+                          </button>
+                          <button
+                            className="bg-gradient-to-r from-red-400 to-red-600 p-1.5 sm:p-2 rounded-full text-white hover:shadow-lg hover:shadow-red-500/20 transition-all duration-300 transform hover:scale-105"
+                            onClick={() => handleDeleteTimer(timerId)}
+                          >
+                            <Trash className="w-3 h-3 sm:w-4 sm:h-4" />
+                          </button>
+                        </div>
                       </div>
                       <span
-                        className={`text-3xl font-semibold bg-clip-text text-transparent ${
+                        className={`text-2xl sm:text-3xl font-semibold bg-clip-text text-transparent ${
                           isIlluminateEnabled
                             ? 'bg-gradient-to-r from-blue-600 to-purple-800'
                             : 'bg-gradient-to-r from-blue-400 to-purple-600'
@@ -2440,10 +2442,10 @@ return (
                   )}
                 </div>
                 {!isEditing && (
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 mt-2 sm:mt-0">
                     {!isRunning && (
                       <button
-                        className="bg-gradient-to-r from-green-400 to-green-600 px-4 py-2 rounded-full font-semibold hover:shadow-lg hover:shadow-green-500/20 transition-all duration-300 transform hover:scale-105"
+                        className="bg-gradient-to-r from-green-400 to-green-600 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full font-semibold hover:shadow-lg hover:shadow-green-500/20 transition-all duration-300 transform hover:scale-105 text-xs sm:text-sm"
                         onClick={() => startCustomTimer(timerId)}
                       >
                         Start
@@ -2451,30 +2453,30 @@ return (
                     )}
                     {isRunning && (
                       <button
-                        className="bg-gradient-to-r from-yellow-400 to-yellow-600 px-4 py-2 rounded-full font-semibold hover:shadow-lg hover:shadow-yellow-500/20 transition-all duration-300 transform hover:scale-105"
+                        className="bg-gradient-to-r from-yellow-400 to-yellow-600 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full font-semibold hover:shadow-lg hover:shadow-yellow-500/20 transition-all duration-300 transform hover:scale-105 text-xs sm:text-sm"
                         onClick={() => pauseCustomTimer(timerId)}
                       >
                         Pause
                       </button>
                     )}
                     <button
-                      className="bg-gradient-to-r from-gray-400 to-gray-600 px-4 py-2 rounded-full font-semibold hover:shadow-lg hover:shadow-gray-500/20 transition-all duration-300 transform hover:scale-105"
+                      className="bg-gradient-to-r from-gray-400 to-gray-600 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full font-semibold hover:shadow-lg hover:shadow-gray-500/20 transition-all duration-300 transform hover:scale-105 text-xs sm:text-sm"
                       onClick={() => resetCustomTimer(timerId)}
                     >
                       Reset
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </div>
-          </div>
-        </div>
-      </main>
-    </div>
-  );
+                    </button>
+                  </div>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    )}
+  </div>
+</div>
+</div>
+</main>
+</div>
+);
 }

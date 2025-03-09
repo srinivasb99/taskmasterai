@@ -18,7 +18,6 @@ import {
   PanelLeftDashed
 } from 'lucide-react';
 import { Sidebar } from './Sidebar';
-import { PageLayout } from './PageLayout';
 import { 
   updateUserProfile, 
   signOutUser, 
@@ -401,7 +400,6 @@ export function Settings() {
   //    RENDER
   // ---------------------------
 return (
-    <PageLayout>
       <div className={`flex flex-col min-h-screen ${containerClass}`}>
         <Sidebar
           isCollapsed={isSidebarCollapsed}
@@ -835,7 +833,6 @@ return (
           </div>
         </main>
       </div>
-    </PageLayout>
   );
 }
 

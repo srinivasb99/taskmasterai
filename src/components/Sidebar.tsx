@@ -92,8 +92,7 @@ export function Sidebar({
   }
 
   // For menu items, define normal, hover, and active states
-  const baseMenuItemClasses =
-    "flex items-center gap-3 px-4 py-2.5 text-sm rounded-lg transition-all duration-200"
+  const baseMenuItemClasses = "flex items-center gap-3 px-4 py-2.5 text-sm rounded-lg transition-all duration-200"
   const isActiveClasses = isIlluminateEnabled
     ? "bg-gray-200 text-gray-900 font-medium"
     : "bg-gray-800 text-white font-medium"
@@ -139,17 +138,8 @@ export function Sidebar({
         </button>
 
         {/* Logo on the Right */}
-        <a
-          href="/"
-          className="p-2 hover:opacity-80 transition-opacity"
-          aria-label="Go to homepage"
-        >
-          <svg
-            className="w-8 h-8 text-indigo-500"
-            viewBox="0 0 24 24"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
+        <a href="/" className="p-2 hover:opacity-80 transition-opacity" aria-label="Go to homepage">
+          <svg className="w-8 h-8 text-indigo-500" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path
               d="M16.19 2H7.81C4.17 2 2 4.17 2 7.81V16.19C2 19.83 4.17 22 7.81 22H16.19C19.83 22 22 19.83 22 16.19V7.81C22 4.17 19.83 2 16.19 2ZM9.97 14.9L7.72 17.15C7.57 17.3 7.38 17.37 7.19 17.37C7 17.37 6.8 17.3 6.66 17.15L5.91 16.4C5.61 16.11 5.61 15.63 5.91 15.34C6.2 15.05 6.67 15.05 6.97 15.34L7.19 15.56L8.91 13.84C9.2 13.55 9.67 13.55 9.97 13.84C10.26 14.13 10.26 14.61 9.97 14.9ZM9.97 7.9L7.72 10.15C7.57 10.3 7.38 10.37 7.19 10.37C7 10.37 6.8 10.3 6.66 10.15L5.91 9.4C5.61 9.11 5.61 8.63 5.91 8.34C6.2 8.05 6.67 8.05 6.97 8.34L7.19 8.56L8.91 6.84C9.2 6.55 9.67 6.55 9.97 6.84C10.26 7.13 10.26 7.61 9.97 7.9ZM17.56 16.62H12.31C11.9 16.62 11.56 16.28 11.56 15.87C11.56 15.46 11.9 15.12 12.31 15.12H17.56C17.98 15.12 18.31 15.46 18.31 15.87C18.31 16.28 17.98 16.62 17.56 16.62ZM17.56 9.62H12.31C11.9 9.62 11.56 9.28 11.56 8.87C11.56 8.46 11.9 8.12 12.31 8.12H17.56C17.98 8.12 18.31 8.46 18.31 8.87C18.31 9.28 17.98 9.62 17.56 9.62Z"
               fill="currentColor"
@@ -159,7 +149,11 @@ export function Sidebar({
       </div>
 
       {/* Main Content Wrapper - Add top padding on mobile for the header */}
-      <div className="md:ml-0 pt-14 md:pt-0">
+      <div className="md:ml-0 md:pt-0">
+        {/* Semi-transparent overlay when mobile menu is open */}
+        {isMobileMenuOpen && (
+          <div className="fixed inset-0 bg-black/50 z-40 md:hidden" onClick={() => setIsMobileMenuOpen(false)} />
+        )}
         {/* Sidebar */}
         <div
           className={`
@@ -168,12 +162,12 @@ export function Sidebar({
             transition-all duration-300 ease-in-out
             ${isCollapsed ? "md:w-20" : "md:w-64"}
             ${isMobileMenuOpen ? "w-64 translate-x-0" : "-translate-x-full md:translate-x-0"}
-            mt-14 md:mt-0 h-[calc(100%-3.5rem)] md:h-full
+            md:mt-0 h-full
           `}
         >
-          {/* Logo Section - Hide on mobile since we have the header */}
-          <div className="mb-6 flex items-center pl-3 md:block hidden">
-            {isCollapsed ? (
+          {/* Logo Section - Show on mobile when menu is open */}
+          <div className="mb-6 flex items-center pl-3">
+            {isCollapsed && !isMobileMenuOpen ? (
               <a href="/">
                 <svg
                   className="w-8 h-8 text-indigo-500"
@@ -188,9 +182,19 @@ export function Sidebar({
                 </svg>
               </a>
             ) : (
-              <a href="/">
-                <Logo className="w-8 h-8" />
-              </a>
+              <div className="flex items-center justify-between w-full">
+                <a href="/">
+                  <Logo className="w-8 h-8" />
+                </a>
+                {/* Close button for mobile */}
+                <button
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="md:hidden p-2 hover:opacity-80 transition-opacity"
+                  aria-label="Close menu"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             )}
           </div>
 
@@ -249,9 +253,7 @@ export function Sidebar({
                 `}
               >
                 <Crown
-                  className={`min-w-[1.25rem] ${
-                    isCollapsed && !isMobileMenuOpen ? "w-6 h-6" : "w-5 h-5 mr-2"
-                  }`}
+                  className={`min-w-[1.25rem] ${isCollapsed && !isMobileMenuOpen ? "w-6 h-6" : "w-5 h-5 mr-2"}`}
                   strokeWidth={2}
                 />
                 {(!isCollapsed || isMobileMenuOpen) && (
@@ -310,3 +312,4 @@ export function Sidebar({
     </>
   )
 }
+

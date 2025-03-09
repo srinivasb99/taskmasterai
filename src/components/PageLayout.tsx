@@ -1,6 +1,8 @@
 import React from "react"
 import { Sidebar } from "./Sidebar"
-import { useAuth } from "../hooks/useAuth"
+import { auth } from '../lib/firebase'
+import { User, onAuthStateChanged } from 'firebase/auth'
+import { updateUserProfile, signOutUser, deleteUserAccount, AuthError, getCurrentUser } from '../lib/settings-firebase';
 
 interface PageLayoutProps {
   children: React.ReactNode

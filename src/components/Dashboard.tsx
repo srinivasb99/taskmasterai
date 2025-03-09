@@ -968,18 +968,18 @@ const formattedHtml = cleanTextLines
 
 setSmartOverview(formattedHtml);
 
-} catch (error) {
-  console.error("Overview generation error:", error);
-  setSmartOverview(`
-    <div class="text-red-400">Error generating overview. Please try again.</div>
-  `);
-} finally {
-  setOverviewLoading(false);
-}
+      } catch (error) {
+        console.error("Overview generation error:", error);
+        setSmartOverview(`
+          <div class="text-red-400">Error generating overview. Please try again.</div>
+        `);
+      } finally {
+        setOverviewLoading(false);
+      }
+    };
 
-generateOverview();
-}, [user, tasks, goals, projects, plans, userName, geminiApiKey]);
-
+    generateOverview();
+  }, [user, tasks, goals, projects, plans, userName, geminiApiKey]);
 
   // ---------------------
   // 11. CREATE & EDIT & DELETE

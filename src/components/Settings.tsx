@@ -18,7 +18,7 @@ import {
   PanelLeftDashed
 } from 'lucide-react';
 import { Sidebar } from './Sidebar';
-import PageLayout from './PageLayout';
+import { PageLayout } from './PageLayout';
 import { 
   updateUserProfile, 
   signOutUser, 

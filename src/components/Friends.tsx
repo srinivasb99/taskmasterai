@@ -245,80 +245,140 @@ export function Friends() {
     }
   }, [])
 
-  // ---------------------------
-  // Dynamic CSS Classes for Modes
-  // ---------------------------
-  const containerClass = isIlluminateEnabled
-    ? "bg-white text-gray-900"
-    : isBlackoutEnabled
-      ? "bg-gray-950 text-white"
-      : "bg-gray-900 text-white"
+// ---------------------------
+// Dynamic CSS Classes for Modes
+// ---------------------------
+const containerClass = isIlluminateEnabled
+  ? "bg-white text-gray-900"
+  : isBlackoutEnabled
+    ? "bg-gray-950 text-white"
+    : "bg-gray-900 text-white";
 
-  const headingClass = isIlluminateEnabled ? "text-gray-900" : "text-white"
-  const subheadingClass = isIlluminateEnabled ? "text-gray-600" : "text-gray-400"
+const headingClass = isIlluminateEnabled
+  ? "text-gray-900"
+  : isBlackoutEnabled
+    ? "text-white"
+    : "text-white";
 
-  // For the main chat header background
-  const chatHeaderClass = isIlluminateEnabled
-    ? "bg-gray-100 border-b border-gray-300"
-    : "bg-gray-800 border-b border-gray-700"
+const subheadingClass = isIlluminateEnabled
+  ? "text-gray-600"
+  : isBlackoutEnabled
+    ? "text-gray-400"
+    : "text-gray-400";
 
-  // For the chat messages area
-  const messageAreaClass = isIlluminateEnabled ? "bg-gray-100" : "bg-gray-700"
+// For the main chat header background
+const chatHeaderClass = isIlluminateEnabled
+  ? "bg-white border-b border-gray-300"
+  : isBlackoutEnabled
+    ? "bg-gray-950 border-b border-gray-800/50"
+    : "bg-gray-800 border-b border-gray-700";
 
-  // For message bubbles: your own and others
-  const ownMessageClass = isIlluminateEnabled ? "bg-blue-500 text-white" : "bg-blue-600 text-white"
-  const otherMessageClass = isIlluminateEnabled ? "bg-gray-300 text-gray-900" : "bg-gray-600 text-white"
+// For the chat messages area
+const messageAreaClass = isIlluminateEnabled
+  ? "bg-white"
+  : isBlackoutEnabled
+    ? "bg-gray-950"
+    : "bg-gray-700";
 
-  // Chat input container
-  const chatInputContainerClass = isIlluminateEnabled ? "bg-gray-100" : "bg-gray-800"
+// For message bubbles: your own and others
+const ownMessageClass = isIlluminateEnabled
+  ? "bg-blue-500 text-white"
+  : isBlackoutEnabled
+    ? "bg-blue-700 text-white"
+    : "bg-blue-600 text-white";
 
-  // Input fields used inside chat input area
-  const inputBg = isIlluminateEnabled
-    ? "bg-white border border-gray-300 text-gray-900"
-    : "bg-gray-700 border border-gray-600 text-white"
+const otherMessageClass = isIlluminateEnabled
+  ? "bg-gray-300 text-gray-900"
+  : isBlackoutEnabled
+    ? "bg-gray-600 text-white"
+    : "bg-gray-600 text-white";
 
-  // Navigation buttons (e.g. for friend requests, etc.)
-  const navButtonClass = isIlluminateEnabled
-    ? "text-gray-700 hover:text-gray-900 hover:bg-gray-200"
-    : "text-gray-400 hover:text-white hover:bg-gray-800"
+// Chat input container
+const chatInputContainerClass = isIlluminateEnabled
+  ? "bg-white"
+  : isBlackoutEnabled
+    ? "bg-gray-950"
+    : "bg-gray-800";
 
-  // Aside (right panel) background
-  const asideClass = isIlluminateEnabled
-    ? "bg-gray-100 border-l border-gray-300"
-    : "bg-gray-800 border-l border-gray-700"
+// Input fields used inside chat input area
+const inputBg = isIlluminateEnabled
+  ? "bg-white border border-gray-300 text-gray-900"
+  : isBlackoutEnabled
+    ? "bg-gray-950 border border-gray-800 text-white"
+    : "bg-gray-700 border border-gray-600 text-white";
 
-  // Group Modal styling
-  const groupModalClass = isIlluminateEnabled
-    ? "bg-white shadow-xl border border-gray-200 text-gray-900"
-    : "bg-gray-800 shadow-xl border border-gray-700 text-gray-300"
+// Navigation buttons (e.g. for friend requests, etc.)
+const navButtonClass = isIlluminateEnabled
+  ? "text-gray-700 hover:text-gray-900 hover:bg-gray-200"
+  : isBlackoutEnabled
+    ? "text-gray-400 hover:text-white hover:bg-gray-950"
+    : "text-gray-400 hover:text-white hover:bg-gray-800";
 
-  // Friend request buttons
-  const acceptButtonClass = isIlluminateEnabled
-    ? "text-green-600 hover:text-green-500"
-    : "text-green-400 hover:text-green-300"
-  const rejectButtonClass = isIlluminateEnabled ? "text-red-600 hover:text-red-500" : "text-red-400 hover:text-red-300"
+// Aside (right panel) background
+const asideClass = isIlluminateEnabled
+  ? "bg-white border-l border-gray-300"
+  : isBlackoutEnabled
+    ? "bg-gray-950 border-l border-gray-800"
+    : "bg-gray-800 border-l border-gray-700";
 
-  // Chat list items (in aside)
-  const selectedChatClass = isIlluminateEnabled ? "bg-blue-500 text-white" : "bg-blue-600 text-white"
-  const chatListItemClass = isIlluminateEnabled
-    ? "bg-gray-200 text-gray-900 hover:bg-gray-300"
-    : "bg-gray-700 text-white hover:bg-gray-600"
+// Group Modal styling
+const groupModalClass = isIlluminateEnabled
+  ? "bg-white shadow-xl border border-gray-200 text-gray-900"
+  : isBlackoutEnabled
+    ? "bg-gray-950 shadow-xl border border-gray-800 text-gray-300"
+    : "bg-gray-800 shadow-xl border border-gray-700 text-gray-300";
 
-  // Button styling
-  const primaryButtonClass = isIlluminateEnabled
-    ? "bg-blue-500 hover:bg-blue-600 text-white"
-    : "bg-blue-600 hover:bg-blue-700 text-white"
+// Friend request buttons
+const acceptButtonClass = isIlluminateEnabled
+  ? "text-green-600 hover:text-green-500"
+  : isBlackoutEnabled
+    ? "text-green-400 hover:text-green-300"
+    : "text-green-400 hover:text-green-300";
 
-  const secondaryButtonClass = isIlluminateEnabled
-    ? "bg-gray-300 hover:bg-gray-400 text-gray-800"
-    : "bg-gray-600 hover:bg-gray-500 text-white"
+const rejectButtonClass = isIlluminateEnabled
+  ? "text-red-600 hover:text-red-500"
+  : isBlackoutEnabled
+    ? "text-red-400 hover:text-red-300"
+    : "text-red-400 hover:text-red-300";
 
-  // Tab styling
-  const activeTabClass = isIlluminateEnabled ? "border-blue-500 text-blue-600" : "border-blue-500 text-blue-400"
+// Chat list items (in aside)
+const selectedChatClass = isIlluminateEnabled
+  ? "bg-blue-500 text-white"
+  : isBlackoutEnabled
+    ? "bg-blue-700 text-white"
+    : "bg-blue-600 text-white";
 
-  const inactiveTabClass = isIlluminateEnabled
-    ? "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-    : "border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-600"
+const chatListItemClass = isIlluminateEnabled
+  ? "bg-gray-200 text-gray-900 hover:bg-gray-300"
+  : isBlackoutEnabled
+    ? "bg-gray-950 text-white hover:bg-gray-900"
+    : "bg-gray-700 text-white hover:bg-gray-600";
+
+// Button styling
+const primaryButtonClass = isIlluminateEnabled
+  ? "bg-blue-500 hover:bg-blue-600 text-white"
+  : isBlackoutEnabled
+    ? "bg-blue-600 hover:bg-blue-700 text-white"
+    : "bg-blue-600 hover:bg-blue-700 text-white";
+
+const secondaryButtonClass = isIlluminateEnabled
+  ? "bg-gray-300 hover:bg-gray-400 text-gray-800"
+  : isBlackoutEnabled
+    ? "bg-gray-950 hover:bg-gray-900 text-white"
+    : "bg-gray-600 hover:bg-gray-500 text-white";
+
+// Tab styling
+const activeTabClass = isIlluminateEnabled
+  ? "border-blue-500 text-blue-600"
+  : isBlackoutEnabled
+    ? "border-blue-500 text-blue-400"
+    : "border-blue-500 text-blue-400";
+
+const inactiveTabClass = isIlluminateEnabled
+  ? "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+  : isBlackoutEnabled
+    ? "border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-600"
+    : "border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-600";
 
   // ---------------------------
   // Auth & Real-time Listeners

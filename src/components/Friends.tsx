@@ -1,3 +1,5 @@
+"use client"
+
 import { useState, useEffect, useRef, type ChangeEvent, type FormEvent } from "react"
 import { useNavigate } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
@@ -11,14 +13,15 @@ import {
   CheckCircle,
   XCircle,
   Edit,
+  Trash2,
   Search,
   Bell,
   UserPlus,
   Smile,
   Mic,
-  Video,
   MoreVertical,
-  Star,
+  X,
+  Clock,
 } from "lucide-react"
 import { Sidebar } from "./Sidebar"
 import { getCurrentUser } from "../lib/settings-firebase"
@@ -33,18 +36,25 @@ import {
   sendMessage,
   uploadChatFile,
   renameChat,
-  deleteChat,
-  unfriendUser,
+  leaveGroupChat,
+  deleteMessage,
   getUserProfile,
+  getUserFriends,
+  listenToFriendsOnlineStatus,
+  setupPresenceSystem,
+  setTypingIndicator,
+  listenToTypingIndicators,
 } from "../lib/friends-firebase"
 
 interface Chat {
   id: string
   isGroup: boolean
   members: string[]
+  memberNames?: Record<string, string>
   name?: string
   lastMessage?: string
   updatedAt?: any
+  createdBy?: string
 }
 
 interface Message {
@@ -151,6 +161,8 @@ export function Friends() {
   const [chats, setChats] = useState<Chat[]>([])
   const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([])
   const [onlineFriends, setOnlineFriends] = useState<UserProfile[]>([])
+  const [typingUsers, setTypingUsers] = useState<any[]>([])
+  const [chatMembers, setChatMembers] = useState<Record<string, UserProfile[]>>({})
 
   // Selected chat & messages
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null)
@@ -188,6 +200,7 @@ export function Friends() {
   const [isRecording, setIsRecording] = useState(false)
   const [showChatOptions, setShowChatOptions] = useState(false)
   const [isStarred, setIsStarred] = useState(false)
+  const [messageToDelete, setMessageToDelete] = useState<string | null>(null)
 
   // Update localStorage and document.body for modes
   useEffect(() => {
@@ -243,18 +256,6 @@ export function Friends() {
     return () => {
       document.removeEventListener("mousedown", handleClickOutside)
     }
-  }, [])
-
-  // Simulate online friends (for demo purposes)
-  useEffect(() => {
-    // This would normally come from a real-time database
-    const mockOnlineFriends: UserProfile[] = [
-      { id: "1", name: "Alex Johnson", status: "online", photoURL: "https://i.pravatar.cc/150?img=1" },
-      { id: "2", name: "Taylor Smith", status: "away", photoURL: "https://i.pravatar.cc/150?img=2" },
-      { id: "3", name: "Jordan Lee", status: "online", photoURL: "https://i.pravatar.cc/150?img=3" },
-      { id: "4", name: "Casey Wilson", status: "busy", photoURL: "https://i.pravatar.cc/150?img=4" },
-    ]
-    setOnlineFriends(mockOnlineFriends)
   }, [])
 
   // ---------------------------
@@ -355,16 +356,44 @@ export function Friends() {
     }
     fetchUserProfile()
 
+    // Set up presence system
+    const cleanupPresence = setupPresenceSystem(currentUser.uid)
+
+    // Listen to chats
     const unsubscribeChats = listenToChatsRealtime(currentUser.uid, (newChats) => {
       setChats(newChats)
     })
+
+    // Listen to friend requests
     const unsubscribeRequests = listenToFriendRequests(currentUser.uid, (requests) => {
       setFriendRequests(requests)
+    })
+
+    // Get and listen to online friends
+    const fetchFriends = async () => {
+      const friends = await getUserFriends(currentUser.uid)
+      const friendIds = friends.map((friend) => friend.id)
+
+      if (friendIds.length > 0) {
+        const unsubscribeFriendStatus = listenToFriendsOnlineStatus(friendIds, (statuses) => {
+          setOnlineFriends(statuses)
+        })
+
+        return unsubscribeFriendStatus
+      }
+      return () => {}
+    }
+
+    let unsubscribeFriendStatus: () => void
+    fetchFriends().then((unsub) => {
+      unsubscribeFriendStatus = unsub
     })
 
     return () => {
       unsubscribeChats()
       unsubscribeRequests()
+      if (unsubscribeFriendStatus) unsubscribeFriendStatus()
+      cleanupPresence()
     }
   }, [navigate])
 
@@ -372,21 +401,24 @@ export function Friends() {
   useEffect(() => {
     if (!selectedChat) {
       setMessages([])
+      setTypingUsers([])
       return
     }
+
     const unsubscribeMessages = listenToMessagesRealtime(selectedChat.id, (msgs) => {
       setMessages(msgs)
     })
-    return () => unsubscribeMessages()
-  }, [selectedChat])
 
-  // Helper to compute display name for a chat:
-  const getChatDisplayName = (chat: Chat): string => {
-    if (chat.isGroup) {
-      return chat.name || "Group Chat"
+    // Listen to typing indicators
+    const unsubscribeTyping = listenToTypingIndicators(selectedChat.id, user?.uid, (users) => {
+      setTypingUsers(users)
+    })
+
+    return () => {
+      unsubscribeMessages()
+      unsubscribeTyping()
     }
-    return chat.name || "Direct Chat"
-  }
+  }, [selectedChat, user?.uid])
 
   // Format timestamp
   const formatTimestamp = (timestamp: any): string => {
@@ -408,28 +440,77 @@ export function Friends() {
     }
   }
 
+  // Format last seen
+  const formatLastSeen = (timestamp: any): string => {
+    if (!timestamp) return "Never online"
+
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffMins = Math.floor(diffMs / (1000 * 60))
+
+    if (diffMins < 1) {
+      return "Just now"
+    } else if (diffMins < 60) {
+      return `${diffMins} ${diffMins === 1 ? "minute" : "minutes"} ago`
+    } else {
+      const diffHours = Math.floor(diffMins / 60)
+      if (diffHours < 24) {
+        return `${diffHours} ${diffHours === 1 ? "hour" : "hours"} ago`
+      } else {
+        const diffDays = Math.floor(diffHours / 24)
+        if (diffDays < 7) {
+          return `${diffDays} ${diffDays === 1 ? "day" : "days"} ago`
+        } else {
+          return date.toLocaleDateString()
+        }
+      }
+    }
+  }
+
+  // Get chat display name
+  const getChatDisplayName = (chat: Chat): string => {
+    if (chat.isGroup) {
+      return chat.name || "Group Chat"
+    }
+
+    // For direct chats, show the other user's name
+    if (user && chat.members.length === 2) {
+      const otherUserId = chat.members.find((id) => id !== user.uid)
+      if (otherUserId && chat.memberNames && chat.memberNames[otherUserId]) {
+        return chat.memberNames[otherUserId]
+      }
+    }
+
+    return chat.name || ""
+  }
+
+  // Get other user ID in direct chat
+  const getOtherUserId = (chat: Chat): string | null => {
+    if (!user || chat.isGroup) return null
+
+    return chat.members.find((id) => id !== user.uid) || null
+  }
+
   // Handle sending a text message
   const handleSendMessage = async (e: FormEvent) => {
     e.preventDefault()
     if (!selectedChat || (!newMessage.trim() && !fileInputRef.current?.files?.length)) return
 
     try {
-      let senderName: string | undefined
-      let senderPhotoURL: string | undefined
-      if (selectedChat.isGroup) {
-        const profile = await getUserProfile(user.uid)
-        senderName = profile?.name || profile?.displayName
-        senderPhotoURL = profile?.photoURL
-      }
-
       if (newMessage.trim()) {
-        await sendMessage(selectedChat.id, newMessage.trim(), user.uid, undefined, senderName, senderPhotoURL)
+        await sendMessage(selectedChat.id, newMessage.trim(), user.uid)
         setNewMessage("")
       }
 
       // If there's a file selected, upload it
       if (fileInputRef.current?.files?.length) {
         await handleFileUpload()
+      }
+
+      // Clear typing indicator
+      if (selectedChat) {
+        setTypingIndicator(selectedChat.id, user.uid, false)
       }
     } catch (err) {
       console.error("Error sending message:", err)
@@ -454,28 +535,11 @@ export function Friends() {
     setUploadProgress(0)
 
     try {
-      // Simulate upload progress
-      const progressInterval = setInterval(() => {
-        setUploadProgress((prev) => {
-          const newProgress = prev + Math.random() * 20
-          return newProgress >= 100 ? 100 : newProgress
-        })
-      }, 200)
+      const fileURL = await uploadChatFile(selectedChat.id, file, (progress) => {
+        setUploadProgress(progress)
+      })
 
-      const fileURL = await uploadChatFile(selectedChat.id, file)
-
-      clearInterval(progressInterval)
-      setUploadProgress(100)
-
-      let senderName: string | undefined
-      let senderPhotoURL: string | undefined
-      if (selectedChat.isGroup) {
-        const profile = await getUserProfile(user.uid)
-        senderName = profile?.name || profile?.displayName
-        senderPhotoURL = profile?.photoURL
-      }
-
-      await sendMessage(selectedChat.id, "", user.uid, fileURL, senderName, senderPhotoURL)
+      await sendMessage(selectedChat.id, "", user.uid, fileURL)
 
       // Clear the file input
       if (fileInputRef.current) {
@@ -495,8 +559,10 @@ export function Friends() {
   const handleTyping = (e: ChangeEvent<HTMLInputElement>) => {
     setNewMessage(e.target.value)
 
-    // Set typing indicator
-    setIsTyping(true)
+    if (!selectedChat) return
+
+    // Set typing indicator in Firebase
+    setTypingIndicator(selectedChat.id, user.uid, true)
 
     // Clear previous timeout
     if (typingTimeout) {
@@ -505,7 +571,9 @@ export function Friends() {
 
     // Set new timeout to clear typing indicator after 2 seconds
     const timeout = setTimeout(() => {
-      setIsTyping(false)
+      if (selectedChat) {
+        setTypingIndicator(selectedChat.id, user.uid, false)
+      }
     }, 2000)
 
     setTypingTimeout(timeout)
@@ -578,31 +646,52 @@ export function Friends() {
     }
   }
 
-  // Rename the current chat
+  // Rename the current chat (only for group chats)
   const handleRenameChat = async () => {
-    if (!selectedChat || !newChatName.trim()) return
+    if (!selectedChat || !newChatName.trim() || !selectedChat.isGroup) return
+
     try {
       await renameChat(selectedChat.id, newChatName.trim())
-      setSelectedChat({ ...selectedChat, name: newChatName.trim() })
       setIsEditingChatName(false)
     } catch (err) {
       console.error("Error renaming chat:", err)
     }
   }
 
-  // Delete or leave chat
-  const handleDeleteChat = async () => {
-    if (!selectedChat) return
+  // Leave group chat
+  const handleLeaveGroupChat = async () => {
+    if (!selectedChat || !selectedChat.isGroup) return
+
     try {
-      if (selectedChat.isGroup) {
-        await deleteChat(selectedChat.id, user.uid)
-      } else {
-        await unfriendUser(selectedChat.id, user.uid)
-      }
+      await leaveGroupChat(selectedChat.id, user.uid)
       setSelectedChat(null)
       setShowChatOptions(false)
+      setSuccess("You have left the group chat")
+
+      // Clear success message after 3 seconds
+      setTimeout(() => {
+        setSuccess(null)
+      }, 3000)
     } catch (err) {
-      console.error("Error deleting chat:", err)
+      console.error("Error leaving group chat:", err)
+    }
+  }
+
+  // Delete message
+  const handleDeleteMessage = async (messageId: string) => {
+    if (!selectedChat) return
+
+    try {
+      await deleteMessage(selectedChat.id, messageId, user.uid)
+      setMessageToDelete(null)
+    } catch (err: any) {
+      console.error("Error deleting message:", err)
+      setError(err.message || "Failed to delete message")
+
+      // Clear error message after 3 seconds
+      setTimeout(() => {
+        setError(null)
+      }, 3000)
     }
   }
 
@@ -632,6 +721,22 @@ export function Friends() {
   // Get pending friend requests count
   const pendingRequestsCount = friendRequests.filter((req) => req.status === "pending").length
 
+  // Get other user's online status for direct chats
+  const getOtherUserStatus = (chat: Chat): string => {
+    if (chat.isGroup) return ""
+
+    const otherUserId = getOtherUserId(chat)
+    if (!otherUserId) return ""
+
+    const friend = onlineFriends.find((f) => f.id === otherUserId)
+    return friend?.status || "offline"
+  }
+
+  const getUserStatus = (userId: string): string => {
+    const friend = onlineFriends.find((f) => f.id === userId)
+    return friend?.status || "offline"
+  }
+
   return (
     <div className={`flex h-screen ${containerClass} overflow-hidden`}>
       {/* Left: Navigation Sidebar */}
@@ -647,7 +752,7 @@ export function Friends() {
             })
           }
         }}
-        userName={user?.displayName || "User"}
+        userName={userProfile?.name || user?.displayName || "User"}
       />
 
       {/* Center: Chat Area */}
@@ -695,68 +800,58 @@ export function Friends() {
               variants={slideUp}
             >
               <div className="flex items-center flex-1 min-w-0">
-                {isEditingChatName ? (
-                  <input
-                    type="text"
-                    value={newChatName}
-                    onChange={(e) => setNewChatName(e.target.value)}
-                    onBlur={handleRenameChat}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") handleRenameChat()
-                    }}
-                    className={`${inputBg} rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 w-full max-w-xs`}
-                    autoFocus
-                  />
-                ) : (
-                  <div className="flex items-center">
-                    <div className="relative mr-3">
-                      <div className="w-10 h-10 rounded-full bg-gray-600 flex items-center justify-center overflow-hidden">
-                        {selectedChat.isGroup ? (
-                          <Users className="w-6 h-6 text-gray-300" />
-                        ) : (
-                          <img
-                            src="https://i.pravatar.cc/150?img=5"
-                            alt="User avatar"
-                            className="w-full h-full object-cover"
-                          />
-                        )}
-                      </div>
+                <div className="flex items-center">
+                  <div className="relative mr-3">
+                    <div className="w-10 h-10 rounded-full bg-gray-600 flex items-center justify-center overflow-hidden">
+                      {selectedChat.isGroup ? (
+                        <Users className="w-6 h-6 text-gray-300" />
+                      ) : (
+                        <User className="w-6 h-6 text-gray-300" />
+                      )}
+                    </div>
+                    {!selectedChat.isGroup && (
                       <div
-                        className={`absolute bottom-0 right-0 w-3 h-3 rounded-full ${
-                          selectedChat.isGroup ? "bg-blue-500" : "bg-green-500"
-                        } border-2 ${isIlluminateEnabled ? "border-gray-100" : "border-gray-800"}`}
+                        className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 ${
+                          getOtherUserStatus(selectedChat) === "online"
+                            ? "bg-green-500"
+                            : getOtherUserStatus(selectedChat) === "away"
+                              ? "bg-yellow-500"
+                              : "bg-gray-500"
+                        } ${isIlluminateEnabled ? "border-gray-100" : "border-gray-800"}`}
                       ></div>
-                    </div>
-                    <div>
-                      <h2 className={`text-lg sm:text-xl font-semibold ${headingClass} truncate`}>
-                        {getChatDisplayName(selectedChat)}
-                      </h2>
-                      <p className={`text-xs ${subheadingClass}`}>{selectedChat.isGroup ? "Group chat" : "Online"}</p>
-                    </div>
+                    )}
                   </div>
-                )}
+                  <div>
+                    <h2 className={`text-lg sm:text-xl font-semibold ${headingClass} truncate`}>
+                      {getChatDisplayName(selectedChat)}
+                    </h2>
+                    <p className={`text-xs ${subheadingClass}`}>
+                      {selectedChat.isGroup
+                        ? `${selectedChat.members.length} members`
+                        : getOtherUserStatus(selectedChat) === "online"
+                          ? "Online"
+                          : getOtherUserStatus(selectedChat) === "away"
+                            ? "Away"
+                            : "Offline"}
+                    </p>
+                  </div>
+                </div>
               </div>
               <div className="flex gap-2 ml-2 flex-shrink-0">
-                <motion.button
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="text-gray-400 hover:text-gray-300 p-1.5 rounded-full hover:bg-gray-700/20"
-                  onClick={() => setIsStarred(!isStarred)}
-                >
-                  <Star className={`w-5 h-5 ${isStarred ? "text-yellow-400 fill-yellow-400" : ""}`} />
-                </motion.button>
-                <motion.button
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="text-blue-400 hover:text-blue-300 p-1.5 rounded-full hover:bg-gray-700/20"
-                  onClick={() => {
-                    setIsEditingChatName(true)
-                    setNewChatName(selectedChat.name || "")
-                  }}
-                  title="Rename Chat"
-                >
-                  <Edit className="w-5 h-5" />
-                </motion.button>
+                {selectedChat.isGroup && selectedChat.createdBy === user?.uid && (
+                  <motion.button
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="text-blue-400 hover:text-blue-300 p-1.5 rounded-full hover:bg-gray-700/20"
+                    onClick={() => {
+                      setIsEditingChatName(true)
+                      setNewChatName(selectedChat.name || "")
+                    }}
+                    title="Rename Group"
+                  >
+                    <Edit className="w-5 h-5" />
+                  </motion.button>
+                )}
                 <motion.div className="relative">
                   <motion.button
                     whileHover={{ scale: 1.1 }}
@@ -786,21 +881,14 @@ export function Friends() {
                           >
                             Mute Notifications
                           </button>
-                          <button
-                            className={`${navButtonClass} block w-full text-left px-4 py-2 text-sm`}
-                            onClick={() => {
-                              setShowChatOptions(false)
-                              // Implement block user
-                            }}
-                          >
-                            Block User
-                          </button>
-                          <button
-                            className={`text-red-500 hover:text-red-400 hover:bg-gray-700/20 block w-full text-left px-4 py-2 text-sm`}
-                            onClick={handleDeleteChat}
-                          >
-                            {selectedChat.isGroup ? "Leave Group" : "Delete Chat"}
-                          </button>
+                          {selectedChat.isGroup && (
+                            <button
+                              className={`text-red-500 hover:text-red-400 hover:bg-gray-700/20 block w-full text-left px-4 py-2 text-sm`}
+                              onClick={handleLeaveGroupChat}
+                            >
+                              Leave Group
+                            </button>
+                          )}
                         </div>
                       </motion.div>
                     )}
@@ -835,7 +923,7 @@ export function Friends() {
                       <motion.div
                         key={msg.id}
                         variants={isOwn ? slideLeft : slideRight}
-                        className={`mb-3 ${isOwn ? "self-end" : "self-start"}`}
+                        className={`mb-3 ${isOwn ? "self-end" : "self-start"} group`}
                       >
                         {showSender && (
                           <div className="flex items-center mb-1 ml-2">
@@ -855,26 +943,44 @@ export function Friends() {
                             </span>
                           </div>
                         )}
-                        <div
-                          className={`relative p-2 sm:p-3 rounded-lg max-w-[75%] break-words ${
-                            isOwn ? `${ownMessageClass}` : `${otherMessageClass}`
-                          }`}
-                        >
-                          {msg.text && <p className="text-sm sm:text-base">{msg.text}</p>}
-                          {msg.fileURL && (
-                            <a
-                              href={msg.fileURL}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className={`flex items-center gap-2 text-xs sm:text-sm underline break-all hover:opacity-80 ${
-                                isOwn ? "text-blue-100" : "text-blue-400"
-                              }`}
-                            >
-                              <Paperclip className="w-4 h-4" />
-                              View File
-                            </a>
+                        <div className="relative">
+                          <div
+                            className={`p-2 sm:p-3 rounded-lg max-w-[75%] break-words ${
+                              isOwn ? `${ownMessageClass}` : `${otherMessageClass}`
+                            }`}
+                          >
+                            {msg.text && <p className="text-sm sm:text-base">{msg.text}</p>}
+                            {msg.fileURL && (
+                              <a
+                                href={msg.fileURL}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={`flex items-center gap-2 text-xs sm:text-sm underline break-all hover:opacity-80 ${
+                                  isOwn ? "text-blue-100" : "text-blue-400"
+                                }`}
+                              >
+                                <Paperclip className="w-4 h-4" />
+                                View File
+                              </a>
+                            )}
+                            <span className="text-xs opacity-70 mt-1 inline-block">
+                              {formatTimestamp(msg.timestamp)}
+                            </span>
+                          </div>
+
+                          {/* Message actions (only for own messages) */}
+                          {isOwn && (
+                            <div className="absolute top-0 right-0 -mt-2 -mr-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <motion.button
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.9 }}
+                                onClick={() => setMessageToDelete(msg.id)}
+                                className="bg-red-500 text-white p-1 rounded-full shadow-md"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </motion.button>
+                            </div>
                           )}
-                          <span className="text-xs opacity-70 mt-1 inline-block">{formatTimestamp(msg.timestamp)}</span>
                         </div>
                       </motion.div>
                     )
@@ -882,26 +988,33 @@ export function Friends() {
                   <div ref={messagesEndRef} />
 
                   {/* Typing indicator */}
-                  {isTyping && (
+                  {typingUsers.length > 0 && (
                     <motion.div
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: 10 }}
                       className={`self-start p-2 rounded-lg ${otherMessageClass} max-w-[75%]`}
                     >
-                      <div className="flex space-x-1">
-                        <div
-                          className="w-2 h-2 rounded-full bg-current animate-bounce"
-                          style={{ animationDelay: "0ms" }}
-                        ></div>
-                        <div
-                          className="w-2 h-2 rounded-full bg-current animate-bounce"
-                          style={{ animationDelay: "150ms" }}
-                        ></div>
-                        <div
-                          className="w-2 h-2 rounded-full bg-current animate-bounce"
-                          style={{ animationDelay: "300ms" }}
-                        ></div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs">
+                          {typingUsers.length === 1
+                            ? `${typingUsers[0].name || "Someone"} is typing...`
+                            : "Multiple people are typing..."}
+                        </span>
+                        <div className="flex space-x-1">
+                          <div
+                            className="w-2 h-2 rounded-full bg-current animate-bounce"
+                            style={{ animationDelay: "0ms" }}
+                          ></div>
+                          <div
+                            className="w-2 h-2 rounded-full bg-current animate-bounce"
+                            style={{ animationDelay: "150ms" }}
+                          ></div>
+                          <div
+                            className="w-2 h-2 rounded-full bg-current animate-bounce"
+                            style={{ animationDelay: "300ms" }}
+                          ></div>
+                        </div>
                       </div>
                     </motion.div>
                   )}
@@ -1111,7 +1224,7 @@ export function Friends() {
                     onClick={() => setSearchQuery("")}
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-300"
                   >
-                    <XCircle className="w-4 h-4" />
+                    <X className="w-4 h-4" />
                   </button>
                 )}
               </div>
@@ -1150,7 +1263,7 @@ export function Friends() {
               </button>
             </div>
 
-            {/* Success message */}
+            {/* Success/Error messages */}
             <AnimatePresence>
               {success && (
                 <motion.div
@@ -1160,6 +1273,16 @@ export function Friends() {
                   className="bg-green-500/20 border-l-4 border-green-500 p-3 mx-4 mt-4 rounded"
                 >
                   <p className="text-green-400 text-sm">{success}</p>
+                </motion.div>
+              )}
+              {error && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="bg-red-500/20 border-l-4 border-red-500 p-3 mx-4 mt-4 rounded"
+                >
+                  <p className="text-red-400 text-sm">{error}</p>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -1193,18 +1316,20 @@ export function Friends() {
                               {chat.isGroup ? (
                                 <Users className="w-6 h-6 text-gray-300" />
                               ) : (
-                                <img
-                                  src="https://i.pravatar.cc/150?img=5"
-                                  alt="User avatar"
-                                  className="w-full h-full object-cover"
-                                />
+                                <User className="w-6 h-6 text-gray-300" />
                               )}
                             </div>
-                            <div
-                              className={`absolute bottom-0 right-0 w-3 h-3 rounded-full ${
-                                chat.isGroup ? "bg-blue-500" : "bg-green-500"
-                              } border-2 ${isIlluminateEnabled ? "border-gray-100" : "border-gray-700"}`}
-                            ></div>
+                            {!chat.isGroup && (
+                              <div
+                                className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 ${
+                                  getOtherUserStatus(chat) === "online"
+                                    ? "bg-green-500"
+                                    : getOtherUserStatus(chat) === "away"
+                                      ? "bg-yellow-500"
+                                      : "bg-gray-500"
+                                } ${isIlluminateEnabled ? "border-gray-100" : "border-gray-700"}`}
+                              ></div>
+                            )}
                           </div>
                           <div className="min-w-0 flex-1">
                             <div className="flex justify-between">
@@ -1257,65 +1382,81 @@ export function Friends() {
                         Send
                       </motion.button>
                     </div>
-                    {error && <p className="text-red-400 text-xs mt-2">{error}</p>}
                   </div>
 
                   <h2 className={`text-lg font-semibold ${headingClass} mb-3`}>Online Friends</h2>
                   <div className="space-y-2">
-                    {onlineFriends.map((friend) => (
-                      <motion.div
-                        key={friend.id}
-                        variants={fadeIn}
-                        className={`flex items-center p-2 rounded-lg ${chatListItemClass}`}
-                      >
-                        <div className="relative mr-3">
-                          <div className="w-10 h-10 rounded-full overflow-hidden">
-                            {friend.photoURL ? (
-                              <img
-                                src={friend.photoURL || "/placeholder.svg"}
-                                alt={friend.name || "User"}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-full h-full bg-gray-600 flex items-center justify-center">
+                    {onlineFriends.length === 0 ? (
+                      <p className="text-gray-400 text-sm text-center py-4">No friends online.</p>
+                    ) : (
+                      onlineFriends.map((friend) => (
+                        <motion.div
+                          key={friend.id}
+                          variants={fadeIn}
+                          className={`flex items-center p-2 rounded-lg ${chatListItemClass}`}
+                        >
+                          <div className="relative mr-3">
+                            <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-600 flex items-center justify-center">
+                              {friend.photoURL ? (
+                                <img
+                                  src={friend.photoURL || "/placeholder.svg"}
+                                  alt={friend.name || "User"}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
                                 <User className="w-6 h-6 text-gray-300" />
-                              </div>
-                            )}
+                              )}
+                            </div>
+                            <div
+                              className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 ${
+                                friend.status === "online"
+                                  ? "bg-green-500"
+                                  : friend.status === "away"
+                                    ? "bg-yellow-500"
+                                    : "bg-red-500"
+                              } ${isIlluminateEnabled ? "border-gray-100" : "border-gray-700"}`}
+                            ></div>
                           </div>
-                          <div
-                            className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 ${
-                              friend.status === "online"
-                                ? "bg-green-500"
-                                : friend.status === "away"
-                                  ? "bg-yellow-500"
-                                  : "bg-red-500"
-                            } ${isIlluminateEnabled ? "border-gray-100" : "border-gray-700"}`}
-                          ></div>
-                        </div>
-                        <div>
-                          <h3 className="text-sm font-medium">{friend.name}</h3>
-                          <p className="text-xs text-gray-400">
-                            {friend.status === "online" ? "Online" : friend.status === "away" ? "Away" : "Busy"}
-                          </p>
-                        </div>
-                        <div className="ml-auto flex gap-1">
-                          <motion.button
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.9 }}
-                            className="text-blue-400 hover:text-blue-300 p-1 rounded-full hover:bg-gray-700/20"
-                          >
-                            <MessageSquare className="w-4 h-4" />
-                          </motion.button>
-                          <motion.button
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.9 }}
-                            className="text-blue-400 hover:text-blue-300 p-1 rounded-full hover:bg-gray-700/20"
-                          >
-                            <Video className="w-4 h-4" />
-                          </motion.button>
-                        </div>
-                      </motion.div>
-                    ))}
+                          <div>
+                            <h3 className="text-sm font-medium">{friend.name}</h3>
+                            <p className="text-xs text-gray-400 flex items-center">
+                              {friend.status === "online" ? (
+                                "Online"
+                              ) : friend.status === "away" ? (
+                                "Away"
+                              ) : (
+                                <span className="flex items-center">
+                                  <Clock className="w-3 h-3 mr-1" />
+                                  {formatLastSeen(friend.lastSeen)}
+                                </span>
+                              )}
+                            </p>
+                          </div>
+                          <div className="ml-auto flex gap-1">
+                            <motion.button
+                              whileHover={{ scale: 1.1 }}
+                              whileTap={{ scale: 0.9 }}
+                              className="text-blue-400 hover:text-blue-300 p-1 rounded-full hover:bg-gray-700/20"
+                              onClick={() => {
+                                // Find or create chat with this friend
+                                const existingChat = chats.find(
+                                  (chat) => !chat.isGroup && chat.members.includes(friend.id),
+                                )
+
+                                if (existingChat) {
+                                  setSelectedChat(existingChat)
+                                  if (isMobileView) {
+                                    setShowMobileAside(false)
+                                  }
+                                }
+                              }}
+                            >
+                              <MessageSquare className="w-4 h-4" />
+                            </motion.button>
+                          </div>
+                        </motion.div>
+                      ))
+                    )}
                   </div>
                 </motion.div>
               )}
@@ -1430,6 +1571,55 @@ export function Friends() {
                   className={`px-3 py-1.5 text-xs sm:text-sm font-medium ${primaryButtonClass} rounded-lg`}
                 >
                   Create
+                </motion.button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Message Confirmation Modal */}
+      <AnimatePresence>
+        {messageToDelete && (
+          <motion.div
+            className="fixed inset-0 flex items-center justify-center z-50 bg-black/50 p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              className={`${groupModalClass} p-4 sm:p-6 rounded-lg w-full max-w-md`}
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+            >
+              <h2 className="text-lg sm:text-xl font-semibold mb-4 flex items-center gap-2">
+                <Trash2 className="w-5 h-5 text-red-500" />
+                Delete Message
+              </h2>
+              <p className="mb-4 text-sm">
+                Are you sure you want to delete this message? This action cannot be undone.
+              </p>
+              <div className="flex justify-end gap-2">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setMessageToDelete(null)}
+                  className={`px-3 py-1.5 text-xs sm:text-sm font-medium ${secondaryButtonClass} rounded-lg`}
+                >
+                  Cancel
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => {
+                    if (messageToDelete) {
+                      handleDeleteMessage(messageToDelete)
+                    }
+                  }}
+                  className="px-3 py-1.5 text-xs sm:text-sm font-medium bg-red-500 hover:bg-red-600 text-white rounded-lg"
+                >
+                  Delete
                 </motion.button>
               </div>
             </motion.div>

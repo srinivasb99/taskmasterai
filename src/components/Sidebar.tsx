@@ -248,7 +248,7 @@ return (
             <button
               onClick={() => navigate("/settings")}
               className={`
-                mx-3 flex items-center gap-3 rounded-lg transition-colors
+                mx-3 flex items-left gap-3 rounded-lg transition-colors
                 ${userProfileText}
                 ${userProfileHoverBg}
                 ${isCollapsed && !isMobileMenuOpen ? "justify-center aspect-square" : "px-4 py-2.5"}

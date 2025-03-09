@@ -22,7 +22,18 @@ export function PageLayout({
   };
 
   return (
-    <div className="flex min-h-screen bg-gray-900">
+    <div
+      className={`
+        flex min-h-screen transition-colors duration-300 ease-in-out
+        ${
+          isBlackoutEnabled
+            ? "bg-gray-950"
+            : isIlluminateEnabled
+            ? "bg-white"
+            : "bg-gray-900"
+        }
+      `}
+    >
       <Sidebar
         userName={user?.displayName || "User"}
         isCollapsed={isSidebarCollapsed}

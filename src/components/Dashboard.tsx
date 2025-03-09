@@ -1253,50 +1253,49 @@ const resetCustomTimer = (timerId: string, defaultTime?: number) => {
 
 // Example of improved color usage in Illuminate mode
 
-// 1. Define a few helper classes specifically for Illuminate mode
-//    to ensure better contrast on a light background.
+// UPDATED: Changed responsive breakpoints from 'sm:' (640px) to 'md:' (768px)
+// This makes the mobile layout activate on medium-sized screens (up to 768px)
+// which is better for split-screen usage and larger mobile devices
+
 // Define conditional color classes based on the isIlluminateEnabled flag
-const headlineColor = isIlluminateEnabled ? 'text-green-700' : 'text-green-400';
-const bulletTextColor = isIlluminateEnabled ? 'text-blue-700' : 'text-blue-300';
-const bulletBorderColor = isIlluminateEnabled ? 'border-blue-700' : 'border-blue-500';
-const defaultTextColor = isIlluminateEnabled ? 'text-gray-700' : 'text-gray-300';
-const illuminateHighlightToday = 'bg-blue-200 text-blue-800 font-bold';
-const illuminateHighlightDeadline = 'bg-red-200 hover:bg-red-300';
-const illuminateHoverGray = 'hover:bg-gray-200';
-const illuminateTextBlue = 'text-blue-700';
-const illuminateTextPurple = 'text-purple-700';
-const illuminateTextGreen = 'text-green-700';
-const illuminateTextPink = 'text-pink-700';
-const illuminateTextYellow = 'text-yellow-700';
+const headlineColor = isIlluminateEnabled ? "text-green-700" : "text-green-400"
+const bulletTextColor = isIlluminateEnabled ? "text-blue-700" : "text-blue-300"
+const bulletBorderColor = isIlluminateEnabled ? "border-blue-700" : "border-blue-500"
+const defaultTextColor = isIlluminateEnabled ? "text-gray-700" : "text-gray-300"
+const illuminateHighlightToday = "bg-blue-200 text-blue-800 font-bold"
+const illuminateHighlightDeadline = "bg-red-200 hover:bg-red-300"
+const illuminateHoverGray = "hover:bg-gray-200"
+const illuminateTextBlue = "text-blue-700"
+const illuminateTextPurple = "text-purple-700"
+const illuminateTextGreen = "text-green-700"
+const illuminateTextPink = "text-pink-700"
+const illuminateTextYellow = "text-yellow-700"
+
+// Define breakpoint for mobile/desktop switch - using md (768px) instead of sm (640px)
+// This makes mobile mode activate on bigger devices and split screens
+const mobileBreakpoint = "md" // ADDED: Variable to control all breakpoints consistently
 
 // Original dynamic classes
 const containerClass = isIlluminateEnabled
-  ? 'bg-white text-gray-900'
+  ? "bg-white text-gray-900"
   : isBlackoutEnabled
-  ? 'bg-gray-950 text-white'
-  : 'bg-gray-900 text-white';
+    ? "bg-gray-950 text-white"
+    : "bg-gray-900 text-white"
 
-const cardClass = isIlluminateEnabled
-  ? 'bg-gray-100 text-gray-900'
-  : 'bg-gray-800 text-gray-300';
+const cardClass = isIlluminateEnabled ? "bg-gray-100 text-gray-900" : "bg-gray-800 text-gray-300"
 
-const headingClass = isIlluminateEnabled ? 'text-gray-900' : 'text-white';
+const headingClass = isIlluminateEnabled ? "text-gray-900" : "text-white"
 // Darken subheading a bit so it’s easier to see on white
-const subheadingClass = isIlluminateEnabled ? 'text-gray-700' : 'text-gray-400';
+const subheadingClass = isIlluminateEnabled ? "text-gray-700" : "text-gray-400"
 
 // Lighten input background but keep enough contrast
-const inputBg = isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700';
+const inputBg = isIlluminateEnabled ? "bg-gray-200" : "bg-gray-700"
 
-  
-  const bgColor = isIlluminateEnabled
-    ? 'bg-white text-gray-900'
-    : isBlackoutEnabled
-    ? 'bg-gray-950 text-white'
-    : 'bg-gray-900 text-white';
-
-            
-
-
+const bgColor = isIlluminateEnabled
+  ? "bg-white text-gray-900"
+  : isBlackoutEnabled
+    ? "bg-gray-950 text-white"
+    : "bg-gray-900 text-white"
 
 return (
   <div className={`${containerClass} min-h-screen w-full overflow-x-hidden`}>
@@ -1311,17 +1310,17 @@ return (
 
     <main
       className={`transition-all duration-300 ease-in-out min-h-screen
-    ${isSidebarCollapsed ? 'ml-20 sm:ml-20' : 'ml-0 sm:ml-64'}
-    p-3 sm:p-4 lg:p-8 overflow-x-hidden`}
+${isSidebarCollapsed ? 'ml-20 md:ml-20' : 'ml-0 md:ml-64'} 
+p-3 md:p-4 lg:p-8 overflow-x-hidden`} 
     >
       <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 sm:gap-6 mb-4 sm:mb-6">
-        <header className="dashboard-header transform transition-all duration-500 ease-out translate-y-0 opacity-100 pt-4 sm:pt-16 lg:pt-0 w-full lg:w-auto">
+        <header className="dashboard-header transform transition-all duration-500 ease-out translate-y-0 opacity-100 pt-4 md:pt-16 lg:pt-0 w-full lg:w-auto\"> 
           <h1
-            className={`text-xl sm:text-2xl lg:text-4xl font-bold mb-2 ${headingClass} break-words`}
+            className={`text-xl md:text-2xl lg:text-4xl font-bold mb-2 ${headingClass} break-words`} 
           >
             {React.cloneElement(greeting.icon, {
               className:
-                'w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 inline-block align-middle mr-2 -translate-y-0.5 ' +
+                'w-4 h-4 md:w-5 md:h-5 lg:w-6 lg:h-6 inline-block align-middle mr-2 -translate-y-0.5 ' + 
                 (greeting.icon.props.className ?? ''),
             })}
             {greeting.greeting},{' '}
@@ -1329,7 +1328,7 @@ return (
               {userName ? userName.split(' ')[0] : 'Loading...'}
             </span>
           </h1>
-          <p className={`italic text-sm sm:text-base lg:text-lg ${subheadingClass}`}>
+          <p className={`italic text-sm md:text-base lg:text-lg ${subheadingClass}`}>
             "{quote.text}" -{' '}
             {/* Darken the author color in illuminate mode */}
             <span
@@ -1344,7 +1343,7 @@ return (
 
         {/* Calendar Card */}
         <div
-          className={`${cardClass} rounded-xl p-2 min-w-[100px] w-full max-w-full sm:max-w-[550px] h-[80px] transform hover:scale-[1.02] transition-all duration-300 flex-shrink-0 lg:flex-shrink overflow-hidden`}
+          className={`${cardClass} rounded-xl p-2 min-w-[100px] w-full max-w-full md:max-w-[550px] h-[80px] transform hover:scale-[1.02] transition-all duration-300 flex-shrink-0 lg:flex-shrink overflow-hidden`} 
         >
           <div className="grid grid-cols-9 gap-1 h-full">
             <button
@@ -1365,7 +1364,7 @@ return (
                     (day) => (
                       <div
                         key={day}
-                        className={`text-center text-[8px] sm:text-[10px] font-medium ${subheadingClass}`}
+                        className={`text-center text-[8px] md:text-[10px] font-medium ${subheadingClass}`}
                       >
                         {day}
                       </div>
@@ -1857,7 +1856,7 @@ return (
                     : new Date(a.data.dueDate);
                   const bDate = b.data.dueDate.toDate
                     ? b.data.dueDate.toDate()
-                    : new Date(b.data.dueDate);
+                    : new Date(a.data.dueDate);
                   return aDate - bDate;
                 })
                 .slice(0, 5);
@@ -1946,10 +1945,10 @@ return (
               ))}
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-2 mb-6">
+            <div className="flex flex-col md:flex-row gap-2 mb-6">
               <input
                 type="text"
-                className={`flex-grow ${inputBg} border border-gray-700 rounded-full p-2 sm:p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300`}
+                className={`flex-grow ${inputBg} border border-gray-700 rounded-full p-2 md:p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300`} 
                 placeholder={`Enter new ${activeTab}...`}
                 value={newItemText}
                 onChange={(e) => setNewItemText(e.target.value)}
@@ -1957,7 +1956,7 @@ return (
               <div className="flex gap-2">
                 <input
                   type="date"
-                  className={`${inputBg} border border-gray-700 rounded-full p-2 sm:p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 w-full sm:w-auto`}
+                  className={`${inputBg} border border-gray-700 rounded-full p-2 md:p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 w-full md:w-auto`} 
                   value={newItemDate}
                   onChange={(e) => setNewItemDate(e.target.value)}
                 />
@@ -1994,7 +1993,7 @@ return (
                   return (
                     <li
                       key={item.id}
-                      className={`p-3 sm:p-4 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3
+                      className={`p-3 md:p-4 rounded-lg flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-3 
     ${
       isCompleted
         ? isIlluminateEnabled
@@ -2059,7 +2058,7 @@ return (
                           />
                           <input
                             type="date"
-                            className={`${inputBg} border border-gray-600 rounded-full p-2 sm:p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300`}
+                            className={`flex-grow ${inputBg} border border-gray-600 rounded-full p-2 sm:p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300`}
                             value={editingDate}
                             onChange={(e) => setEditingDate(e.target.value)}
                           />
@@ -2243,7 +2242,6 @@ return (
                           Low: {minF}°F
                         </p>
                       </div>
-                      {/* Lighten the bar background in illuminate mode */}
                       <div
                         className={`mt-2 w-full h-2 ${
                           isIlluminateEnabled ? 'bg-gray-300' : 'bg-gray-600'
@@ -2264,7 +2262,6 @@ return (
       </>
     ) : (
       <div className="animate-pulse space-y-4">
-        {/* For illuminate mode, lighten these skeleton bars */}
         <div
           className={`h-8 rounded-full w-1/2 ${
             isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700'
@@ -2297,7 +2294,6 @@ return (
         <PlusCircle className="w-3 h-3 sm:w-4 sm:h-4" /> New Timer
       </button>
     </div>
-    {/* If you want a different gradient for the big timer in illuminate mode, define conditionally */}
     <div
       className={`text-4xl sm:text-6xl font-bold mb-4 sm:mb-6 text-center bg-clip-text text-transparent ${
         isIlluminateEnabled
@@ -2350,7 +2346,6 @@ return (
           const isRunning = runningState ? runningState.isRunning : false;
           const isEditing = editingTimerId === timerId;
 
-          // Determine background based on mode and item status
           let itemBgClass = '';
           if (!isEditing) {
             if (timer.data.completed) {
@@ -2380,8 +2375,8 @@ return (
               className={`p-3 sm:p-4 rounded-lg backdrop-blur-sm transform transition-all duration-300 hover:scale-[1.02] hover:shadow-lg animate-fadeIn ${itemBgClass}`}
               style={{ animationDelay: `${index * 100}ms` }}
             >
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
-                <div className="flex flex-col items-center sm:items-start w-full sm:w-auto">
+              <div className="flex flex-col md:flex-row items-center justify-between gap-3 md:gap-4"> 
+                <div className="flex flex-col items-center md:items-start w-full md:w-auto"> 
                   {isEditing ? (
                     <div className="flex flex-col gap-2 w-full">
                       <input

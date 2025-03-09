@@ -817,7 +817,7 @@ Return ONLY the title, with no extra commentary.
     alert(`Sharing conversation ID: ${conv.id}`);
   };
 
-  const iconClass = "w-6 h-6"; // Use consistent size for all icons
+  const iconClass = "w-5 h-5"; // Use consistent size for all icons
   
   // ----- Quick Actions for "no conversation selected" -----
   const quickActions = [

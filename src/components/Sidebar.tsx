@@ -123,10 +123,6 @@ return (
         )}
       </button>
       
-      <div className={`flex-1 flex items-center justify-center gap-2 ${mobileHeaderText} font-medium`}>
-        <span>{getCurrentPageTitle()}</span>
-      </div>
-      
       <button 
         onClick={() => navigate('/settings')}
         className={`${mobileHeaderText} p-1 hover:opacity-80 transition-opacity`}

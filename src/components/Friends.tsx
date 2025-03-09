@@ -1,5 +1,3 @@
-"use client"
-
 import { useState, useEffect, useRef, type ChangeEvent, type FormEvent } from "react"
 import { useNavigate } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"

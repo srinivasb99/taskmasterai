@@ -1,36 +1,9 @@
-import { useState, useEffect, useRef, ChangeEvent, FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
-import {
-  User,
-  Users2,
-  MessageSquare,
-  PlusCircle,
-  Paperclip,
-  Send,
-  Users,
-  CheckCircle,
-  XCircle,
-  Edit,
-  Trash2,
-  Search,
-  Bell,
-  UserPlus,
-  Settings,
-  ChevronRight,
-  ChevronLeft,
-  Image,
-  Smile,
-  Mic,
-  MoreVertical,
-  Star,
-  Filter,
-  X,
-  LogOut,
-  Clock,
-} from "lucide-react";
-import { Sidebar } from "./Sidebar";
-import { getCurrentUser } from "../lib/settings-firebase";
+import { useState, useEffect, useRef, type ChangeEvent, type FormEvent } from "react"
+import { useNavigate } from "react-router-dom"
+import { motion, AnimatePresence } from "framer-motion"
+import { User, Users2, MessageSquare, PlusCircle, Paperclip, Send, Users, CheckCircle, XCircle, Edit, Trash2, Search, Bell, UserPlus, Settings, ChevronRight, ChevronLeft, Image, Smile, Mic, MoreVertical, Star, Filter, X, LogOut, Clock } from 'lucide-react'
+import { Sidebar } from "./Sidebar"
+import { getCurrentUser } from "../lib/settings-firebase"
 import {
   listenToChatsRealtime,
   listenToMessagesRealtime,
@@ -53,71 +26,70 @@ import {
   listenToFriendsOnlineStatus,
   setTypingIndicator,
   listenToTypingIndicators,
-  getUserFriends,
-} from "../lib/friends-firebase";
+  getUserFriends
+} from "../lib/friends-firebase"
 
-// Interfaces
 interface Chat {
-  id: string;
-  isGroup: boolean;
-  members: string[];
-  memberNames?: Record<string, string>;
-  name?: string;
-  lastMessage?: string;
-  updatedAt?: any;
-  createdBy?: string;
+  id: string
+  isGroup: boolean
+  members: string[]
+  memberNames?: Record<string, string>
+  name?: string
+  lastMessage?: string
+  updatedAt?: any
+  createdBy?: string
 }
 
 interface Message {
-  id: string;
-  text: string;
-  senderId: string;
-  senderName?: string;
-  senderPhotoURL?: string;
-  fileURL?: string;
-  fileType?: string;
-  fileName?: string;
-  timestamp?: any;
+  id: string
+  text: string
+  senderId: string
+  senderName?: string
+  senderPhotoURL?: string
+  fileURL?: string
+  fileType?: string
+  fileName?: string
+  timestamp?: any
 }
 
 interface FriendRequest {
-  id: string;
-  fromUserId: string;
-  fromUserName: string;
-  toUserId: string;
-  status: "pending" | "accepted" | "rejected";
+  id: string
+  fromUserId: string
+  fromUserName: string
+  toUserId: string
+  status: "pending" | "accepted" | "rejected"
 }
 
 interface UserProfile {
-  id: string;
-  name?: string;
-  displayName?: string;
-  email?: string;
-  photoURL?: string;
-  status?: "online" | "offline" | "away" | "busy";
-  lastSeen?: any;
+  id: string
+  name?: string
+  displayName?: string
+  email?: string
+  photoURL?: string
+  status?: "online" | "offline" | "away" | "busy"
+  lastSeen?: any
 }
 
-// Animation Variants
+// Animation variants
 const slideUp = {
   hidden: { opacity: 0, y: 20 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.3 } },
-};
+}
 
 const slideRight = {
   hidden: { opacity: 0, x: -20 },
   visible: { opacity: 1, x: 0, transition: { duration: 0.3 } },
-};
+}
 
 const slideLeft = {
   hidden: { opacity: 0, x: 20 },
   visible: { opacity: 1, x: 0, transition: { duration: 0.3 } },
-};
+}
 
 const fadeIn = {
   hidden: { opacity: 0 },
   visible: { opacity: 1, transition: { duration: 0.2 } },
-};
+}
 
 const staggerChildren = {
   hidden: { opacity: 0 },
@@ -127,435 +99,462 @@ const staggerChildren = {
       staggerChildren: 0.07,
     },
   },
-};
+}
 
 export function Friends() {
-  const navigate = useNavigate();
+  const navigate = useNavigate()
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const chatContainerRef = useRef<HTMLDivElement>(null)
+  const emojiPickerRef = useRef<HTMLDivElement>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const audioChunksRef = useRef<Blob[]>([])
 
-  // Refs
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const emojiPickerRef = useRef<HTMLDivElement>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const chatContainerRef = useRef<HTMLDivElement>(null);
+  // Auth state
+  const [user, setUser] = useState<any>(null)
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
 
-  // Auth and profile states
-  const [user, setUser] = useState<any>(null);
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-
-  // Sidebar & mode states
+  // Sidebar collapse state (persisted)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
-    const stored = localStorage.getItem("isSidebarCollapsed");
-    return stored ? JSON.parse(stored) : false;
-  });
+    const stored = localStorage.getItem("isSidebarCollapsed")
+    return stored ? JSON.parse(stored) : false
+  })
+
+  // Blackout mode state
   const [isBlackoutEnabled, setIsBlackoutEnabled] = useState(() => {
-    const stored = localStorage.getItem("isBlackoutEnabled");
-    return stored ? JSON.parse(stored) : false;
-  });
+    const stored = localStorage.getItem("isBlackoutEnabled")
+    return stored ? JSON.parse(stored) : false
+  })
+
+  // Sidebar Blackout option state
   const [isSidebarBlackoutEnabled, setIsSidebarBlackoutEnabled] = useState(() => {
-    const stored = localStorage.getItem("isSidebarBlackoutEnabled");
-    return stored ? JSON.parse(stored) : false;
-  });
+    const stored = localStorage.getItem("isSidebarBlackoutEnabled")
+    return stored ? JSON.parse(stored) : false
+  })
+
+  // Illuminate (light mode) state
   const [isIlluminateEnabled, setIsIlluminateEnabled] = useState(() => {
-    const stored = localStorage.getItem("isIlluminateEnabled");
-    return stored ? JSON.parse(stored) : false;
-  });
+    const stored = localStorage.getItem("isIlluminateEnabled")
+    return stored ? JSON.parse(stored) : false
+  })
+
+  // Sidebar Illuminate option state
   const [isSidebarIlluminateEnabled, setIsSidebarIlluminateEnabled] = useState(() => {
-    const stored = localStorage.getItem("isSidebarIlluminateEnabled");
-    return stored ? JSON.parse(stored) : false;
-  });
+    const stored = localStorage.getItem("isSidebarIlluminateEnabled")
+    return stored ? JSON.parse(stored) : false
+  })
 
-  // Right-hand panels states
-  const [chats, setChats] = useState<Chat[]>([]);
-  const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
-  const [onlineFriends, setOnlineFriends] = useState<UserProfile[]>([]);
-  const [typingUsers, setTypingUsers] = useState<any[]>([]);
-  const [chatMembers, setChatMembers] = useState<Record<string, UserProfile[]>>({});
+  // Right-hand panels state
+  const [chats, setChats] = useState<Chat[]>([])
+  const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([])
+  const [onlineFriends, setOnlineFriends] = useState<UserProfile[]>([])
+  const [typingUsers, setTypingUsers] = useState<any[]>([])
+  const [chatMembers, setChatMembers] = useState<Record<string, UserProfile[]>>({})
 
-  // Selected chat and messages
-  const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [newMessage, setNewMessage] = useState("");
-  const [isTyping, setIsTyping] = useState(false);
-  const [typingTimeout, setTypingTimeout] = useState<NodeJS.Timeout | null>(null);
+  // Selected chat & messages
+  const [selectedChat, setSelectedChat] = useState<Chat | null>(null)
+  const [messages, setMessages] = useState<Message[]>([])
+  const [newMessage, setNewMessage] = useState("")
+  const [isTyping, setIsTyping] = useState(false)
+  const [typingTimeout, setTypingTimeout] = useState<NodeJS.Timeout | null>(null)
 
-  // Chat renaming
-  const [isEditingChatName, setIsEditingChatName] = useState(false);
-  const [newChatName, setNewChatName] = useState("");
+  // Renaming chat
+  const [isEditingChatName, setIsEditingChatName] = useState(false)
+  const [newChatName, setNewChatName] = useState("")
 
-  // Friend request states
-  const [friendEmail, setFriendEmail] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-
-  // Group chat creation
-  const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
-  const [groupName, setGroupName] = useState("");
-  const [groupEmails, setGroupEmails] = useState("");
-
-  // File uploading state
-  const [fileUploading, setFileUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-
-  // Mobile view state
-  const [isMobileView, setIsMobileView] = useState(false);
-  const [showMobileAside, setShowMobileAside] = useState(false);
-
-  // UI states
-  const [activeTab, setActiveTab] = useState<"chats" | "friends" | "requests">("chats");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
-  const [showChatOptions, setShowChatOptions] = useState(false);
-  const [isStarred, setIsStarred] = useState(false);
-  const [messageToDelete, setMessageToDelete] = useState<string | null>(null);
-
-  // NEW: Attachment states
+  // Adding friend by email
+  const [friendEmail, setFriendEmail] = useState("")
+  const [error, setError] = useState<string | null>(null)
+    // NEW: States for attachments
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
   const [attachedAudio, setAttachedAudio] = useState<File | null>(null);
+  
+  const [success, setSuccess] = useState<string | null>(null)
 
-  // Update localStorage and body class for modes
+  // Creating group chat
+  const [isGroupModalOpen, setIsGroupModalOpen] = useState(false)
+  const [groupName, setGroupName] = useState("")
+  const [groupEmails, setGroupEmails] = useState("") // comma-separated emails
+
+  // File uploading
+  const [fileUploading, setFileUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+
+  // Mobile view state
+  const [isMobileView, setIsMobileView] = useState(false)
+  const [showMobileAside, setShowMobileAside] = useState(false)
+
+  // UI state
+  const [activeTab, setActiveTab] = useState<"chats" | "friends" | "requests">("chats")
+  const [searchQuery, setSearchQuery] = useState("")
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false)
+  const [isRecording, setIsRecording] = useState(false)
+  const [showChatOptions, setShowChatOptions] = useState(false)
+  const [isStarred, setIsStarred] = useState(false)
+  const [messageToDelete, setMessageToDelete] = useState<string | null>(null)
+
+  // Update localStorage and document.body for modes
   useEffect(() => {
-    localStorage.setItem("isBlackoutEnabled", JSON.stringify(isBlackoutEnabled));
-    document.body.classList.toggle("blackout-mode", isBlackoutEnabled);
-  }, [isBlackoutEnabled]);
+    localStorage.setItem("isBlackoutEnabled", JSON.stringify(isBlackoutEnabled))
+    document.body.classList.toggle("blackout-mode", isBlackoutEnabled)
+  }, [isBlackoutEnabled])
 
   useEffect(() => {
-    localStorage.setItem("isSidebarBlackoutEnabled", JSON.stringify(isSidebarBlackoutEnabled));
-  }, [isSidebarBlackoutEnabled]);
+    localStorage.setItem("isSidebarBlackoutEnabled", JSON.stringify(isSidebarBlackoutEnabled))
+  }, [isSidebarBlackoutEnabled])
 
   useEffect(() => {
-    localStorage.setItem("isIlluminateEnabled", JSON.stringify(isIlluminateEnabled));
+    localStorage.setItem("isIlluminateEnabled", JSON.stringify(isIlluminateEnabled))
     if (isIlluminateEnabled) {
-      document.body.classList.add("illuminate-mode");
+      document.body.classList.add("illuminate-mode")
     } else {
-      document.body.classList.remove("illuminate-mode");
+      document.body.classList.remove("illuminate-mode")
     }
-  }, [isIlluminateEnabled]);
+  }, [isIlluminateEnabled])
 
   useEffect(() => {
-    localStorage.setItem("isSidebarIlluminateEnabled", JSON.stringify(isSidebarIlluminateEnabled));
-  }, [isSidebarIlluminateEnabled]);
+    localStorage.setItem("isSidebarIlluminateEnabled", JSON.stringify(isSidebarIlluminateEnabled))
+  }, [isSidebarIlluminateEnabled])
 
-  // Check mobile view
+  // Check for mobile view
   useEffect(() => {
     const checkMobileView = () => {
-      setIsMobileView(window.innerWidth < 768);
-    };
-    checkMobileView();
-    window.addEventListener("resize", checkMobileView);
-    return () => window.removeEventListener("resize", checkMobileView);
-  }, []);
+      setIsMobileView(window.innerWidth < 768)
+    }
+
+    checkMobileView()
+    window.addEventListener("resize", checkMobileView)
+
+    return () => {
+      window.removeEventListener("resize", checkMobileView)
+    }
+  }, [])
 
   // Scroll to bottom when new messages arrive
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [messages])
 
   // Close emoji picker when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target as Node)) {
-        setShowEmojiPicker(false);
+        setShowEmojiPicker(false)
       }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+    }
 
-  // ---------------------------
-  // Dynamic CSS Classes for Modes
-  // ---------------------------
-  const containerClass = isIlluminateEnabled
-    ? "bg-white text-gray-900"
-    : isBlackoutEnabled
-      ? "bg-gray-950 text-white"
-      : "bg-gray-900 text-white";
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside)
+    }
+  }, [])
 
-  const headingClass = isIlluminateEnabled
-    ? "text-gray-900"
-    : isBlackoutEnabled
-      ? "text-white"
-      : "text-white";
+// ---------------------------
+// Dynamic CSS Classes for Modes
+// ---------------------------
+const containerClass = isIlluminateEnabled
+  ? "bg-white text-gray-900"
+  : isBlackoutEnabled
+    ? "bg-gray-950 text-white"
+    : "bg-gray-900 text-white";
 
-  const subheadingClass = isIlluminateEnabled
-    ? "text-gray-600"
-    : isBlackoutEnabled
-      ? "text-gray-400"
-      : "text-gray-400";
+const headingClass = isIlluminateEnabled
+  ? "text-gray-900"
+  : isBlackoutEnabled
+    ? "text-white"
+    : "text-white";
 
-  // For the main chat header background
-  const chatHeaderClass = isIlluminateEnabled
-    ? "bg-white border-b border-gray-300"
-    : isBlackoutEnabled
-      ? "bg-gray-950 border-b border-gray-800/50"
-      : "bg-gray-800 border-b border-gray-700";
+const subheadingClass = isIlluminateEnabled
+  ? "text-gray-600"
+  : isBlackoutEnabled
+    ? "text-gray-400"
+    : "text-gray-400";
 
-  // For the chat messages area
-  const messageAreaClass = isIlluminateEnabled
-    ? "bg-white"
-    : isBlackoutEnabled
-      ? "bg-gray-950"
-      : "bg-gray-700";
+// For the main chat header background
+const chatHeaderClass = isIlluminateEnabled
+  ? "bg-white border-b border-gray-300"
+  : isBlackoutEnabled
+    ? "bg-gray-950 border-b border-gray-800/50"
+    : "bg-gray-800 border-b border-gray-700";
 
-  // For message bubbles: your own and others
-  const ownMessageClass = isIlluminateEnabled
-    ? "bg-blue-500 text-white"
-    : isBlackoutEnabled
-      ? "bg-blue-700 text-white"
-      : "bg-blue-600 text-white";
+// For the chat messages area
+const messageAreaClass = isIlluminateEnabled
+  ? "bg-white"
+  : isBlackoutEnabled
+    ? "bg-gray-950"
+    : "bg-gray-700";
 
-  const otherMessageClass = isIlluminateEnabled
-    ? "bg-gray-300 text-gray-900"
-    : isBlackoutEnabled
-      ? "bg-gray-600 text-white"
-      : "bg-gray-600 text-white";
+// For message bubbles: your own and others
+const ownMessageClass = isIlluminateEnabled
+  ? "bg-blue-500 text-white"
+  : isBlackoutEnabled
+    ? "bg-blue-700 text-white"
+    : "bg-blue-600 text-white";
 
-  // Chat input container
-  const chatInputContainerClass = isIlluminateEnabled
-    ? "bg-white"
-    : isBlackoutEnabled
-      ? "bg-gray-950"
-      : "bg-gray-800";
+const otherMessageClass = isIlluminateEnabled
+  ? "bg-gray-300 text-gray-900"
+  : isBlackoutEnabled
+    ? "bg-gray-600 text-white"
+    : "bg-gray-600 text-white";
 
-  // Input fields inside chat input area
-  const inputBg = isIlluminateEnabled
-    ? "bg-white border border-gray-300 text-gray-900"
-    : isBlackoutEnabled
-      ? "bg-gray-950 border border-gray-800 text-white"
-      : "bg-gray-700 border border-gray-600 text-white";
+// Chat input container
+const chatInputContainerClass = isIlluminateEnabled
+  ? "bg-white"
+  : isBlackoutEnabled
+    ? "bg-gray-950"
+    : "bg-gray-800";
 
-  // Navigation buttons
-  const navButtonClass = isIlluminateEnabled
-    ? "text-gray-700 hover:text-gray-900 hover:bg-gray-200"
-    : isBlackoutEnabled
-      ? "text-gray-400 hover:text-white hover:bg-gray-950"
-      : "text-gray-400 hover:text-white hover:bg-gray-800";
+// Input fields used inside chat input area
+const inputBg = isIlluminateEnabled
+  ? "bg-white border border-gray-300 text-gray-900"
+  : isBlackoutEnabled
+    ? "bg-gray-950 border border-gray-800 text-white"
+    : "bg-gray-700 border border-gray-600 text-white";
 
-  // Aside background
-  const asideClass = isIlluminateEnabled
-    ? "bg-white border-l border-gray-300"
-    : isBlackoutEnabled
-      ? "bg-gray-950 border-l border-gray-800"
-      : "bg-gray-800 border-l border-gray-700";
+// Navigation buttons (e.g. for friend requests, etc.)
+const navButtonClass = isIlluminateEnabled
+  ? "text-gray-700 hover:text-gray-900 hover:bg-gray-200"
+  : isBlackoutEnabled
+    ? "text-gray-400 hover:text-white hover:bg-gray-950"
+    : "text-gray-400 hover:text-white hover:bg-gray-800";
 
-  // Group Modal styling
-  const groupModalClass = isIlluminateEnabled
-    ? "bg-white shadow-xl border border-gray-200 text-gray-900"
-    : isBlackoutEnabled
-      ? "bg-gray-950 shadow-xl border border-gray-800 text-gray-300"
-      : "bg-gray-800 shadow-xl border border-gray-700 text-gray-300";
+// Aside (right panel) background
+const asideClass = isIlluminateEnabled
+  ? "bg-white border-l border-gray-300"
+  : isBlackoutEnabled
+    ? "bg-gray-950 border-l border-gray-800"
+    : "bg-gray-800 border-l border-gray-700";
 
-  // Friend request buttons
-  const acceptButtonClass = isIlluminateEnabled
-    ? "text-green-600 hover:text-green-500"
-    : isBlackoutEnabled
-      ? "text-green-400 hover:text-green-300"
-      : "text-green-400 hover:text-green-300";
+// Group Modal styling
+const groupModalClass = isIlluminateEnabled
+  ? "bg-white shadow-xl border border-gray-200 text-gray-900"
+  : isBlackoutEnabled
+    ? "bg-gray-950 shadow-xl border border-gray-800 text-gray-300"
+    : "bg-gray-800 shadow-xl border border-gray-700 text-gray-300";
 
-  const rejectButtonClass = isIlluminateEnabled
-    ? "text-red-600 hover:text-red-500"
-    : isBlackoutEnabled
-      ? "text-red-400 hover:text-red-300"
-      : "text-red-400 hover:text-red-300";
+// Friend request buttons
+const acceptButtonClass = isIlluminateEnabled
+  ? "text-green-600 hover:text-green-500"
+  : isBlackoutEnabled
+    ? "text-green-400 hover:text-green-300"
+    : "text-green-400 hover:text-green-300";
 
-  // Chat list items (aside)
-  const selectedChatClass = isIlluminateEnabled
-    ? "bg-blue-500 text-white"
-    : isBlackoutEnabled
-      ? "bg-blue-700 text-white"
-      : "bg-blue-600 text-white";
+const rejectButtonClass = isIlluminateEnabled
+  ? "text-red-600 hover:text-red-500"
+  : isBlackoutEnabled
+    ? "text-red-400 hover:text-red-300"
+    : "text-red-400 hover:text-red-300";
 
-  const chatListItemClass = isIlluminateEnabled
-    ? "bg-gray-200 text-gray-900 hover:bg-gray-300"
-    : isBlackoutEnabled
-      ? "bg-gray-950 text-white hover:bg-gray-900"
-      : "bg-gray-700 text-white hover:bg-gray-600";
+// Chat list items (in aside)
+const selectedChatClass = isIlluminateEnabled
+  ? "bg-blue-500 text-white"
+  : isBlackoutEnabled
+    ? "bg-blue-700 text-white"
+    : "bg-blue-600 text-white";
 
-  // Button styling
-  const primaryButtonClass = isIlluminateEnabled
-    ? "bg-blue-500 hover:bg-blue-600 text-white"
-    : isBlackoutEnabled
-      ? "bg-blue-600 hover:bg-blue-700 text-white"
-      : "bg-blue-600 hover:bg-blue-700 text-white";
+const chatListItemClass = isIlluminateEnabled
+  ? "bg-gray-200 text-gray-900 hover:bg-gray-300"
+  : isBlackoutEnabled
+    ? "bg-gray-950 text-white hover:bg-gray-900"
+    : "bg-gray-700 text-white hover:bg-gray-600";
 
-  const secondaryButtonClass = isIlluminateEnabled
-    ? "bg-gray-300 hover:bg-gray-400 text-gray-800"
-    : isBlackoutEnabled
-      ? "bg-gray-950 hover:bg-gray-900 text-white"
-      : "bg-gray-600 hover:bg-gray-500 text-white";
+// Button styling
+const primaryButtonClass = isIlluminateEnabled
+  ? "bg-blue-500 hover:bg-blue-600 text-white"
+  : isBlackoutEnabled
+    ? "bg-blue-600 hover:bg-blue-700 text-white"
+    : "bg-blue-600 hover:bg-blue-700 text-white";
 
-  // Tab styling
-  const activeTabClass = isIlluminateEnabled
-    ? "border-blue-500 text-blue-600"
-    : isBlackoutEnabled
-      ? "border-blue-500 text-blue-400"
-      : "border-blue-500 text-blue-400";
+const secondaryButtonClass = isIlluminateEnabled
+  ? "bg-gray-300 hover:bg-gray-400 text-gray-800"
+  : isBlackoutEnabled
+    ? "bg-gray-950 hover:bg-gray-900 text-white"
+    : "bg-gray-600 hover:bg-gray-500 text-white";
 
-  const inactiveTabClass = isIlluminateEnabled
-    ? "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-    : isBlackoutEnabled
-      ? "border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-600"
-      : "border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-600";
+// Tab styling
+const activeTabClass = isIlluminateEnabled
+  ? "border-blue-500 text-blue-600"
+  : isBlackoutEnabled
+    ? "border-blue-500 text-blue-400"
+    : "border-blue-500 text-blue-400";
+
+const inactiveTabClass = isIlluminateEnabled
+  ? "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+  : isBlackoutEnabled
+    ? "border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-600"
+    : "border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-600";
 
   // ---------------------------
   // Auth & Real-time Listeners
   // ---------------------------
   useEffect(() => {
-    const currentUser = getCurrentUser();
+    const currentUser = getCurrentUser()
     if (!currentUser) {
-      navigate("/login");
-      return;
+      navigate("/login")
+      return
     }
-    setUser(currentUser);
+    setUser(currentUser)
 
     // Get user profile
     const fetchUserProfile = async () => {
-      const profile = await getUserProfile(currentUser.uid);
+      const profile = await getUserProfile(currentUser.uid)
       if (profile) {
         setUserProfile({
           id: currentUser.uid,
           ...profile,
-        });
+        })
       }
-    };
-    fetchUserProfile();
+    }
+    fetchUserProfile()
 
     // Set up presence system
-    const cleanupPresence = setupPresenceSystem(currentUser.uid);
+    const cleanupPresence = setupPresenceSystem(currentUser.uid)
 
     // Listen to chats
     const unsubscribeChats = listenToChatsRealtime(currentUser.uid, (newChats) => {
-      setChats(newChats);
-    });
+      setChats(newChats)
+    })
 
     // Listen to friend requests
     const unsubscribeRequests = listenToFriendRequests(currentUser.uid, (requests) => {
-      setFriendRequests(requests);
-    });
+      setFriendRequests(requests)
+    })
 
     // Get and listen to online friends
     const fetchFriends = async () => {
-      const friends = await getUserFriends(currentUser.uid);
-      const friendIds = friends.map((friend) => friend.id);
+      const friends = await getUserFriends(currentUser.uid)
+      const friendIds = friends.map((friend) => friend.id)
+
       if (friendIds.length > 0) {
         const unsubscribeFriendStatus = listenToFriendsOnlineStatus(friendIds, (statuses) => {
-          setOnlineFriends(statuses);
-        });
-        return unsubscribeFriendStatus;
-      }
-      return () => {};
-    };
+          setOnlineFriends(statuses)
+        })
 
-    let unsubscribeFriendStatus: () => void;
+        return unsubscribeFriendStatus
+      }
+      return () => {}
+    }
+
+    let unsubscribeFriendStatus: () => void
     fetchFriends().then((unsub) => {
-      unsubscribeFriendStatus = unsub;
-    });
+      unsubscribeFriendStatus = unsub
+    })
 
     return () => {
-      unsubscribeChats();
-      unsubscribeRequests();
-      if (unsubscribeFriendStatus) unsubscribeFriendStatus();
-      cleanupPresence();
-    };
-  }, [navigate]);
+      unsubscribeChats()
+      unsubscribeRequests()
+      if (unsubscribeFriendStatus) unsubscribeFriendStatus()
+      cleanupPresence()
+    }
+  }, [navigate])
 
   // Listen to messages in selected chat
   useEffect(() => {
     if (!selectedChat) {
-      setMessages([]);
-      setTypingUsers([]);
-      return;
+      setMessages([])
+      setTypingUsers([])
+      return
     }
+
     const unsubscribeMessages = listenToMessagesRealtime(selectedChat.id, (msgs) => {
-      setMessages(msgs);
-    });
+      setMessages(msgs)
+    })
+
     // Listen to typing indicators
     const unsubscribeTyping = listenToTypingIndicators(selectedChat.id, user?.uid, (users) => {
-      setTypingUsers(users);
-    });
+      setTypingUsers(users)
+    })
+
     return () => {
-      unsubscribeMessages();
-      unsubscribeTyping();
-    };
-  }, [selectedChat, user?.uid]);
+      unsubscribeMessages()
+      unsubscribeTyping()
+    }
+  }, [selectedChat, user?.uid])
 
   // Format timestamp
   const formatTimestamp = (timestamp: any): string => {
-    if (!timestamp) return "";
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    if (!timestamp) return ""
+
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+
     if (diffDays === 0) {
-      return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
     } else if (diffDays === 1) {
-      return "Yesterday";
+      return "Yesterday"
     } else if (diffDays < 7) {
-      return date.toLocaleDateString([], { weekday: "short" });
+      return date.toLocaleDateString([], { weekday: "short" })
     } else {
-      return date.toLocaleDateString([], { month: "short", day: "numeric" });
+      return date.toLocaleDateString([], { month: "short", day: "numeric" })
     }
-  };
+  }
 
   // Format last seen
   const formatLastSeen = (timestamp: any): string => {
-    if (!timestamp) return "Never online";
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / (1000 * 60));
+    if (!timestamp) return "Never online"
+
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffMins = Math.floor(diffMs / (1000 * 60))
+
     if (diffMins < 1) {
-      return "Just now";
+      return "Just now"
     } else if (diffMins < 60) {
-      return `${diffMins} ${diffMins === 1 ? "minute" : "minutes"} ago`;
+      return `${diffMins} ${diffMins === 1 ? "minute" : "minutes"} ago`
     } else {
-      const diffHours = Math.floor(diffMins / 60);
+      const diffHours = Math.floor(diffMins / 60)
       if (diffHours < 24) {
-        return `${diffHours} ${diffHours === 1 ? "hour" : "hours"} ago`;
+        return `${diffHours} ${diffHours === 1 ? "hour" : "hours"} ago`
       } else {
-        const diffDays = Math.floor(diffHours / 24);
+        const diffDays = Math.floor(diffHours / 24)
         if (diffDays < 7) {
-          return `${diffDays} ${diffDays === 1 ? "day" : "days"} ago`;
+          return `${diffDays} ${diffDays === 1 ? "day" : "days"} ago`
         } else {
-          return date.toLocaleDateString();
+          return date.toLocaleDateString()
         }
       }
     }
-  };
+  }
 
   // Get chat display name
   const getChatDisplayName = (chat: Chat): string => {
     if (chat.isGroup) {
-      return chat.name || "Group Chat";
+      return chat.name || "Group Chat"
     }
+
+    // For direct chats, show the other user's name
     if (user && chat.members.length === 2) {
-      const otherUserId = chat.members.find((id) => id !== user.uid);
+      const otherUserId = chat.members.find((id) => id !== user.uid)
       if (otherUserId && chat.memberNames && chat.memberNames[otherUserId]) {
-        return chat.memberNames[otherUserId];
+        return chat.memberNames[otherUserId]
       }
     }
-    return chat.name || "";
-  };
+
+    return chat.name || ""
+  }
 
   // Get other user ID in direct chat
   const getOtherUserId = (chat: Chat): string | null => {
-    if (!user || chat.isGroup) return null;
-    return chat.members.find((id) => id !== user.uid) || null;
-  };
+    if (!user || chat.isGroup) return null
+
+    return chat.members.find((id) => id !== user.uid) || null
+  }
 
   // Determine file type
   const getFileType = (fileURL: string): string => {
-    const extension = fileURL.split(".").pop()?.toLowerCase() || "";
-    if (["jpg", "jpeg", "png", "gif", "webp", "svg"].includes(extension)) {
-      return "image";
-    } else if (["mp3", "wav", "ogg", "webm"].includes(extension)) {
-      return "audio";
-    } else if (["mp4", "webm", "ogg", "mov"].includes(extension)) {
-      return "video";
+    const extension = fileURL.split('.').pop()?.toLowerCase() || '';
+    
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(extension)) {
+      return 'image';
+    } else if (['mp3', 'wav', 'ogg', 'webm'].includes(extension)) {
+      return 'audio';
+    } else if (['mp4', 'webm', 'ogg', 'mov'].includes(extension)) {
+      return 'video';
     } else {
-      return "file";
+      return 'file';
     }
   };
 
@@ -563,24 +562,28 @@ export function Friends() {
   const getFileName = (fileURL: string): string => {
     try {
       const url = new URL(fileURL);
-      const pathParts = url.pathname.split("/");
+      const pathParts = url.pathname.split('/');
       const fullFileName = pathParts[pathParts.length - 1];
-      const fileNameParts = fullFileName.split("_");
+      
+      // Remove timestamp prefix if it exists (e.g., 1234567890_filename.jpg)
+      const fileNameParts = fullFileName.split('_');
       if (fileNameParts.length > 1 && !isNaN(Number(fileNameParts[0]))) {
-        return fileNameParts.slice(1).join("_");
+        return fileNameParts.slice(1).join('_');
       }
+      
       return fullFileName;
     } catch (e) {
-      return "file";
+      return 'file';
     }
   };
 
-  // Handle sending a text message or attached file/audio
+   // Handle sending the message
   const handleSendMessage = async (e: FormEvent) => {
     e.preventDefault();
     if (!selectedChat || (!newMessage.trim() && !attachedFile && !attachedAudio)) return;
 
     let fileURL = "";
+    // If a file is attached, upload it first
     if (attachedFile) {
       setFileUploading(true);
       try {
@@ -596,7 +599,9 @@ export function Friends() {
         setFileUploading(false);
         setUploadProgress(0);
       }
-    } else if (attachedAudio) {
+    }
+    // Else if an audio recording is attached, upload that instead
+    else if (attachedAudio) {
       setFileUploading(true);
       try {
         fileURL = await uploadChatFile(selectedChat.id, attachedAudio, (progress) => {
@@ -626,7 +631,56 @@ export function Friends() {
     }
   };
 
-  // Handle typing indicator
+
+  // Handle file selection—store the file instead of auto-uploading
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files?.length) {
+      setAttachedFile(e.target.files[0]);
+    }
+  };
+
+  // Handle file upload
+  const handleFileUpload = async () => {
+    const file = fileInputRef.current?.files?.[0];
+    if (!file || !selectedChat) return;
+
+    setFileUploading(true);
+    setUploadProgress(0);
+    
+    try {
+      const fileURL = await uploadChatFile(selectedChat.id, file, (progress) => {
+        setUploadProgress(progress);
+      });
+
+      // Determine file type
+      const fileType = file.type.split('/')[0]; // e.g., 'image', 'audio', 'video'
+      
+      await sendMessage(
+        selectedChat.id, 
+        '', 
+        user.uid, 
+        fileURL
+      );
+      
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    } catch (err) {
+      console.error('Error uploading file:', err);
+      setError('Failed to upload file. Please try again.');
+      
+      setTimeout(() => {
+        setError(null);
+      }, 3000);
+    } finally {
+      setTimeout(() => {
+        setFileUploading(false);
+        setUploadProgress(0);
+      }, 500);
+    }
+  };
+
+   // Handle typing indicator (existing logic)
   const handleTyping = (e: ChangeEvent<HTMLInputElement>) => {
     setNewMessage(e.target.value);
     if (!selectedChat) return;
@@ -638,24 +692,157 @@ export function Friends() {
     setTypingTimeout(timeout);
   };
 
-  // Add emoji to message
-  const addEmoji = (emoji: string) => {
-    setNewMessage((prev) => prev + emoji);
-    setShowEmojiPicker(false);
+  // Send friend request
+  const handleSendFriendRequest = async () => {
+    setError(null)
+    setSuccess(null)
+    if (!friendEmail.trim()) return
+
+    try {
+      await sendFriendRequest(user.uid, friendEmail.trim())
+      setFriendEmail("")
+      setSuccess("Friend request sent successfully!")
+
+      // Clear success message after 3 seconds
+      setTimeout(() => {
+        setSuccess(null)
+      }, 3000)
+    } catch (err: any) {
+      console.error("Error sending friend request:", err)
+      setError(err.message || "Failed to send friend request")
+    }
+  }
+
+  const handleAcceptRequest = async (requestId: string) => {
+    try {
+      await acceptFriendRequest(requestId)
+      setSuccess("Friend request accepted!")
+
+      // Clear success message after 3 seconds
+      setTimeout(() => {
+        setSuccess(null)
+      }, 3000)
+    } catch (err) {
+      console.error("Error accepting request:", err)
+    }
+  }
+
+  const handleRejectRequest = async (requestId: string) => {
+    try {
+      await rejectFriendRequest(requestId)
+    } catch (err) {
+      console.error("Error rejecting request:", err)
+    }
+  }
+
+  // Create group chat
+  const handleCreateGroupChat = async () => {
+    if (!groupName.trim() || !groupEmails.trim()) return
+
+    try {
+      const emails = groupEmails
+        .split(",")
+        .map((email) => email.trim())
+        .filter((e) => e)
+      await createGroupChat(groupName.trim(), emails, user.uid)
+      setGroupName("")
+      setGroupEmails("")
+      setIsGroupModalOpen(false)
+      setSuccess("Group chat created successfully!")
+
+      // Clear success message after 3 seconds
+      setTimeout(() => {
+        setSuccess(null)
+      }, 3000)
+    } catch (err) {
+      console.error("Error creating group chat:", err)
+    }
+  }
+
+  // Rename the current chat (only for group chats)
+  const handleRenameChat = async () => {
+    if (!selectedChat || !newChatName.trim() || !selectedChat.isGroup) return;
+  
+    try {
+      await renameChat(selectedChat.id, newChatName.trim());
+      setIsEditingChatName(false);
+      setNewChatName('');
+      setSuccess('Group chat renamed successfully!');
+      
+      setTimeout(() => {
+        setSuccess(null);
+      }, 3000);
+    } catch (err: any) {
+      setError(err.message || 'Failed to rename group chat');
+      
+      setTimeout(() => {
+        setError(null);
+      }, 3000);
+    }
   };
 
-  // Start voice recording
+  // Leave group chat
+  const handleLeaveGroupChat = async () => {
+    if (!selectedChat || !selectedChat.isGroup) return
+
+    try {
+      await leaveGroupChat(selectedChat.id, user.uid)
+      setSelectedChat(null)
+      setShowChatOptions(false)
+      setSuccess("You have left the group chat")
+
+      // Clear success message after 3 seconds
+      setTimeout(() => {
+        setSuccess(null)
+      }, 3000)
+    } catch (err) {
+      console.error("Error leaving group chat:", err)
+    }
+  }
+
+  // Delete message
+  const handleDeleteMessage = async (messageId: string) => {
+    if (!selectedChat) return
+
+    try {
+      await deleteMessage(selectedChat.id, messageId, user.uid)
+      setMessageToDelete(null)
+    } catch (err: any) {
+      console.error("Error deleting message:", err)
+      setError(err.message || "Failed to delete message")
+
+      // Clear error message after 3 seconds
+      setTimeout(() => {
+        setError(null)
+      }, 3000)
+    }
+  }
+
+  // Toggle mobile aside
+  const toggleMobileAside = () => {
+    setShowMobileAside(!showMobileAside)
+  }
+
+  // Add emoji to message
+  const addEmoji = (emoji: string) => {
+    setNewMessage((prev) => prev + emoji)
+    setShowEmojiPicker(false)
+  }
+
+  // Start recording audio; on stop, set attachedAudio state
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
+
       mediaRecorder.ondataavailable = (e) => {
         if (e.data.size > 0) {
           audioChunksRef.current.push(e.data);
         }
       };
+
       mediaRecorder.onstop = () => {
         if (selectedChat && audioChunksRef.current.length > 0) {
           const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
@@ -663,6 +850,7 @@ export function Friends() {
           setAttachedAudio(file);
         }
       };
+
       mediaRecorder.start();
       setIsRecording(true);
     } catch (err) {
@@ -672,7 +860,7 @@ export function Friends() {
     }
   };
 
-  // Stop voice recording
+  // Stop recording audio
   const stopRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
@@ -681,45 +869,43 @@ export function Friends() {
     }
   };
 
-  // Toggle mobile aside
-  const toggleMobileAside = () => {
-    setShowMobileAside(!showMobileAside);
-  };
-
   // Filter chats based on search query
   const filteredChats = chats.filter((chat) => {
-    const chatName = getChatDisplayName(chat).toLowerCase();
-    return chatName.includes(searchQuery.toLowerCase());
-  });
+    const chatName = getChatDisplayName(chat).toLowerCase()
+    return chatName.includes(searchQuery.toLowerCase())
+  })
 
   // Get pending friend requests count
-  const pendingRequestsCount = friendRequests.filter((req) => req.status === "pending").length;
+  const pendingRequestsCount = friendRequests.filter((req) => req.status === "pending").length
 
   // Get other user's online status for direct chats
   const getOtherUserStatus = (chat: Chat): string => {
-    if (chat.isGroup) return "";
-    const otherUserId = getOtherUserId(chat);
-    if (!otherUserId) return "";
-    const friend = onlineFriends.find((f) => f.id === otherUserId);
-    return friend?.status || "offline";
-  };
+    if (chat.isGroup) return ""
+
+    const otherUserId = getOtherUserId(chat)
+    if (!otherUserId) return ""
+
+    const friend = onlineFriends.find((f) => f.id === otherUserId)
+    return friend?.status || "offline"
+  }
 
   const getUserStatus = (userId: string): string => {
-    const friend = onlineFriends.find((f) => f.id === userId);
-    return friend?.status || "offline";
-  };
+    const friend = onlineFriends.find((f) => f.id === userId)
+    return friend?.status || "offline"
+  }
 
   // Render file content based on file type
   const renderFileContent = (fileURL: string) => {
     const fileType = getFileType(fileURL);
     const fileName = getFileName(fileURL);
+    
     switch (fileType) {
-      case "image":
+      case 'image':
         return (
           <div className="mt-2 rounded-lg overflow-hidden max-w-xs">
-            <img
-              src={fileURL || "/placeholder.svg"}
-              alt="Shared image"
+            <img 
+              src={fileURL || "/placeholder.svg"} 
+              alt="Shared image" 
               className="max-w-full h-auto object-contain"
               onError={(e) => {
                 e.currentTarget.src = "/placeholder.svg?height=200&width=200";
@@ -727,7 +913,7 @@ export function Friends() {
             />
           </div>
         );
-      case "audio":
+      case 'audio':
         return (
           <div className="mt-2">
             <audio controls className="max-w-full">
@@ -736,7 +922,7 @@ export function Friends() {
             </audio>
           </div>
         );
-      case "video":
+      case 'video':
         return (
           <div className="mt-2 rounded-lg overflow-hidden max-w-xs">
             <video controls className="max-w-full">
@@ -755,7 +941,7 @@ export function Friends() {
             download={fileName}
           >
             <Paperclip className="w-4 h-4" />
-            {fileName || "Download file"}
+            {fileName || 'Download file'}
           </a>
         );
     }
@@ -1248,6 +1434,7 @@ export function Friends() {
     </motion.div>
   )}
 </motion.form>
+
           </>
         ) : (
           <motion.div

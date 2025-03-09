@@ -1,8 +1,19 @@
-import { useState, useEffect, useRef, type ChangeEvent, type FormEvent } from "react"
-import { useNavigate } from "react-router-dom"
-import { MessageSquare, Paperclip, Send, Users, CheckCircle, XCircle, Edit, Trash2, Menu, X } from "lucide-react"
-import { Sidebar } from "./Sidebar"
-import { getCurrentUser } from "../lib/settings-firebase"
+import { useState, useEffect, useRef, type ChangeEvent, type FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  MessageSquare,
+  Paperclip,
+  Send,
+  Users,
+  CheckCircle,
+  XCircle,
+  Edit,
+  Trash2,
+  Menu,
+  X,
+} from "lucide-react";
+import { Sidebar } from "./Sidebar";
+import { getCurrentUser } from "../lib/settings-firebase";
 import {
   listenToChatsRealtime,
   listenToMessagesRealtime,
@@ -15,315 +26,447 @@ import {
   uploadChatFile,
   renameChat as renameChatFirebase,
   deleteChat,
-} from "../lib/friends-firebase"
+} from "../lib/friends-firebase";
 
-// Import shadcn components
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Card, CardContent } from "@/components/ui/card"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+// ------------------------------------------------------------
+// Inline shadcn UI component definitions
+// ------------------------------------------------------------
+
+// Button Component
+const Button = ({
+  children,
+  variant,
+  size,
+  onClick,
+  type,
+  className = "",
+  ...props
+}: {
+  children: React.ReactNode;
+  variant?: "ghost" | "secondary" | "outline" | "default";
+  size?: "icon" | "default";
+  onClick?: () => void;
+  type?: "button" | "submit" | "reset";
+  className?: string;
+  [x: string]: any;
+}) => {
+  let baseClass = "px-4 py-2 rounded focus:outline-none transition";
+  if (variant === "ghost") {
+    baseClass += " bg-transparent hover:bg-gray-100";
+  } else if (variant === "secondary") {
+    baseClass += " bg-gray-200 hover:bg-gray-300";
+  } else if (variant === "outline") {
+    baseClass += " border border-gray-400";
+  } else {
+    // default variant
+    baseClass += " bg-blue-500 text-white hover:bg-blue-600";
+  }
+  if (size === "icon") {
+    baseClass = "p-2 rounded-full";
+  }
+  return (
+    <button type={type || "button"} onClick={onClick} className={`${baseClass} ${className}`} {...props}>
+      {children}
+    </button>
+  );
+};
+
+// Input Component
+const Input = ({ className = "", ...props }: { className?: string; [x: string]: any }) => {
+  return <input className={`border p-2 rounded focus:outline-none ${className}`} {...props} />;
+};
+
+// Textarea Component
+const Textarea = ({ className = "", ...props }: { className?: string; [x: string]: any }) => {
+  return <textarea className={`border p-2 rounded focus:outline-none ${className}`} {...props} />;
+};
+
+// Dialog Components
+const Dialog = ({
+  open,
+  onOpenChange,
+  children,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  children: React.ReactNode;
+}) => {
+  if (!open) return null;
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+      onClick={() => onOpenChange(false)}
+    >
+      <div onClick={(e) => e.stopPropagation()}>{children}</div>
+    </div>
+  );
+};
+
+const DialogContent = ({ children, className = "", ...props }: { children: React.ReactNode; className?: string; [x: string]: any }) => {
+  return (
+    <div className={`bg-white p-4 rounded shadow-md ${className}`} {...props}>
+      {children}
+    </div>
+  );
+};
+
+const DialogHeader = ({ children }: { children: React.ReactNode }) => {
+  return <div className="mb-4">{children}</div>;
+};
+
+const DialogTitle = ({ children }: { children: React.ReactNode }) => {
+  return <h2 className="text-xl font-semibold">{children}</h2>;
+};
+
+// ScrollArea Component
+const ScrollArea = ({ children, className = "", ...props }: { children: React.ReactNode; className?: string; [x: string]: any }) => {
+  return (
+    <div className={`overflow-y-auto ${className}`} {...props}>
+      {children}
+    </div>
+  );
+};
+
+// Card Components
+const Card = ({ children, className = "", ...props }: { children: React.ReactNode; className?: string; [x: string]: any }) => {
+  return (
+    <div className={`border rounded shadow ${className}`} {...props}>
+      {children}
+    </div>
+  );
+};
+
+const CardContent = ({ children, className = "", ...props }: { children: React.ReactNode; className?: string; [x: string]: any }) => {
+  return (
+    <div className={`p-4 ${className}`} {...props}>
+      {children}
+    </div>
+  );
+};
+
+// Avatar Components
+const Avatar = ({ children, className = "", ...props }: { children: React.ReactNode; className?: string; [x: string]: any }) => {
+  return (
+    <div className={`w-10 h-10 rounded-full overflow-hidden ${className}`} {...props}>
+      {children}
+    </div>
+  );
+};
+
+const AvatarImage = ({ src, alt = "avatar", className = "", ...props }: { src: string; alt?: string; className?: string; [x: string]: any }) => {
+  return <img src={src} alt={alt} className={`w-full h-full object-cover ${className}`} {...props} />;
+};
+
+const AvatarFallback = ({ children, className = "", ...props }: { children: React.ReactNode; className?: string; [x: string]: any }) => {
+  return (
+    <div className={`w-full h-full flex items-center justify-center bg-gray-300 ${className}`} {...props}>
+      {children}
+    </div>
+  );
+};
+
+// ------------------------------------------------------------
+// Friends Component
+// ------------------------------------------------------------
 
 interface Chat {
-  id: string
-  isGroup: boolean
-  members: string[]
-  name?: string // For direct chats, this should be the other user's name; for groups, a custom name.
+  id: string;
+  isGroup: boolean;
+  members: string[];
+  name?: string;
 }
 
 interface Message {
-  id: string
-  text: string
-  senderId: string
-  senderName?: string
-  senderPhotoURL?: string
-  fileURL?: string
-  timestamp?: any
+  id: string;
+  text: string;
+  senderId: string;
+  senderName?: string;
+  senderPhotoURL?: string;
+  fileURL?: string;
+  timestamp?: any;
 }
 
 interface FriendRequest {
-  id: string
-  fromUserId: string
-  fromUserName: string
-  toUserId: string
-  status: "pending" | "accepted" | "rejected"
+  id: string;
+  fromUserId: string;
+  fromUserName: string;
+  toUserId: string;
+  status: "pending" | "accepted" | "rejected";
 }
 
 export function Friends() {
-  const navigate = useNavigate()
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Auth state
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<any>(null);
 
   // Sidebar collapse state (persisted)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
-    const stored = localStorage.getItem("isSidebarCollapsed")
-    return stored ? JSON.parse(stored) : false
-  })
+    const stored = localStorage.getItem("isSidebarCollapsed");
+    return stored ? JSON.parse(stored) : false;
+  });
 
   // Blackout mode state
   const [isBlackoutEnabled, setIsBlackoutEnabled] = useState(() => {
-    const stored = localStorage.getItem("isBlackoutEnabled")
-    return stored ? JSON.parse(stored) : false
-  })
+    const stored = localStorage.getItem("isBlackoutEnabled");
+    return stored ? JSON.parse(stored) : false;
+  });
 
   // Sidebar Blackout option state
   const [isSidebarBlackoutEnabled, setIsSidebarBlackoutEnabled] = useState(() => {
-    const stored = localStorage.getItem("isSidebarBlackoutEnabled")
-    return stored ? JSON.parse(stored) : false
-  })
+    const stored = localStorage.getItem("isSidebarBlackoutEnabled");
+    return stored ? JSON.parse(stored) : false;
+  });
 
   // Illuminate (light mode) state
   const [isIlluminateEnabled, setIsIlluminateEnabled] = useState(() => {
-    const stored = localStorage.getItem("isIlluminateEnabled")
-    return stored ? JSON.parse(stored) : false
-  })
+    const stored = localStorage.getItem("isIlluminateEnabled");
+    return stored ? JSON.parse(stored) : false;
+  });
 
   // Sidebar Illuminate option state
   const [isSidebarIlluminateEnabled, setIsSidebarIlluminateEnabled] = useState(() => {
-    const stored = localStorage.getItem("isSidebarIlluminateEnabled")
-    return stored ? JSON.parse(stored) : false
-  })
+    const stored = localStorage.getItem("isSidebarIlluminateEnabled");
+    return stored ? JSON.parse(stored) : false;
+  });
 
   // Update localStorage and document.body for modes
   useEffect(() => {
-    localStorage.setItem("isBlackoutEnabled", JSON.stringify(isBlackoutEnabled))
-    document.body.classList.toggle("blackout-mode", isBlackoutEnabled)
-  }, [isBlackoutEnabled])
+    localStorage.setItem("isBlackoutEnabled", JSON.stringify(isBlackoutEnabled));
+    document.body.classList.toggle("blackout-mode", isBlackoutEnabled);
+  }, [isBlackoutEnabled]);
 
   useEffect(() => {
-    localStorage.setItem("isSidebarBlackoutEnabled", JSON.stringify(isSidebarBlackoutEnabled))
-  }, [isSidebarBlackoutEnabled])
+    localStorage.setItem("isSidebarBlackoutEnabled", JSON.stringify(isSidebarBlackoutEnabled));
+  }, [isSidebarBlackoutEnabled]);
 
   useEffect(() => {
-    localStorage.setItem("isIlluminateEnabled", JSON.stringify(isIlluminateEnabled))
+    localStorage.setItem("isIlluminateEnabled", JSON.stringify(isIlluminateEnabled));
     if (isIlluminateEnabled) {
-      document.body.classList.add("illuminate-mode")
+      document.body.classList.add("illuminate-mode");
     } else {
-      document.body.classList.remove("illuminate-mode")
+      document.body.classList.remove("illuminate-mode");
     }
-  }, [isIlluminateEnabled])
+  }, [isIlluminateEnabled]);
 
   useEffect(() => {
-    localStorage.setItem("isSidebarIlluminateEnabled", JSON.stringify(isSidebarIlluminateEnabled))
-  }, [isSidebarIlluminateEnabled])
+    localStorage.setItem("isSidebarIlluminateEnabled", JSON.stringify(isSidebarIlluminateEnabled));
+  }, [isSidebarIlluminateEnabled]);
 
   // Right-hand panels state
-  const [chats, setChats] = useState<Chat[]>([])
-  const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([])
+  const [chats, setChats] = useState<Chat[]>([]);
+  const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
 
   // Selected chat & messages
-  const [selectedChat, setSelectedChat] = useState<Chat | null>(null)
-  const [messages, setMessages] = useState<Message[]>([])
-  const [newMessage, setNewMessage] = useState("")
+  const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [newMessage, setNewMessage] = useState("");
 
   // Renaming chat
-  const [isEditingChatName, setIsEditingChatName] = useState(false)
-  const [newChatName, setNewChatName] = useState("")
+  const [isEditingChatName, setIsEditingChatName] = useState(false);
+  const [newChatName, setNewChatName] = useState("");
 
   // Adding friend by email
-  const [friendEmail, setFriendEmail] = useState("")
-  const [error, setError] = useState<string | null>(null)
+  const [friendEmail, setFriendEmail] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
   // Creating group chat
-  const [isGroupModalOpen, setIsGroupModalOpen] = useState(false)
-  const [groupName, setGroupName] = useState("")
-  const [groupEmails, setGroupEmails] = useState("") // comma-separated emails
+  const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
+  const [groupName, setGroupName] = useState("");
+  const [groupEmails, setGroupEmails] = useState(""); // comma-separated emails
 
   // File uploading
-  const [fileUploading, setFileUploading] = useState(false)
+  const [fileUploading, setFileUploading] = useState(false);
 
   // Add mobile menu state
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const [isMobile, setIsMobile] = useState(false)
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   // Check for mobile screen size
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768)
+      setIsMobile(window.innerWidth < 768);
       if (window.innerWidth >= 768) {
-        setIsMobileMenuOpen(false)
+        setIsMobileMenuOpen(false);
       }
-    }
+    };
 
-    checkMobile()
-    window.addEventListener("resize", checkMobile)
-    return () => window.removeEventListener("resize", checkMobile)
-  }, [])
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   // Dynamic theme classes
   const containerClass = isIlluminateEnabled
     ? "bg-background text-foreground"
     : isBlackoutEnabled
-      ? "bg-black text-white"
-      : "bg-gray-900 text-white"
+    ? "bg-black text-white"
+    : "bg-gray-900 text-white";
 
-  const chatAreaClass = isIlluminateEnabled ? "bg-muted" : isBlackoutEnabled ? "bg-gray-950" : "bg-gray-800"
+  const chatAreaClass = isIlluminateEnabled ? "bg-muted" : isBlackoutEnabled ? "bg-gray-950" : "bg-gray-800";
 
   const messageClass = (isOwn: boolean) => {
     if (isIlluminateEnabled) {
-      return isOwn ? "bg-primary text-primary-foreground" : "bg-muted-foreground/10 text-foreground"
+      return isOwn ? "bg-primary text-primary-foreground" : "bg-muted-foreground/10 text-foreground";
     }
-    return isOwn ? "bg-blue-600 text-white" : "bg-gray-700 text-white"
-  }
+    return isOwn ? "bg-blue-600 text-white" : "bg-gray-700 text-white";
+  };
 
   // Helper Functions
   const handleAcceptRequest = async (requestId: string) => {
     try {
-      await acceptFriendRequestFirebase(requestId)
+      await acceptFriendRequestFirebase(requestId);
     } catch (error) {
-      console.error("Error accepting friend request:", error)
+      console.error("Error accepting friend request:", error);
     }
-  }
+  };
 
   const handleRejectRequest = async (requestId: string) => {
     try {
-      await rejectFriendRequestFirebase(requestId)
+      await rejectFriendRequestFirebase(requestId);
     } catch (error) {
-      console.error("Error rejecting friend request:", error)
+      console.error("Error rejecting friend request:", error);
     }
-  }
+  };
 
   const handleSendFriendRequest = async () => {
-    setError(null)
+    setError(null);
     if (!friendEmail) {
-      setError("Please enter an email address.")
-      return
+      setError("Please enter an email address.");
+      return;
     }
 
     try {
-      await sendFriendRequest(user.uid, friendEmail)
-      setFriendEmail("") // Clear the input after sending
+      await sendFriendRequest(user.uid, friendEmail);
+      setFriendEmail(""); // Clear the input after sending
     } catch (err: any) {
-      setError(err.message || "Failed to send friend request.")
+      setError(err.message || "Failed to send friend request.");
     }
-  }
+  };
 
   const getChatDisplayName = (chat: Chat): string => {
     if (chat.isGroup && chat.name) {
-      return chat.name
+      return chat.name;
     } else {
-      const otherUserId = chat.members.find((memberId) => memberId !== user.uid)
+      const otherUserId = chat.members.find((memberId) => memberId !== user.uid);
       // Find the other user's name from the chats array or fetch it
-      const otherUser = chats.find((c) => c.id === chat.id)?.name
-      return otherUser || "Unknown User" // Fallback to "Unknown User" if name is not available
+      const otherUser = chats.find((c) => c.id === chat.id)?.name;
+      return otherUser || "Unknown User"; // Fallback to "Unknown User" if name is not available
     }
-  }
+  };
 
   const handleRenameChat = async () => {
-    if (!selectedChat) return
+    if (!selectedChat) return;
 
     try {
-      await renameChatFirebase(selectedChat.id, newChatName)
-      setSelectedChat({ ...selectedChat, name: newChatName })
-      setIsEditingChatName(false)
+      await renameChatFirebase(selectedChat.id, newChatName);
+      setSelectedChat({ ...selectedChat, name: newChatName });
+      setIsEditingChatName(false);
     } catch (error) {
-      console.error("Error renaming chat:", error)
+      console.error("Error renaming chat:", error);
     }
-  }
+  };
 
   const handleDeleteChat = async () => {
-    if (!selectedChat) return
+    if (!selectedChat) return;
 
     try {
-      await deleteChat(selectedChat.id)
-      setSelectedChat(null)
-      setMessages([])
+      await deleteChat(selectedChat.id);
+      setSelectedChat(null);
+      setMessages([]);
     } catch (error) {
-      console.error("Error deleting chat:", error)
+      console.error("Error deleting chat:", error);
     }
-  }
+  };
 
   const handleSendMessage = async (e: FormEvent) => {
-    e.preventDefault()
-    if (!newMessage.trim()) return
-    if (!selectedChat) return
+    e.preventDefault();
+    if (!newMessage.trim()) return;
+    if (!selectedChat) return;
 
     try {
-      await sendMessage(selectedChat.id, newMessage)
-      setNewMessage("")
+      await sendMessage(selectedChat.id, newMessage);
+      setNewMessage("");
     } catch (error) {
-      console.error("Error sending message:", error)
+      console.error("Error sending message:", error);
     }
-  }
+  };
 
   const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-    setFileUploading(true)
+    setFileUploading(true);
     try {
-      if (!selectedChat) return
-      await uploadChatFile(selectedChat.id, file)
+      if (!selectedChat) return;
+      await uploadChatFile(selectedChat.id, file);
     } catch (error) {
-      console.error("Error uploading file:", error)
+      console.error("Error uploading file:", error);
     } finally {
-      setFileUploading(false)
+      setFileUploading(false);
     }
-  }
+  };
 
   const handleCreateGroupChat = async () => {
     if (!groupName.trim() || !groupEmails.trim()) {
-      alert("Please enter a group name and member emails.")
-      return
+      alert("Please enter a group name and member emails.");
+      return;
     }
 
-    const emailsArray = groupEmails.split(",").map((email) => email.trim())
+    const emailsArray = groupEmails.split(",").map((email) => email.trim());
 
     try {
-      await createGroupChat(groupName, emailsArray)
-      setIsGroupModalOpen(false)
-      setGroupName("")
-      setGroupEmails("")
+      await createGroupChat(groupName, emailsArray);
+      setIsGroupModalOpen(false);
+      setGroupName("");
+      setGroupEmails("");
     } catch (error) {
-      console.error("Error creating group chat:", error)
+      console.error("Error creating group chat:", error);
     }
-  }
+  };
 
   useEffect(() => {
     const fetchUser = async () => {
-      const currentUser = await getCurrentUser()
+      const currentUser = await getCurrentUser();
       if (currentUser) {
-        setUser(currentUser)
+        setUser(currentUser);
       } else {
-        navigate("/login")
+        navigate("/login");
       }
-    }
+    };
 
-    fetchUser()
-  }, [navigate])
+    fetchUser();
+  }, [navigate]);
 
   useEffect(() => {
-    if (!user) return
+    if (!user) return;
 
     const unsubscribeChats = listenToChatsRealtime(user.uid, (updatedChats) => {
-      setChats(updatedChats)
-    })
+      setChats(updatedChats);
+    });
 
     const unsubscribeFriendRequests = listenToFriendRequests(user.uid, (requests) => {
-      setFriendRequests(requests)
-    })
+      setFriendRequests(requests);
+    });
 
     return () => {
-      unsubscribeChats()
-      unsubscribeFriendRequests()
-    }
-  }, [user])
+      unsubscribeChats();
+      unsubscribeFriendRequests();
+    };
+  }, [user]);
 
   useEffect(() => {
-    if (!selectedChat) return
+    if (!selectedChat) return;
 
     const unsubscribeMessages = listenToMessagesRealtime(selectedChat.id, (updatedMessages) => {
-      setMessages(updatedMessages)
-    })
+      setMessages(updatedMessages);
+    });
 
     return () => {
-      unsubscribeMessages()
-    }
-  }, [selectedChat])
+      unsubscribeMessages();
+    };
+  }, [selectedChat]);
 
   return (
     <div className={`flex h-screen ${containerClass}`}>
@@ -421,8 +564,8 @@ export function Friends() {
                       variant={selectedChat?.id === chat.id ? "default" : "secondary"}
                       className="w-full justify-start"
                       onClick={() => {
-                        setSelectedChat(chat)
-                        setIsMobileMenuOpen(false)
+                        setSelectedChat(chat);
+                        setIsMobileMenuOpen(false);
                       }}
                     >
                       <MessageSquare className="mr-2 h-4 w-4" />
@@ -468,8 +611,8 @@ export function Friends() {
                   variant="ghost"
                   size="icon"
                   onClick={() => {
-                    setIsEditingChatName(true)
-                    setNewChatName(selectedChat.name || "")
+                    setIsEditingChatName(true);
+                    setNewChatName(selectedChat.name || "");
                   }}
                 >
                   <Edit className="h-4 w-4" />
@@ -491,7 +634,7 @@ export function Friends() {
                       {selectedChat.isGroup && msg.senderId !== user.uid && (
                         <div className="flex items-center gap-2 mb-1">
                           <Avatar className="h-6 w-6">
-                            <AvatarImage src={msg.senderPhotoURL} />
+                            <AvatarImage src={msg.senderPhotoURL || ""} />
                             <AvatarFallback>{msg.senderName?.[0]}</AvatarFallback>
                           </Avatar>
                           <span className="text-xs font-medium">{msg.senderName}</span>
@@ -583,8 +726,7 @@ export function Friends() {
         </DialogContent>
       </Dialog>
     </div>
-  )
+  );
 }
 
-export default Friends
-
+export default Friends;

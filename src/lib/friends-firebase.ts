@@ -23,7 +23,7 @@ import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage
 ------------------------------------------------------------- */
 
 /**
- * Set user's online status in Firestore
+ * Set user's online status in Firestore.
  */
 export const setUserOnlineStatus = async (userId: string, status: "online" | "offline" | "away") => {
   try {
@@ -38,13 +38,13 @@ export const setUserOnlineStatus = async (userId: string, status: "online" | "of
 }
 
 /**
- * Listen to a user's online status
+ * Listen to a user's online status.
  */
 export const listenToUserOnlineStatus = (userId: string, callback: (status: string) => void) => {
   const userRef = doc(db, "users", userId)
-  const unsubscribe = onSnapshot(userRef, (doc) => {
-    if (doc.exists()) {
-      const userData = doc.data()
+  const unsubscribe = onSnapshot(userRef, (docSnap) => {
+    if (docSnap.exists()) {
+      const userData = docSnap.data()
       callback(userData.status || "offline")
     } else {
       callback("offline")
@@ -54,7 +54,7 @@ export const listenToUserOnlineStatus = (userId: string, callback: (status: stri
 }
 
 /**
- * Listen to online status of multiple users
+ * Listen to online status of multiple users.
  */
 export const listenToFriendsOnlineStatus = (userIds: string[], callback: (statuses: any[]) => void) => {
   if (!userIds.length) {
@@ -67,10 +67,10 @@ export const listenToFriendsOnlineStatus = (userIds: string[], callback: (status
 
   const unsubscribe = onSnapshot(q, (snapshot) => {
     const statuses: any[] = []
-    snapshot.forEach((doc) => {
-      const userData = doc.data()
+    snapshot.forEach((docSnap) => {
+      const userData = docSnap.data()
       statuses.push({
-        id: doc.id,
+        id: docSnap.id,
         name: userData.name || userData.displayName,
         email: userData.email,
         photoURL: userData.photoURL,
@@ -85,13 +85,11 @@ export const listenToFriendsOnlineStatus = (userIds: string[], callback: (status
 }
 
 /**
- * Setup presence system to track when users go offline
+ * Setup presence system to track when users go offline.
  */
 export const setupPresenceSystem = (userId: string) => {
-  // Set up connection state change listener
   const userStatusRef = doc(db, "users", userId)
 
-  // When the user is online
   const setOnline = async () => {
     await updateDoc(userStatusRef, {
       status: "online",
@@ -99,7 +97,6 @@ export const setupPresenceSystem = (userId: string) => {
     })
   }
 
-  // When the user goes offline
   const setOffline = async () => {
     await updateDoc(userStatusRef, {
       status: "offline",
@@ -107,15 +104,12 @@ export const setupPresenceSystem = (userId: string) => {
     })
   }
 
-  // Set up listeners for connection state
   window.addEventListener("online", setOnline)
   window.addEventListener("offline", setOffline)
   window.addEventListener("beforeunload", setOffline)
 
-  // Set initial status
   setOnline()
 
-  // Return cleanup function
   return () => {
     window.removeEventListener("online", setOnline)
     window.removeEventListener("offline", setOffline)
@@ -130,80 +124,103 @@ export const setupPresenceSystem = (userId: string) => {
 
 /**
  * Listen in real time to chats for a given user.
+ * For direct chats, the other user's profile data is subscribed to for live updates.
  */
-export const listenToChatsRealtime = (userId: string, callback: (chats: any[]) => void) => {
+export const listenToChatsRealtime = (
+  userId: string,
+  callback: (chats: any[]) => void,
+) => {
   const chatsRef = collection(db, "chats")
   const q = query(chatsRef, where("members", "array-contains", userId))
-  const unsubscribe = onSnapshot(q, async (snapshot) => {
-    const chatList: any[] = []
+  
+  let chatList: any[] = []
+  const userCache = new Map<string, any>()
+  const userSubscriptions = new Map<string, () => void>()
 
-    for (const docSnap of snapshot.docs) {
-      const chatData = docSnap.data()
-      let chatName = chatData.name
-
-      // For direct chats, get the other user's name
-      if (!chatData.isGroup && chatData.members.length === 2) {
-        const otherUserId = chatData.members.find((id: string) => id !== userId)
-        if (otherUserId) {
-          const otherUserDoc = await getDoc(doc(db, "users", otherUserId))
-          if (otherUserDoc.exists()) {
-            const otherUserData = otherUserDoc.data()
-            chatName = otherUserData.name || otherUserData.displayName || otherUserData.email
+  const updateChatsWithUserData = () => {
+    const updatedChats = chatList.map((chat) => {
+      if (!chat.isGroup && chat.members.length === 2) {
+        const otherUserId = chat.members.find((id: string) => id !== userId)
+        if (otherUserId && userCache.has(otherUserId)) {
+          const userData = userCache.get(otherUserId)
+          return {
+            ...chat,
+            name: userData.name || userData.displayName || chat.name,
           }
         }
       }
-
-      chatList.push({
-        id: docSnap.id,
-        ...chatData,
-        name: chatName,
-      })
-    }
-
-    // Sort by updatedAt descending
-    chatList.sort((a, b) => {
-      if (a.updatedAt?.seconds && b.updatedAt?.seconds) {
-        return b.updatedAt.seconds - a.updatedAt.seconds
-      }
-      return 0
+      return chat
     })
+    callback(updatedChats)
+  }
 
-    callback(chatList)
+  const unsubscribeChats = onSnapshot(q, (snapshot) => {
+    chatList = []
+    snapshot.forEach((docSnap) => {
+      const chatData = docSnap.data()
+      chatList.push({ id: docSnap.id, ...chatData })
+      if (!chatData.isGroup && chatData.members.length === 2) {
+        const otherUserId = chatData.members.find((id: string) => id !== userId)
+        if (otherUserId && !userSubscriptions.has(otherUserId)) {
+          const userDocRef = doc(db, "users", otherUserId)
+          const unsubscribeUser = onSnapshot(userDocRef, (userSnap) => {
+            if (userSnap.exists()) {
+              userCache.set(otherUserId, userSnap.data())
+              updateChatsWithUserData()
+            }
+          })
+          userSubscriptions.set(otherUserId, unsubscribeUser)
+        }
+      }
+    })
+    updateChatsWithUserData()
   })
-  return unsubscribe
+
+  return () => {
+    unsubscribeChats()
+    userSubscriptions.forEach((unsubscribe) => unsubscribe())
+    userSubscriptions.clear()
+  }
 }
 
 /**
  * Listen in real time to messages for a given chat.
+ * For each message, the sender’s profile data is subscribed to so that any updates (e.g., profile pic changes) are reflected live.
  */
-export const listenToMessagesRealtime = (chatId: string, callback: (messages: any[]) => void) => {
+export const listenToMessagesRealtime = (
+  chatId: string,
+  callback: (messages: any[]) => void,
+) => {
   const messagesRef = collection(db, "chats", chatId, "messages")
   const q = query(messagesRef, orderBy("timestamp", "asc"))
-  const unsubscribe = onSnapshot(q, async (snapshot) => {
-    const msgList: any[] = []
+  
+  let messagesList: any[] = []
+  const userCache = new Map<string, any>()
+  const userSubscriptions = new Map<string, () => void>()
 
-    for (const docSnap of snapshot.docs) {
-      const messageData = docSnap.data()
-
-      // Get sender info if not already included
-      if (messageData.senderId && (!messageData.senderName || !messageData.senderPhotoURL)) {
-        try {
-          const senderDoc = await getDoc(doc(db, "users", messageData.senderId))
-          if (senderDoc.exists()) {
-            const senderData = senderDoc.data()
-            messageData.senderName = messageData.senderName || senderData.name || senderData.displayName
-            messageData.senderPhotoURL = messageData.senderPhotoURL || senderData.photoURL
-          }
-        } catch (error) {
-          console.error("Error fetching sender data:", error)
+  const updateMessagesWithUserData = () => {
+    const updatedMessages = messagesList.map((message) => {
+      if (message.senderId && userCache.has(message.senderId)) {
+        const userData = userCache.get(message.senderId)
+        return {
+          ...message,
+          senderName: userData.name || userData.displayName || message.senderName,
+          senderPhotoURL: userData.photoURL || message.senderPhotoURL,
         }
       }
+      return message
+    })
+    callback(updatedMessages)
+  }
 
-      // Determine file type if there's a file URL
+  const unsubscribeMessages = onSnapshot(q, (snapshot) => {
+    messagesList = []
+    snapshot.forEach((docSnap) => {
+      const messageData = { id: docSnap.id, ...docSnap.data() }
+
+      // Determine file type and file name if fileURL exists.
       if (messageData.fileURL) {
-        const fileURL = messageData.fileURL
-        const extension = fileURL.split(".").pop()?.toLowerCase() || ""
-
+        const extension = messageData.fileURL.split(".").pop()?.toLowerCase() || ""
         if (["jpg", "jpeg", "png", "gif", "webp", "svg"].includes(extension)) {
           messageData.fileType = "image"
         } else if (["mp3", "wav", "ogg", "webm"].includes(extension)) {
@@ -213,14 +230,10 @@ export const listenToMessagesRealtime = (chatId: string, callback: (messages: an
         } else {
           messageData.fileType = "file"
         }
-
-        // Extract file name from URL
         try {
-          const url = new URL(fileURL)
+          const url = new URL(messageData.fileURL)
           const pathParts = url.pathname.split("/")
           const fullFileName = pathParts[pathParts.length - 1]
-
-          // Remove timestamp prefix if it exists (e.g., 1234567890_filename.jpg)
           const fileNameParts = fullFileName.split("_")
           if (fileNameParts.length > 1 && !isNaN(Number(fileNameParts[0]))) {
             messageData.fileName = fileNameParts.slice(1).join("_")
@@ -232,12 +245,27 @@ export const listenToMessagesRealtime = (chatId: string, callback: (messages: an
         }
       }
 
-      msgList.push({ id: docSnap.id, ...messageData })
-    }
+      messagesList.push(messageData)
 
-    callback(msgList)
+      if (messageData.senderId && !userSubscriptions.has(messageData.senderId)) {
+        const userDocRef = doc(db, "users", messageData.senderId)
+        const unsubscribeUser = onSnapshot(userDocRef, (userSnap) => {
+          if (userSnap.exists()) {
+            userCache.set(messageData.senderId, userSnap.data())
+            updateMessagesWithUserData()
+          }
+        })
+        userSubscriptions.set(messageData.senderId, unsubscribeUser)
+      }
+    })
+    updateMessagesWithUserData()
   })
-  return unsubscribe
+
+  return () => {
+    unsubscribeMessages()
+    userSubscriptions.forEach((unsubscribe) => unsubscribe())
+    userSubscriptions.clear()
+  }
 }
 
 /**
@@ -264,7 +292,6 @@ export const listenToFriendRequests = (userId: string, callback: (requests: any[
  * Send a friend request from the current user to the user with the given email.
  */
 export const sendFriendRequest = async (fromUserId: string, friendEmail: string): Promise<void> => {
-  // Lookup the "toUser" by email in the "users" collection.
   const usersRef = collection(db, "users")
   const q = query(usersRef, where("email", "==", friendEmail))
   const userSnap = await getDocs(q)
@@ -281,12 +308,10 @@ export const sendFriendRequest = async (fromUserId: string, friendEmail: string)
     throw new Error("Invalid user document")
   }
 
-  // Check if this is the user's own email
   if (toUserId === fromUserId) {
     throw new Error("You cannot send a friend request to yourself")
   }
 
-  // Check if a request already exists
   const existingRequestsQuery = query(
     collection(db, "friendRequests"),
     where("fromUserId", "==", fromUserId),
@@ -297,7 +322,6 @@ export const sendFriendRequest = async (fromUserId: string, friendEmail: string)
     throw new Error("A friend request has already been sent to this user")
   }
 
-  // Check if they're already friends (have a direct chat)
   const chatsRef = collection(db, "chats")
   const existingChatsQuery = query(chatsRef, where("members", "array-contains", fromUserId))
   const existingChatsSnap = await getDocs(existingChatsQuery)
@@ -314,12 +338,10 @@ export const sendFriendRequest = async (fromUserId: string, friendEmail: string)
     throw new Error("You are already friends with this user")
   }
 
-  // Retrieve the sender's display name.
   const fromUserDoc = await getDoc(doc(db, "users", fromUserId))
   const fromUserData = fromUserDoc.exists() ? fromUserDoc.data() : null
   const fromUserName = fromUserData?.name || fromUserData?.displayName || "Unknown User"
 
-  // Create a friendRequests document.
   await addDoc(collection(db, "friendRequests"), {
     fromUserId,
     fromUserName,
@@ -331,7 +353,6 @@ export const sendFriendRequest = async (fromUserId: string, friendEmail: string)
 
 /**
  * Accept a friend request.
- * Updates the request to "accepted" and creates a private chat if one doesn't exist.
  */
 export const acceptFriendRequest = async (requestId: string): Promise<void> => {
   const reqRef = doc(db, "friendRequests", requestId)
@@ -345,10 +366,8 @@ export const acceptFriendRequest = async (requestId: string): Promise<void> => {
     return
   }
 
-  // Mark the request as accepted.
   await updateDoc(reqRef, { status: "accepted" })
 
-  // Create a private chat if one does not already exist.
   const chatsRef = collection(db, "chats")
   const q = query(chatsRef, where("members", "array-contains", requestData.fromUserId))
   const existingChatsSnap = await getDocs(q)
@@ -367,7 +386,6 @@ export const acceptFriendRequest = async (requestId: string): Promise<void> => {
   })
 
   if (!chatExists) {
-    // Get both users' data for the chat
     const fromUserDoc = await getDoc(doc(db, "users", requestData.fromUserId))
     const toUserDoc = await getDoc(doc(db, "users", requestData.toUserId))
 
@@ -424,7 +442,6 @@ export const createGroupChat = async (groupName: string, emails: string[], owner
   const memberIds: string[] = [ownerId]
   const memberNames: Record<string, string> = {}
 
-  // Get owner's name
   const ownerDoc = await getDoc(doc(db, "users", ownerId))
   if (ownerDoc.exists()) {
     const ownerData = ownerDoc.data()
@@ -476,7 +493,6 @@ export const renameChat = async (chatId: string, newName: string): Promise<void>
 
   const chatData = chatSnap.data()
 
-  // Only allow renaming group chats
   if (!chatData.isGroup) {
     throw new Error("Only group chats can be renamed")
   }
@@ -486,7 +502,6 @@ export const renameChat = async (chatId: string, newName: string): Promise<void>
 
 /**
  * Leave a group chat.
- * This removes the current user from the members array.
  */
 export const leaveGroupChat = async (chatId: string, currentUserId: string): Promise<void> => {
   const chatRef = doc(db, "chats", chatId)
@@ -502,13 +517,11 @@ export const leaveGroupChat = async (chatId: string, currentUserId: string): Pro
     throw new Error("This operation is only valid for group chats")
   }
 
-  // Remove user from members array
   await updateDoc(chatRef, {
     members: arrayRemove(currentUserId),
     updatedAt: serverTimestamp(),
   })
 
-  // If memberNames exists, remove the user from it
   if (chatData.memberNames && chatData.memberNames[currentUserId]) {
     const memberNames = { ...chatData.memberNames }
     delete memberNames[currentUserId]
@@ -518,7 +531,6 @@ export const leaveGroupChat = async (chatId: string, currentUserId: string): Pro
 
 /**
  * Delete a message.
- * Users can only delete their own messages.
  */
 export const deleteMessage = async (chatId: string, messageId: string, currentUserId: string): Promise<void> => {
   const messageRef = doc(db, "chats", chatId, "messages", messageId)
@@ -530,29 +542,23 @@ export const deleteMessage = async (chatId: string, messageId: string, currentUs
 
   const messageData = messageSnap.data()
 
-  // Check if the current user is the sender
   if (messageData.senderId !== currentUserId) {
     throw new Error("You can only delete your own messages")
   }
 
-  // If there's a file, delete it from storage
   if (messageData.fileURL) {
     try {
-      // Extract the file path from the URL
       const fileUrl = new URL(messageData.fileURL)
       const filePath = decodeURIComponent(fileUrl.pathname.split("/o/")[1].split("?")[0])
       const fileRef = ref(storage, filePath)
       await deleteObject(fileRef)
     } catch (error) {
       console.error("Error deleting file:", error)
-      // Continue with message deletion even if file deletion fails
     }
   }
 
-  // Delete the message
   await deleteDoc(messageRef)
 
-  // Update the chat's lastMessage if this was the last message
   const messagesRef = collection(db, "chats", chatId, "messages")
   const q = query(messagesRef, orderBy("timestamp", "desc"), limit(1))
   const lastMessageSnap = await getDocs(q)
@@ -564,7 +570,6 @@ export const deleteMessage = async (chatId: string, messageId: string, currentUs
       updatedAt: serverTimestamp(),
     })
   } else {
-    // If no messages left, update lastMessage to empty
     await updateDoc(doc(db, "chats", chatId), {
       lastMessage: "",
       updatedAt: serverTimestamp(),
@@ -578,10 +583,8 @@ export const deleteMessage = async (chatId: string, messageId: string, currentUs
 
 /**
  * Send a message in a chat.
- * Includes sender information automatically.
  */
 export const sendMessage = async (chatId: string, text: string, senderId: string, fileURL?: string): Promise<void> => {
-  // Get sender information
   const senderDoc = await getDoc(doc(db, "users", senderId))
   let senderName
   let senderPhotoURL
@@ -602,10 +605,8 @@ export const sendMessage = async (chatId: string, text: string, senderId: string
     timestamp: serverTimestamp(),
   }
 
-  // If there's a file URL, determine its type
   if (fileURL) {
     const extension = fileURL.split(".").pop()?.toLowerCase() || ""
-
     if (["jpg", "jpeg", "png", "gif", "webp", "svg"].includes(extension)) {
       messageData.fileType = "image"
     } else if (["mp3", "wav", "ogg", "webm"].includes(extension)) {
@@ -615,14 +616,10 @@ export const sendMessage = async (chatId: string, text: string, senderId: string
     } else {
       messageData.fileType = "file"
     }
-
-    // Extract file name from URL
     try {
       const url = new URL(fileURL)
       const pathParts = url.pathname.split("/")
       const fullFileName = pathParts[pathParts.length - 1]
-
-      // Remove timestamp prefix if it exists (e.g., 1234567890_filename.jpg)
       const fileNameParts = fullFileName.split("_")
       if (fileNameParts.length > 1 && !isNaN(Number(fileNameParts[0]))) {
         messageData.fileName = fileNameParts.slice(1).join("_")
@@ -636,7 +633,6 @@ export const sendMessage = async (chatId: string, text: string, senderId: string
 
   await addDoc(messagesRef, messageData)
 
-  // Update the parent chat with lastMessage and updatedAt.
   const chatDocRef = doc(db, "chats", chatId)
   await updateDoc(chatDocRef, {
     lastMessage: text || (fileURL ? "Sent a file" : ""),
@@ -657,10 +653,8 @@ export const uploadChatFile = async (
   const fileRef = ref(storage, filePath)
 
   try {
-    // Create upload task
     const uploadTask = uploadBytes(fileRef, file)
 
-    // If progress callback is provided, simulate progress
     if (onProgress) {
       let progress = 0
       const interval = setInterval(() => {
@@ -679,7 +673,6 @@ export const uploadChatFile = async (
       const downloadURL = await getDownloadURL(snapshot.ref)
       return downloadURL
     } else {
-      // Simple upload without progress tracking
       const snapshot = await uploadTask
       const downloadURL = await getDownloadURL(snapshot.ref)
       return downloadURL
@@ -695,7 +688,7 @@ export const uploadChatFile = async (
 ------------------------------------------------------------- */
 
 /**
- * Set typing indicator for a user in a chat
+ * Set typing indicator for a user in a chat.
  */
 export const setTypingIndicator = async (chatId: string, userId: string, isTyping: boolean): Promise<void> => {
   const typingRef = doc(db, "chats", chatId, "typing", userId)
@@ -711,7 +704,8 @@ export const setTypingIndicator = async (chatId: string, userId: string, isTypin
 }
 
 /**
- * Listen to typing indicators in a chat
+ * Listen to typing indicators in a chat.
+ * This version subscribes to each typing user’s profile so that their name and photo update live.
  */
 export const listenToTypingIndicators = (
   chatId: string,
@@ -719,45 +713,53 @@ export const listenToTypingIndicators = (
   callback: (typingUsers: any[]) => void,
 ): (() => void) => {
   const typingRef = collection(db, "chats", chatId, "typing")
+  const userCache = new Map<string, any>()
+  const userSubscriptions = new Map<string, () => void>()
 
-  const unsubscribe = onSnapshot(typingRef, async (snapshot) => {
-    const typingUsers: any[] = []
-
-    for (const doc of snapshot.docs) {
-      const data = doc.data()
-
-      // Skip if this is the current user
-      if (doc.id === currentUserId) continue
-
-      // Check if the typing indicator is recent (within last 10 seconds)
-      const timestamp = data.timestamp?.toDate ? data.timestamp.toDate() : new Date()
-      const now = new Date()
-      const diffMs = now.getTime() - timestamp.getTime()
-
-      // Only consider typing indicators from the last 10 seconds
-      if (diffMs < 10000) {
-        // Get user info
-        const userDoc = await getDoc(doc(db, "users", doc.id))
-        if (userDoc.exists()) {
-          const userData = userDoc.data()
-          typingUsers.push({
-            id: doc.id,
-            name: userData.name || userData.displayName || userData.email,
-            photoURL: userData.photoURL,
-          })
-        } else {
-          typingUsers.push({ id: doc.id })
+  const updateTypingUsers = (typingDocs: any[]) => {
+    const typingUsers = typingDocs.map((docSnap) => {
+      if (userCache.has(docSnap.id)) {
+        const userData = userCache.get(docSnap.id)
+        return {
+          id: docSnap.id,
+          name: userData.name || userData.displayName || userData.email,
+          photoURL: userData.photoURL,
         }
-      } else {
-        // Remove stale typing indicators
-        await deleteDoc(doc.ref)
       }
-    }
-
+      return { id: docSnap.id }
+    })
     callback(typingUsers)
+  }
+
+  const unsubscribeTyping = onSnapshot(typingRef, (snapshot) => {
+    const validTypingDocs: any[] = []
+    const now = Date.now()
+    snapshot.forEach((docSnap) => {
+      if (docSnap.id === currentUserId) return
+      const data = docSnap.data()
+      const timestamp = data.timestamp?.toDate ? data.timestamp.toDate().getTime() : now
+      if (now - timestamp < 10000) {
+        validTypingDocs.push(docSnap)
+        if (!userSubscriptions.has(docSnap.id)) {
+          const userDocRef = doc(db, "users", docSnap.id)
+          const unsubscribeUser = onSnapshot(userDocRef, (userSnap) => {
+            if (userSnap.exists()) {
+              userCache.set(docSnap.id, userSnap.data())
+              updateTypingUsers(validTypingDocs)
+            }
+          })
+          userSubscriptions.set(docSnap.id, unsubscribeUser)
+        }
+      }
+    })
+    updateTypingUsers(validTypingDocs)
   })
 
-  return unsubscribe
+  return () => {
+    unsubscribeTyping()
+    userSubscriptions.forEach((unsubscribe) => unsubscribe())
+    userSubscriptions.clear()
+  }
 }
 
 /* -------------------------------------------------------------
@@ -776,59 +778,47 @@ export const getUserProfile = async (userId: string): Promise<any> => {
 }
 
 /**
- * Get the other user in a direct chat
+ * Get the other user in a direct chat.
  */
 export const getOtherUserInDirectChat = async (chat: any, currentUserId: string): Promise<any> => {
   if (chat.isGroup) {
     return null
   }
-
   const otherUserId = chat.members.find((id: string) => id !== currentUserId)
   if (!otherUserId) {
     return null
   }
-
   const profile = await getUserProfile(otherUserId)
   if (profile) {
-    return {
-      id: otherUserId,
-      ...profile,
-    }
+    return { id: otherUserId, ...profile }
   }
-
   return null
 }
 
 /**
- * Get profiles for all members in a chat
+ * Get profiles for all members in a chat.
  */
 export const getChatMembersProfiles = async (memberIds: string[]): Promise<any[]> => {
   if (memberIds.length === 0) {
     return []
   }
-
   const profiles: any[] = []
-
   for (const memberId of memberIds) {
     const profile = await getUserProfile(memberId)
     if (profile) {
-      profiles.push({
-        id: memberId,
-        ...profile,
-      })
+      profiles.push({ id: memberId, ...profile })
     }
   }
-
   return profiles
 }
 
 /**
- * Get all friends of a user (users who share a direct chat with them)
+ * Get all friends of a user (users who share a direct chat with them).
+ * This one-time function is available if you do not require realtime updates.
  */
 export const getUserFriends = async (userId: string): Promise<any[]> => {
   const chatsRef = collection(db, "chats")
   const q = query(chatsRef, where("members", "array-contains", userId), where("isGroup", "==", false))
-
   const chatsSnap = await getDocs(q)
   const friendIds: string[] = []
 
@@ -846,18 +836,13 @@ export const getUserFriends = async (userId: string): Promise<any[]> => {
     return []
   }
 
-  // Get user data for all friends
   const friends: any[] = []
-
-  // Firebase doesn't support 'in' queries with more than 10 items
-  // So we need to batch the requests if there are more than 10 friends
   const batchSize = 10
   for (let i = 0; i < friendIds.length; i += batchSize) {
     const batch = friendIds.slice(i, i + batchSize)
     const usersRef = collection(db, "users")
     const batchQuery = query(usersRef, where("__name__", "in", batch))
     const usersSnap = await getDocs(batchQuery)
-
     usersSnap.forEach((userDoc) => {
       const userData = userDoc.data()
       friends.push({
@@ -870,7 +855,65 @@ export const getUserFriends = async (userId: string): Promise<any[]> => {
       })
     })
   }
-
   return friends
 }
 
+/**
+ * Listen to all friends of a user in realtime.
+ * This listener uses a similar pattern to chats and typing indicators to subscribe to friends' user documents.
+ */
+export const listenToUserFriends = (userId: string, callback: (friends: any[]) => void) => {
+  const chatsRef = collection(db, "chats")
+  const q = query(chatsRef, where("members", "array-contains", userId), where("isGroup", "==", false))
+  let friendIds = new Set<string>()
+  const userCache = new Map<string, any>()
+  const userSubscriptions = new Map<string, () => void>()
+
+  const updateFriends = () => {
+    const friends = Array.from(friendIds).map((fid) => {
+      if (userCache.has(fid)) {
+        const userData = userCache.get(fid)
+        return {
+          id: fid,
+          name: userData.name || userData.displayName || userData.email,
+          email: userData.email,
+          photoURL: userData.photoURL,
+          status: userData.status || "offline",
+          lastSeen: userData.lastSeen,
+        }
+      }
+      return { id: fid }
+    })
+    callback(friends)
+  }
+
+  const unsubscribeChats = onSnapshot(q, (snapshot) => {
+    friendIds.clear()
+    snapshot.forEach((chatDoc) => {
+      const chatData = chatDoc.data()
+      if (chatData.members && chatData.members.length === 2) {
+        const friendId = chatData.members.find((id: string) => id !== userId)
+        if (friendId) {
+          friendIds.add(friendId)
+          if (!userSubscriptions.has(friendId)) {
+            const userDocRef = doc(db, "users", friendId)
+            const unsubscribeUser = onSnapshot(userDocRef, (userSnap) => {
+              if (userSnap.exists()) {
+                userCache.set(friendId, userSnap.data())
+                updateFriends()
+              }
+            })
+            userSubscriptions.set(friendId, unsubscribeUser)
+          }
+        }
+      }
+    })
+    updateFriends()
+  })
+
+  return () => {
+    unsubscribeChats()
+    userSubscriptions.forEach((unsubscribe) => unsubscribe())
+    userSubscriptions.clear()
+  }
+}

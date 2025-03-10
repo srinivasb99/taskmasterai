@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from "react"
-import { motion, useScroll, useTransform, useSpring, useInView, AnimatePresence, MotionValue } from "framer-motion"
+import { motion, useScroll, useTransform, useSpring, useInView, AnimatePresence } from "framer-motion"
 import { LayoutDashboard, NotebookPen, Users, Users2, Bot, Calendar, ArrowRight, CheckCircle, Clock, FileText, MessageSquare, Share2, BrainCircuit, CalendarDays, Sparkles } from 'lucide-react'
 
 // Reusable components
@@ -91,7 +91,7 @@ const ParallaxText = ({ children, baseVelocity = 100 }) => {
 }
 
 // Feature sections
-export default function FeatureSections() {
+export default function MainFeatures() {
   return (
     <>
       <DashboardSection />
@@ -106,7 +106,7 @@ export default function FeatureSections() {
   )
 }
 
-function useParallax(value: MotionValue<number>, distance: number) {
+function useParallax(value, distance) {
   return useTransform(value, [0, 1], [-distance, distance])
 }
 
@@ -218,7 +218,11 @@ function DashboardSection() {
             <GlowingBorder className="shadow-2xl shadow-indigo-500/20">
               <div className="relative bg-gray-900 rounded-xl overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-br from-indigo-900/30 to-purple-900/30" />
-
+                <img 
+                  src="https://firebasestorage.googleapis.com/v0/b/deepworkai-c3419.appspot.com/o/Screenshot%202025-02-17%20at%202.41.40%E2%80%AFPM.png?alt=media&token=cb886770-2359-46e2-8469-e2447d13dba4" 
+                  alt="TaskMaster Dashboard" 
+                  className="rounded-xl relative z-10 w-full"
+                />
                 
                 {/* Animated UI elements */}
                 <motion.div 
@@ -455,9 +459,9 @@ function FriendsSection() {
   }
 
   const chatMessages = [
-    { user: "Alex", message: "Hey team, I've shared my notes from yesterday's meeting", time: "10:24 AM", avatar: "/placeholder.svg?height=40&width=40" },
-    { user: "You", message: "Thanks! I'll review them and add my comments", time: "10:26 AM", avatar: "/placeholder.svg?height=40&width=40" },
-    { user: "Sarah", message: "Great work everyone! I've updated the project timeline", time: "10:30 AM", avatar: "/placeholder.svg?height=40&width=40" }
+    { user: "Alex", message: "Hey team, I've shared my notes from yesterday's meeting", time: "10:24 AM", avatar: "https://i.pravatar.cc/40?img=1" },
+    { user: "You", message: "Thanks! I'll review them and add my comments", time: "10:26 AM", avatar: "https://i.pravatar.cc/40?img=2" },
+    { user: "Sarah", message: "Great work everyone! I've updated the project timeline", time: "10:30 AM", avatar: "https://i.pravatar.cc/40?img=3" }
   ]
 
   return (
@@ -539,7 +543,7 @@ function FriendsSection() {
                           className="w-8 h-8 rounded-full border-2 border-gray-800 bg-gray-900 flex items-center justify-center overflow-hidden"
                         >
                           <img
-                            src={`/placeholder.svg?height=32&width=32`}
+                            src={`https://i.pravatar.cc/32?img=${num}`}
                             alt={`User ${num}`}
                             className="w-full h-full object-cover"
                           />
@@ -590,6 +594,10 @@ function FriendsSection() {
                   />
                   <button className="absolute right-3 top-1/2 transform -translate-y-1/2 bg-gradient-to-r from-blue-500 to-indigo-500 p-2 rounded-full">
                     <ArrowRight className="w-5 h-5 text-white" />
+                  </button>
+                </div>
+                
+                {/* Typing indicator */}
                   </button>
                 </div>
                 
@@ -738,7 +746,7 @@ function CommunitySection() {
                     <div className="bg-gray-900 p-4 rounded-xl">
                       <div className="flex items-center gap-3 mb-3">
                         <div className="w-8 h-8 rounded-full overflow-hidden">
-                          <img src={`/placeholder.svg?height=32&width=32`} alt="User" className="w-full h-full object-cover" />
+                          <img src={`https://i.pravatar.cc/32?img=${index + 4}`} alt="User" className="w-full h-full object-cover" />
                         </div>
                         <div>
                           <p className="text-white text-sm font-medium">User {item}</p>
@@ -1183,21 +1191,21 @@ function TestimonialsSection() {
       name: "Sarah Johnson",
       role: "Product Manager",
       company: "TechCorp",
-      image: "/placeholder.svg?height=80&width=80",
+      image: "https://i.pravatar.cc/80?img=5",
       text: "TaskMaster AI has completely transformed how I manage my workload. The AI assistant is like having a personal productivity coach available 24/7."
     },
     {
       name: "Michael Chen",
       role: "Software Engineer",
       company: "DevStudio",
-      image: "/placeholder.svg?height=80&width=80",
+      image: "https://i.pravatar.cc/80?img=6",
       text: "The note-taking feature has been a game-changer for me. I can upload technical documentation and instantly get structured notes with key points highlighted. It saves me hours every week."
     },
     {
       name: "Emily Rodriguez",
       role: "Marketing Director",
       company: "BrandForward",
-      image: "/placeholder.svg?height=80&width=80",
+      image: "https://i.pravatar.cc/80?img=7",
       text: "Our team's collaboration has improved dramatically since we started using TaskMaster AI. The real-time messaging and file sharing capabilities are seamless and intuitive."
     }
   ]

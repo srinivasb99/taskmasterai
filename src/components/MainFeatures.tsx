@@ -1,7 +1,6 @@
 import React, { useRef, useEffect, useState } from "react"
 import { motion, useScroll, useTransform, useSpring, useInView, AnimatePresence, MotionValue } from "framer-motion"
 import { LayoutDashboard, NotebookPen, Users, Users2, Bot, Calendar, ArrowRight, CheckCircle, Clock, FileText, MessageSquare, Share2, BrainCircuit, CalendarDays, Sparkles } from 'lucide-react'
-import Image from "next/image"
 
 // Reusable components
 const GlowingBorder = ({ children, className = "" }) => (

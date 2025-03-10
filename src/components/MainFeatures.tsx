@@ -626,7 +626,7 @@ function FriendsSection() {
       user: "You",
       message: "Thanks! I'll review them and add my comments",
       time: "10:26 AM",
-      avatar: "https://i.pravatar.cc/40?img=2",
+      avatar: "https://www.iconpacks.net/icons/2/free-user-icon-3296-thumb.png",
     },
     {
       id: 3,

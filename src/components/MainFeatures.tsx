@@ -640,13 +640,13 @@ function FriendsSection() {
   const [friends, setFriends] = useState([
     { id: 1, name: "Alex Johnson", status: "online", avatar: "https://i.pravatar.cc/40?img=1" },
     { id: 2, name: "Sarah Williams", status: "online", avatar: "https://i.pravatar.cc/40?img=3" },
-    { id: 3, name: "Michael Chen", status: "offline", avatar: "https://i.pravatar.cc/40?img=4" },
-    { id: 4, name: "Emily Rodriguez", status: "away", avatar: "https://i.pravatar.cc/40?img=5" }
+    { id: 3, name: "Michael Chen", status: "offline", avatar: "https://i.pravatar.cc/40?img=11" },
+    { id: 4, name: "Emily Rodriguez", status: "away", avatar: "https://i.pravatar.cc/80?img=9" }
   ])
   
   const [friendRequests, setFriendRequests] = useState([
-    { id: 1, name: "Jordan Smith", avatar: "https://i.pravatar.cc/40?img=6" },
-    { id: 2, name: "Taylor Brown", avatar: "https://i.pravatar.cc/40?img=7" }
+    { id: 1, name: "Jordan Smith", avatar: "https://i.pravatar.cc/80?img=7" },
+    { id: 2, name: "Taylor Brown", avatar: "https://i.pravatar.cc/80?img=10" }
   ])
   
   const [activeTab, setActiveTab] = useState("chats")
@@ -1011,7 +1011,7 @@ function CommunitySection() {
       uploadedAt: new Date().toISOString(),
       userId: "user1",
       userName: "Michael Chen",
-      userAvatar: "https://i.pravatar.cc/32?img=4"
+      userAvatar: "https://i.pravatar.cc/40?img=11"
     },
     { 
       id: 2, 
@@ -1019,7 +1019,7 @@ function CommunitySection() {
       uploadedAt: new Date(Date.now() - 86400000).toISOString(),
       userId: "user2",
       userName: "Emily Rodriguez",
-      userAvatar: "https://i.pravatar.cc/32?img=5"
+      userAvatar: "https://i.pravatar.cc/32?img=9"
     },
     { 
       id: 3, 
@@ -1027,7 +1027,7 @@ function CommunitySection() {
       uploadedAt: new Date(Date.now() - 172800000).toISOString(),
       userId: "user3",
       userName: "Jordan Smith",
-      userAvatar: "https://i.pravatar.cc/32?img=6"
+      userAvatar: "https://i.pravatar.cc/80?img=7"
     }
   ])
   
@@ -1819,14 +1819,14 @@ function TestimonialsSection() {
       name: "Michael Chen",
       role: "Software Engineer",
       company: "DevStudio",
-      image: "https://i.pravatar.cc/80?img=6",
+      image: "https://i.pravatar.cc/40?img=11",
       text: "The note-taking feature has been a game-changer for me. I can upload technical documentation and instantly get structured notes with key points highlighted. It saves me hours every week.",
     },
     {
       name: "Emily Rodriguez",
       role: "Marketing Director",
       company: "BrandForward",
-      image: "https://i.pravatar.cc/80?img=7",
+      image: "https://i.pravatar.cc/80?img=9",
       text: "Our team's collaboration has improved dramatically since we started using TaskMaster AI. The real-time messaging and file sharing capabilities are seamless and intuitive.",
     },
   ]

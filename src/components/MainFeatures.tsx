@@ -218,13 +218,7 @@ function DashboardSection() {
             <GlowingBorder className="shadow-2xl shadow-indigo-500/20">
               <div className="relative bg-gray-900 rounded-xl overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-br from-indigo-900/30 to-purple-900/30" />
-                <Image 
-                  src="https://firebasestorage.googleapis.com/v0/b/deepworkai-c3419.appspot.com/o/Screenshot%202025-02-17%20at%202.41.40%E2%80%AFPM.png?alt=media&token=cb886770-2359-46e2-8469-e2447d13dba4" 
-                  alt="TaskMaster Dashboard" 
-                  width={800} 
-                  height={500}
-                  className="rounded-xl relative z-10"
-                />
+
                 
                 {/* Animated UI elements */}
                 <motion.div 

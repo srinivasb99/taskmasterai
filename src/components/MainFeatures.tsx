@@ -1,14 +1,15 @@
+"use client"
+
 import React, { useRef, useEffect, useState } from "react"
 import { motion, useScroll, useTransform, useSpring, useInView, AnimatePresence } from "framer-motion"
-import { LayoutDashboard, NotebookPen, Users, Users2, Bot, Calendar, ArrowRight, CheckCircle, Clock, FileText, MessageSquare, Share2, BrainCircuit, CalendarDays, Sparkles } from 'lucide-react'
+import { LayoutDashboard, NotebookPen, Users, Users2, Bot, Calendar, ArrowRight, CheckCircle, Clock, FileText, MessageSquare, Share2, BrainCircuit, CalendarDays, Sparkles, Send, Plus, Search, X, Upload, Youtube, Mic, Filter, AlertTriangle, ChevronRight, ChevronLeft, Trash2, Edit2, Save, Tag, Paperclip, Smile, MoreVertical, Globe, CircleUserRound, Coins } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
 
 // Reusable components
 const GlowingBorder = ({ children, className = "" }) => (
   <div className={`relative rounded-xl overflow-hidden ${className}`}>
     <div className="absolute inset-0 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 opacity-70 blur-[2px]" />
-    <div className="relative bg-gray-900/95 h-full rounded-xl p-[1px] overflow-hidden">
-      {children}
-    </div>
+    <div className="relative bg-gray-900/95 h-full rounded-xl p-[1px] overflow-hidden">{children}</div>
   </div>
 )
 
@@ -302,6 +303,58 @@ function NotesSection() {
     { title: "Audio Notes", color: "from-blue-500 to-cyan-500" }
   ]
 
+  // Interactive Notes Feature
+  const [showNoteModal, setShowNoteModal] = useState(false)
+  const [noteTitle, setNoteTitle] = useState("")
+  const [noteContent, setNoteContent] = useState("")
+  const [notes, setNotes] = useState([
+    { id: 1, title: "Meeting Notes", content: "Discussed project timeline and deliverables", type: "text" },
+    { id: 2, title: "Research Summary", content: "Key findings from the market analysis", type: "pdf" }
+  ])
+  const [selectedNote, setSelectedNote] = useState(null)
+  const [isEditing, setIsEditing] = useState(false)
+
+  const handleCreateNote = () => {
+    if (!noteTitle.trim() || !noteContent.trim()) return
+    
+    if (isEditing && selectedNote) {
+      setNotes(notes.map(note => 
+        note.id === selectedNote.id 
+          ? { ...note, title: noteTitle, content: noteContent }
+          : note
+      ))
+    } else {
+      const newNote = {
+        id: Date.now(),
+        title: noteTitle,
+        content: noteContent,
+        type: "text"
+      }
+      setNotes([...notes, newNote])
+    }
+    
+    setNoteTitle("")
+    setNoteContent("")
+    setShowNoteModal(false)
+    setIsEditing(false)
+    setSelectedNote(null)
+  }
+
+  const handleEditNote = (note) => {
+    setNoteTitle(note.title)
+    setNoteContent(note.content)
+    setSelectedNote(note)
+    setIsEditing(true)
+    setShowNoteModal(true)
+  }
+
+  const handleDeleteNote = (id) => {
+    setNotes(notes.filter(note => note.id !== id))
+    if (selectedNote?.id === id) {
+      setSelectedNote(null)
+    }
+  }
+
   return (
     <section ref={ref} className="relative py-32 overflow-hidden bg-gray-900/80">
       <FloatingElements count={15} />
@@ -341,14 +394,30 @@ function NotesSection() {
               ))}
             </motion.div>
             
-            <motion.div variants={itemVariants}>
-              <motion.a 
-                href="/notes" 
+            <motion.div variants={itemVariants} className="flex gap-4">
+              <motion.button
+                onClick={() => {
+                  setNoteTitle("")
+                  setNoteContent("")
+                  setIsEditing(false)
+                  setSelectedNote(null)
+                  setShowNoteModal(true)
+                }}
                 className="group inline-flex items-center px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-full text-lg font-semibold transition-all transform hover:scale-105 hover:shadow-lg hover:shadow-purple-500/25"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >
-                <span>Try Notes</span>
+                <Plus className="w-5 h-5 mr-2" />
+                <span>Create Note</span>
+              </motion.button>
+              
+              <motion.a 
+                href="/notes" 
+                className="group inline-flex items-center px-6 py-3 bg-gray-800 text-white rounded-full text-lg font-semibold transition-all transform hover:scale-105"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <span>View All Notes</span>
                 <ArrowRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" />
               </motion.a>
             </motion.div>
@@ -359,60 +428,146 @@ function NotesSection() {
             style={{ x: springX }}
           >
             <div className="relative">
-              {/* Note cards with staggered animation */}
-              <motion.div 
-                className="absolute top-0 left-0 w-full h-full"
-                initial={{ rotate: -5, y: 20 }}
-                animate={{ rotate: -5, y: [20, 0, 20] }}
-                transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
-              >
-                <GlowingBorder className="shadow-2xl shadow-purple-500/20 bg-gray-800 p-6 rounded-xl">
-                  <div className="h-64 flex flex-col">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-xl font-bold text-white">Meeting Notes</h3>
-                      <div className="px-3 py-1 rounded-full bg-purple-500/20 text-purple-300 text-xs">AI Generated</div>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="h-3 bg-gray-700 rounded-full w-full"></div>
-                      <div className="h-3 bg-gray-700 rounded-full w-5/6"></div>
-                      <div className="h-3 bg-gray-700 rounded-full w-4/6"></div>
-                    </div>
-                    <div className="mt-auto">
-                      <div className="flex items-center text-gray-400 text-sm">
-                        <Clock className="w-4 h-4 mr-2" />
-                        <span>Updated 2 hours ago</span>
+              {/* Interactive Notes List */}
+              <GlowingBorder className="shadow-2xl shadow-purple-500/20 bg-gray-800 p-6 rounded-xl mb-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-xl font-bold text-white">Your Notes</h3>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Search notes..."
+                      className="w-full bg-gray-700 text-gray-200 pl-10 pr-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    />
+                  </div>
+                </div>
+                
+                <div className="space-y-3 max-h-64 overflow-y-auto">
+                  {notes.map(note => (
+                    <div 
+                      key={note.id} 
+                      className="bg-gray-700 p-4 rounded-lg hover:bg-gray-600 transition-colors cursor-pointer"
+                      onClick={() => setSelectedNote(note)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-white font-medium">{note.title}</h4>
+                        <div className="flex gap-2">
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleEditNote(note)
+                            }}
+                            className="p-1.5 text-gray-400 hover:text-white rounded-full hover:bg-gray-500/30"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleDeleteNote(note.id)
+                            }}
+                            className="p-1.5 text-gray-400 hover:text-red-400 rounded-full hover:bg-gray-500/30"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                      <p className="text-gray-300 text-sm mt-1 line-clamp-2">{note.content}</p>
+                      <div className="flex items-center mt-2">
+                        <span className="px-2 py-0.5 text-xs bg-purple-500/20 text-purple-300 rounded-full">
+                          {note.type === "text" ? "Text Note" : note.type === "pdf" ? "PDF Note" : "Note"}
+                        </span>
                       </div>
                     </div>
-                  </div>
-                </GlowingBorder>
-              </motion.div>
+                  ))}
+                </div>
+              </GlowingBorder>
               
-              <motion.div 
-                className="relative z-10 mt-10 ml-10"
-                initial={{ rotate: 5, y: -20 }}
-                animate={{ rotate: 5, y: [-20, 0, -20] }}
-                transition={{ duration: 6, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
-              >
+              {/* Selected Note Preview */}
+              {selectedNote && (
                 <GlowingBorder className="shadow-2xl shadow-pink-500/20 bg-gray-800 p-6 rounded-xl">
-                  <div className="h-64 flex flex-col">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-xl font-bold text-white">{selectedNote.title}</h3>
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => handleEditNote(selectedNote)}
+                        className="p-1.5 text-gray-400 hover:text-white rounded-full hover:bg-gray-700"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteNote(selectedNote.id)}
+                        className="p-1.5 text-gray-400 hover:text-red-400 rounded-full hover:bg-gray-700"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="prose prose-invert max-w-none">
+                    <ReactMarkdown>
+                      {selectedNote.content}
+                    </ReactMarkdown>
+                  </div>
+                </GlowingBorder>
+              )}
+              
+              {/* Note creation modal */}
+              {showNoteModal && (
+                <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+                  <div className="bg-gray-800 rounded-xl p-6 max-w-md w-full">
                     <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-xl font-bold text-white">Research Summary</h3>
-                      <div className="px-3 py-1 rounded-full bg-pink-500/20 text-pink-300 text-xs">PDF Extract</div>
+                      <h3 className="text-xl font-bold text-white">
+                        {isEditing ? "Edit Note" : "Create New Note"}
+                      </h3>
+                      <button 
+                        onClick={() => setShowNoteModal(false)}
+                        className="text-gray-400 hover:text-white"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
                     </div>
-                    <div className="space-y-2">
-                      <div className="h-3 bg-gray-700 rounded-full w-full"></div>
-                      <div className="h-3 bg-gray-700 rounded-full w-5/6"></div>
-                      <div className="h-3 bg-gray-700 rounded-full w-4/6"></div>
-                    </div>
-                    <div className="mt-auto">
-                      <div className="flex items-center text-gray-400 text-sm">
-                        <Clock className="w-4 h-4 mr-2" />
-                        <span>Updated yesterday</span>
+                    
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-1">Title</label>
+                        <input
+                          type="text"
+                          value={noteTitle}
+                          onChange={(e) => setNoteTitle(e.target.value)}
+                          className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          placeholder="Note title"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-1">Content</label>
+                        <textarea
+                          value={noteContent}
+                          onChange={(e) => setNoteContent(e.target.value)}
+                          className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500 min-h-[200px]"
+                          placeholder="Note content (Markdown supported)"
+                        />
+                      </div>
+                      
+                      <div className="flex justify-end gap-3">
+                        <button
+                          onClick={() => setShowNoteModal(false)}
+                          className="px-4 py-2 text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleCreateNote}
+                          disabled={!noteTitle.trim() || !noteContent.trim()}
+                          className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {isEditing ? "Save Changes" : "Create Note"}
+                        </button>
                       </div>
                     </div>
                   </div>
-                </GlowingBorder>
-              </motion.div>
+                </div>
+              )}
               
               <motion.div 
                 className="absolute top-20 right-0 z-20"
@@ -437,7 +592,7 @@ function NotesSection() {
 function FriendsSection() {
   const ref = useRef(null)
   const isInView = useInView(ref, { once: false, amount: 0.3 })
-  
+
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
@@ -458,11 +613,94 @@ function FriendsSection() {
     }
   }
 
-  const chatMessages = [
-    { user: "Alex", message: "Hey team, I've shared my notes from yesterday's meeting", time: "10:24 AM", avatar: "https://i.pravatar.cc/40?img=1" },
-    { user: "You", message: "Thanks! I'll review them and add my comments", time: "10:26 AM", avatar: "https://i.pravatar.cc/40?img=2" },
-    { user: "Sarah", message: "Great work everyone! I've updated the project timeline", time: "10:30 AM", avatar: "https://i.pravatar.cc/40?img=3" }
-  ]
+  // Interactive Friends Feature
+  const [message, setMessage] = useState("")
+  const [chatMessages, setChatMessages] = useState([
+    {
+      id: 1,
+      user: "Alex",
+      message: "Hey team, I've shared my notes from yesterday's meeting",
+      time: "10:24 AM",
+      avatar: "https://i.pravatar.cc/40?img=1",
+    },
+    {
+      id: 2,
+      user: "You",
+      message: "Thanks! I'll review them and add my comments",
+      time: "10:26 AM",
+      avatar: "https://i.pravatar.cc/40?img=2",
+    },
+    {
+      id: 3,
+      user: "Sarah",
+      message: "Great work everyone! I've updated the project timeline",
+      time: "10:30 AM",
+      avatar: "https://i.pravatar.cc/40?img=3",
+    }
+  ])
+  
+  const [friends, setFriends] = useState([
+    { id: 1, name: "Alex Johnson", status: "online", avatar: "https://i.pravatar.cc/40?img=1" },
+    { id: 2, name: "Sarah Williams", status: "online", avatar: "https://i.pravatar.cc/40?img=3" },
+    { id: 3, name: "Michael Chen", status: "offline", avatar: "https://i.pravatar.cc/40?img=4" },
+    { id: 4, name: "Emily Rodriguez", status: "away", avatar: "https://i.pravatar.cc/40?img=5" }
+  ])
+  
+  const [friendRequests, setFriendRequests] = useState([
+    { id: 1, name: "Jordan Smith", avatar: "https://i.pravatar.cc/40?img=6" },
+    { id: 2, name: "Taylor Brown", avatar: "https://i.pravatar.cc/40?img=7" }
+  ])
+  
+  const [activeTab, setActiveTab] = useState("chats")
+  const [selectedChat, setSelectedChat] = useState(null)
+  const [isTyping, setIsTyping] = useState(false)
+  
+  const handleSendMessage = (e) => {
+    e.preventDefault()
+    if (!message.trim()) return
+    
+    const newMessage = {
+      id: Date.now(),
+      user: "You",
+      message: message,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      avatar: "https://i.pravatar.cc/40?img=2"
+    }
+    
+    setChatMessages([...chatMessages, newMessage])
+    setMessage("")
+    
+    // Simulate response
+    setIsTyping(true)
+    setTimeout(() => {
+      const response = {
+        id: Date.now() + 1,
+        user: "Alex",
+        message: "Thanks for the update! Let's discuss this in our next meeting.",
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        avatar: "https://i.pravatar.cc/40?img=1"
+      }
+      setChatMessages(prev => [...prev, response])
+      setIsTyping(false)
+    }, 2000)
+  }
+  
+  const handleAcceptRequest = (id) => {
+    const request = friendRequests.find(req => req.id === id)
+    if (request) {
+      setFriends([...friends, { 
+        id: Date.now(), 
+        name: request.name, 
+        status: "online",
+        avatar: request.avatar
+      }])
+      setFriendRequests(friendRequests.filter(req => req.id !== id))
+    }
+  }
+  
+  const handleRejectRequest = (id) => {
+    setFriendRequests(friendRequests.filter(req => req.id !== id))
+  }
 
   return (
     <section ref={ref} className="relative py-32 overflow-hidden bg-gray-900">
@@ -534,95 +772,194 @@ function FriendsSection() {
           >
             <GlowingBorder className="shadow-2xl shadow-blue-500/20">
               <div className="bg-gray-900 p-6 rounded-xl">
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center gap-3">
-                    <div className="flex -space-x-2">
-                      {[1, 2, 3].map((num) => (
-                        <div 
-                          key={num} 
-                          className="w-8 h-8 rounded-full border-2 border-gray-800 bg-gray-900 flex items-center justify-center overflow-hidden"
-                        >
-                          <img
-                            src={`https://i.pravatar.cc/32?img=${num}`}
-                            alt={`User ${num}`}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                      ))}
-                    </div>
-                    <h3 className="text-white font-semibold">Project Team</h3>
-                  </div>
-                  <div className="px-3 py-1 rounded-full bg-blue-500/20 text-blue-300 text-xs">3 Online</div>
-                </div>
-                
-                <div className="space-y-4 mb-6">
-                  {chatMessages.map((message, index) => (
-                    <motion.div 
-                      key={index}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
-                      transition={{ duration: 0.5, delay: index * 0.2 + 0.5 }}
-                      className={`flex ${message.user === "You" ? "justify-end" : "justify-start"}`}
-                    >
-                      <div className={`flex gap-3 max-w-[80%] ${message.user === "You" ? "flex-row-reverse" : ""}`}>
-                        <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0">
-                          <img src={message.avatar || "/placeholder.svg"} alt={message.user} className="w-full h-full object-cover" />
-                        </div>
-                        <div>
-                          <div className={`flex items-center gap-2 mb-1 ${message.user === "You" ? "justify-end" : ""}`}>
-                            <span className="text-sm font-medium text-white">{message.user}</span>
-                            <span className="text-xs text-gray-400">{message.time}</span>
-                          </div>
-                          <div className={`p-3 rounded-lg ${
-                            message.user === "You" 
-                              ? "bg-indigo-500/20 text-indigo-100" 
-                              : "bg-gray-800 text-gray-200"
-                          }`}>
-                            {message.message}
-                          </div>
-                        </div>
-                      </div>
-                    </motion.div>
-                  ))}
-                </div>
-                
-                <div className="relative">
-                  <input 
-                    type="text" 
-                    placeholder="Type a message..." 
-                    className="w-full bg-gray-800 border border-gray-700 rounded-full py-3 px-4 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                  <button className="absolute right-3 top-1/2 transform -translate-y-1/2 bg-gradient-to-r from-blue-500 to-indigo-500 p-2 rounded-full">
-                    <ArrowRight className="w-5 h-5 text-white" />
+                {/* Tabs */}
+                <div className="flex border-b border-gray-700 mb-4">
+                  <button
+                    onClick={() => setActiveTab("chats")}
+                    className={`flex-1 py-2 text-sm font-medium border-b-2 transition-colors ${
+                      activeTab === "chats" 
+                        ? "border-blue-500 text-blue-400" 
+                        : "border-transparent text-gray-400 hover:text-gray-300"
+                    }`}
+                  >
+                    Chats
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("friends")}
+                    className={`flex-1 py-2 text-sm font-medium border-b-2 transition-colors ${
+                      activeTab === "friends" 
+                        ? "border-blue-500 text-blue-400" 
+                        : "border-transparent text-gray-400 hover:text-gray-300"
+                    }`}
+                  >
+                    Friends
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("requests")}
+                    className={`flex-1 py-2 text-sm font-medium border-b-2 transition-colors ${
+                      activeTab === "requests" 
+                        ? "border-blue-500 text-blue-400" 
+                        : "border-transparent text-gray-400 hover:text-gray-300"
+                    } relative`}
+                  >
+                    Requests
+                    {friendRequests.length > 0 && (
+                      <span className="absolute top-0 right-0 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                        {friendRequests.length}
+                      </span>
+                    )}
                   </button>
                 </div>
                 
-                {/* Typing indicator */}
-                <motion.div 
-                  className="flex items-center gap-1 mt-3 ml-3"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: [0, 1, 0] }}
-                  transition={{ duration: 2, repeat: Infinity }}
-                >
-                  <span className="text-xs text-gray-400">Alex is typing</span>
-                  <div className="flex gap-1">
-                    <motion.div 
-                      className="w-1.5 h-1.5 rounded-full bg-blue-400"
-                      animate={{ y: [0, -3, 0] }}
-                      transition={{ duration: 0.6, repeat: Infinity, delay: 0 }}
-                    />
-                    <motion.div 
-                      className="w-1.5 h-1.5 rounded-full bg-blue-400"
-                      animate={{ y: [0, -3, 0] }}
-                      transition={{ duration: 0.6, repeat: Infinity, delay: 0.2 }}
-                    />
-                    <motion.div 
-                      className="w-1.5 h-1.5 rounded-full bg-blue-400"
-                      animate={{ y: [0, -3, 0] }}
-                      transition={{ duration: 0.6, repeat: Infinity, delay: 0.4 }}
-                    />
+                {/* Tab Content */}
+                {activeTab === "chats" && (
+                  <div>
+                    <div className="space-y-4 mb-6 max-h-64 overflow-y-auto">
+                      {chatMessages.map((msg) => (
+                        <div
+                          key={msg.id}
+                          className={`flex ${msg.user === "You" ? "justify-end" : "justify-start"}`}
+                        >
+                          <div className={`flex ${msg.user === "You" ? "flex-row-reverse" : ""} gap-3 max-w-[80%]`}>
+                            <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0">
+                              <img src={msg.avatar || "/placeholder.svg"} alt={msg.user} className="w-full h-full object-cover" />
+                            </div>
+                            <div>
+                              <div className={`flex items-center gap-2 mb-1 ${msg.user === "You" ? "justify-end" : ""}`}>
+                                <span className="text-sm font-medium text-white">{msg.user}</span>
+                                <span className="text-xs text-gray-400">{msg.time}</span>
+                              </div>
+                              <div className={`p-3 rounded-lg ${
+                                msg.user === "You" 
+                                  ? "bg-indigo-500/20 text-indigo-100" 
+                                  : "bg-gray-800 text-gray-200"
+                              }`}>
+                                {msg.message}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      
+                      {/* Typing indicator */}
+                      {isTyping && (
+                        <div className="flex justify-start">
+                          <div className="flex items-center gap-3 max-w-[80%]">
+                            <div className="w-8 h-8 rounded-full overflow-hidden">
+                              <img src="https://i.pravatar.cc/40?img=1" alt="Alex" className="w-full h-full object-cover" />
+                            </div>
+                            <div className="p-3 rounded-lg bg-gray-800 text-gray-200">
+                              <div className="flex items-center gap-1">
+                                <span className="text-xs">Alex is typing</span>
+                                <div className="flex space-x-1">
+                                  <motion.div 
+                                    className="w-1.5 h-1.5 rounded-full bg-blue-400"
+                                    animate={{ y: [0, -3, 0] }}
+                                    transition={{ duration: 0.6, repeat: Infinity, delay: 0 }}
+                                  />
+                                  <motion.div 
+                                    className="w-1.5 h-1.5 rounded-full bg-blue-400"
+                                    animate={{ y: [0, -3, 0] }}
+                                    transition={{ duration: 0.6, repeat: Infinity, delay: 0.2 }}
+                                  />
+                                  <motion.div 
+                                    className="w-1.5 h-1.5 rounded-full bg-blue-400"
+                                    animate={{ y: [0, -3, 0] }}
+                                    transition={{ duration: 0.6, repeat: Infinity, delay: 0.4 }}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <form onSubmit={handleSendMessage} className="relative">
+                      <input 
+                        type="text" 
+                        value={message}
+                        onChange={(e) => setMessage(e.target.value)}
+                        placeholder="Type a message..." 
+                        className="w-full bg-gray-800 border border-gray-700 rounded-full py-3 px-4 pr-12 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                      <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center gap-1">
+                        <button type="button" className="p-1.5 text-gray-400 hover:text-gray-300 rounded-full">
+                          <Paperclip className="w-5 h-5" />
+                        </button>
+                        <button type="button" className="p-1.5 text-gray-400 hover:text-gray-300 rounded-full">
+                          <Smile className="w-5 h-5" />
+                        </button>
+                        <button type="submit" className="bg-gradient-to-r from-blue-500 to-indigo-500 p-2 rounded-full">
+                          <Send className="w-5 h-5 text-white" />
+                        </button>
+                      </div>
+                    </form>
                   </div>
-                </motion.div>
+                )}
+                
+                {activeTab === "friends" && (
+                  <div className="space-y-3 max-h-80 overflow-y-auto">
+                    {friends.map((friend) => (
+                      <div key={friend.id} className="flex items-center justify-between p-2 rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors">
+                        <div className="flex items-center gap-3">
+                          <div className="relative">
+                            <div className="w-10 h-10 rounded-full overflow-hidden">
+                              <img src={friend.avatar || "/placeholder.svg"} alt={friend.name} className="w-full h-full object-cover" />
+                            </div>
+                            <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-gray-800 ${
+                              friend.status === "online" ? "bg-green-500" : 
+                              friend.status === "away" ? "bg-yellow-500" : "bg-gray-500"
+                            }`} />
+                          </div>
+                          <div>
+                            <h3 className="text-white font-medium">{friend.name}</h3>
+                            <p className="text-xs text-gray-400 capitalize">{friend.status}</p>
+                          </div>
+                        </div>
+                        <button className="p-2 text-blue-400 hover:text-blue-300 rounded-full hover:bg-gray-600/30">
+                          <MessageSquare className="w-5 h-5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                {activeTab === "requests" && (
+                  <div className="space-y-3 max-h-80 overflow-y-auto">
+                    {friendRequests.length === 0 ? (
+                      <p className="text-center text-gray-400 py-4">No pending friend requests</p>
+                    ) : (
+                      friendRequests.map((request) => (
+                        <div key={request.id} className="flex items-center justify-between p-3 rounded-lg bg-gray-800">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full overflow-hidden">
+                              <img src={request.avatar || "/placeholder.svg"} alt={request.name} className="w-full h-full object-cover" />
+                            </div>
+                            <div>
+                              <h3 className="text-white font-medium">{request.name}</h3>
+                              <p className="text-xs text-gray-400">Wants to be your friend</p>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <button 
+                              onClick={() => handleAcceptRequest(request.id)}
+                              className="p-1.5 text-green-400 hover:text-green-300 rounded-full hover:bg-gray-700"
+                            >
+                              <CheckCircle className="w-5 h-5" />
+                            </button>
+                            <button 
+                              onClick={() => handleRejectRequest(request.id)}
+                              className="p-1.5 text-red-400 hover:text-red-300 rounded-full hover:bg-gray-700"
+                            >
+                              <X className="w-5 h-5" />
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
               </div>
             </GlowingBorder>
           </motion.div>
@@ -637,7 +974,7 @@ function CommunitySection() {
   const isInView = useInView(ref, { once: false, amount: 0.3 })
   const { scrollYProgress } = useScroll({
     target: ref,
-    offset: ["start end", "end start"]
+    offset: ["start end", "end start"],
   })
   
   const rotate = useTransform(scrollYProgress, [0, 1], [0, 360])
@@ -663,12 +1000,85 @@ function CommunitySection() {
     }
   }
 
-  const communityItems = [
-    { title: "Shared Notes", count: "2.4k", color: "from-purple-500 to-indigo-500" },
-    { title: "Public Resources", count: "5.7k", color: "from-pink-500 to-purple-500" },
-    { title: "Active Users", count: "10k+", color: "from-indigo-500 to-blue-500" },
-    { title: "Daily Uploads", count: "320+", color: "from-blue-500 to-cyan-500" }
-  ]
+  // Interactive Community Feature
+  const [searchTerm, setSearchTerm] = useState("")
+  const [filterType, setFilterType] = useState("All")
+  const [tokens, setTokens] = useState(500)
+  const [showUploadModal, setShowUploadModal] = useState(false)
+  
+  const [communityFiles, setCommunityFiles] = useState([
+    { 
+      id: 1, 
+      fileName: "Market Research.pdf", 
+      uploadedAt: new Date().toISOString(),
+      userId: "user1",
+      userName: "Michael Chen",
+      userAvatar: "https://i.pravatar.cc/32?img=4"
+    },
+    { 
+      id: 2, 
+      fileName: "Project Timeline.xlsx", 
+      uploadedAt: new Date(Date.now() - 86400000).toISOString(),
+      userId: "user2",
+      userName: "Emily Rodriguez",
+      userAvatar: "https://i.pravatar.cc/32?img=5"
+    },
+    { 
+      id: 3, 
+      fileName: "Presentation Slides.pptx", 
+      uploadedAt: new Date(Date.now() - 172800000).toISOString(),
+      userId: "user3",
+      userName: "Jordan Smith",
+      userAvatar: "https://i.pravatar.cc/32?img=6"
+    }
+  ])
+  
+  const [yourFiles, setYourFiles] = useState([
+    { 
+      id: 4, 
+      fileName: "Research Notes.docx", 
+      uploadedAt: new Date(Date.now() - 259200000).toISOString()
+    },
+    { 
+      id: 5, 
+      fileName: "Budget Forecast.xlsx", 
+      uploadedAt: new Date(Date.now() - 345600000).toISOString()
+    }
+  ])
+  
+  const [unlockedFiles, setUnlockedFiles] = useState([])
+  
+  const handleUnlockFile = (file) => {
+    const cost = 50 // Simulated cost
+    if (tokens >= cost) {
+      setTokens(tokens - cost)
+      setUnlockedFiles([...unlockedFiles, file])
+    } else {
+      alert("Not enough tokens to unlock this file")
+    }
+  }
+  
+  const handleUploadFile = () => {
+    const newFile = {
+      id: Date.now(),
+      fileName: `Uploaded File ${yourFiles.length + 1}.pdf`,
+      uploadedAt: new Date().toISOString()
+    }
+    
+    setYourFiles([...yourFiles, newFile])
+    setTokens(tokens + 100) // Reward tokens for uploading
+    setShowUploadModal(false)
+  }
+  
+  // Helper function to get file extension
+  const getFileExtension = (fileName) => {
+    return fileName.split('.').pop().toUpperCase()
+  }
+  
+  // Helper function to get display name without extension
+  const getDisplayName = (fileName) => {
+    return fileName.replace(/\.[^/.]+$/, "")
+  }
 
   return (
     <section ref={ref} className="relative py-32 overflow-hidden bg-gray-900/80">
@@ -697,23 +1107,51 @@ function CommunitySection() {
             </motion.p>
             
             <motion.div variants={containerVariants} className="grid grid-cols-2 gap-4 mb-8">
-              {communityItems.map((item, index) => (
-                <motion.div 
-                  key={index}
-                  variants={itemVariants}
-                  className={`p-4 rounded-xl bg-gradient-to-r ${item.color} bg-opacity-10 border border-gray-700/50 backdrop-blur-sm`}
-                  whileHover={{ scale: 1.05, y: -5 }}
-                >
-                  <p className="text-gray-300 text-sm mb-1">{item.title}</p>
-                  <h3 className="text-white font-bold text-2xl">{item.count}</h3>
-                </motion.div>
-              ))}
+              <motion.div variants={itemVariants} className="p-4 rounded-xl bg-gradient-to-r from-purple-500 to-indigo-500 bg-opacity-10 border border-gray-700/50 backdrop-blur-sm" whileHover={{ scale: 1.05, y: -5 }}>
+                <p className="text-gray-300 text-sm mb-1">Shared Notes</p>
+                <h3 className="text-white font-bold text-2xl">2.4k</h3>
+              </motion.div>
+              <motion.div variants={itemVariants} className="p-4 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 bg-opacity-10 border border-gray-700/50 backdrop-blur-sm" whileHover={{ scale: 1.05, y: -5 }}>
+                <p className="text-gray-300 text-sm mb-1">Public Resources</p>
+                <h3 className="text-white font-bold text-2xl">5.7k</h3>
+              </motion.div>
+              <motion.div variants={itemVariants} className="p-4 rounded-xl bg-gradient-to-r from-indigo-500 to-blue-500 bg-opacity-10 border border-gray-700/50 backdrop-blur-sm" whileHover={{ scale: 1.05, y: -5 }}>
+                <p className="text-gray-300 text-sm mb-1">Active Users</p>
+                <h3 className="text-white font-bold text-2xl">10k+</h3>
+              </motion.div>
+              <motion.div variants={itemVariants} className="p-4 rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 bg-opacity-10 border border-gray-700/50 backdrop-blur-sm" whileHover={{ scale: 1.05, y: -5 }}>
+                <p className="text-gray-300 text-sm mb-1">Daily Uploads</p>
+                <h3 className="text-white font-bold text-2xl">320+</h3>
+              </motion.div>
             </motion.div>
             
-            <motion.div variants={itemVariants}>
+            <motion.div variants={itemVariants} className="flex items-center gap-4">
+              <div className="flex items-center gap-2 text-gray-300">
+                <Coins className="w-5 h-5 text-yellow-400" />
+                <motion.span
+                  key={tokens}
+                  initial={{ scale: 0.8, opacity: 0.5 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                  className="text-lg"
+                >
+                  {tokens}
+                </motion.span>
+              </div>
+              
+              <motion.button
+                onClick={() => setShowUploadModal(true)}
+                className="group inline-flex items-center px-6 py-3 bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-full text-lg font-semibold transition-all transform hover:scale-105 hover:shadow-lg hover:shadow-pink-500/25"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <Upload className="w-5 h-5 mr-2" />
+                <span>Upload File</span>
+              </motion.button>
+              
               <motion.a 
                 href="/community" 
-                className="group inline-flex items-center px-6 py-3 bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-full text-lg font-semibold transition-all transform hover:scale-105 hover:shadow-lg hover:shadow-pink-500/25"
+                className="group inline-flex items-center px-6 py-3 bg-gray-800 text-white rounded-full text-lg font-semibold transition-all transform hover:scale-105"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >
@@ -729,67 +1167,201 @@ function CommunitySection() {
               style={{ rotate: springRotate }}
             />
             
-            <div className="relative grid grid-cols-2 gap-6">
-              {[1, 2, 3, 4].map((item, index) => (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, y: 50 }}
-                  animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 50 }}
-                  transition={{ duration: 0.8, delay: index * 0.2 }}
-                  className="relative"
-                >
-                  <GlowingBorder className="shadow-xl">
-                    <div className="bg-gray-900 p-4 rounded-xl">
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className="w-8 h-8 rounded-full overflow-hidden">
-                          <img src={`https://i.pravatar.cc/32?img=${index + 4}`} alt="User" className="w-full h-full object-cover" />
+            <div className="relative">
+              {/* Search and Filter */}
+              <div className="mb-6 flex flex-col gap-2">
+                <div className="flex items-center rounded-full px-4 py-2 bg-gray-800">
+                  <Search className="text-gray-400 w-5 h-5 mr-2" />
+                  <input
+                    type="text"
+                    placeholder="Search community files..."
+                    className="bg-transparent focus:outline-none w-full text-gray-200"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-gray-300 text-sm">Filter by type:</label>
+                  <select
+                    value={filterType}
+                    onChange={(e) => setFilterType(e.target.value)}
+                    className="rounded-full px-3 py-1 focus:outline-none bg-gray-800 text-gray-200"
+                  >
+                    <option>All</option>
+                    <option>pdf</option>
+                    <option>xlsx</option>
+                    <option>docx</option>
+                    <option>pptx</option>
+                  </select>
+                </div>
+              </div>
+              
+              {/* Community Files */}
+              <GlowingBorder className="shadow-xl mb-6">
+                <div className="bg-gray-800/60 p-4 rounded-xl">
+                  <h2 className="text-xl font-semibold text-white mb-4">Community Files</h2>
+                  <div className="space-y-3 max-h-48 overflow-y-auto">
+                    {communityFiles
+                      .filter(file => {
+                        if (filterType !== "All") {
+                          return file.fileName.toLowerCase().endsWith(filterType.toLowerCase())
+                        }
+                        return true
+                      })
+                      .filter(file => 
+                        file.fileName.toLowerCase().includes(searchTerm.toLowerCase())
+                      )
+                      .map(file => (
+                        <div key={file.id} className="p-3 rounded-lg bg-gray-800 border border-gray-700 hover:bg-gray-700 transition-colors">
+                          <div className="flex items-center gap-3 mb-2">
+                            <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-gray-700">
+                              {file.userAvatar ? (
+                                <img src={file.userAvatar || "/placeholder.svg"} alt={file.userName} className="w-full h-full object-cover" />
+                              ) : (
+                                <CircleUserRound className="w-4 h-4 text-gray-400" />
+                              )}
+                            </div>
+                            <span className="text-sm font-medium text-gray-300">{file.userName}</span>
+                          </div>
+                          
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <span className="font-medium text-indigo-400">{getDisplayName(file.fileName)}</span>
+                              <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-700 text-gray-300">
+                                {getFileExtension(file.fileName)}
+                              </span>
+                            </div>
+                            
+                            {!unlockedFiles.includes(file.id) && (
+                              <button
+                                onClick={() => handleUnlockFile(file)}
+                                className="px-3 py-1 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-full text-sm transition-all transform hover:scale-105 flex flex-col items-center"
+                              >
+                                <div className="flex items-center text-xs">
+                                  <Coins className="w-4 h-4 text-yellow-400 mr-1" />
+                                  <span>50</span>
+                                </div>
+                              </button>
+                            )}
+                          </div>
+                          <span className="mt-2 block text-sm text-gray-400">
+                            {new Date(file.uploadedAt).toLocaleString()}
+                          </span>
                         </div>
-                        <div>
-                          <p className="text-white text-sm font-medium">User {item}</p>
-                          <p className="text-gray-400 text-xs">Shared recently</p>
+                      ))}
+                  </div>
+                </div>
+              </GlowingBorder>
+              
+              {/* Your Shared Files */}
+              <GlowingBorder className="shadow-xl mb-6">
+                <div className="bg-gray-800/60 p-4 rounded-xl">
+                  <h2 className="text-xl font-semibold text-white mb-4">Your Shared Files</h2>
+                  <div className="space-y-3 max-h-48 overflow-y-auto">
+                    {yourFiles.length === 0 ? (
+                      <p className="flex items-center gap-2 text-gray-400">
+                        <Coins className="w-4 h-4 text-yellow-400" />
+                        You haven't shared any files yet. Upload files to earn tokens.
+                      </p>
+                    ) : (
+                      yourFiles.map(file => (
+                        <div key={file.id} className="p-3 rounded-lg bg-gray-800 border border-gray-700 hover:bg-gray-700 transition-colors">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="font-medium text-indigo-300">{getDisplayName(file.fileName)}</span>
+                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-600 text-gray-300">
+                              {getFileExtension(file.fileName)}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button className="px-2 py-1 bg-indigo-500 text-white rounded text-xs">
+                              Edit
+                            </button>
+                            <button className="px-2 py-1 bg-red-500 text-white rounded text-xs">
+                              Delete
+                            </button>
+                          </div>
+                          <span className="block text-sm mt-1 text-gray-400">
+                            {new Date(file.uploadedAt).toLocaleString()}
+                          </span>
                         </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </GlowingBorder>
+              
+              {/* Unlocked Files */}
+              <GlowingBorder className="shadow-xl">
+                <div className="bg-gray-800/60 p-4 rounded-xl">
+                  <h2 className="text-xl font-semibold text-white mb-4">Unlocked Files</h2>
+                  <div className="space-y-3 max-h-48 overflow-y-auto">
+                    {unlockedFiles.length === 0 ? (
+                      <p className="text-gray-400">You haven't unlocked any files yet.</p>
+                    ) : (
+                      unlockedFiles.map(file => (
+                        <div key={file.id} className="p-3 rounded-lg bg-gray-800 border border-gray-700 hover:bg-gray-700 transition-colors">
+                          <div className="flex items-center justify-between mb-2">
+                            <a href="#" className="font-medium text-indigo-300 hover:underline">
+                              {getDisplayName(file.fileName)}
+                            </a>
+                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-600 text-gray-300">
+                              {getFileExtension(file.fileName)}
+                            </span>
+                          </div>
+                          <span className="block text-sm mt-1 text-gray-400">
+                            {new Date(file.uploadedAt).toLocaleString()}
+                          </span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </GlowingBorder>
+              
+              {/* Upload Modal */}
+              {showUploadModal && (
+                <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+                  <div className="bg-gray-800 rounded-xl p-6 max-w-md w-full">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-xl font-bold text-white">Upload File</h3>
+                      <button 
+                        onClick={() => setShowUploadModal(false)}
+                        className="text-gray-400 hover:text-white"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <div className="border-2 border-dashed border-gray-600 rounded-lg p-8 text-center">
+                        <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                        <p className="text-gray-300 mb-2">Drag and drop your file here</p>
+                        <p className="text-gray-400 text-sm mb-4">or</p>
+                        <button className="px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors">
+                          Browse Files
+                        </button>
                       </div>
                       
-                      <div className="h-24 bg-gray-800 rounded-lg mb-3 flex items-center justify-center">
-                        <FileText className="w-8 h-8 text-gray-600" />
-                      </div>
-                      
-                      <div className="flex items-center justify-between">
-                        <p className="text-white text-sm">Resource {item}</p>
-                        <div className="flex items-center gap-2">
-                          <div className="p-1.5 rounded-full bg-gray-800 hover:bg-gray-700 cursor-pointer">
-                            <Share2 className="w-3.5 h-3.5 text-gray-400" />
-                          </div>
-                          <div className="p-1.5 rounded-full bg-gray-800 hover:bg-gray-700 cursor-pointer">
-                            <MessageSquare className="w-3.5 h-3.5 text-gray-400" />
+                      <div className="flex justify-between items-center">
+                        <div className="text-gray-300">
+                          <p className="font-medium">Earn tokens:</p>
+                          <div className="flex items-center text-yellow-400">
+                            <Coins className="w-4 h-4 mr-1" />
+                            <span>+100</span>
                           </div>
                         </div>
+                        
+                        <button
+                          onClick={handleUploadFile}
+                          className="px-4 py-2 bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-lg hover:from-pink-600 hover:to-purple-600 transition-colors"
+                        >
+                          Upload
+                        </button>
                       </div>
                     </div>
-                  </GlowingBorder>
-                  
-                  {/* Floating badges */}
-                  {index === 0 && (
-                    <motion.div 
-                      className="absolute -top-2 -right-2 px-2 py-1 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full text-xs text-white font-medium"
-                      animate={{ y: [0, -5, 0] }}
-                      transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                    >
-                      Popular
-                    </motion.div>
-                  )}
-                  
-                  {index === 2 && (
-                    <motion.div 
-                      className="absolute -top-2 -right-2 px-2 py-1 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full text-xs text-white font-medium"
-                      animate={{ y: [0, -5, 0] }}
-                      transition={{ duration: 2, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
-                    >
-                      New
-                    </motion.div>
-                  )}
-                </motion.div>
-              ))}
+                  </div>
+                </div>
+              )}
             </div>
           </motion.div>
         </div>
@@ -801,7 +1373,7 @@ function CommunitySection() {
 function AIAssistantSection() {
   const ref = useRef(null)
   const isInView = useInView(ref, { once: false, amount: 0.3 })
-  
+
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
@@ -822,12 +1394,62 @@ function AIAssistantSection() {
     }
   }
 
+  // Interactive AI Assistant Feature
+  const [chatMessage, setChatMessage] = useState("")
+  const [chatHistory, setChatHistory] = useState([
+    { role: "assistant", content: "Hello! I'm TaskMaster AI. How can I help you be more productive today?" }
+  ])
+  const [isTyping, setIsTyping] = useState(false)
+  
+  const handleSendMessage = (e) => {
+    e.preventDefault()
+    if (!chatMessage.trim()) return
+    
+    // Add user message to chat
+    const newChatHistory = [
+      ...chatHistory,
+      { role: "user", content: chatMessage }
+    ]
+    setChatHistory(newChatHistory)
+    setChatMessage("")
+    
+    // Simulate AI thinking
+    setIsTyping(true)
+    
+    // Simulate AI response based on user input
+    setTimeout(() => {
+      let response = ""
+      
+      if (chatMessage.toLowerCase().includes("hello") || chatMessage.toLowerCase().includes("hi")) {
+        response = "Hello there! How can I assist you with your productivity today?"
+      }
+      else if (chatMessage.toLowerCase().includes("task") || chatMessage.toLowerCase().includes("todo")) {
+        response = "I can help you manage your tasks! Would you like me to create a new task, prioritize existing ones, or set reminders?"
+      }
+      else if (chatMessage.toLowerCase().includes("goal")) {
+        response = "Setting goals is a great way to stay focused! What kind of goal would you like to set? Short-term or long-term?"
+      }
+      else if (chatMessage.toLowerCase().includes("time") || chatMessage.toLowerCase().includes("timer")) {
+        response = "Time management is crucial for productivity. I can set a timer for you or suggest time blocking techniques. What would you prefer?"
+      }
+      else if (chatMessage.toLowerCase().includes("summarize") || chatMessage.toLowerCase().includes("summary")) {
+        response = "I'd be happy to help summarize information for you. Please share the content you'd like me to summarize."
+      }
+      else {
+        response = "I understand you're looking for assistance. Could you provide more details about what you need help with? I can assist with task management, goal setting, time tracking, and more."
+      }
+      
+      setChatHistory([...newChatHistory, { role: "assistant", content: response }])
+      setIsTyping(false)
+    }, 1500)
+  }
+
   const [currentMessage, setCurrentMessage] = useState(0)
   const messages = [
     "Can you summarize my meeting notes from yesterday?",
     "Help me organize my tasks for today by priority",
     "What's the best time to schedule the team meeting?",
-    "Analyze this document and extract key insights"
+    "Analyze this document and extract key insights",
   ]
 
   useEffect(() => {
@@ -919,63 +1541,67 @@ function AIAssistantSection() {
                   </div>
                 </div>
                 
-                <div className="space-y-4 mb-6">
-                  <AnimatePresence mode="wait">
-                    <motion.div 
-                      key={currentMessage}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -20 }}
-                      transition={{ duration: 0.5 }}
-                      className="flex justify-end"
+                <div className="space-y-4 mb-6 max-h-64 overflow-y-auto">
+                  {chatHistory.map((message, index) => (
+                    <div 
+                      key={index}
+                      className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
                     >
-                      <div className="bg-blue-500/20 text-blue-100 p-3 rounded-lg max-w-[80%]">
-                        {messages[currentMessage]}
+                      <div className={`max-w-[80%] rounded-lg p-3 ${
+                        message.role === "user" 
+                          ? "bg-blue-500/20 text-blue-100" 
+                          : "bg-gray-800 text-gray-200"
+                      }`}>
+                        <ReactMarkdown>
+                          {message.content}
+                        </ReactMarkdown>
                       </div>
-                    </motion.div>
-                  </AnimatePresence>
+                    </div>
+                  ))}
                   
-                  <motion.div 
-                    className="flex"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.5, duration: 0.5 }}
-                  >
-                    <div className="bg-gray-800 text-gray-200 p-3 rounded-lg max-w-[80%]">
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="w-6 h-6 rounded-full bg-gradient-to-r from-cyan-500 to-blue-500 flex items-center justify-center">
-                          <Bot className="w-4 h-4 text-white" />
+                  {isTyping && (
+                    <div className="flex justify-start">
+                      <div className="bg-gray-800 text-gray-200 p-3 rounded-lg max-w-[80%]">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs">AI Assistant is typing</span>
+                          <div className="flex space-x-1">
+                            <motion.div 
+                              className="w-2 h-2 rounded-full bg-gray-400"
+                              animate={{ y: [0, -3, 0] }}
+                              transition={{ duration: 0.6, repeat: Infinity, delay: 0 }}
+                            />
+                            <motion.div 
+                              className="w-2 h-2 rounded-full bg-gray-400"
+                              animate={{ y: [0, -3, 0] }}
+                              transition={{ duration: 0.6, repeat: Infinity, delay: 0.2 }}
+                            />
+                            <motion.div 
+                              className="w-2 h-2 rounded-full bg-gray-400"
+                              animate={{ y: [0, -3, 0] }}
+                              transition={{ duration: 0.6, repeat: Infinity, delay: 0.4 }}
+                            />
+                          </div>
                         </div>
-                        <p className="text-sm font-medium">AI Assistant</p>
                       </div>
-                      <p>I'm here to help! Let me take care of that for you right away.</p>
                     </div>
-                  </motion.div>
-                  
-                  <motion.div 
-                    className="flex"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 1, duration: 0.5 }}
-                  >
-                    <div className="bg-gray-800 text-gray-200 p-3 rounded-lg max-w-[80%]">
-                      <div className="h-4 bg-gray-700 rounded-full w-full mb-2"></div>
-                      <div className="h-4 bg-gray-700 rounded-full w-5/6 mb-2"></div>
-                      <div className="h-4 bg-gray-700 rounded-full w-4/6"></div>
-                    </div>
-                  </motion.div>
+                  )}
                 </div>
                 
-                <div className="relative">
+                <form onSubmit={handleSendMessage} className="relative">
                   <input 
                     type="text" 
+                    value={chatMessage}
+                    onChange={(e) => setChatMessage(e.target.value)}
                     placeholder="Ask me anything..." 
-                    className="w-full bg-gray-800 border border-gray-700 rounded-full py-3 px-4 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                    className="w-full bg-gray-800 border border-gray-700 rounded-full py-3 px-4 pr-12 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
                   />
-                  <button className="absolute right-3 top-1/2 transform -translate-y-1/2 bg-gradient-to-r from-cyan-500 to-blue-500 p-2 rounded-full">
-                    <ArrowRight className="w-5 h-5 text-white" />
+                  <button 
+                    type="submit"
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 bg-gradient-to-r from-cyan-500 to-blue-500 p-2 rounded-full"
+                  >
+                    <Send className="w-5 h-5 text-white" />
                   </button>
-                </div>
+                </form>
                 
                 {/* Pulsing effect */}
                 <motion.div 
@@ -997,7 +1623,7 @@ function CalendarSection() {
   const isInView = useInView(ref, { once: false, amount: 0.3 })
   const { scrollYProgress } = useScroll({
     target: ref,
-    offset: ["start end", "end start"]
+    offset: ["start end", "end start"],
   })
   
   const y = useParallax(scrollYProgress, 100)
@@ -1023,9 +1649,160 @@ function CalendarSection() {
     }
   }
 
+  // Interactive Calendar Feature
+  const [currentDate, setCurrentDate] = useState(new Date())
+  const [events, setEvents] = useState([
+    { 
+      id: 1, 
+      title: "Team Meeting", 
+      startDate: new Date(new Date().setHours(10, 0, 0, 0)),
+      endDate: new Date(new Date().setHours(11, 30, 0, 0)),
+      type: "event",
+      color: "#3B82F6" // Blue
+    },
+    { 
+      id: 2, 
+      title: "Project Deadline", 
+      startDate: new Date(new Date().setHours(14, 0, 0, 0)),
+      endDate: new Date(new Date().setHours(14, 0, 0, 0)),
+      type: "task",
+      color: "#EF4444" // Red
+    },
+    { 
+      id: 3, 
+      title: "Weekly Review", 
+      startDate: new Date(new Date().setDate(new Date().getDate() + 2)),
+      endDate: new Date(new Date().setDate(new Date().getDate() + 2)),
+      type: "event",
+      color: "#8B5CF6" // Purple
+    }
+  ])
+  const [showEventModal, setShowEventModal] = useState(false)
+  const [selectedEvent, setSelectedEvent] = useState(null)
+  const [eventForm, setEventForm] = useState({
+    title: "",
+    startDate: new Date(),
+    endDate: new Date(),
+    type: "event",
+    color: "#3B82F6" // Default blue
+  })
+  
+  const handlePrevMonth = () => {
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1))
+  }
+  
+  const handleNextMonth = () => {
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1))
+  }
+  
+  const handleDateClick = (date) => {
+    setEventForm({
+      ...eventForm,
+      startDate: date,
+      endDate: date
+    })
+    setSelectedEvent(null)
+    setShowEventModal(true)
+  }
+  
+  const handleEventClick = (event) => {
+    setSelectedEvent(event)
+    setEventForm({
+      title: event.title,
+      startDate: event.startDate,
+      endDate: event.endDate,
+      type: event.type,
+      color: event.color
+    })
+    setShowEventModal(true)
+  }
+  
+  const handleCreateEvent = () => {
+    if (!eventForm.title) return
+    
+    if (selectedEvent) {
+      // Update existing event
+      setEvents(events.map(event => 
+        event.id === selectedEvent.id 
+          ? { ...event, ...eventForm }
+          : event
+      ))
+    } else {
+      // Create new event
+      const newEvent = {
+        id: Date.now(),
+        ...eventForm
+      }
+      setEvents([...events, newEvent])
+    }
+    
+    setShowEventModal(false)
+    setSelectedEvent(null)
+    setEventForm({
+      title: "",
+      startDate: new Date(),
+      endDate: new Date(),
+      type: "event",
+      color: "#3B82F6"
+    })
+  }
+  
+  const handleDeleteEvent = () => {
+    if (!selectedEvent) return
+    
+    setEvents(events.filter(event => event.id !== selectedEvent.id))
+    setShowEventModal(false)
+    setSelectedEvent(null)
+  }
+  
   // Generate calendar days
-  const days = Array.from({ length: 31 }, (_, i) => i + 1)
-  const today = new Date().getDate()
+  const getDaysInMonth = (year, month) => {
+    return new Date(year, month + 1, 0).getDate()
+  }
+  
+  const getFirstDayOfMonth = (year, month) => {
+    return new Date(year, month, 1).getDay()
+  }
+  
+  const days = []
+  const daysInMonth = getDaysInMonth(currentDate.getFullYear(), currentDate.getMonth())
+  const firstDayOfMonth = getFirstDayOfMonth(currentDate.getFullYear(), currentDate.getMonth())
+  
+  // Add empty cells for days before the first day of the month
+  for (let i = 0; i < firstDayOfMonth; i++) {
+    days.push(null)
+  }
+  
+  // Add days of the month
+  for (let i = 1; i <= daysInMonth; i++) {
+    days.push(i)
+  }
+  
+  // Helper function to check if a date has events
+  const getEventsForDay = (day) => {
+    if (!day) return []
+    
+    const date = new Date(currentDate.getFullYear(), currentDate.getMonth(), day)
+    return events.filter(event => {
+      const eventDate = new Date(event.startDate)
+      return (
+        eventDate.getDate() === date.getDate() &&
+        eventDate.getMonth() === date.getMonth() &&
+        eventDate.getFullYear() === date.getFullYear()
+      )
+    })
+  }
+  
+  // Format date for input
+  const formatDateForInput = (date) => {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    const hours = String(date.getHours()).padStart(2, '0')
+    const minutes = String(date.getMinutes()).padStart(2, '0')
+    
+    return `${year}-${month}-${day}T${hours}:${minutes}`
+  }
 
   return (
     <section ref={ref} className="relative py-32 overflow-hidden bg-gray-900/80">
@@ -1076,76 +1853,124 @@ function CalendarSection() {
               </motion.div>
             </motion.div>
             
-            <motion.div variants={itemVariants}>
-              <motion.a 
-                href="/calendar" 
+            <motion.div variants={itemVariants} className="flex gap-4">
+              <motion.button
+                onClick={() => {
+                  setSelectedEvent(null)
+                  setEventForm({
+                    title: "",
+                    startDate: new Date(),
+                    endDate: new Date(),
+                    type: "event",
+                    color: "#3B82F6"
+                  })
+                  setShowEventModal(true)
+                }}
                 className="group inline-flex items-center px-6 py-3 bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-full text-lg font-semibold transition-all transform hover:scale-105 hover:shadow-lg hover:shadow-green-500/25"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >
-                <span>Try Calendar</span>
+                <Plus className="w-5 h-5 mr-2" />
+                <span>New Event</span>
+              </motion.button>
+              
+              <motion.a 
+                href="/calendar" 
+                className="group inline-flex items-center px-6 py-3 bg-gray-800 text-white rounded-full text-lg font-semibold transition-all transform hover:scale-105"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <span>Open Calendar</span>
                 <ArrowRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" />
               </motion.a>
             </motion.div>
           </motion.div>
           
-          <motion.div 
-            className="lg:w-1/2"
-            style={{ y: springY }}
-          >
+          <motion.div className="lg:w-1/2" style={{ y: springY }}>
             <GlowingBorder className="shadow-2xl shadow-green-500/20">
               <div className="bg-gray-900 p-6 rounded-xl">
                 <div className="flex items-center justify-between mb-6">
                   <div>
-                    <h3 className="text-white font-semibold text-xl">March 2025</h3>
+                    <h3 className="text-white font-semibold text-xl">
+                      {currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
+                    </h3>
                     <p className="text-gray-400 text-sm">Your schedule at a glance</p>
                   </div>
                   <div className="flex gap-2">
-                    <button className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700">
-                      <ArrowRight className="w-5 h-5 text-gray-400 rotate-180" />
+                    <button 
+                      onClick={handlePrevMonth}
+                      className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors"
+                    >
+                      <ChevronLeft className="w-5 h-5 text-gray-400" />
                     </button>
-                    <button className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700">
-                      <ArrowRight className="w-5 h-5 text-gray-400" />
+                    <button 
+                      onClick={handleNextMonth}
+                      className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors"
+                    >
+                      <ChevronRight className="w-5 h-5 text-gray-400" />
                     </button>
                   </div>
                 </div>
                 
                 <div className="grid grid-cols-7 gap-1 mb-4">
-                  {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, index) => (
-                    <div key={index} className="text-center text-gray-400 text-sm py-2">
+                  {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+                    <div key={day} className="text-center text-gray-400 text-sm py-2">
                       {day}
                     </div>
                   ))}
                 </div>
                 
                 <div className="grid grid-cols-7 gap-1">
-                  {days.map((day) => (
-                    <motion.div 
-                      key={day}
-                      className={`aspect-square rounded-lg flex flex-col items-center justify-center ${
-                        day === today 
-                          ? 'bg-gradient-to-r from-green-500 to-teal-500 text-white' 
-                          : 'bg-gray-800/50 hover:bg-gray-700/50 text-gray-300'
-                      } cursor-pointer relative`}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                    >
-                      <span className={day === today ? 'font-bold' : ''}>{day}</span>
-                      
-                      {/* Event indicators */}
-                      {day % 5 === 0 && (
-                        <div className="absolute bottom-1 w-1.5 h-1.5 rounded-full bg-purple-500" />
-                      )}
-                      
-                      {day % 7 === 0 && (
-                        <div className="absolute bottom-1 left-[calc(50%-6px)] w-1.5 h-1.5 rounded-full bg-blue-500" />
-                      )}
-                      
-                      {day % 9 === 0 && (
-                        <div className="absolute bottom-1 right-[calc(50%-6px)] w-1.5 h-1.5 rounded-full bg-pink-500" />
-                      )}
-                    </motion.div>
-                  ))}
+                  {days.map((day, index) => {
+                    const dayEvents = day ? getEventsForDay(day) : []
+                    const isToday = day && new Date().getDate() === day && 
+                                    new Date().getMonth() === currentDate.getMonth() &&
+                                    new Date().getFullYear() === currentDate.getFullYear()
+                    
+                    return (
+                      <div 
+                        key={index}
+                        className={`aspect-square rounded-lg flex flex-col p-2 ${
+                          day 
+                            ? 'bg-gray-800/50 hover:bg-gray-700 cursor-pointer' 
+                            : 'bg-transparent'
+                        } ${isToday ? 'ring-2 ring-green-500' : ''}`}
+                        onClick={() => day && handleDateClick(new Date(currentDate.getFullYear(), currentDate.getMonth(), day))}
+                      >
+                        {day && (
+                          <>
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-white font-medium">{day}</span>
+                              {dayEvents.length > 0 && (
+                                <span className="text-xs text-gray-400">{dayEvents.length}</span>
+                              )}
+                            </div>
+                            <div className="space-y-1 overflow-hidden flex-1">
+                              {dayEvents.slice(0, 2).map((event) => (
+                                <button
+                                  key={event.id}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleEventClick(event)
+                                  }}
+                                  className="w-full text-left px-2 py-1 rounded text-xs flex items-center gap-1"
+                                  style={{ backgroundColor: `${event.color}20`, color: event.color }}
+                                >
+                                  <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: event.color }}></span>
+                                  <span className="truncate">{event.title}</span>
+                                </button>
+                              ))}
+                              {dayEvents.length > 2 && (
+                                <div className="text-xs text-center text-gray-400">
+                                  +{dayEvents.length - 2} more
+                                </div>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
                 
                 <div className="mt-6 space-y-3">
@@ -1171,6 +1996,131 @@ function CalendarSection() {
                 </div>
               </div>
             </GlowingBorder>
+            
+            {/* Event Modal */}
+            {showEventModal && (
+              <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                <div className="bg-gray-800 rounded-xl p-6 max-w-md w-full mx-auto">
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-lg font-semibold text-white">
+                      {selectedEvent ? "Edit Event" : "New Event"}
+                    </h3>
+                    <button
+                      onClick={() => {
+                        setShowEventModal(false)
+                        setSelectedEvent(null)
+                      }}
+                      className="text-gray-400 hover:text-white transition-colors"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Title</label>
+                      <input
+                        type="text"
+                        value={eventForm.title}
+                        onChange={(e) => setEventForm({ ...eventForm, title: e.target.value })}
+                        className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                        placeholder="Event title"
+                      />
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">Start Date</label>
+                        <input
+                          type="datetime-local"
+                          value={formatDateForInput(eventForm.startDate)}
+                          onChange={(e) => setEventForm({ 
+                            ...eventForm, 
+                            startDate: new Date(e.target.value) 
+                          })}
+                          className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">End Date</label>
+                        <input
+                          type="datetime-local"
+                          value={formatDateForInput(eventForm.endDate)}
+                          onChange={(e) => setEventForm({ 
+                            ...eventForm, 
+                            endDate: new Date(e.target.value) 
+                          })}
+                          className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                        />
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Type</label>
+                      <div className="grid grid-cols-3 gap-2">
+                        <button
+                          onClick={() => setEventForm({ ...eventForm, type: "event", color: "#3B82F6" })}
+                          className={`flex flex-col items-center justify-center gap-1 p-2 rounded-lg transition-all ${
+                            eventForm.type === "event" ? "ring-2 ring-white" : ""
+                          }`}
+                          style={{ backgroundColor: "#3B82F620", color: "#3B82F6" }}
+                        >
+                          <Calendar className="w-4 h-4" />
+                          <span className="text-xs">Event</span>
+                        </button>
+                        <button
+                          onClick={() => setEventForm({ ...eventForm, type: "task", color: "#EF4444" })}
+                          className={`flex flex-col items-center justify-center gap-1 p-2 rounded-lg transition-all ${
+                            eventForm.type === "task" ? "ring-2 ring-white" : ""
+                          }`}
+                          style={{ backgroundColor: "#EF444420", color: "#EF4444" }}
+                        >
+                          <CheckCircle className="w-4 h-4" />
+                          <span className="text-xs">Task</span>
+                        </button>
+                        <button
+                          onClick={() => setEventForm({ ...eventForm, type: "goal", color: "#10B981" })}
+                          className={`flex flex-col items-center justify-center gap-1 p-2 rounded-lg transition-all ${
+                            eventForm.type === "goal" ? "ring-2 ring-white" : ""
+                          }`}
+                          style={{ backgroundColor: "#10B98120", color: "#10B981" }}
+                        >
+                          <Target className="w-4 h-4" />
+                          <span className="text-xs">Goal</span>
+                        </button>
+                      </div>
+                    </div>
+                    
+                    <div className="flex justify-end gap-3 mt-6">
+                      {selectedEvent && (
+                        <button
+                          onClick={handleDeleteEvent}
+                          className="px-4 py-2 text-red-300 bg-red-900/20 rounded-lg hover:bg-red-900/30 transition-colors"
+                        >
+                          Delete
+                        </button>
+                      )}
+                      <button
+                        onClick={() => {
+                          setShowEventModal(false)
+                          setSelectedEvent(null)
+                        }}
+                        className="px-4 py-2 text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleCreateEvent}
+                        disabled={!eventForm.title}
+                        className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {selectedEvent ? "Update" : "Create"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </motion.div>
         </div>
       </div>
@@ -1181,29 +2131,29 @@ function CalendarSection() {
 function TestimonialsSection() {
   const ref = useRef(null)
   const isInView = useInView(ref, { once: false, amount: 0.3 })
-  
+
   const testimonials = [
     {
       name: "Sarah Johnson",
       role: "Product Manager",
       company: "TechCorp",
       image: "https://i.pravatar.cc/80?img=5",
-      text: "TaskMaster AI has completely transformed how I manage my workload. The AI assistant is like having a personal productivity coach available 24/7."
+      text: "TaskMaster AI has completely transformed how I manage my workload. The AI assistant is like having a personal productivity coach available 24/7.",
     },
     {
       name: "Michael Chen",
       role: "Software Engineer",
       company: "DevStudio",
       image: "https://i.pravatar.cc/80?img=6",
-      text: "The note-taking feature has been a game-changer for me. I can upload technical documentation and instantly get structured notes with key points highlighted. It saves me hours every week."
+      text: "The note-taking feature has been a game-changer for me. I can upload technical documentation and instantly get structured notes with key points highlighted. It saves me hours every week.",
     },
     {
       name: "Emily Rodriguez",
       role: "Marketing Director",
       company: "BrandForward",
       image: "https://i.pravatar.cc/80?img=7",
-      text: "Our team's collaboration has improved dramatically since we started using TaskMaster AI. The real-time messaging and file sharing capabilities are seamless and intuitive."
-    }
+      text: "Our team's collaboration has improved dramatically since we started using TaskMaster AI. The real-time messaging and file sharing capabilities are seamless and intuitive.",
+    },
   ]
 
   const containerVariants = {
@@ -1212,9 +2162,9 @@ function TestimonialsSection() {
       opacity: 1,
       transition: {
         staggerChildren: 0.2,
-        delayChildren: 0.3
-      }
-    }
+        delayChildren: 0.3,
+      },
+    },
   }
 
   const itemVariants = {
@@ -1222,37 +2172,40 @@ function TestimonialsSection() {
     visible: {
       y: 0,
       opacity: 1,
-      transition: { duration: 0.8, ease: [0.4, 0, 0.2, 1] }
-    }
+      transition: { duration: 0.8, ease: [0.4, 0, 0.2, 1] },
+    },
   }
 
   return (
     <section ref={ref} className="relative py-32 overflow-hidden bg-gray-900">
       <FloatingElements count={15} />
-      
+
       <div className="container mx-auto px-4 relative z-10">
-        <motion.div 
+        <motion.div
           className="text-center mb-16"
           initial="hidden"
           animate={isInView ? "visible" : "hidden"}
           variants={containerVariants}
         >
-          <motion.h2 variants={itemVariants} className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+          <motion.h2
+            variants={itemVariants}
+            className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent"
+          >
             Loved by Professionals Worldwide
           </motion.h2>
           <motion.p variants={itemVariants} className="text-xl text-gray-300 max-w-3xl mx-auto">
             See what our users are saying about how TaskMaster AI has transformed their productivity and collaboration.
           </motion.p>
         </motion.div>
-        
-        <motion.div 
+
+        <motion.div
           className="grid grid-cols-1 md:grid-cols-3 gap-8"
           initial="hidden"
           animate={isInView ? "visible" : "hidden"}
           variants={containerVariants}
         >
           {testimonials.map((testimonial, index) => (
-            <motion.div 
+            <motion.div
               key={index}
               variants={itemVariants}
               className="relative"
@@ -1262,25 +2215,31 @@ function TestimonialsSection() {
                 <div className="bg-gray-900 p-6 rounded-xl h-full flex flex-col">
                   <div className="flex items-center gap-4 mb-4">
                     <div className="w-12 h-12 rounded-full overflow-hidden">
-                      <img src={testimonial.image || "/placeholder.svg"} alt={testimonial.name} className="w-full h-full object-cover" />
+                      <img
+                        src={testimonial.image || "/placeholder.svg"}
+                        alt={testimonial.name}
+                        className="w-full h-full object-cover"
+                      />
                     </div>
                     <div>
                       <h3 className="text-white font-semibold">{testimonial.name}</h3>
-                      <p className="text-gray-400 text-sm">{testimonial.role}, {testimonial.company}</p>
+                      <p className="text-gray-400 text-sm">
+                        {testimonial.role}, {testimonial.company}
+                      </p>
                     </div>
                   </div>
-                  
+
                   <p className="text-gray-300 italic flex-grow">{testimonial.text}</p>
-                  
+
                   <div className="mt-4 flex">
                     {Array.from({ length: 5 }).map((_, i) => (
-                      <motion.svg 
-                        key={i} 
-                        className="w-5 h-5 text-yellow-500 fill-current" 
+                      <motion.svg
+                        key={i}
+                        className="w-5 h-5 text-yellow-500 fill-current"
                         viewBox="0 0 24 24"
                         initial={{ opacity: 0, scale: 0 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: 0.5 + (i * 0.1) }}
+                        transition={{ delay: 0.5 + i * 0.1 }}
                       >
                         <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
                       </motion.svg>
@@ -1299,16 +2258,16 @@ function TestimonialsSection() {
 function CTASection() {
   const ref = useRef(null)
   const isInView = useInView(ref, { once: false, amount: 0.3 })
-  
+
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
       opacity: 1,
       transition: {
         staggerChildren: 0.2,
-        delayChildren: 0.3
-      }
-    }
+        delayChildren: 0.3,
+      },
+    },
   }
 
   const itemVariants = {
@@ -1316,37 +2275,44 @@ function CTASection() {
     visible: {
       y: 0,
       opacity: 1,
-      transition: { duration: 0.8, ease: [0.4, 0, 0.2, 1] }
-    }
+      transition: { duration: 0.8, ease: [0.4, 0, 0.2, 1] },
+    },
   }
 
   return (
     <section ref={ref} className="relative py-32 overflow-hidden bg-gray-900">
       <FloatingElements count={20} />
-      
+
       <div className="container mx-auto px-4 relative z-10">
-        <motion.div 
+        <motion.div
           className="max-w-4xl mx-auto text-center"
           initial="hidden"
           animate={isInView ? "visible" : "hidden"}
           variants={containerVariants}
         >
-          <motion.div variants={itemVariants} className="inline-flex items-center px-4 py-2 rounded-full bg-indigo-500/10 border border-indigo-500/20 backdrop-blur-sm mb-6">
+          <motion.div
+            variants={itemVariants}
+            className="inline-flex items-center px-4 py-2 rounded-full bg-indigo-500/10 border border-indigo-500/20 backdrop-blur-sm mb-6"
+          >
             <Sparkles className="w-4 h-4 text-indigo-400 mr-2" />
             <span className="text-sm text-indigo-300">Start Your Productivity Journey</span>
           </motion.div>
-          
-          <motion.h2 variants={itemVariants} className="text-4xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+
+          <motion.h2
+            variants={itemVariants}
+            className="text-4xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent"
+          >
             Ready to Transform Your Workflow?
           </motion.h2>
-          
+
           <motion.p variants={itemVariants} className="text-xl text-gray-300 mb-12 max-w-2xl mx-auto">
-            Join thousands of professionals who have already elevated their productivity with TaskMaster AI's powerful features.
+            Join thousands of professionals who have already elevated their productivity with TaskMaster AI's powerful
+            features.
           </motion.p>
-          
+
           <motion.div variants={itemVariants} className="flex flex-col sm:flex-row items-center justify-center gap-6">
-            <motion.a 
-              href="/signup" 
+            <motion.a
+              href="/signup"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               className="group relative inline-flex items-center px-8 py-4 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-full text-lg font-semibold transition-all transform hover:shadow-lg hover:shadow-indigo-500/25 w-full sm:w-auto justify-center"
@@ -1355,9 +2321,9 @@ function CTASection() {
               <ArrowRight className="w-5 h-5 ml-2 text-white transition-transform group-hover:translate-x-1" />
               <div className="absolute inset-0 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 blur-lg opacity-50 group-hover:opacity-75 transition-opacity" />
             </motion.a>
-            
-            <motion.a 
-              href="/demo" 
+
+            <motion.a
+              href="/demo"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               className="inline-flex items-center px-8 py-4 bg-gray-800/50 text-white rounded-full text-lg font-semibold border border-gray-700/50 backdrop-blur-sm transition-all hover:bg-gray-700/50 w-full sm:w-auto justify-center"
@@ -1365,12 +2331,12 @@ function CTASection() {
               Watch Demo
             </motion.a>
           </motion.div>
-          
+
           <motion.div variants={itemVariants} className="mt-12">
             <p className="text-gray-400 mb-4">Trusted by teams at</p>
             <div className="flex flex-wrap justify-center gap-8 opacity-70">
-              {['Company 1', 'Company 2', 'Company 3', 'Company 4', 'Company 5'].map((company, index) => (
-                <motion.div 
+              {["Company 1", "Company 2", "Company 3", "Company 4", "Company 5"].map((company, index) => (
+                <motion.div
                   key={index}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -1392,3 +2358,4 @@ function CTASection() {
 function useMotionValue(initial) {
   return useRef({ get: () => initial, set: () => {} }).current
 }
+

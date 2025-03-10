@@ -626,7 +626,7 @@ function FriendsSection() {
       user: "You",
       message: "Thanks! I'll review them and add my comments",
       time: "10:26 AM",
-      avatar: "https://www.iconpacks.net/icons/2/free-user-icon-3296-thumb.png",
+      avatar: "https://www.elevenforum.com/data/attachments/82/82529-ade63e4209709292183f654907b168f5.jpg?hash=reY-Qglwkp",
     },
     {
       id: 3,

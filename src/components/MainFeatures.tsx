@@ -662,7 +662,7 @@ function FriendsSection() {
       user: "You",
       message: message,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      avatar: "https://www.iconpacks.net/icons/2/free-user-icon-3296-thumb.png"
+      avatar: "https://www.elevenforum.com/data/attachments/82/82529-ade63e4209709292183f654907b168f5.jpg?hash=reY-Qglwkp"
     }
     
     setChatMessages([...chatMessages, newMessage])

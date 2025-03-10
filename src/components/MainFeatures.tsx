@@ -1,5 +1,3 @@
-"use client"
-
 import React, { useRef, useEffect, useState } from "react"
 import { motion, useScroll, useTransform, useSpring, useInView, AnimatePresence } from "framer-motion"
 import { LayoutDashboard, NotebookPen, Users, Users2, Bot, Calendar, ArrowRight, CheckCircle, Clock, FileText, MessageSquare, Share2, BrainCircuit, CalendarDays, Sparkles, Send, Plus, Search, X, Upload, Youtube, Mic, Filter, AlertTriangle, ChevronRight, ChevronLeft, Trash2, Edit2, Save, Tag, Paperclip, Smile, MoreVertical, Globe, CircleUserRound, Coins } from 'lucide-react'
@@ -1623,7 +1621,7 @@ function CalendarSection() {
   const isInView = useInView(ref, { once: false, amount: 0.3 })
   const { scrollYProgress } = useScroll({
     target: ref,
-    offset: ["start end", "end start"],
+    offset: ["start end", "end start"]
   })
   
   const y = useParallax(scrollYProgress, 100)
@@ -1649,160 +1647,9 @@ function CalendarSection() {
     }
   }
 
-  // Interactive Calendar Feature
-  const [currentDate, setCurrentDate] = useState(new Date())
-  const [events, setEvents] = useState([
-    { 
-      id: 1, 
-      title: "Team Meeting", 
-      startDate: new Date(new Date().setHours(10, 0, 0, 0)),
-      endDate: new Date(new Date().setHours(11, 30, 0, 0)),
-      type: "event",
-      color: "#3B82F6" // Blue
-    },
-    { 
-      id: 2, 
-      title: "Project Deadline", 
-      startDate: new Date(new Date().setHours(14, 0, 0, 0)),
-      endDate: new Date(new Date().setHours(14, 0, 0, 0)),
-      type: "task",
-      color: "#EF4444" // Red
-    },
-    { 
-      id: 3, 
-      title: "Weekly Review", 
-      startDate: new Date(new Date().setDate(new Date().getDate() + 2)),
-      endDate: new Date(new Date().setDate(new Date().getDate() + 2)),
-      type: "event",
-      color: "#8B5CF6" // Purple
-    }
-  ])
-  const [showEventModal, setShowEventModal] = useState(false)
-  const [selectedEvent, setSelectedEvent] = useState(null)
-  const [eventForm, setEventForm] = useState({
-    title: "",
-    startDate: new Date(),
-    endDate: new Date(),
-    type: "event",
-    color: "#3B82F6" // Default blue
-  })
-  
-  const handlePrevMonth = () => {
-    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1))
-  }
-  
-  const handleNextMonth = () => {
-    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1))
-  }
-  
-  const handleDateClick = (date) => {
-    setEventForm({
-      ...eventForm,
-      startDate: date,
-      endDate: date
-    })
-    setSelectedEvent(null)
-    setShowEventModal(true)
-  }
-  
-  const handleEventClick = (event) => {
-    setSelectedEvent(event)
-    setEventForm({
-      title: event.title,
-      startDate: event.startDate,
-      endDate: event.endDate,
-      type: event.type,
-      color: event.color
-    })
-    setShowEventModal(true)
-  }
-  
-  const handleCreateEvent = () => {
-    if (!eventForm.title) return
-    
-    if (selectedEvent) {
-      // Update existing event
-      setEvents(events.map(event => 
-        event.id === selectedEvent.id 
-          ? { ...event, ...eventForm }
-          : event
-      ))
-    } else {
-      // Create new event
-      const newEvent = {
-        id: Date.now(),
-        ...eventForm
-      }
-      setEvents([...events, newEvent])
-    }
-    
-    setShowEventModal(false)
-    setSelectedEvent(null)
-    setEventForm({
-      title: "",
-      startDate: new Date(),
-      endDate: new Date(),
-      type: "event",
-      color: "#3B82F6"
-    })
-  }
-  
-  const handleDeleteEvent = () => {
-    if (!selectedEvent) return
-    
-    setEvents(events.filter(event => event.id !== selectedEvent.id))
-    setShowEventModal(false)
-    setSelectedEvent(null)
-  }
-  
   // Generate calendar days
-  const getDaysInMonth = (year, month) => {
-    return new Date(year, month + 1, 0).getDate()
-  }
-  
-  const getFirstDayOfMonth = (year, month) => {
-    return new Date(year, month, 1).getDay()
-  }
-  
-  const days = []
-  const daysInMonth = getDaysInMonth(currentDate.getFullYear(), currentDate.getMonth())
-  const firstDayOfMonth = getFirstDayOfMonth(currentDate.getFullYear(), currentDate.getMonth())
-  
-  // Add empty cells for days before the first day of the month
-  for (let i = 0; i < firstDayOfMonth; i++) {
-    days.push(null)
-  }
-  
-  // Add days of the month
-  for (let i = 1; i <= daysInMonth; i++) {
-    days.push(i)
-  }
-  
-  // Helper function to check if a date has events
-  const getEventsForDay = (day) => {
-    if (!day) return []
-    
-    const date = new Date(currentDate.getFullYear(), currentDate.getMonth(), day)
-    return events.filter(event => {
-      const eventDate = new Date(event.startDate)
-      return (
-        eventDate.getDate() === date.getDate() &&
-        eventDate.getMonth() === date.getMonth() &&
-        eventDate.getFullYear() === date.getFullYear()
-      )
-    })
-  }
-  
-  // Format date for input
-  const formatDateForInput = (date) => {
-    const year = date.getFullYear()
-    const month = String(date.getMonth() + 1).padStart(2, '0')
-    const day = String(date.getDate()).padStart(2, '0')
-    const hours = String(date.getHours()).padStart(2, '0')
-    const minutes = String(date.getMinutes()).padStart(2, '0')
-    
-    return `${year}-${month}-${day}T${hours}:${minutes}`
-  }
+  const days = Array.from({ length: 31 }, (_, i) => i + 1)
+  const today = new Date().getDate()
 
   return (
     <section ref={ref} className="relative py-32 overflow-hidden bg-gray-900/80">
@@ -1853,124 +1700,76 @@ function CalendarSection() {
               </motion.div>
             </motion.div>
             
-            <motion.div variants={itemVariants} className="flex gap-4">
-              <motion.button
-                onClick={() => {
-                  setSelectedEvent(null)
-                  setEventForm({
-                    title: "",
-                    startDate: new Date(),
-                    endDate: new Date(),
-                    type: "event",
-                    color: "#3B82F6"
-                  })
-                  setShowEventModal(true)
-                }}
+            <motion.div variants={itemVariants}>
+              <motion.a 
+                href="/calendar" 
                 className="group inline-flex items-center px-6 py-3 bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-full text-lg font-semibold transition-all transform hover:scale-105 hover:shadow-lg hover:shadow-green-500/25"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >
-                <Plus className="w-5 h-5 mr-2" />
-                <span>New Event</span>
-              </motion.button>
-              
-              <motion.a 
-                href="/calendar" 
-                className="group inline-flex items-center px-6 py-3 bg-gray-800 text-white rounded-full text-lg font-semibold transition-all transform hover:scale-105"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <span>Open Calendar</span>
+                <span>Try Calendar</span>
                 <ArrowRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" />
               </motion.a>
             </motion.div>
           </motion.div>
           
-          <motion.div className="lg:w-1/2" style={{ y: springY }}>
+          <motion.div 
+            className="lg:w-1/2"
+            style={{ y: springY }}
+          >
             <GlowingBorder className="shadow-2xl shadow-green-500/20">
               <div className="bg-gray-900 p-6 rounded-xl">
                 <div className="flex items-center justify-between mb-6">
                   <div>
-                    <h3 className="text-white font-semibold text-xl">
-                      {currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
-                    </h3>
+                    <h3 className="text-white font-semibold text-xl">March 2025</h3>
                     <p className="text-gray-400 text-sm">Your schedule at a glance</p>
                   </div>
                   <div className="flex gap-2">
-                    <button 
-                      onClick={handlePrevMonth}
-                      className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors"
-                    >
-                      <ChevronLeft className="w-5 h-5 text-gray-400" />
+                    <button className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700">
+                      <ArrowRight className="w-5 h-5 text-gray-400 rotate-180" />
                     </button>
-                    <button 
-                      onClick={handleNextMonth}
-                      className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors"
-                    >
-                      <ChevronRight className="w-5 h-5 text-gray-400" />
+                    <button className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700">
+                      <ArrowRight className="w-5 h-5 text-gray-400" />
                     </button>
                   </div>
                 </div>
                 
                 <div className="grid grid-cols-7 gap-1 mb-4">
-                  {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
-                    <div key={day} className="text-center text-gray-400 text-sm py-2">
+                  {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, index) => (
+                    <div key={index} className="text-center text-gray-400 text-sm py-2">
                       {day}
                     </div>
                   ))}
                 </div>
                 
                 <div className="grid grid-cols-7 gap-1">
-                  {days.map((day, index) => {
-                    const dayEvents = day ? getEventsForDay(day) : []
-                    const isToday = day && new Date().getDate() === day && 
-                                    new Date().getMonth() === currentDate.getMonth() &&
-                                    new Date().getFullYear() === currentDate.getFullYear()
-                    
-                    return (
-                      <div 
-                        key={index}
-                        className={`aspect-square rounded-lg flex flex-col p-2 ${
-                          day 
-                            ? 'bg-gray-800/50 hover:bg-gray-700 cursor-pointer' 
-                            : 'bg-transparent'
-                        } ${isToday ? 'ring-2 ring-green-500' : ''}`}
-                        onClick={() => day && handleDateClick(new Date(currentDate.getFullYear(), currentDate.getMonth(), day))}
-                      >
-                        {day && (
-                          <>
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="text-white font-medium">{day}</span>
-                              {dayEvents.length > 0 && (
-                                <span className="text-xs text-gray-400">{dayEvents.length}</span>
-                              )}
-                            </div>
-                            <div className="space-y-1 overflow-hidden flex-1">
-                              {dayEvents.slice(0, 2).map((event) => (
-                                <button
-                                  key={event.id}
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleEventClick(event)
-                                  }}
-                                  className="w-full text-left px-2 py-1 rounded text-xs flex items-center gap-1"
-                                  style={{ backgroundColor: `${event.color}20`, color: event.color }}
-                                >
-                                  <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: event.color }}></span>
-                                  <span className="truncate">{event.title}</span>
-                                </button>
-                              ))}
-                              {dayEvents.length > 2 && (
-                                <div className="text-xs text-center text-gray-400">
-                                  +{dayEvents.length - 2} more
-                                </div>
-                              )}
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    )
-                  })}
+                  {days.map((day) => (
+                    <motion.div 
+                      key={day}
+                      className={`aspect-square rounded-lg flex flex-col items-center justify-center ${
+                        day === today 
+                          ? 'bg-gradient-to-r from-green-500 to-teal-500 text-white' 
+                          : 'bg-gray-800/50 hover:bg-gray-700/50 text-gray-300'
+                      } cursor-pointer relative`}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      <span className={day === today ? 'font-bold' : ''}>{day}</span>
+                      
+                      {/* Event indicators */}
+                      {day % 5 === 0 && (
+                        <div className="absolute bottom-1 w-1.5 h-1.5 rounded-full bg-purple-500" />
+                      )}
+                      
+                      {day % 7 === 0 && (
+                        <div className="absolute bottom-1 left-[calc(50%-6px)] w-1.5 h-1.5 rounded-full bg-blue-500" />
+                      )}
+                      
+                      {day % 9 === 0 && (
+                        <div className="absolute bottom-1 right-[calc(50%-6px)] w-1.5 h-1.5 rounded-full bg-pink-500" />
+                      )}
+                    </motion.div>
+                  ))}
                 </div>
                 
                 <div className="mt-6 space-y-3">
@@ -1996,137 +1795,13 @@ function CalendarSection() {
                 </div>
               </div>
             </GlowingBorder>
-            
-            {/* Event Modal */}
-            {showEventModal && (
-              <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                <div className="bg-gray-800 rounded-xl p-6 max-w-md w-full mx-auto">
-                  <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-lg font-semibold text-white">
-                      {selectedEvent ? "Edit Event" : "New Event"}
-                    </h3>
-                    <button
-                      onClick={() => {
-                        setShowEventModal(false)
-                        setSelectedEvent(null)
-                      }}
-                      className="text-gray-400 hover:text-white transition-colors"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Title</label>
-                      <input
-                        type="text"
-                        value={eventForm.title}
-                        onChange={(e) => setEventForm({ ...eventForm, title: e.target.value })}
-                        className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
-                        placeholder="Event title"
-                      />
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">Start Date</label>
-                        <input
-                          type="datetime-local"
-                          value={formatDateForInput(eventForm.startDate)}
-                          onChange={(e) => setEventForm({ 
-                            ...eventForm, 
-                            startDate: new Date(e.target.value) 
-                          })}
-                          className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">End Date</label>
-                        <input
-                          type="datetime-local"
-                          value={formatDateForInput(eventForm.endDate)}
-                          onChange={(e) => setEventForm({ 
-                            ...eventForm, 
-                            endDate: new Date(e.target.value) 
-                          })}
-                          className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
-                        />
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Type</label>
-                      <div className="grid grid-cols-3 gap-2">
-                        <button
-                          onClick={() => setEventForm({ ...eventForm, type: "event", color: "#3B82F6" })}
-                          className={`flex flex-col items-center justify-center gap-1 p-2 rounded-lg transition-all ${
-                            eventForm.type === "event" ? "ring-2 ring-white" : ""
-                          }`}
-                          style={{ backgroundColor: "#3B82F620", color: "#3B82F6" }}
-                        >
-                          <Calendar className="w-4 h-4" />
-                          <span className="text-xs">Event</span>
-                        </button>
-                        <button
-                          onClick={() => setEventForm({ ...eventForm, type: "task", color: "#EF4444" })}
-                          className={`flex flex-col items-center justify-center gap-1 p-2 rounded-lg transition-all ${
-                            eventForm.type === "task" ? "ring-2 ring-white" : ""
-                          }`}
-                          style={{ backgroundColor: "#EF444420", color: "#EF4444" }}
-                        >
-                          <CheckCircle className="w-4 h-4" />
-                          <span className="text-xs">Task</span>
-                        </button>
-                        <button
-                          onClick={() => setEventForm({ ...eventForm, type: "goal", color: "#10B981" })}
-                          className={`flex flex-col items-center justify-center gap-1 p-2 rounded-lg transition-all ${
-                            eventForm.type === "goal" ? "ring-2 ring-white" : ""
-                          }`}
-                          style={{ backgroundColor: "#10B98120", color: "#10B981" }}
-                        >
-                          <Target className="w-4 h-4" />
-                          <span className="text-xs">Goal</span>
-                        </button>
-                      </div>
-                    </div>
-                    
-                    <div className="flex justify-end gap-3 mt-6">
-                      {selectedEvent && (
-                        <button
-                          onClick={handleDeleteEvent}
-                          className="px-4 py-2 text-red-300 bg-red-900/20 rounded-lg hover:bg-red-900/30 transition-colors"
-                        >
-                          Delete
-                        </button>
-                      )}
-                      <button
-                        onClick={() => {
-                          setShowEventModal(false)
-                          setSelectedEvent(null)
-                        }}
-                        className="px-4 py-2 text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={handleCreateEvent}
-                        disabled={!eventForm.title}
-                        className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {selectedEvent ? "Update" : "Create"}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
           </motion.div>
         </div>
       </div>
     </section>
   )
 }
+
 
 function TestimonialsSection() {
   const ref = useRef(null)

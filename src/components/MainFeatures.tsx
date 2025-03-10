@@ -619,7 +619,7 @@ function FriendsSection() {
       user: "Alex",
       message: "Hey team, I've shared my notes from yesterday's meeting",
       time: "10:24 AM",
-      avatar: "https://i.pravatar.cc/40?img=1",
+      avatar: "https://i.pravatar.cc/80?img=28",
     },
     {
       id: 2,
@@ -630,16 +630,16 @@ function FriendsSection() {
     },
     {
       id: 3,
-      user: "Sarah",
+      user: "Karen",
       message: "Great work everyone! I've updated the project timeline",
       time: "10:30 AM",
-      avatar: "https://i.pravatar.cc/40?img=3",
+      avatar: "https://i.pravatar.cc/80?img=43",
     }
   ])
   
   const [friends, setFriends] = useState([
-    { id: 1, name: "Alex Johnson", status: "online", avatar: "https://i.pravatar.cc/40?img=1" },
-    { id: 2, name: "Sarah Williams", status: "online", avatar: "https://i.pravatar.cc/40?img=3" },
+    { id: 1, name: "Alex Johnson", status: "online", avatar: "https://i.pravatar.cc/80?img=28" },
+    { id: 2, name: "Karen Williams", status: "online", avatar: "https://i.pravatar.cc/80?img=43" },
     { id: 3, name: "Michael Chen", status: "offline", avatar: "https://i.pravatar.cc/40?img=11" },
     { id: 4, name: "Emily Rodriguez", status: "away", avatar: "https://i.pravatar.cc/80?img=9" }
   ])
@@ -662,7 +662,7 @@ function FriendsSection() {
       user: "You",
       message: message,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      avatar: "https://i.pravatar.cc/40?img=2"
+      avatar: "https://www.iconpacks.net/icons/2/free-user-icon-3296-thumb.png"
     }
     
     setChatMessages([...chatMessages, newMessage])

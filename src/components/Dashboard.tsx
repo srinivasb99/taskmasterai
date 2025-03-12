@@ -1503,9 +1503,9 @@ Keep it brief, actionable, impersonal, and readable.
                   (greeting.icon.props.className ?? ''),
               })}
               {greeting.greeting},{' '}
-              <span className="font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-500 to-blue-500">
-                {userName ? userName.split(' ')[0] : 'Loading...'}
-              </span>
+            <span className="font-bold">
+              {userName ? userName.split(' ')[0] : 'Loading...'}
+            </span>
             </h1>
             <p className={`italic text-sm md:text-base lg:text-lg ${subheadingClass} animate-slideInUp`}>
               "{quote.text}" -{' '}
@@ -2348,7 +2348,6 @@ Keep it brief, actionable, impersonal, and readable.
                     onClick={handleCreate}
                   >
                     <PlusCircle className="w-4 h-4 inline-block mr-1" />
-                    Create {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
                   </button>
                 </div>
               </div>

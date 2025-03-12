@@ -15,6 +15,25 @@ import {
   Trash,
 } from "lucide-react"
 import { geminiEndpoint, streamResponse, extractCandidateText } from "../lib/ai-helpers"
+import {
+  onFirebaseAuthStateChanged,
+  onCollectionSnapshot,
+  createTask,
+  createGoal,
+  createProject,
+  updateDashboardLastSeen,
+  createPlan,
+  addCustomTimer,
+  onCustomTimersSnapshot,
+  updateItem,
+  deleteItem,
+  markItemComplete,
+  updateCustomTimer,
+  deleteCustomTimer,
+  weatherApiKey,
+  hfApiKey,
+  geminiApiKey,
+} from '../lib/dashboard-firebase';
 
 interface TaskAnalyticsProps {
   tasks: Array<{ id: string; data: any }>

@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBlackoutMode } from '../hooks/useBlackoutMode';
 import { useIlluminateMode } from '../hooks/useIlluminateMode';
-import { PlusCircle, Edit, Trash, Sparkles, CheckCircle, MessageCircle, RotateCcw, Square, X, TimerIcon, Send, ChevronLeft, ChevronRight, Moon, Sun, Star, Wind, Droplets, Zap, Calendar, Clock, MoreHorizontal, ArrowUpRight, Bookmark, BookOpen, Lightbulb, Flame, Award, TrendingUp, Rocket, Target, Layers, Clipboard, AlertCircle } from 'lucide-react';
+import { PlusCircle, Edit, Trash, Sparkles, CheckCircle, MessageCircle, RotateCcw, Square, X, TimerIcon, Send, ChevronLeft, ChevronRight, Moon, Sun, Star, Wind, Droplets, Zap, Calendar, Clock, MoreHorizontal, ArrowUpRight, Bookmark, BookOpen, Lightbulb, Flame, Award, TrendingUp, Rocket, Target, Layers, Clipboard, AlertCircle, ThumbsUp, ThumbsDown, BrainCircuit, ArrowRight, Flag, Bell, Filter, Tag, BarChart, PieChart } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { Timer } from './Timer';
 import { FlashcardsQuestions } from './FlashcardsQuestions';
@@ -34,6 +34,9 @@ import {
 import { auth } from '../lib/firebase'
 import { User, onAuthStateChanged } from 'firebase/auth'
 import { updateUserProfile, signOutUser, deleteUserAccount, AuthError, getCurrentUser } from '../lib/settings-firebase';
+import { SmartInsight } from './SmartInsight';
+import { PriorityBadge } from './PriorityBadge';
+import { TaskAnalytics } from './TaskAnalytics';
 
 // ---------------------
 // Helper functions for Gemini integration
@@ -121,6 +124,35 @@ const getWeekDates = (date: Date): Date[] => {
 const formatDateForComparison = (date: Date): string => {
   return date.toISOString().split('T')[0];
 };
+
+// Calculate priority based on due date and other factors
+const calculatePriority = (item: any): 'high' | 'medium' | 'low' => {
+  if (!item.data.dueDate) return 'low';
+  
+  const dueDate = item.data.dueDate.toDate ? item.data.dueDate.toDate() : new Date(item.data.dueDate);
+  const now = new Date();
+  const diffTime = dueDate.getTime() - now.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  // Check if item has a priority field already
+  if (item.data.priority) return item.data.priority;
+  
+  // Calculate based on due date
+  if (diffDays <= 1) return 'high';
+  if (diffDays <= 3) return 'medium';
+  return 'low';
+};
+
+// Interface for Smart Insights
+interface SmartInsight {
+  id: string;
+  text: string;
+  type: 'suggestion' | 'warning' | 'achievement';
+  accepted?: boolean;
+  rejected?: boolean;
+  relatedItemId?: string;
+  createdAt: Date;
+}
 
 export function Dashboard() {
   // ---------------------
@@ -313,34 +345,38 @@ export function Dashboard() {
 
     tasks.forEach((t) => {
       const due = t.data.dueDate?.toDate?.();
+      const priority = t.data.priority || calculatePriority(t);
       lines.push(
         `Task: ${t.data.task || 'Untitled'}${
           due ? ` (Due: ${due.toLocaleDateString()})` : ''
-        }`
+        } [Priority: ${priority}] [Completed: ${t.data.completed ? 'Yes' : 'No'}]`
       );
     });
     goals.forEach((g) => {
       const due = g.data.dueDate?.toDate?.();
+      const priority = g.data.priority || calculatePriority(g);
       lines.push(
         `Goal: ${g.data.goal || 'Untitled'}${
           due ? ` (Due: ${due.toLocaleDateString()})` : ''
-        }`
+        } [Priority: ${priority}] [Completed: ${g.data.completed ? 'Yes' : 'No'}]`
       );
     });
     projects.forEach((p) => {
       const due = p.data.dueDate?.toDate?.();
+      const priority = p.data.priority || calculatePriority(p);
       lines.push(
         `Project: ${p.data.project || 'Untitled'}${
           due ? ` (Due: ${due.toLocaleDateString()})` : ''
-        }`
+        } [Priority: ${priority}] [Completed: ${p.data.completed ? 'Yes' : 'No'}]`
       );
     });
     plans.forEach((p) => {
       const due = p.data.dueDate?.toDate?.();
+      const priority = p.data.priority || calculatePriority(p);
       lines.push(
         `Plan: ${p.data.plan || 'Untitled'}${
           due ? ` (Due: ${due.toLocaleDateString()})` : ''
-        }`
+        } [Priority: ${priority}] [Completed: ${p.data.completed ? 'Yes' : 'No'}]`
       );
     });
 
@@ -427,6 +463,8 @@ Guidelines:
    - Do not include or reference code blocks for languages like Python, Bash, or any other
      unless explicitly requested by ${userName}.
    - Only reference ${userName}'s items if ${userName} explicitly asks about them.
+   - When discussing tasks, goals, projects, or plans, consider their priority levels and due dates.
+   - Provide specific advice based on item priorities and completion status.
 
 2. Educational Content (JSON):
    - If ${userName} explicitly requests educational content (flashcards or quiz questions), provide exactly one JSON object.
@@ -567,13 +605,40 @@ Follow these instructions strictly.
   const [projects, setProjects] = useState<Array<{ id: string; data: any }>>([]);
   const [plans, setPlans] = useState<Array<{ id: string; data: any }>>([]);
   const [customTimers, setCustomTimers] = useState<Array<{ id: string; data: any }>>([]);
+  
+  // New state for smart insights
+  const [smartInsights, setSmartInsights] = useState<SmartInsight[]>([]);
+  const [showInsightsPanel, setShowInsightsPanel] = useState(false);
 
   const handleMarkComplete = async (itemId: string) => {
     if (!user) return;
     try {
       await markItemComplete(activeTab, itemId);
+      
+      // Generate a completion insight
+      const item = currentItems.find(item => item.id === itemId);
+      if (item) {
+        const itemName = item.data[titleField] || 'Untitled';
+        const newInsight: SmartInsight = {
+          id: Math.random().toString(36).substr(2, 9),
+          text: `Great job completing "${itemName}"! Would you like to create a follow-up task?`,
+          type: 'achievement',
+          relatedItemId: itemId,
+          createdAt: new Date()
+        };
+        setSmartInsights(prev => [newInsight, ...prev]);
+      }
     } catch (error) {
       console.error("Error marking item as complete:", error);
+    }
+  };
+
+  const handleSetPriority = async (itemId: string, priority: 'high' | 'medium' | 'low') => {
+    if (!user) return;
+    try {
+      await updateItem(activeTab, itemId, { priority });
+    } catch (error) {
+      console.error("Error updating priority:", error);
     }
   };
 
@@ -601,13 +666,16 @@ Follow these instructions strictly.
   const [activeTab, setActiveTab] = useState<"tasks" | "goals" | "projects" | "plans">("tasks");
   const [newItemText, setNewItemText] = useState("");
   const [newItemDate, setNewItemDate] = useState("");
+  const [newItemPriority, setNewItemPriority] = useState<'high' | 'medium' | 'low'>('medium');
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
   const [editingDate, setEditingDate] = useState("");
+  const [editingPriority, setEditingPriority] = useState<'high' | 'medium' | 'low'>('medium');
   const [cardVisible, setCardVisible] = useState(false);
   const [editingTimerId, setEditingTimerId] = useState<string | null>(null);
   const [editingTimerName, setEditingTimerName] = useState("");
   const [editingTimerMinutes, setEditingTimerMinutes] = useState("");
+  const [showAnalytics, setShowAnalytics] = useState(false);
 
   // Effect for card animation on mount
   useEffect(() => {
@@ -707,6 +775,8 @@ Follow these instructions strictly.
     const unsubProjects = onCollectionSnapshot('projects', user.uid, (items) => setProjects(items));
     const unsubPlans = onCollectionSnapshot('plans', user.uid, (items) => setPlans(items));
     const unsubTimers = onCustomTimersSnapshot(user.uid, (timers) => {
+        => setPlans(items));
+    const unsubTimers = onCustomTimersSnapshot(user.uid, (timers) => {
       setCustomTimers(timers);
     });
     return () => {
@@ -756,6 +826,79 @@ Follow these instructions strictly.
   const [lastGeneratedData, setLastGeneratedData] = useState<string>("");
   const [lastResponse, setLastResponse] = useState<string>("");
 
+  // Generate AI insights based on tasks, goals, projects, and plans
+  useEffect(() => {
+    if (!user || tasks.length === 0) return;
+    
+    // Check for overdue items
+    const now = new Date();
+    const overdueItems = [...tasks, ...goals, ...projects, ...plans].filter(item => {
+      if (!item.data.dueDate || item.data.completed) return false;
+      const dueDate = item.data.dueDate.toDate ? item.data.dueDate.toDate() : new Date(item.data.dueDate);
+      return dueDate < now;
+    });
+    
+    // Generate insights for overdue items
+    overdueItems.forEach(item => {
+      const itemType = item.data.task ? 'task' : item.data.goal ? 'goal' : item.data.project ? 'project' : 'plan';
+      const itemName = item.data[itemType] || 'Untitled';
+      
+      // Check if we already have an insight for this item
+      const existingInsight = smartInsights.find(insight => 
+        insight.relatedItemId === item.id && 
+        insight.type === 'warning' &&
+        !insight.accepted && 
+        !insight.rejected
+      );
+      
+      if (!existingInsight) {
+        const newInsight: SmartInsight = {
+          id: Math.random().toString(36).substr(2, 9),
+          text: `"${itemName}" is overdue. Would you like to reschedule or mark as complete?`,
+          type: 'warning',
+          relatedItemId: item.id,
+          createdAt: new Date()
+        };
+        setSmartInsights(prev => [newInsight, ...prev]);
+      }
+    });
+    
+    // Check for upcoming deadlines
+    const upcomingItems = [...tasks, ...goals, ...projects, ...plans].filter(item => {
+      if (!item.data.dueDate || item.data.completed) return false;
+      const dueDate = item.data.dueDate.toDate ? item.data.dueDate.toDate() : new Date(item.data.dueDate);
+      const diffTime = dueDate.getTime() - now.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      return diffDays <= 2 && diffDays > 0;
+    });
+    
+    // Generate insights for upcoming deadlines
+    upcomingItems.forEach(item => {
+      const itemType = item.data.task ? 'task' : item.data.goal ? 'goal' : item.data.project ? 'project' : 'plan';
+      const itemName = item.data[itemType] || 'Untitled';
+      
+      // Check if we already have an insight for this item
+      const existingInsight = smartInsights.find(insight => 
+        insight.relatedItemId === item.id && 
+        insight.type === 'suggestion' &&
+        !insight.accepted && 
+        !insight.rejected
+      );
+      
+      if (!existingInsight) {
+        const newInsight: SmartInsight = {
+          id: Math.random().toString(36).substr(2, 9),
+          text: `"${itemName}" is due soon. Would you like to set a reminder?`,
+          type: 'suggestion',
+          relatedItemId: item.id,
+          createdAt: new Date()
+        };
+        setSmartInsights(prev => [newInsight, ...prev]);
+      }
+    });
+    
+  }, [user, tasks, goals, projects, plans]);
+
   useEffect(() => {
     if (!user) return;
 
@@ -764,7 +907,9 @@ Follow these instructions strictly.
       const formatItem = (item: any, type: string) => {
         const dueDate = item.data.dueDate?.toDate?.();
         const title = item.data[type] || item.data.title || 'Untitled';
-        return `• ${title}${dueDate ? ` (Due: ${dueDate.toLocaleDateString()})` : ''}`;
+        const priority = item.data.priority || calculatePriority(item);
+        const completed = item.data.completed ? 'Completed' : 'Not completed';
+        return `• ${title}${dueDate ? ` (Due: ${dueDate.toLocaleDateString()})` : ''} [Priority: ${priority}] [Status: ${completed}]`;
       };
 
       // Combine all items
@@ -811,6 +956,7 @@ Follow these guidelines exactly:
 4. For each priority:
    - Reference specific tasks from the data naturally
    - Format due dates as "Month Day" (e.g., "March 7th") if present
+   - Consider priority levels (high, medium, low) when suggesting what to focus on
    - Suggest ONE clear, actionable next step
    - Blend seamlessly into the paragraph
 5. Focus on practical execution, not description
@@ -1002,6 +1148,16 @@ Keep it brief, actionable, impersonal, and readable.
       }
       setNewItemText("");
       setNewItemDate("");
+      
+      // Generate a new item insight
+      const newInsight: SmartInsight = {
+        id: Math.random().toString(36).substr(2, 9),
+        text: `New ${activeTab.slice(0, -1)} created! Would you like to break it down into smaller steps?`,
+        type: 'suggestion',
+        createdAt: new Date()
+      };
+      setSmartInsights(prev => [newInsight, ...prev]);
+      
     } catch (error) {
       console.error("Error creating item:", error);
     }
@@ -1025,6 +1181,7 @@ Keep it brief, actionable, impersonal, and readable.
   }
 
   const handleEditClick = (itemId: string, oldText: string, oldDueDate?: any) => {
+    const item = currentItems.find(item => item.id === itemId);
     setEditingItemId(itemId);
     setEditingText(oldText || "");
     if (oldDueDate) {
@@ -1032,6 +1189,13 @@ Keep it brief, actionable, impersonal, and readable.
       setEditingDate(dueDateObj.toISOString().split("T")[0]);
     } else {
       setEditingDate("");
+    }
+    
+    // Set editing priority
+    if (item && item.data.priority) {
+      setEditingPriority(item.data.priority);
+    } else {
+      setEditingPriority('medium');
     }
   };
 
@@ -1050,6 +1214,7 @@ Keep it brief, actionable, impersonal, and readable.
       await updateItem(collectionName, itemId, {
         [titleField]: editingText,
         dueDate: dateValue || null,
+        priority: editingPriority
       });
       setEditingItemId(null);
       setEditingText("");
@@ -1237,6 +1402,41 @@ Keep it brief, actionable, impersonal, and readable.
   const totalPlans = plans.length;
   const completedPlans = plans.filter((pl) => pl.data.completed).length;
   const plansProgress = totalPlans > 0 ? (completedPlans / totalPlans) * 100 : 0;
+
+  // Smart Insights handlers
+  const handleAcceptInsight = (insightId: string) => {
+    setSmartInsights(prev => 
+      prev.map(insight => 
+        insight.id === insightId 
+          ? { ...insight, accepted: true, rejected: false } 
+          : insight
+      )
+    );
+    
+    // Find the insight
+    const insight = smartInsights.find(i => i.id === insightId);
+    if (insight && insight.relatedItemId) {
+      // If it's a warning about an overdue item, open the edit dialog
+      if (insight.type === 'warning') {
+        const item = [...tasks, ...goals, ...projects, ...plans].find(i => i.id === insight.relatedItemId);
+        if (item) {
+          const itemType = item.data.task ? 'task' : item.data.goal ? 'goal' : item.data.project ? 'project' : 'plan';
+          const itemName = item.data[itemType] || 'Untitled';
+          handleEditClick(item.id, itemName, item.data.dueDate);
+        }
+      }
+    }
+  };
+
+  const handleRejectInsight = (insightId: string) => {
+    setSmartInsights(prev => 
+      prev.map(insight => 
+        insight.id === insightId 
+          ? { ...insight, accepted: false, rejected: true } 
+          : insight
+      )
+    );
+  };
 
   // Define conditional color classes based on the isIlluminateEnabled flag
   const headlineColor = isIlluminateEnabled ? "text-green-700" : "text-green-400"
@@ -1450,6 +1650,110 @@ Keep it brief, actionable, impersonal, and readable.
             </div>
           </div>
         </div>
+
+        {/* Smart Insights Panel */}
+        {smartInsights.filter(insight => !insight.accepted && !insight.rejected).length > 0 && (
+          <div 
+            className={`${cardClass} rounded-xl p-4 sm:p-6 mb-6 shadow-lg animate-fadeIn relative overflow-hidden`}
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10 pointer-events-none"></div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className={`text-lg sm:text-xl font-semibold flex items-center ${isIlluminateEnabled ? illuminateTextBlue : 'text-blue-300'}`}>
+                <BrainCircuit className="w-5 h-5 mr-2 animate-pulse" />
+                AI Insights
+                <span className="ml-2 text-xs bg-gradient-to-r from-pink-500 to-purple-500 text-white px-2 py-0.5 rounded-full">
+                  {smartInsights.filter(insight => !insight.accepted && !insight.rejected).length}
+                </span>
+              </h2>
+              <button 
+                onClick={() => setShowInsightsPanel(!showInsightsPanel)}
+                className={`p-1.5 rounded-full transition-colors ${
+                  isIlluminateEnabled 
+                    ? 'hover:bg-gray-200 text-gray-700' 
+                    : 'hover:bg-gray-700 text-gray-300'
+                }`}
+              >
+                {showInsightsPanel ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
+              </button>
+            </div>
+            
+            <div className={`space-y-3 transition-all duration-300 ${showInsightsPanel ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0 overflow-hidden'}`}>
+              {smartInsights
+                .filter(insight => !insight.accepted && !insight.rejected)
+                .map((insight, index) => (
+                  <div 
+                    key={insight.id}
+                    className={`p-3 rounded-lg flex items-center justify-between gap-3 animate-slideInRight ${
+                      insight.type === 'warning' 
+                        ? isIlluminateEnabled ? 'bg-red-100' : 'bg-red-900/20' 
+                        : insight.type === 'suggestion'
+                          ? isIlluminateEnabled ? 'bg-blue-100' : 'bg-blue-900/20'
+                          : isIlluminateEnabled ? 'bg-green-100' : 'bg-green-900/20'
+                    }`}
+                    style={{ animationDelay: `${index * 100}ms` }}
+                  >
+                    <div className="flex items-center gap-2">
+                      {insight.type === 'warning' && <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />}
+                      {insight.type === 'suggestion' && <Lightbulb className="w-5 h-5 text-blue-500 flex-shrink-0" />}
+                      {insight.type === 'achievement' && <Award className="w-5 h-5 text-green-500 flex-shrink-0" />}
+                      <p className="text-sm">{insight.text}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => handleAcceptInsight(insight.id)}
+                        className="p-1.5 rounded-full bg-green-500 text-white hover:bg-green-600 transition-colors"
+                        title="Accept"
+                      >
+                        <ThumbsUp className="w-4 h-4" />
+                      </button>
+                      <button 
+                        onClick={() => handleRejectInsight(insight.id)}
+                        className="p-1.5 rounded-full bg-red-500 text-white hover:bg-red-600 transition-colors"
+                        title="Reject"
+                      >
+                        <ThumbsDown className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+            </div>
+            
+            {!showInsightsPanel && (
+              <div className="flex flex-wrap gap-2">
+                {smartInsights
+                  .filter(insight => !insight.accepted && !insight.rejected)
+                  .slice(0, 3)
+                  .map((insight) => (
+                    <div 
+                      key={insight.id}
+                      className={`px-3 py-1.5 rounded-full text-xs flex items-center gap-1 animate-fadeIn ${
+                        insight.type === 'warning' 
+                          ? isIlluminateEnabled ? 'bg-red-100 text-red-700' : 'bg-red-900/20 text-red-400' 
+                          : insight.type === 'suggestion'
+                            ? isIlluminateEnabled ? 'bg-blue-100 text-blue-700' : 'bg-blue-900/20 text-blue-400'
+                            : isIlluminateEnabled ? 'bg-green-100 text-green-700' : 'bg-green-900/20 text-green-400'
+                      }`}
+                    >
+                      {insight.type === 'warning' && <AlertCircle className="w-3 h-3 flex-shrink-0" />}
+                      {insight.type === 'suggestion' && <Lightbulb className="w-3 h-3 flex-shrink-0" />}
+                      {insight.type === 'achievement' && <Award className="w-3 h-3 flex-shrink-0" />}
+                      <span className="truncate max-w-[200px]">{insight.text}</span>
+                    </div>
+                  ))}
+                {smartInsights.filter(insight => !insight.accepted && !insight.rejected).length > 3 && (
+                  <button 
+                    onClick={() => setShowInsightsPanel(true)}
+                    className={`px-3 py-1.5 rounded-full text-xs ${
+                      isIlluminateEnabled ? 'bg-gray-200 text-gray-700' : 'bg-gray-700 text-gray-300'
+                    } hover:opacity-80 transition-opacity`}
+                  >
+                    +{smartInsights.filter(insight => !insight.accepted && !insight.rejected).length - 3} more
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         <div
           className={`${cardClass} rounded-xl p-4 sm:p-6 relative min-h-[200px] transform hover:shadow-lg hover:shadow-purple-500/20 transition-all duration-500 ease-out ${
@@ -1679,134 +1983,163 @@ Keep it brief, actionable, impersonal, and readable.
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
           <div className="flex flex-col gap-6">
-            {/* Productivity Card */}
+            {/* Productivity Card with Analytics Toggle */}
             <div
-              className={`${cardClass} rounded-xl p-6 transform hover:scale-[1.02] transition-all duration-300 shadow-lg animate-fadeIn`}
+              className={`${cardClass} rounded-xl p-6 transform hover:scale-[1.02] transition-all duration-300 shadow-lg animate-fadeIn relative overflow-hidden`}
             >
-              <h2
-                className={`text-xl font-semibold mb-4 ${
-                  isIlluminateEnabled ? illuminateTextPurple : 'text-purple-400'
-                } flex items-center`}
-              >
-                <TrendingUp className="w-5 h-5 mr-2" />
-                Your Productivity
-              </h2>
-              <div className="space-y-4">
-                {totalTasks > 0 && (
-                  <div className="mb-4">
-                    <div className="flex justify-between mb-2">
-                      <p className="flex items-center">
-                        <Clipboard className="w-4 h-4 mr-2" />
-                        Tasks
-                      </p>
-                      <p
-                        className={
-                          isIlluminateEnabled
-                            ? illuminateTextGreen
-                            : 'text-green-400'
-                        }
-                      >
-                        {completedTasks}/{totalTasks}
-                      </p>
-                    </div>
-                    <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-green-400 to-green-600 rounded-full transition-all duration-1000 ease-out"
-                        style={{ width: `${tasksProgress}%` }}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {totalGoals > 0 && (
-                  <div className="mb-4">
-                    <div className="flex justify-between mb-2">
-                      <p className="flex items-center">
-                        <Target className="w-4 h-4 mr-2" />
-                        Goals
-                      </p>
-                      <p
-                        className={
-                          isIlluminateEnabled
-                            ? illuminateTextPink
-                            : 'text-pink-400'
-                        }
-                      >
-                        {completedGoals}/{totalGoals}
-                      </p>
-                    </div>
-                    <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-pink-400 to-pink-600 rounded-full transition-all duration-1000 ease-out"
-                        style={{ width: `${goalsProgress}%` }}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {totalProjects > 0 && (
-                  <div className="mb-4">
-                    <div className="flex justify-between mb-2">
-                      <p className="flex items-center">
-                        <Layers className="w-4 h-4 mr-2" />
-                        Projects
-                      </p>
-                      <p
-                        className={
-                          isIlluminateEnabled
-                            ? illuminateTextBlue
-                            : 'text-blue-400'
-                        }
-                      >
-                        {completedProjects}/{totalProjects}
-                      </p>
-                    </div>
-                    <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-blue-400 to-blue-600 rounded-full transition-all duration-1000 ease-out"
-                        style={{ width: `${projectsProgress}%` }}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {totalPlans > 0 && (
-                  <div className="mb-4">
-                    <div className="flex justify-between mb-2">
-                      <p className="flex items-center">
-                        <Rocket className="w-4 h-4 mr-2" />
-                        Plans
-                      </p>
-                      <p
-                        className={
-                          isIlluminateEnabled
-                            ? illuminateTextYellow
-                            : 'text-yellow-400'
-                        }
-                      >
-                        {completedPlans}/{totalPlans}
-                      </p>
-                    </div>
-                    <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-yellow-400 to-yellow-600 rounded-full transition-all duration-1000 ease-out"
-                        style={{ width: `${plansProgress}%` }}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {totalTasks === 0 &&
-                  totalGoals === 0 &&
-                  totalProjects === 0 &&
-                  totalPlans === 0 && (
-                    <p className="text-gray-400 flex items-center">
-                      <Lightbulb className="w-4 h-4 mr-2 text-yellow-400" />
-                      No items to track yet. Start by creating some tasks,
-                      goals, projects, or plans!
-                    </p>
-                  )}
+              <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-blue-500/5 pointer-events-none"></div>
+              <div className="flex justify-between items-center mb-4">
+                <h2
+                  className={`text-xl font-semibold ${
+                    isIlluminateEnabled ? illuminateTextPurple : 'text-purple-400'
+                  } flex items-center`}
+                >
+                  <TrendingUp className="w-5 h-5 mr-2" />
+                  Your Productivity
+                </h2>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => setShowAnalytics(!showAnalytics)}
+                    className={`p-1.5 rounded-full transition-colors ${
+                      isIlluminateEnabled 
+                        ? 'hover:bg-gray-200 text-gray-700' 
+                        : 'hover:bg-gray-700 text-gray-300'
+                    } flex items-center gap-1 text-xs`}
+                  >
+                    {showAnalytics ? <BarChart className="w-4 h-4" /> : <PieChart className="w-4 h-4" />}
+                    <span>{showAnalytics ? 'Basic View' : 'Analytics'}</span>
+                  </button>
+                </div>
               </div>
+              
+              {showAnalytics ? (
+                <div className="animate-fadeIn">
+                  <TaskAnalytics 
+                    tasks={tasks}
+                    goals={goals}
+                    projects={projects}
+                    plans={plans}
+                    isIlluminateEnabled={isIlluminateEnabled}
+                  />
+                </div>
+              ) : (
+                <div className="space-y-4 animate-fadeIn">
+                  {totalTasks > 0 && (
+                    <div className="mb-4">
+                      <div className="flex justify-between mb-2">
+                        <p className="flex items-center">
+                          <Clipboard className="w-4 h-4 mr-2" />
+                          Tasks
+                        </p>
+                        <p
+                          className={
+                            isIlluminateEnabled
+                              ? illuminateTextGreen
+                              : 'text-green-400'
+                          }
+                        >
+                          {completedTasks}/{totalTasks}
+                        </p>
+                      </div>
+                      <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-green-400 to-green-600 rounded-full transition-all duration-1000 ease-out"
+                          style={{ width: `${tasksProgress}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {totalGoals > 0 && (
+                    <div className="mb-4">
+                      <div className="flex justify-between mb-2">
+                        <p className="flex items-center">
+                          <Target className="w-4 h-4 mr-2" />
+                          Goals
+                        </p>
+                        <p
+                          className={
+                            isIlluminateEnabled
+                              ? illuminateTextPink
+                              : 'text-pink-400'
+                          }
+                        >
+                          {completedGoals}/{totalGoals}
+                        </p>
+                      </div>
+                      <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-pink-400 to-pink-600 rounded-full transition-all duration-1000 ease-out"
+                          style={{ width: `${goalsProgress}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {totalProjects > 0 && (
+                    <div className="mb-4">
+                      <div className="flex justify-between mb-2">
+                        <p className="flex items-center">
+                          <Layers className="w-4 h-4 mr-2" />
+                          Projects
+                        </p>
+                        <p
+                          className={
+                            isIlluminateEnabled
+                              ? illuminateTextBlue
+                              : 'text-blue-400'
+                          }
+                        >
+                          {completedProjects}/{totalProjects}
+                        </p>
+                      </div>
+                      <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-blue-400 to-blue-600 rounded-full transition-all duration-1000 ease-out"
+                          style={{ width: `${projectsProgress}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {totalPlans > 0 && (
+                    <div className="mb-4">
+                      <div className="flex justify-between mb-2">
+                        <p className="flex items-center">
+                          <Rocket className="w-4 h-4 mr-2" />
+                          Plans
+                        </p>
+                        <p
+                          className={
+                            isIlluminateEnabled
+                              ? illuminateTextYellow
+                              : 'text-yellow-400'
+                          }
+                        >
+                          {completedPlans}/{totalPlans}
+                        </p>
+                      </div>
+                      <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-yellow-400 to-yellow-600 rounded-full transition-all duration-1000 ease-out"
+                          style={{ width: `${plansProgress}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {totalTasks === 0 &&
+                    totalGoals === 0 &&
+                    totalProjects === 0 &&
+                    totalPlans === 0 && (
+                      <p className="text-gray-400 flex items-center">
+                        <Lightbulb className="w-4 h-4 mr-2 text-yellow-400" />
+                        No items to track yet. Start by creating some tasks,
+                        goals, projects, or plans!
+                      </p>
+                    )}
+                </div>
+              )}
             </div>
 
             {/* Upcoming Deadlines Card */}
@@ -1900,6 +2233,9 @@ Keep it brief, actionable, impersonal, and readable.
                         urgencyColor = isIlluminateEnabled ? 'border-l-green-600' : 'border-l-green-500';
                       }
 
+                      // Get priority
+                      const priority = data.priority || calculatePriority(item);
+
                       return (
                         <li
                           key={id}
@@ -1918,6 +2254,7 @@ Keep it brief, actionable, impersonal, and readable.
                                 {type}:
                               </span>{' '}
                               {itemName}
+                              <PriorityBadge priority={priority} isIlluminateEnabled={isIlluminateEnabled} />
                             </div>
                             <div
                               className={`text-xs ml-4 ${
@@ -1999,6 +2336,15 @@ Keep it brief, actionable, impersonal, and readable.
                     value={newItemDate}
                     onChange={(e) => setNewItemDate(e.target.value)}
                   />
+                  <select
+                    className={`${inputBg} border border-gray-700 rounded-full p-2 md:p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 shadow-inner`}
+                    value={newItemPriority}
+                    onChange={(e) => setNewItemPriority(e.target.value as 'high' | 'medium' | 'low')}
+                  >
+                    <option value="high">High Priority</option>
+                    <option value="medium">Medium Priority</option>
+                    <option value="low">Low Priority</option>
+                  </select>
                   <button
                     className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-full font-semibold hover:shadow-lg hover:shadow-purple-500/20 transition-all duration-300 transform hover:scale-105 whitespace-nowrap"
                     onClick={handleCreate}
@@ -2029,6 +2375,7 @@ Keep it brief, actionable, impersonal, and readable.
                       overdue = dueDateObj < new Date();
                     }
                     const isEditing = editingItemId === itemId;
+                    const priority = item.data.priority || calculatePriority(item);
 
                     return (
                       <li
@@ -2066,6 +2413,7 @@ Keep it brief, actionable, impersonal, and readable.
                             >
                               {textValue}
                             </span>
+                            <PriorityBadge priority={priority} isIlluminateEnabled={isIlluminateEnabled} />
                             {dueDateStr && (
                               <span
                                 className={`text-xs sm:text-sm font-medium px-2 sm:px-3 py-0.5 sm:py-1 rounded-full ${
@@ -2104,6 +2452,15 @@ Keep it brief, actionable, impersonal, and readable.
                               value={editingDate}
                               onChange={(e) => setEditingDate(e.target.value)}
                             />
+                            <select
+                              className={`${inputBg} border border-gray-600 rounded-full p-2 sm:p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 shadow-inner`}
+                              value={editingPriority}
+                              onChange={(e) => setEditingPriority(e.target.value as 'high' | 'medium' | 'low')}
+                            >
+                              <option value="high">High Priority</option>
+                              <option value="medium">Medium Priority</option>
+                              <option value="low">Low Priority</option>
+                            </select>
                           </div>
                         )}
                         <div className="flex gap-2 mt-2 sm:mt-0">
@@ -2350,7 +2707,7 @@ Keep it brief, actionable, impersonal, and readable.
                   isIlluminateEnabled
                     ? 'bg-gradient-to-r from-blue-600 to-purple-800'
                     : 'bg-gradient-to-r from-blue-400 to-purple-600'
-                } animate-pulse`}
+                } ${pomodoroRunning ? 'animate-pulse' : ''}`}
               >
                 {formatPomodoroTime(pomodoroTimeLeft)}
               </div>
@@ -2383,6 +2740,7 @@ Keep it brief, actionable, impersonal, and readable.
 
             {/* CUSTOM TIMERS LIST */}
             <div className={`${cardClass} rounded-xl p-6 transform hover:scale-[1.02] transition-all duration-300 shadow-lg animate-fadeIn`}>
+              <h2 className={`  transition-all duration-300 shadow-lg animate-fadeIn`}>
               <h2 className={`text-xl font-semibold mb-6 ${headingClass} flex items-center`}>
                 <TimerIcon className="w-5 h-5 mr-2" />
                 Custom Timers

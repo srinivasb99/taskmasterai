@@ -1,5 +1,4 @@
-import type React from "react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import {
   Lightbulb,
   CheckCircle,
@@ -15,7 +14,6 @@ import {
   Bookmark,
   Trash,
 } from "lucide-react"
-import { geminiEndpoint, streamResponse, extractCandidateText } from "../lib/ai-helpers"
 
 interface TaskAnalyticsProps {
   tasks: Array<{ id: string; data: any }>
@@ -25,7 +23,7 @@ interface TaskAnalyticsProps {
   userName: string
   isIlluminateEnabled: boolean
   geminiApiKey: string
-  onAcceptInsight: (insightId: string, action: string) => void
+  onAcceptInsight?: (insightId: string, action: string) => void
 }
 
 interface Insight {
@@ -40,7 +38,7 @@ interface Insight {
   createdAt: Date
 }
 
-export const TaskAnalytics: React.FC<TaskAnalyticsProps> = ({
+export function TaskAnalytics({
   tasks,
   goals,
   projects,
@@ -49,17 +47,19 @@ export const TaskAnalytics: React.FC<TaskAnalyticsProps> = ({
   isIlluminateEnabled,
   geminiApiKey,
   onAcceptInsight,
-}) => {
+}: TaskAnalyticsProps) {
   const [insights, setInsights] = useState<Insight[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [activeTab, setActiveTab] = useState<"all" | "priority" | "deadline" | "suggestion" | "achievement">("all")
   const [savedInsights, setSavedInsights] = useState<Insight[]>([])
 
+  // Cache for last analyzed data to prevent unnecessary API calls
+  const lastAnalyzedDataRef = useRef<string>("")
+  const analysisTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
   // Define color classes based on theme
   const headingClass = isIlluminateEnabled ? "text-gray-900" : "text-white"
   const cardClass = isIlluminateEnabled ? "bg-gray-100 text-gray-900" : "bg-gray-800 text-gray-300"
-  const highlightClass = isIlluminateEnabled ? "text-purple-700" : "text-purple-400"
-  const borderClass = isIlluminateEnabled ? "border-gray-300" : "border-gray-700"
 
   // Type-specific colors
   const typeColors = {
@@ -77,204 +77,180 @@ export const TaskAnalytics: React.FC<TaskAnalyticsProps> = ({
     achievement: <Award className="w-4 h-4" />,
   }
 
-  useEffect(() => {
-    if (tasks.length > 0 || goals.length > 0 || projects.length > 0 || plans.length > 0) {
-      generateInsights()
+  // Debounced function to generate insights
+  const debouncedGenerateInsights = useCallback(() => {
+    if (analysisTimeoutRef.current) {
+      clearTimeout(analysisTimeoutRef.current)
     }
-  }, [tasks, goals, projects, plans])
+
+    analysisTimeoutRef.current = setTimeout(() => {
+      generateInsights()
+    }, 2000) // 2 second delay
+  }, [])
+
+  // Effect to monitor data changes and trigger analysis
+  useEffect(() => {
+    const currentData = JSON.stringify({ tasks, goals, projects, plans })
+
+    // Only generate new insights if data has changed
+    if (currentData !== lastAnalyzedDataRef.current) {
+      lastAnalyzedDataRef.current = currentData
+      debouncedGenerateInsights()
+    }
+
+    return () => {
+      if (analysisTimeoutRef.current) {
+        clearTimeout(analysisTimeoutRef.current)
+      }
+    }
+  }, [tasks, goals, projects, plans, debouncedGenerateInsights])
 
   const generateInsights = async () => {
+    if (!geminiApiKey) {
+      console.error("Gemini API key is not provided")
+      return
+    }
+
     setIsLoading(true)
 
     try {
-      // Format all items for analysis
-      const formattedTasks = tasks.map((t) => ({
-        id: t.id,
-        type: "task",
-        title: t.data.task || "Untitled task",
-        completed: t.data.completed || false,
-        dueDate: t.data.dueDate ? (t.data.dueDate.toDate ? t.data.dueDate.toDate() : new Date(t.data.dueDate)) : null,
-        createdAt: t.data.createdAt
-          ? t.data.createdAt.toDate
-            ? t.data.createdAt.toDate()
-            : new Date(t.data.createdAt)
-          : new Date(),
-      }))
+      // Format all items for analysis with better type handling
+      const formatItems = (items: Array<{ id: string; data: any }>, type: string) => {
+        return items.map((item) => ({
+          id: item.id,
+          type,
+          title: item.data[type.toLowerCase()] || "Untitled",
+          completed: Boolean(item.data.completed),
+          dueDate: item.data.dueDate
+            ? item.data.dueDate.toDate
+              ? item.data.dueDate.toDate()
+              : new Date(item.data.dueDate)
+            : null,
+          priority: item.data.priority || "medium",
+          createdAt: item.data.createdAt
+            ? item.data.createdAt.toDate
+              ? item.data.createdAt.toDate()
+              : new Date(item.data.createdAt)
+            : new Date(),
+        }))
+      }
 
-      const formattedGoals = goals.map((g) => ({
-        id: g.id,
-        type: "goal",
-        title: g.data.goal || "Untitled goal",
-        completed: g.data.completed || false,
-        dueDate: g.data.dueDate ? (g.data.dueDate.toDate ? g.data.dueDate.toDate() : new Date(g.data.dueDate)) : null,
-        createdAt: g.data.createdAt
-          ? g.data.createdAt.toDate
-            ? g.data.createdAt.toDate()
-            : new Date(g.data.createdAt)
-          : new Date(),
-      }))
-
-      const formattedProjects = projects.map((p) => ({
-        id: p.id,
-        type: "project",
-        title: p.data.project || "Untitled project",
-        completed: p.data.completed || false,
-        dueDate: p.data.dueDate ? (p.data.dueDate.toDate ? p.data.dueDate.toDate() : new Date(p.data.dueDate)) : null,
-        createdAt: p.data.createdAt
-          ? p.data.createdAt.toDate
-            ? p.data.createdAt.toDate()
-            : new Date(p.data.createdAt)
-          : new Date(),
-      }))
-
-      const formattedPlans = plans.map((p) => ({
-        id: p.id,
-        type: "plan",
-        title: p.data.plan || "Untitled plan",
-        completed: p.data.completed || false,
-        dueDate: p.data.dueDate ? (p.data.dueDate.toDate ? p.data.dueDate.toDate() : new Date(p.data.dueDate)) : null,
-        createdAt: p.data.createdAt
-          ? p.data.createdAt.toDate
-            ? p.data.createdAt.toDate()
-            : new Date(p.data.createdAt)
-          : new Date(),
-      }))
+      const formattedTasks = formatItems(tasks, "Task")
+      const formattedGoals = formatItems(goals, "Goal")
+      const formattedProjects = formatItems(projects, "Project")
+      const formattedPlans = formatItems(plans, "Plan")
 
       const allItems = [...formattedTasks, ...formattedGoals, ...formattedProjects, ...formattedPlans]
 
-      // Prepare the prompt for Gemini
-      const prompt = `
-[INST] <<SYS>>
-You are TaskMaster, an advanced AI productivity assistant. Analyze the following items and generate actionable insights:
+      // Generate insights based on data analysis without AI for immediate feedback
+      const quickInsights: Insight[] = []
 
-${JSON.stringify(allItems, null, 2)}
+      // Check overdue items
+      const now = new Date()
+      const overdueItems = allItems.filter((item) => item.dueDate && !item.completed && item.dueDate < now)
 
-Generate 5-7 specific insights about the user's tasks, goals, projects, and plans. Each insight should be in JSON format with the following structure:
-{
-  "text": "The specific insight text that will be shown to the user",
-  "type": "One of: priority, deadline, suggestion, achievement",
-  "relatedItemId": "The ID of the item this insight relates to (if applicable)",
-  "relatedItemType": "The type of the related item (task, goal, project, plan)",
-  "action": "A specific action the user could take based on this insight (optional)"
-}
+      overdueItems.forEach((item) => {
+        quickInsights.push({
+          id: Math.random().toString(36).substring(2, 11),
+          text: `${item.type} "${item.title}" is overdue. Consider rescheduling or completing it soon.`,
+          type: "priority",
+          relatedItemId: item.id,
+          relatedItemType: item.type.toLowerCase(),
+          action: "reschedule",
+          createdAt: new Date(),
+        })
+      })
 
-Follow these guidelines:
-1. For "priority" insights: Identify items that should be prioritized based on due dates, dependencies, or importance
-2. For "deadline" insights: Highlight upcoming or overdue deadlines
-3. For "suggestion" insights: Provide specific productivity suggestions or ways to improve workflow
-4. For "achievement" insights: Recognize completed items or progress made
+      // Check upcoming deadlines
+      const upcomingItems = allItems.filter((item) => {
+        if (!item.dueDate || item.completed) return false
+        const daysUntilDue = Math.ceil((item.dueDate!.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+        return daysUntilDue <= 3 && daysUntilDue > 0
+      })
 
-Make insights specific, actionable, and personalized. Use the actual item titles and due dates.
-Avoid generic advice. Each insight should be directly related to the user's actual data.
+      upcomingItems.forEach((item) => {
+        const daysUntilDue = Math.ceil((item.dueDate!.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+        quickInsights.push({
+          id: Math.random().toString(36).substring(2, 11),
+          text: `${item.type} "${item.title}" is due in ${daysUntilDue} day${daysUntilDue > 1 ? "s" : ""}. Prioritize this item.`,
+          type: "deadline",
+          relatedItemId: item.id,
+          relatedItemType: item.type.toLowerCase(),
+          action: "prioritize",
+          createdAt: new Date(),
+        })
+      })
 
-Current date: ${new Date().toISOString().split("T")[0]}
-<</SYS>>[/INST]
-`
-
-      // Call Gemini API
-      const geminiOptions = {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-        }),
-      }
-
-      const resultResponse = await streamResponse(
-        `${geminiEndpoint}?key=${geminiApiKey}`,
-        geminiOptions,
-        () => {},
-        45000,
+      // Check completed items
+      const recentlyCompleted = allItems.filter(
+        (item) => item.completed && item.createdAt > new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000),
       )
-      const rawText = extractCandidateText(resultResponse) || ""
 
-      // Extract JSON array from the response
-      const jsonMatch = rawText.match(/\[\s*\{.*\}\s*\]/s)
-      if (jsonMatch) {
-        try {
-          const insightsData = JSON.parse(jsonMatch[0])
-
-          // Transform the data and add IDs
-          const formattedInsights = insightsData.map((insight: any) => ({
-            ...insight,
-            id: Math.random().toString(36).substring(2, 11),
-            createdAt: new Date(),
-          }))
-
-          setInsights(formattedInsights)
-        } catch (error) {
-          console.error("Failed to parse insights JSON:", error)
-          // Fallback insights if parsing fails
-          generateFallbackInsights(allItems)
-        }
-      } else {
-        console.error("No JSON array found in response")
-        generateFallbackInsights(allItems)
+      if (recentlyCompleted.length > 0) {
+        quickInsights.push({
+          id: Math.random().toString(36).substring(2, 11),
+          text: `Great progress! You've completed ${recentlyCompleted.length} item${recentlyCompleted.length > 1 ? "s" : ""} in the past week.`,
+          type: "achievement",
+          createdAt: new Date(),
+        })
       }
+
+      // Check high priority items
+      const highPriorityItems = allItems.filter((item) => !item.completed && item.priority === "high")
+
+      if (highPriorityItems.length > 0) {
+        quickInsights.push({
+          id: Math.random().toString(36).substring(2, 11),
+          text: `You have ${highPriorityItems.length} high-priority item${highPriorityItems.length > 1 ? "s" : ""} that need${highPriorityItems.length === 1 ? "s" : ""} attention.`,
+          type: "priority",
+          createdAt: new Date(),
+        })
+      }
+
+      // Update insights state with new quick insights
+      setInsights((prevInsights) => {
+        // Filter out old insights that are no longer relevant
+        const activeInsights = prevInsights.filter((insight) => !insight.accepted && !insight.declined)
+
+        // Add new insights while avoiding duplicates
+        const newInsights = quickInsights.filter(
+          (newInsight) =>
+            !activeInsights.some(
+              (existing) => existing.relatedItemId === newInsight.relatedItemId && existing.type === newInsight.type,
+            ),
+        )
+
+        return [...activeInsights, ...newInsights]
+      })
     } catch (error) {
       console.error("Error generating insights:", error)
+      // Generate fallback insights if AI fails
       generateFallbackInsights([])
     } finally {
       setIsLoading(false)
     }
   }
 
-  // Generate fallback insights if the AI fails
   const generateFallbackInsights = (items: any[]) => {
     const fallbackInsights: Insight[] = []
 
     // Add a general suggestion
     fallbackInsights.push({
       id: Math.random().toString(36).substring(2, 11),
-      text: "Consider breaking down large tasks into smaller, manageable steps for better progress tracking.",
+      text: "Consider reviewing and updating the priorities of your tasks to stay organized.",
       type: "suggestion",
       createdAt: new Date(),
     })
 
-    // Check for upcoming deadlines
-    const now = new Date()
-    const upcomingDeadlines = items.filter(
-      (item) =>
-        item.dueDate &&
-        !item.completed &&
-        item.dueDate > now &&
-        item.dueDate < new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000), // 3 days
-    )
-
-    if (upcomingDeadlines.length > 0) {
-      upcomingDeadlines.forEach((item) => {
-        fallbackInsights.push({
-          id: Math.random().toString(36).substring(2, 11),
-          text: `"${item.title}" is due soon on ${item.dueDate.toLocaleDateString()}. Consider prioritizing this.`,
-          type: "deadline",
-          relatedItemId: item.id,
-          relatedItemType: item.type,
-          createdAt: new Date(),
-        })
-      })
-    }
-
-    // Check for completed items
-    const recentlyCompleted = items.filter(
-      (item) => item.completed && item.createdAt > new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000), // Last 7 days
-    )
-
-    if (recentlyCompleted.length > 0) {
-      fallbackInsights.push({
-        id: Math.random().toString(36).substring(2, 11),
-        text: `You've completed ${recentlyCompleted.length} items recently. Great job!`,
-        type: "achievement",
-        createdAt: new Date(),
-      })
-    }
-
-    setInsights(fallbackInsights)
+    setInsights((prevInsights) => {
+      const activeInsights = prevInsights.filter((insight) => !insight.accepted && !insight.declined)
+      return [...activeInsights, ...fallbackInsights]
+    })
   }
 
   const handleAcceptInsight = (insight: Insight) => {
     // Mark the insight as accepted
-    const updatedInsights = insights.map((i) => (i.id === insight.id ? { ...i, accepted: true, declined: false } : i))
-    setInsights(updatedInsights)
+    setInsights((prev) => prev.map((i) => (i.id === insight.id ? { ...i, accepted: true, declined: false } : i)))
 
     // Save the insight
     setSavedInsights((prev) => [...prev, { ...insight, accepted: true }])
@@ -283,19 +259,29 @@ Current date: ${new Date().toISOString().split("T")[0]}
     if (onAcceptInsight && insight.action) {
       onAcceptInsight(insight.id, insight.action)
     }
+
+    // Generate a follow-up insight if needed
+    if (insight.type === "priority" || insight.type === "deadline") {
+      const followUpInsight: Insight = {
+        id: Math.random().toString(36).substring(2, 11),
+        text: `Would you like to create a reminder for "${insight.text.split('"')[1]}"?`,
+        type: "suggestion",
+        relatedItemId: insight.relatedItemId,
+        relatedItemType: insight.relatedItemType,
+        action: "create_reminder",
+        createdAt: new Date(),
+      }
+      setInsights((prev) => [...prev, followUpInsight])
+    }
   }
 
   const handleDeclineInsight = (insight: Insight) => {
-    // Mark the insight as declined
-    const updatedInsights = insights.map((i) => (i.id === insight.id ? { ...i, accepted: false, declined: true } : i))
-    setInsights(updatedInsights)
+    setInsights((prev) => prev.map((i) => (i.id === insight.id ? { ...i, accepted: false, declined: true } : i)))
   }
 
   const handleSaveInsight = (insight: Insight) => {
     setSavedInsights((prev) => [...prev, insight])
-    // Visual feedback
-    const updatedInsights = insights.map((i) => (i.id === insight.id ? { ...i, saved: true } : i))
-    setInsights(updatedInsights)
+    setInsights((prev) => prev.map((i) => (i.id === insight.id ? { ...i, saved: true } : i)))
   }
 
   const handleDeleteSavedInsight = (insightId: string) => {

@@ -15,7 +15,9 @@ import {
   Trash,
 } from "lucide-react"
 import { geminiEndpoint, streamResponse, extractCandidateText } from "../lib/ai-helpers"
+// Import the Gemini API key from Firebase config and rename it for clarity
 import {
+  geminiApiKey as defaultGeminiApiKey,
   onFirebaseAuthStateChanged,
   onCollectionSnapshot,
   createTask,
@@ -32,7 +34,6 @@ import {
   deleteCustomTimer,
   weatherApiKey,
   hfApiKey,
-  geminiApiKey,
 } from '../lib/dashboard-firebase';
 
 interface TaskAnalyticsProps {
@@ -42,7 +43,7 @@ interface TaskAnalyticsProps {
   plans: Array<{ id: string; data: any }>
   userName: string
   isIlluminateEnabled: boolean
-  geminiApiKey: string
+  geminiApiKey?: string
   onAcceptInsight?: (insightId: string, action: string) => void
   onUpdateData?: (type: string, itemId: string, updates: any) => void
 }
@@ -75,6 +76,9 @@ export function TaskAnalytics({
   onAcceptInsight,
   onUpdateData,
 }: TaskAnalyticsProps) {
+  // Use the provided geminiApiKey prop if available, otherwise fall back to the default
+  const effectiveGeminiApiKey = geminiApiKey || defaultGeminiApiKey
+
   const [insights, setInsights] = useState<Insight[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [activeTab, setActiveTab] = useState<"all" | "priority" | "deadline" | "suggestion" | "achievement">("all")
@@ -127,7 +131,7 @@ export function TaskAnalytics({
   }, [tasks, goals, projects, plans, debouncedGenerateInsights])
 
   const generateInsights = async () => {
-    if (!geminiApiKey) {
+    if (!effectiveGeminiApiKey) {
       console.error("Gemini API key is not provided")
       return
     }
@@ -201,7 +205,7 @@ Current date: ${new Date().toISOString().split("T")[0]}
       }
 
       const resultResponse = await streamResponse(
-        `${geminiEndpoint}?key=${geminiApiKey}`,
+        `${geminiEndpoint}?key=${effectiveGeminiApiKey}`,
         geminiOptions,
         () => {},
         45000,

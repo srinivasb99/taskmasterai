@@ -775,8 +775,6 @@ Follow these instructions strictly.
     const unsubProjects = onCollectionSnapshot('projects', user.uid, (items) => setProjects(items));
     const unsubPlans = onCollectionSnapshot('plans', user.uid, (items) => setPlans(items));
     const unsubTimers = onCustomTimersSnapshot(user.uid, (timers) => {
-        => setPlans(items));
-    const unsubTimers = onCustomTimersSnapshot(user.uid, (timers) => {
       setCustomTimers(timers);
     });
     return () => {

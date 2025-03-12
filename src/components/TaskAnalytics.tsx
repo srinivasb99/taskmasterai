@@ -1,3 +1,5 @@
+"use client"
+
 import { useState, useEffect, useCallback, useRef } from "react"
 import {
   Lightbulb,
@@ -24,6 +26,7 @@ interface TaskAnalyticsProps {
   isIlluminateEnabled: boolean
   geminiApiKey: string
   onAcceptInsight?: (insightId: string, action: string) => void
+  onUpdateData?: (type: string, itemId: string, updates: any) => void
 }
 
 interface Insight {
@@ -33,8 +36,13 @@ interface Insight {
   relatedItemId?: string
   relatedItemType?: string
   action?: string
+  actionData?: {
+    type: string
+    updates: any
+  }
   accepted?: boolean
   declined?: boolean
+  saved?: boolean
   createdAt: Date
 }
 
@@ -47,6 +55,7 @@ export function TaskAnalytics({
   isIlluminateEnabled,
   geminiApiKey,
   onAcceptInsight,
+  onUpdateData,
 }: TaskAnalyticsProps) {
   const [insights, setInsights] = useState<Insight[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -248,35 +257,107 @@ export function TaskAnalytics({
     })
   }
 
-  const handleAcceptInsight = (insight: Insight) => {
+  const handleAcceptInsight = async (insight: Insight) => {
     // Mark the insight as accepted
     setInsights((prev) => prev.map((i) => (i.id === insight.id ? { ...i, accepted: true, declined: false } : i)))
 
     // Save the insight
     setSavedInsights((prev) => [...prev, { ...insight, accepted: true }])
 
-    // Call the parent callback if provided
-    if (onAcceptInsight && insight.action) {
-      onAcceptInsight(insight.id, insight.action)
-    }
+    // Process the insight action
+    if (insight.action) {
+      // Determine action type and updates based on insight type and action
+      let updates = {}
+      const itemType = insight.relatedItemType || ""
 
-    // Generate a follow-up insight if needed
-    if (insight.type === "priority" || insight.type === "deadline") {
-      const followUpInsight: Insight = {
-        id: Math.random().toString(36).substring(2, 11),
-        text: `Would you like to create a reminder for "${insight.text.split('"')[1]}"?`,
-        type: "suggestion",
-        relatedItemId: insight.relatedItemId,
-        relatedItemType: insight.relatedItemType,
-        action: "create_reminder",
-        createdAt: new Date(),
+      switch (insight.type) {
+        case "priority":
+          updates = { priority: "high" }
+          break
+        case "deadline":
+          // If it's about rescheduling, add 3 days to current date
+          if (insight.action === "reschedule") {
+            const newDate = new Date()
+            newDate.setDate(newDate.getDate() + 3)
+            updates = { dueDate: newDate }
+          }
+          break
+        case "suggestion":
+          if (insight.action === "create_reminder") {
+            // Create a reminder by setting a notification
+            updates = { hasReminder: true, reminderDate: new Date() }
+          }
+          break
+        case "achievement":
+          // Mark as completed if it's about completion
+          if (insight.action.includes("complete")) {
+            updates = { completed: true }
+          }
+          break
       }
-      setInsights((prev) => [...prev, followUpInsight])
+
+      // Call the parent callback with the updates
+      if (onUpdateData && insight.relatedItemId && Object.keys(updates).length > 0) {
+        onUpdateData(itemType, insight.relatedItemId, updates)
+      }
+
+      // Call the general accept callback
+      if (onAcceptInsight) {
+        onAcceptInsight(insight.id, insight.action)
+      }
+
+      // Generate follow-up insight if needed
+      const followUpInsight = generateFollowUpInsight(insight)
+      if (followUpInsight) {
+        setInsights((prev) => [...prev, followUpInsight])
+      }
+    }
+  }
+
+  const generateFollowUpInsight = (insight: Insight): Insight | null => {
+    // Generate appropriate follow-up based on insight type
+    switch (insight.type) {
+      case "priority":
+        return {
+          id: Math.random().toString(36).substring(2, 11),
+          text: `Would you like to break down "${insight.text.split('"')[1]}" into smaller tasks?`,
+          type: "suggestion",
+          relatedItemId: insight.relatedItemId,
+          relatedItemType: insight.relatedItemType,
+          action: "create_subtasks",
+          createdAt: new Date(),
+        }
+      case "deadline":
+        return {
+          id: Math.random().toString(36).substring(2, 11),
+          text: `Would you like to set up regular progress check-ins for this item?`,
+          type: "suggestion",
+          relatedItemId: insight.relatedItemId,
+          relatedItemType: insight.relatedItemType,
+          action: "setup_checkins",
+          createdAt: new Date(),
+        }
+      default:
+        return null
     }
   }
 
   const handleDeclineInsight = (insight: Insight) => {
     setInsights((prev) => prev.map((i) => (i.id === insight.id ? { ...i, accepted: false, declined: true } : i)))
+
+    // If it's a priority or deadline insight, maybe generate an alternative suggestion
+    if (insight.type === "priority" || insight.type === "deadline") {
+      const alternativeInsight: Insight = {
+        id: Math.random().toString(36).substring(2, 11),
+        text: `Would you like to adjust the priority or deadline for this item instead?`,
+        type: "suggestion",
+        relatedItemId: insight.relatedItemId,
+        relatedItemType: insight.relatedItemType,
+        action: "adjust_settings",
+        createdAt: new Date(),
+      }
+      setInsights((prev) => [...prev, alternativeInsight])
+    }
   }
 
   const handleSaveInsight = (insight: Insight) => {

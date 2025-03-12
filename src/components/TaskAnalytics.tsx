@@ -1,5 +1,3 @@
-"use client"
-
 import { useState, useEffect, useCallback, useRef } from "react"
 import {
   Lightbulb,
@@ -16,6 +14,7 @@ import {
   Bookmark,
   Trash,
 } from "lucide-react"
+import { geminiEndpoint, streamResponse, extractCandidateText } from "../lib/ai-helpers"
 
 interface TaskAnalyticsProps {
   tasks: Array<{ id: string; data: any }>
@@ -70,15 +69,13 @@ export function TaskAnalytics({
   const headingClass = isIlluminateEnabled ? "text-gray-900" : "text-white"
   const cardClass = isIlluminateEnabled ? "bg-gray-100 text-gray-900" : "bg-gray-800 text-gray-300"
 
-  // Type-specific colors
+  // Type-specific colors and icons
   const typeColors = {
     priority: isIlluminateEnabled ? "text-red-700 bg-red-100" : "text-red-400 bg-red-900/20",
     deadline: isIlluminateEnabled ? "text-orange-700 bg-orange-100" : "text-orange-400 bg-orange-900/20",
     suggestion: isIlluminateEnabled ? "text-blue-700 bg-blue-100" : "text-blue-400 bg-blue-900/20",
     achievement: isIlluminateEnabled ? "text-green-700 bg-green-100" : "text-green-400 bg-green-900/20",
   }
-
-  // Icons for each insight type
   const typeIcons = {
     priority: <AlertTriangle className="w-4 h-4" />,
     deadline: <Calendar className="w-4 h-4" />,
@@ -91,22 +88,18 @@ export function TaskAnalytics({
     if (analysisTimeoutRef.current) {
       clearTimeout(analysisTimeoutRef.current)
     }
-
     analysisTimeoutRef.current = setTimeout(() => {
       generateInsights()
     }, 2000) // 2 second delay
-  }, [])
+  }, [tasks, goals, projects, plans])
 
   // Effect to monitor data changes and trigger analysis
   useEffect(() => {
     const currentData = JSON.stringify({ tasks, goals, projects, plans })
-
-    // Only generate new insights if data has changed
     if (currentData !== lastAnalyzedDataRef.current) {
       lastAnalyzedDataRef.current = currentData
       debouncedGenerateInsights()
     }
-
     return () => {
       if (analysisTimeoutRef.current) {
         clearTimeout(analysisTimeoutRef.current)
@@ -123,7 +116,7 @@ export function TaskAnalytics({
     setIsLoading(true)
 
     try {
-      // Format all items for analysis with better type handling
+      // Format items for analysis with improved type handling
       const formatItems = (items: Array<{ id: string; data: any }>, type: string) => {
         return items.map((item) => ({
           id: item.id,
@@ -148,134 +141,133 @@ export function TaskAnalytics({
       const formattedGoals = formatItems(goals, "Goal")
       const formattedProjects = formatItems(projects, "Project")
       const formattedPlans = formatItems(plans, "Plan")
-
       const allItems = [...formattedTasks, ...formattedGoals, ...formattedProjects, ...formattedPlans]
 
-      // Generate insights based on data analysis without AI for immediate feedback
-      const quickInsights: Insight[] = []
+      // Build the prompt for Gemini
+      const prompt = `
+[INST] <<SYS>>
+You are TaskMaster, an advanced AI productivity assistant. Analyze the following items and generate actionable insights:
 
-      // Check overdue items
-      const now = new Date()
-      const overdueItems = allItems.filter((item) => item.dueDate && !item.completed && item.dueDate < now)
+${JSON.stringify(allItems, null, 2)}
 
-      overdueItems.forEach((item) => {
-        quickInsights.push({
-          id: Math.random().toString(36).substring(2, 11),
-          text: `${item.type} "${item.title}" is overdue. Consider rescheduling or completing it soon.`,
-          type: "priority",
-          relatedItemId: item.id,
-          relatedItemType: item.type.toLowerCase(),
-          action: "reschedule",
-          createdAt: new Date(),
-        })
-      })
+Generate 5-7 specific insights about the user's tasks, goals, projects, and plans. Each insight should be in JSON format with the following structure:
+{
+  "text": "The specific insight text that will be shown to the user",
+  "type": "One of: priority, deadline, suggestion, achievement",
+  "relatedItemId": "The ID of the item this insight relates to (if applicable)",
+  "relatedItemType": "The type of the related item (task, goal, project, plan)",
+  "action": "A specific action the user could take based on this insight (optional)"
+}
 
-      // Check upcoming deadlines
-      const upcomingItems = allItems.filter((item) => {
-        if (!item.dueDate || item.completed) return false
-        const daysUntilDue = Math.ceil((item.dueDate!.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-        return daysUntilDue <= 3 && daysUntilDue > 0
-      })
+Follow these guidelines:
+1. For "priority" insights: Identify items that should be prioritized based on due dates, dependencies, or importance.
+2. For "deadline" insights: Highlight upcoming or overdue deadlines.
+3. For "suggestion" insights: Provide specific productivity suggestions or ways to improve workflow.
+4. For "achievement" insights: Recognize completed items or progress made.
 
-      upcomingItems.forEach((item) => {
-        const daysUntilDue = Math.ceil((item.dueDate!.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-        quickInsights.push({
-          id: Math.random().toString(36).substring(2, 11),
-          text: `${item.type} "${item.title}" is due in ${daysUntilDue} day${daysUntilDue > 1 ? "s" : ""}. Prioritize this item.`,
-          type: "deadline",
-          relatedItemId: item.id,
-          relatedItemType: item.type.toLowerCase(),
-          action: "prioritize",
-          createdAt: new Date(),
-        })
-      })
+Make insights specific, actionable, and personalized. Use the actual item titles and due dates.
+Avoid generic advice. Each insight should be directly related to the user's actual data.
 
-      // Check completed items
-      const recentlyCompleted = allItems.filter(
-        (item) => item.completed && item.createdAt > new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000),
+Current date: ${new Date().toISOString().split("T")[0]}
+<</SYS>>[/INST]
+`
+
+      // Call Gemini API
+      const geminiOptions = {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+        }),
+      }
+
+      const resultResponse = await streamResponse(
+        `${geminiEndpoint}?key=${geminiApiKey}`,
+        geminiOptions,
+        () => {},
+        45000,
       )
-
-      if (recentlyCompleted.length > 0) {
-        quickInsights.push({
-          id: Math.random().toString(36).substring(2, 11),
-          text: `Great progress! You've completed ${recentlyCompleted.length} item${recentlyCompleted.length > 1 ? "s" : ""} in the past week.`,
-          type: "achievement",
-          createdAt: new Date(),
-        })
+      const rawText = extractCandidateText(resultResponse) || ""
+      const jsonMatch = rawText.match(/\[\s*\{.*\}\s*\]/s)
+      if (jsonMatch) {
+        try {
+          const insightsData = JSON.parse(jsonMatch[0])
+          const formattedInsights = insightsData.map((insight: any) => ({
+            ...insight,
+            id: Math.random().toString(36).substring(2, 11),
+            createdAt: new Date(),
+          }))
+          setInsights(formattedInsights)
+        } catch (error) {
+          console.error("Failed to parse insights JSON:", error)
+          generateFallbackInsights(allItems)
+        }
+      } else {
+        console.error("No JSON array found in response")
+        generateFallbackInsights(allItems)
       }
-
-      // Check high priority items
-      const highPriorityItems = allItems.filter((item) => !item.completed && item.priority === "high")
-
-      if (highPriorityItems.length > 0) {
-        quickInsights.push({
-          id: Math.random().toString(36).substring(2, 11),
-          text: `You have ${highPriorityItems.length} high-priority item${highPriorityItems.length > 1 ? "s" : ""} that need${highPriorityItems.length === 1 ? "s" : ""} attention.`,
-          type: "priority",
-          createdAt: new Date(),
-        })
-      }
-
-      // Update insights state with new quick insights
-      setInsights((prevInsights) => {
-        // Filter out old insights that are no longer relevant
-        const activeInsights = prevInsights.filter((insight) => !insight.accepted && !insight.declined)
-
-        // Add new insights while avoiding duplicates
-        const newInsights = quickInsights.filter(
-          (newInsight) =>
-            !activeInsights.some(
-              (existing) => existing.relatedItemId === newInsight.relatedItemId && existing.type === newInsight.type,
-            ),
-        )
-
-        return [...activeInsights, ...newInsights]
-      })
     } catch (error) {
       console.error("Error generating insights:", error)
-      // Generate fallback insights if AI fails
       generateFallbackInsights([])
     } finally {
       setIsLoading(false)
     }
   }
 
+  // Fallback insights if AI generation fails
   const generateFallbackInsights = (items: any[]) => {
     const fallbackInsights: Insight[] = []
-
-    // Add a general suggestion
     fallbackInsights.push({
       id: Math.random().toString(36).substring(2, 11),
       text: "Consider reviewing and updating the priorities of your tasks to stay organized.",
       type: "suggestion",
       createdAt: new Date(),
     })
-
-    setInsights((prevInsights) => {
-      const activeInsights = prevInsights.filter((insight) => !insight.accepted && !insight.declined)
-      return [...activeInsights, ...fallbackInsights]
+    // Check for upcoming deadlines
+    const now = new Date()
+    const upcomingDeadlines = items.filter(
+      (item) =>
+        item.dueDate &&
+        !item.completed &&
+        item.dueDate > now &&
+        item.dueDate < new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000),
+    )
+    upcomingDeadlines.forEach((item) => {
+      fallbackInsights.push({
+        id: Math.random().toString(36).substring(2, 11),
+        text: `"${item.title}" is due soon on ${item.dueDate.toLocaleDateString()}. Consider prioritizing this.`,
+        type: "deadline",
+        relatedItemId: item.id,
+        relatedItemType: item.type.toLowerCase(),
+        createdAt: new Date(),
+      })
     })
+    // Recognize recently completed items
+    const recentlyCompleted = items.filter(
+      (item) => item.completed && item.createdAt > new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000),
+    )
+    if (recentlyCompleted.length > 0) {
+      fallbackInsights.push({
+        id: Math.random().toString(36).substring(2, 11),
+        text: `Great job! You've completed ${recentlyCompleted.length} item${recentlyCompleted.length > 1 ? "s" : ""} recently.`,
+        type: "achievement",
+        createdAt: new Date(),
+      })
+    }
+    setInsights(fallbackInsights)
   }
 
   const handleAcceptInsight = async (insight: Insight) => {
-    // Mark the insight as accepted
     setInsights((prev) => prev.map((i) => (i.id === insight.id ? { ...i, accepted: true, declined: false } : i)))
-
-    // Save the insight
     setSavedInsights((prev) => [...prev, { ...insight, accepted: true }])
-
-    // Process the insight action
     if (insight.action) {
-      // Determine action type and updates based on insight type and action
       let updates = {}
       const itemType = insight.relatedItemType || ""
-
       switch (insight.type) {
         case "priority":
           updates = { priority: "high" }
           break
         case "deadline":
-          // If it's about rescheduling, add 3 days to current date
           if (insight.action === "reschedule") {
             const newDate = new Date()
             newDate.setDate(newDate.getDate() + 3)
@@ -284,29 +276,21 @@ export function TaskAnalytics({
           break
         case "suggestion":
           if (insight.action === "create_reminder") {
-            // Create a reminder by setting a notification
             updates = { hasReminder: true, reminderDate: new Date() }
           }
           break
         case "achievement":
-          // Mark as completed if it's about completion
           if (insight.action.includes("complete")) {
             updates = { completed: true }
           }
           break
       }
-
-      // Call the parent callback with the updates
       if (onUpdateData && insight.relatedItemId && Object.keys(updates).length > 0) {
         onUpdateData(itemType, insight.relatedItemId, updates)
       }
-
-      // Call the general accept callback
       if (onAcceptInsight) {
         onAcceptInsight(insight.id, insight.action)
       }
-
-      // Generate follow-up insight if needed
       const followUpInsight = generateFollowUpInsight(insight)
       if (followUpInsight) {
         setInsights((prev) => [...prev, followUpInsight])
@@ -315,7 +299,6 @@ export function TaskAnalytics({
   }
 
   const generateFollowUpInsight = (insight: Insight): Insight | null => {
-    // Generate appropriate follow-up based on insight type
     switch (insight.type) {
       case "priority":
         return {
@@ -344,8 +327,6 @@ export function TaskAnalytics({
 
   const handleDeclineInsight = (insight: Insight) => {
     setInsights((prev) => prev.map((i) => (i.id === insight.id ? { ...i, accepted: false, declined: true } : i)))
-
-    // If it's a priority or deadline insight, maybe generate an alternative suggestion
     if (insight.type === "priority" || insight.type === "deadline") {
       const alternativeInsight: Insight = {
         id: Math.random().toString(36).substring(2, 11),
@@ -388,7 +369,6 @@ export function TaskAnalytics({
         </button>
       </div>
 
-      {/* Tabs for filtering insights */}
       <div className="flex flex-wrap gap-2 mb-4 overflow-x-auto pb-1">
         {["all", "priority", "deadline", "suggestion", "achievement"].map((tab) => (
           <button
@@ -427,10 +407,8 @@ export function TaskAnalytics({
         ))}
       </div>
 
-      {/* Insights list */}
       <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
         {isLoading ? (
-          // Loading state
           Array.from({ length: 3 }).map((_, index) => (
             <div
               key={index}
@@ -534,7 +512,6 @@ export function TaskAnalytics({
         )}
       </div>
 
-      {/* Saved insights section */}
       {savedInsights.length > 0 && (
         <div className="mt-6">
           <h3 className={`text-sm font-medium mb-2 ${headingClass} flex items-center`}>
@@ -578,4 +555,3 @@ export function TaskAnalytics({
     </div>
   )
 }
-

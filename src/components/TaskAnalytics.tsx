@@ -21,14 +21,18 @@ import { geminiEndpoint, streamResponse, extractCandidateText } from "../lib/ai-
 // Firebase (dashboard) module
 import {
   geminiApiKey as defaultGeminiApiKey,
-  updateItem, // optional if you need it
 } from "../lib/dashboard-firebase"
 
 // AI-actions to create new tasks/goals/projects/plans
-import { createUserTask } from "../lib/ai-actions-firebase"
+import {
+  createUserTask,
+  createUserGoal,
+  createUserPlan,
+  createUserProject,
+} from "../lib/ai-actions-firebase"
 
-// Firestore functions to store accepted insights
-import { db } from "../lib/firebase" // or from "dashboard-firebase" if that's where you export `db`
+// Firestore references to store accepted insights
+import { db } from "../lib/firebase"
 import { collection, addDoc, serverTimestamp } from "firebase/firestore"
 
 interface TaskAnalyticsProps {
@@ -42,13 +46,12 @@ interface TaskAnalyticsProps {
 
   /**
    * Called when the user accepts an insight (optional).
-   * For example, you might track analytics or do further logic.
    */
   onAcceptInsight?: (insightId: string, action: string) => void
 
   /**
-   * Called if the user wants to update the existing item in Firestore.
-   * E.g., if an insight says "Set priority to high," you can update the doc.
+   * Called if the user wants to update an existing doc in Firestore
+   * (e.g. setting a new dueDate or changing priority).
    */
   onUpdateData?: (collectionName: string, itemId: string, updates: any) => void
 }
@@ -60,10 +63,11 @@ interface Insight {
   relatedItemId?: string
   relatedItemType?: string
   action?: string
-  actionData?: {
-    type: string
-    updates: any
-  }
+  /**
+   * The raw triple-backtick JSON returned by the AI
+   * (e.g. { "action": "createPlan", "payload": {...} })
+   */
+  actionJson?: string
   accepted?: boolean
   declined?: boolean
   saved?: boolean
@@ -81,7 +85,7 @@ export function TaskAnalytics({
   onAcceptInsight,
   onUpdateData,
 }: TaskAnalyticsProps) {
-  // Fallback to the default Gemini key if none provided
+  // Use provided geminiApiKey prop or fall back to the default imported key
   const effectiveGeminiApiKey = geminiApiKey || defaultGeminiApiKey
 
   const [insights, setInsights] = useState<Insight[]>([])
@@ -89,15 +93,15 @@ export function TaskAnalytics({
   const [activeTab, setActiveTab] = useState<"all" | "priority" | "deadline" | "suggestion" | "achievement">("all")
   const [savedInsights, setSavedInsights] = useState<Insight[]>([])
 
-  // Cache for last-analyzed data to avoid repeated AI calls
+  // Cache for last analyzed data
   const lastAnalyzedDataRef = useRef<string>("")
   const analysisTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Classes based on theme
+  // Theme-based classes
   const headingClass = isIlluminateEnabled ? "text-gray-900" : "text-white"
   const cardClass = isIlluminateEnabled ? "bg-gray-100 text-gray-900" : "bg-gray-800 text-gray-300"
 
-  // Type-specific colors and icons
+  // Colors/icons by insight type
   const typeColors = {
     priority: isIlluminateEnabled ? "text-red-700 bg-red-100" : "text-red-400 bg-red-900/20",
     deadline: isIlluminateEnabled ? "text-orange-700 bg-orange-100" : "text-orange-400 bg-orange-900/20",
@@ -111,7 +115,7 @@ export function TaskAnalytics({
     achievement: <Award className="w-4 h-4" />,
   }
 
-  // Debounced function to generate insights after data changes
+  // Debounced generation
   const debouncedGenerateInsights = useCallback(() => {
     if (analysisTimeoutRef.current) {
       clearTimeout(analysisTimeoutRef.current)
@@ -121,6 +125,7 @@ export function TaskAnalytics({
     }, 2000)
   }, [tasks, goals, projects, plans])
 
+  // Watch for data changes
   useEffect(() => {
     const currentData = JSON.stringify({ tasks, goals, projects, plans })
     if (currentData !== lastAnalyzedDataRef.current) {
@@ -134,7 +139,9 @@ export function TaskAnalytics({
     }
   }, [tasks, goals, projects, plans, debouncedGenerateInsights])
 
-  // 1) Generate insights from AI or fallback
+  // ------------------------------
+  // 1) Generate Insights from AI
+  // ------------------------------
   const generateInsights = async () => {
     if (!effectiveGeminiApiKey) {
       console.error("Gemini API key is not provided")
@@ -143,6 +150,7 @@ export function TaskAnalytics({
     setIsLoading(true)
 
     try {
+      // Format your data
       const formatItems = (items: Array<{ id: string; data: any }>, type: string) => {
         return items.map((item) => ({
           id: item.id,
@@ -169,32 +177,34 @@ export function TaskAnalytics({
       const formattedPlans = formatItems(plans, "Plan")
       const allItems = [...formattedTasks, ...formattedGoals, ...formattedProjects, ...formattedPlans]
 
-      // Build prompt for Gemini
+      // Instruct Gemini to return a triple-backtick JSON block for each action
       const prompt = `
 [INST] <<SYS>>
-You are TaskMaster, an advanced AI productivity assistant. Analyze the following items and generate actionable insights:
+You are TaskMaster, an advanced AI productivity assistant. Analyze the following items and generate 5-7 actionable insights:
 
 ${JSON.stringify(allItems, null, 2)}
 
-Generate 5-7 specific insights about the user's tasks, goals, projects, and plans. Each insight should be in JSON format with the following structure:
+Each insight is JSON with:
 {
-  "text": "The specific insight text that will be shown to the user",
-  "type": "One of: priority, deadline, suggestion, achievement",
-  "relatedItemId": "The ID of the item this insight relates to (if applicable)",
-  "relatedItemType": "The type of the related item (task, goal, project, plan)",
-  "action": "A specific action the user could take based on this insight (optional)"
+  "text": "...",
+  "type": "priority | deadline | suggestion | achievement",
+  "relatedItemId": "...",
+  "relatedItemType": "...",
+  "action": "A short text describing the action",
+  "actionJson": "A triple-backtick JSON block with no extra text, e.g.:
+  \\\`\`\`json
+  {
+    \\"action\\": \\"createPlan\\",
+    \\"payload\\": {
+      \\"plan\\": \\"30-minute review session\\",
+      \\"dueDate\\": \\"2025-03-14\\"
+    }
+  }
+  \\\`\`\`
+  If no action is needed, omit actionJson."
 }
 
-Follow these guidelines:
-1. For "priority" insights: Identify items that should be prioritized based on due dates, dependencies, or importance.
-2. For "deadline" insights: Highlight upcoming or overdue deadlines.
-3. For "suggestion" insights: Provide specific productivity suggestions or ways to improve workflow.
-4. For "achievement" insights: Recognize completed items or progress made.
-
-Make insights specific, actionable, and personalized. Use the actual item titles and due dates.
-Avoid generic advice. Each insight should be directly related to the user's actual data.
-
-Current date: ${new Date().toISOString().split("T")[0]}
+Please do not add additional commentary outside the JSON. Return an array of these JSON insights.
 <</SYS>>[/INST]
 `
 
@@ -211,19 +221,37 @@ Current date: ${new Date().toISOString().split("T")[0]}
         `${geminiEndpoint}?key=${effectiveGeminiApiKey}`,
         geminiOptions,
         () => {},
-        45000,
+        45000
       )
       const rawText = extractCandidateText(resultResponse) || ""
+
+      // Attempt to find an array of insights
       const jsonMatch = rawText.match(/\[\s*\{.*\}\s*\]/s)
       if (jsonMatch) {
         try {
-          const insightsData = JSON.parse(jsonMatch[0])
-          const formattedInsights = insightsData.map((insight: any) => ({
-            ...insight,
-            id: Math.random().toString(36).substring(2, 11),
-            createdAt: new Date(),
-          }))
-          setInsights(formattedInsights)
+          const insightsData = JSON.parse(jsonMatch[0]) as any[]
+
+          // For each insight, we can parse out the triple-backtick JSON block
+          const processedInsights = insightsData.map((insightObj) => {
+            // We'll store the entire triple-backtick block in `actionJson` if present
+            let storedJson = ""
+            if (typeof insightObj.actionJson === "string") {
+              // We expect something like ```json { ... } ```
+              // Let's attempt to extract only the JSON portion
+              const blockMatch = insightObj.actionJson.match(/```json([\s\S]*?)```/i)
+              if (blockMatch) {
+                storedJson = blockMatch[1].trim()
+              }
+            }
+            return {
+              ...insightObj,
+              id: Math.random().toString(36).substring(2, 11),
+              createdAt: new Date(),
+              actionJson: storedJson || "",
+            } as Insight
+          })
+
+          setInsights(processedInsights)
         } catch (error) {
           console.error("Failed to parse insights JSON:", error)
           generateFallbackInsights(allItems)
@@ -244,7 +272,6 @@ Current date: ${new Date().toISOString().split("T")[0]}
   const generateFallbackInsights = (items: any[]) => {
     const fallbackInsights: Insight[] = []
 
-    // Example suggestion
     fallbackInsights.push({
       id: Math.random().toString(36).substring(2, 11),
       text: "Consider reviewing and updating the priorities of your tasks to stay organized.",
@@ -252,14 +279,14 @@ Current date: ${new Date().toISOString().split("T")[0]}
       createdAt: new Date(),
     })
 
-    // Check for upcoming deadlines
+    // Basic example for upcoming deadlines
     const now = new Date()
     const upcomingDeadlines = items.filter(
       (item) =>
         item.dueDate &&
         !item.completed &&
         item.dueDate > now &&
-        item.dueDate < new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000),
+        item.dueDate < new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000)
     )
     upcomingDeadlines.forEach((item) => {
       fallbackInsights.push({
@@ -272,9 +299,9 @@ Current date: ${new Date().toISOString().split("T")[0]}
       })
     })
 
-    // Recognize recently completed items
+    // Achievements
     const recentlyCompleted = items.filter(
-      (item) => item.completed && item.createdAt > new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000),
+      (item) => item.completed && item.createdAt > new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
     )
     if (recentlyCompleted.length > 0) {
       fallbackInsights.push({
@@ -290,10 +317,7 @@ Current date: ${new Date().toISOString().split("T")[0]}
     setInsights(fallbackInsights)
   }
 
-  /**
-   * Save an accepted insight to Firestore (in a "acceptedInsights" collection).
-   * This is purely optional but helps keep track of accepted insights.
-   */
+  // 3) Save accepted insight to Firestore
   async function storeAcceptedInsight(userId: string, insight: Insight) {
     try {
       await addDoc(collection(db, "acceptedInsights"), {
@@ -306,80 +330,85 @@ Current date: ${new Date().toISOString().split("T")[0]}
     }
   }
 
-  // 3) Handle acceptance of an insight
+  // 4) Handle Accept
   const handleAcceptInsight = async (insight: Insight) => {
-    // Mark the insight as accepted locally
+    // Mark locally
     setInsights((prev) => prev.map((i) => (i.id === insight.id ? { ...i, accepted: true, declined: false } : i)))
     setSavedInsights((prev) => [...prev, { ...insight, accepted: true }])
 
-    // If there's an action, handle it
-    if (insight.action) {
-      let updates: Record<string, any> = {}
-      const collectionName = insight.relatedItemType || ""
-
-      switch (insight.type) {
-        case "priority":
-          // Example: set the priority to "high"
-          updates = { priority: "high" }
-          break
-
-        case "deadline":
-          // If it's "reschedule", we set the dueDate 3 days later
-          if (insight.action === "reschedule") {
-            const newDate = new Date()
-            newDate.setDate(newDate.getDate() + 3)
-            updates = { dueDate: newDate }
-          }
-          break
-
-        case "suggestion":
-          // Example: if it says "create_reminder", we add a reminder
-          if (insight.action === "create_reminder") {
-            updates = { hasReminder: true, reminderDate: new Date() }
-          }
-          // Example: if it says "create_subtasks", we create a brand new task
-          if (insight.action === "create_subtasks") {
-            // You can parse the text to figure out a better name, or do multiple tasks
-            const newTaskTitle = `Follow-up on: ${insight.text}`
-            try {
-              await createUserTask(userId, {
-                task: newTaskTitle,
-                dueDate: new Date(), // set some default due date
+    // Parse the actionJson if present
+    if (insight.actionJson) {
+      try {
+        const parsed = JSON.parse(insight.actionJson)
+        if (parsed.action && parsed.payload) {
+          // For example, createPlan, createTask, etc.
+          switch (parsed.action) {
+            case "createPlan":
+              await createUserPlan(userId, {
+                plan: parsed.payload.plan || "AI Plan",
+                dueDate: parsed.payload.dueDate || null,
               })
-            } catch (err) {
-              console.error("Error creating subtask:", err)
-            }
+              break
+            case "createTask":
+              await createUserTask(userId, {
+                task: parsed.payload.task || "AI Task",
+                dueDate: parsed.payload.dueDate || null,
+              })
+              break
+            case "createGoal":
+              await createUserGoal(userId, {
+                goal: parsed.payload.goal || "AI Goal",
+                dueDate: parsed.payload.dueDate || null,
+              })
+              break
+            case "createProject":
+              await createUserProject(userId, {
+                project: parsed.payload.project || "AI Project",
+                dueDate: parsed.payload.dueDate || null,
+              })
+              break
+            default:
+              console.log("Unknown action:", parsed.action)
+              break
           }
-          break
-
-        case "achievement":
-          // If the user wants to "complete" something
-          if (insight.action?.includes("complete")) {
-            updates = { completed: true }
-          }
-          break
+        }
+      } catch (err) {
+        console.error("Error parsing or handling actionJson:", err)
       }
+    }
 
-      // If there's a related item to update, call onUpdateData
-      if (onUpdateData && insight.relatedItemId && Object.keys(updates).length > 0) {
+    // If there's a short action field (like "reschedule"), handle it:
+    if (insight.action) {
+      const collectionName = insight.relatedItemType || ""
+      let updates: Record<string, any> = {}
+
+      // Example logic
+      if (insight.action === "reschedule") {
+        const newDate = new Date()
+        newDate.setDate(newDate.getDate() + 1)
+        updates.dueDate = newDate
+      }
+      if (Object.keys(updates).length && onUpdateData && insight.relatedItemId) {
         onUpdateData(collectionName, insight.relatedItemId, updates)
       }
     }
 
-    // Optionally call the parent's callback
+    // Optionally call parent's callback
     if (onAcceptInsight) {
       onAcceptInsight(insight.id, insight.action || "")
     }
 
-    // Save the accepted insight to Firestore (optional)
+    // Save to Firestore
     await storeAcceptedInsight(userId, insight)
   }
 
-  // 4) Handle declines
+  // 5) Handle Decline
   const handleDeclineInsight = (insight: Insight) => {
-    setInsights((prev) => prev.map((i) => (i.id === insight.id ? { ...i, accepted: false, declined: true } : i)))
+    setInsights((prev) =>
+      prev.map((i) => (i.id === insight.id ? { ...i, accepted: false, declined: true } : i))
+    )
 
-    // Optionally present an alternative
+    // Example: show alternative if it's a priority or deadline
     if (insight.type === "priority" || insight.type === "deadline") {
       const alternativeInsight: Insight = {
         id: Math.random().toString(36).substring(2, 11),
@@ -394,7 +423,7 @@ Current date: ${new Date().toISOString().split("T")[0]}
     }
   }
 
-  // 5) Save an insight locally (e.g., for quick reference)
+  // 6) Save an insight locally
   const handleSaveInsight = (insight: Insight) => {
     setSavedInsights((prev) => [...prev, insight])
     setInsights((prev) => prev.map((i) => (i.id === insight.id ? { ...i, saved: true } : i)))
@@ -404,8 +433,10 @@ Current date: ${new Date().toISOString().split("T")[0]}
     setSavedInsights((prev) => prev.filter((i) => i.id !== insightId))
   }
 
+  // Filter by tab
   const filteredInsights = activeTab === "all" ? insights : insights.filter((insight) => insight.type === activeTab)
 
+  // 7) Render
   return (
     <div className={`${cardClass} rounded-xl p-4 sm:p-6 shadow-lg animate-fadeIn`}>
       <div className="flex items-center justify-between mb-4">
@@ -465,6 +496,7 @@ Current date: ${new Date().toISOString().split("T")[0]}
       {/* Insights List */}
       <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
         {isLoading ? (
+          // Loading state
           Array.from({ length: 3 }).map((_, index) => (
             <div
               key={index}
@@ -511,6 +543,13 @@ Current date: ${new Date().toISOString().split("T")[0]}
                 >
                   <ArrowUpRight className="w-3 h-3 mr-1" />
                   Suggested action: {insight.action}
+                </div>
+              )}
+
+              {/* If you want to display the raw JSON for debugging */}
+              {insight.actionJson && (
+                <div className="text-xs p-2 bg-gray-900/10 rounded-md mt-1 break-words">
+                  <strong>Action JSON:</strong> {insight.actionJson}
                 </div>
               )}
 
@@ -571,7 +610,7 @@ Current date: ${new Date().toISOString().split("T")[0]}
         )}
       </div>
 
-      {/* Saved Insights Section */}
+      {/* Saved Insights */}
       {savedInsights.length > 0 && (
         <div className="mt-6">
           <h3 className={`text-sm font-medium mb-2 ${headingClass} flex items-center`}>

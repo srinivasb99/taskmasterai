@@ -18,10 +18,8 @@ import {
 // AI helpers
 import { geminiEndpoint, streamResponse, extractCandidateText } from "../lib/ai-helpers"
 
-// Firebase (dashboard) module
-import {
-  geminiApiKey as defaultGeminiApiKey,
-} from "../lib/dashboard-firebase"
+// Firebase dashboard module
+import { geminiApiKey as defaultGeminiApiKey } from "../lib/dashboard-firebase"
 
 // AI-actions to create new tasks/goals/projects/plans
 import {
@@ -31,28 +29,24 @@ import {
   createUserProject,
 } from "../lib/ai-actions-firebase"
 
-// Firestore references to store accepted insights
+// Firestore helpers to save accepted insights
 import { db } from "../lib/firebase"
 import { collection, addDoc, serverTimestamp } from "firebase/firestore"
+
+// Import Auth and onAuthStateChanged from Firebase Auth and settings-firebase helpers
+import { auth } from "../lib/firebase"
+import { User, onAuthStateChanged } from "firebase/auth"
+import { getCurrentUser } from "../lib/settings-firebase"
 
 interface TaskAnalyticsProps {
   tasks: Array<{ id: string; data: any }>
   goals: Array<{ id: string; data: any }>
   projects: Array<{ id: string; data: any }>
   plans: Array<{ id: string; data: any }>
-  userId: string
+  // Removed userId prop in favor of using the current logged-in user.
   isIlluminateEnabled: boolean
   geminiApiKey?: string
-
-  /**
-   * Called when the user accepts an insight (optional).
-   */
   onAcceptInsight?: (insightId: string, action: string) => void
-
-  /**
-   * Called if the user wants to update an existing doc in Firestore
-   * (e.g. setting a new dueDate or changing priority).
-   */
   onUpdateData?: (collectionName: string, itemId: string, updates: any) => void
 }
 
@@ -64,8 +58,17 @@ interface Insight {
   relatedItemType?: string
   action?: string
   /**
-   * The raw triple-backtick JSON returned by the AI
-   * (e.g. { "action": "createPlan", "payload": {...} })
+   * The raw triple-backtick JSON returned by the AI,
+   * e.g.:
+   * ```json
+   * {
+   *   "action": "createPlan",
+   *   "payload": {
+   *     "plan": "30-minute review session",
+   *     "dueDate": "2025-03-14"
+   *   }
+   * }
+   * ```
    */
   actionJson?: string
   accepted?: boolean
@@ -79,21 +82,30 @@ export function TaskAnalytics({
   goals,
   projects,
   plans,
-  userId,
   isIlluminateEnabled,
   geminiApiKey,
   onAcceptInsight,
   onUpdateData,
 }: TaskAnalyticsProps) {
-  // Use provided geminiApiKey prop or fall back to the default imported key
+  // Use provided geminiApiKey prop or fall back to default
   const effectiveGeminiApiKey = geminiApiKey || defaultGeminiApiKey
 
+  // Local state for insights and loading status
   const [insights, setInsights] = useState<Insight[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [activeTab, setActiveTab] = useState<"all" | "priority" | "deadline" | "suggestion" | "achievement">("all")
   const [savedInsights, setSavedInsights] = useState<Insight[]>([])
 
-  // Cache for last analyzed data
+  // Local state for the current user (from Firebase Auth)
+  const [currentUser, setCurrentUser] = useState<User | null>(null)
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user)
+    })
+    return () => unsubscribe()
+  }, [])
+
+  // Cache for last-analyzed data and debounce timer
   const lastAnalyzedDataRef = useRef<string>("")
   const analysisTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -101,7 +113,7 @@ export function TaskAnalytics({
   const headingClass = isIlluminateEnabled ? "text-gray-900" : "text-white"
   const cardClass = isIlluminateEnabled ? "bg-gray-100 text-gray-900" : "bg-gray-800 text-gray-300"
 
-  // Colors/icons by insight type
+  // Colors and icons for each insight type
   const typeColors = {
     priority: isIlluminateEnabled ? "text-red-700 bg-red-100" : "text-red-400 bg-red-900/20",
     deadline: isIlluminateEnabled ? "text-orange-700 bg-orange-100" : "text-orange-400 bg-orange-900/20",
@@ -115,7 +127,7 @@ export function TaskAnalytics({
     achievement: <Award className="w-4 h-4" />,
   }
 
-  // Debounced generation
+  // Debounced generation of insights
   const debouncedGenerateInsights = useCallback(() => {
     if (analysisTimeoutRef.current) {
       clearTimeout(analysisTimeoutRef.current)
@@ -125,7 +137,6 @@ export function TaskAnalytics({
     }, 2000)
   }, [tasks, goals, projects, plans])
 
-  // Watch for data changes
   useEffect(() => {
     const currentData = JSON.stringify({ tasks, goals, projects, plans })
     if (currentData !== lastAnalyzedDataRef.current) {
@@ -139,18 +150,14 @@ export function TaskAnalytics({
     }
   }, [tasks, goals, projects, plans, debouncedGenerateInsights])
 
-  // ------------------------------
-  // 1) Generate Insights from AI
-  // ------------------------------
+  // 1) Generate insights via AI
   const generateInsights = async () => {
     if (!effectiveGeminiApiKey) {
       console.error("Gemini API key is not provided")
       return
     }
     setIsLoading(true)
-
     try {
-      // Format your data
       const formatItems = (items: Array<{ id: string; data: any }>, type: string) => {
         return items.map((item) => ({
           id: item.id,
@@ -177,14 +184,14 @@ export function TaskAnalytics({
       const formattedPlans = formatItems(plans, "Plan")
       const allItems = [...formattedTasks, ...formattedGoals, ...formattedProjects, ...formattedPlans]
 
-      // Instruct Gemini to return a triple-backtick JSON block for each action
+      // Instruct Gemini to return a triple-backtick JSON block for each insight action
       const prompt = `
 [INST] <<SYS>>
 You are TaskMaster, an advanced AI productivity assistant. Analyze the following items and generate 5-7 actionable insights:
 
 ${JSON.stringify(allItems, null, 2)}
 
-Each insight is JSON with:
+Each insight must be a JSON object with:
 {
   "text": "...",
   "type": "priority | deadline | suggestion | achievement",
@@ -204,7 +211,7 @@ Each insight is JSON with:
   If no action is needed, omit actionJson."
 }
 
-Please do not add additional commentary outside the JSON. Return an array of these JSON insights.
+Do not include any commentary outside the JSON. Return an array of these JSON objects.
 <</SYS>>[/INST]
 `
 
@@ -216,7 +223,6 @@ Please do not add additional commentary outside the JSON. Return an array of the
         }),
       }
 
-      // Stream the response
       const resultResponse = await streamResponse(
         `${geminiEndpoint}?key=${effectiveGeminiApiKey}`,
         geminiOptions,
@@ -224,28 +230,19 @@ Please do not add additional commentary outside the JSON. Return an array of the
         45000
       )
 
-      // If the server responded 429, you might not get a valid JSON
-      // (Your streamResponse function might or might not expose status code.)
-      // For demonstration, we do:
       if (!resultResponse) {
-        console.warn("No response from AI or 429 error. Try again later.")
+        console.warn("No response from AI or rate limit reached. Try again later.")
         setIsLoading(false)
         return
       }
 
-      // Extract the text from the streaming
       let rawText = extractCandidateText(resultResponse) || ""
-
-      // 1) Sanitize the AI's raw text to remove ASCII control chars
+      // Sanitize rawText to remove control characters
       rawText = rawText.replace(/[\u0000-\u001F]+/g, "")
-
-      // 2) Then find the JSON array
       const jsonMatch = rawText.match(/\[\s*\{.*\}\s*\]/s)
       if (jsonMatch) {
         try {
           const insightsData = JSON.parse(jsonMatch[0]) as any[]
-
-          // For each insight, parse out the triple-backtick JSON block if present
           const processedInsights = insightsData.map((insightObj) => {
             let storedJson = ""
             if (typeof insightObj.actionJson === "string") {
@@ -261,7 +258,6 @@ Please do not add additional commentary outside the JSON. Return an array of the
               actionJson: storedJson || "",
             } as Insight
           })
-
           setInsights(processedInsights)
         } catch (error) {
           console.error("Failed to parse insights JSON:", error)
@@ -282,15 +278,12 @@ Please do not add additional commentary outside the JSON. Return an array of the
   // 2) Fallback if AI fails
   const generateFallbackInsights = (items: any[]) => {
     const fallbackInsights: Insight[] = []
-
     fallbackInsights.push({
       id: Math.random().toString(36).substring(2, 11),
       text: "Consider reviewing and updating the priorities of your tasks to stay organized.",
       type: "suggestion",
       createdAt: new Date(),
     })
-
-    // Basic example for upcoming deadlines
     const now = new Date()
     const upcomingDeadlines = items.filter(
       (item) =>
@@ -309,35 +302,30 @@ Please do not add additional commentary outside the JSON. Return an array of the
         createdAt: new Date(),
       })
     })
-
-    // Achievements
     const recentlyCompleted = items.filter(
       (item) => item.completed && item.createdAt > new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
     )
     if (recentlyCompleted.length > 0) {
       fallbackInsights.push({
         id: Math.random().toString(36).substring(2, 11),
-        text: `Great job! You've completed ${recentlyCompleted.length} item${
-          recentlyCompleted.length > 1 ? "s" : ""
-        } recently.`,
+        text: `Great job! You've completed ${recentlyCompleted.length} item${recentlyCompleted.length > 1 ? "s" : ""} recently.`,
         type: "achievement",
         createdAt: new Date(),
       })
     }
-
     setInsights(fallbackInsights)
   }
 
   // 3) Save accepted insight to Firestore
-  async function storeAcceptedInsight(uid: string, insight: Insight) {
+  async function storeAcceptedInsight(insight: Insight) {
+    const effectiveUserId = currentUser?.uid
+    if (!effectiveUserId) {
+      console.error("No user logged in, skipping accepted insight save")
+      return
+    }
     try {
-      // Check userId is not undefined
-      if (!uid) {
-        console.error("No userId found, skipping accepted insight save")
-        return
-      }
       await addDoc(collection(db, "acceptedInsights"), {
-        userId: uid, // must be a valid string
+        userId: effectiveUserId,
         ...insight,
         acceptedAt: serverTimestamp(),
       })
@@ -348,37 +336,43 @@ Please do not add additional commentary outside the JSON. Return an array of the
 
   // 4) Handle Accept
   const handleAcceptInsight = async (insight: Insight) => {
-    // Mark locally
-    setInsights((prev) => prev.map((i) => (i.id === insight.id ? { ...i, accepted: true, declined: false } : i)))
+    // Mark locally as accepted
+    setInsights((prev) =>
+      prev.map((i) => (i.id === insight.id ? { ...i, accepted: true, declined: false } : i))
+    )
     setSavedInsights((prev) => [...prev, { ...insight, accepted: true }])
+    const effectiveUserId = currentUser?.uid
+    if (!effectiveUserId) {
+      console.error("No user logged in, cannot process accepted insight")
+      return
+    }
 
-    // Parse the actionJson if present
+    // If an actionJson exists, parse and handle the action
     if (insight.actionJson) {
       try {
         const parsed = JSON.parse(insight.actionJson)
         if (parsed.action && parsed.payload) {
-          // For example, createPlan, createTask, etc.
           switch (parsed.action) {
             case "createPlan":
-              await createUserPlan(userId, {
+              await createUserPlan(effectiveUserId, {
                 plan: parsed.payload.plan || "AI Plan",
                 dueDate: parsed.payload.dueDate || null,
               })
               break
             case "createTask":
-              await createUserTask(userId, {
+              await createUserTask(effectiveUserId, {
                 task: parsed.payload.task || "AI Task",
                 dueDate: parsed.payload.dueDate || null,
               })
               break
             case "createGoal":
-              await createUserGoal(userId, {
+              await createUserGoal(effectiveUserId, {
                 goal: parsed.payload.goal || "AI Goal",
                 dueDate: parsed.payload.dueDate || null,
               })
               break
             case "createProject":
-              await createUserProject(userId, {
+              await createUserProject(effectiveUserId, {
                 project: parsed.payload.project || "AI Project",
                 dueDate: parsed.payload.dueDate || null,
               })
@@ -393,12 +387,10 @@ Please do not add additional commentary outside the JSON. Return an array of the
       }
     }
 
-    // If there's a short action field (like "reschedule"), handle it:
+    // If a short action field is provided, for example "reschedule", handle that update
     if (insight.action) {
       const collectionName = insight.relatedItemType || ""
       let updates: Record<string, any> = {}
-
-      // Example logic
       if (insight.action === "reschedule") {
         const newDate = new Date()
         newDate.setDate(newDate.getDate() + 1)
@@ -409,13 +401,12 @@ Please do not add additional commentary outside the JSON. Return an array of the
       }
     }
 
-    // Optionally call parent's callback
     if (onAcceptInsight) {
       onAcceptInsight(insight.id, insight.action || "")
     }
 
-    // Save to Firestore
-    await storeAcceptedInsight(userId, insight)
+    // Finally, store the accepted insight in Firestore
+    await storeAcceptedInsight(insight)
   }
 
   // 5) Handle Decline
@@ -423,8 +414,6 @@ Please do not add additional commentary outside the JSON. Return an array of the
     setInsights((prev) =>
       prev.map((i) => (i.id === insight.id ? { ...i, accepted: false, declined: true } : i))
     )
-
-    // Example: show alternative if it's a priority or deadline
     if (insight.type === "priority" || insight.type === "deadline") {
       const alternativeInsight: Insight = {
         id: Math.random().toString(36).substring(2, 11),
@@ -442,17 +431,18 @@ Please do not add additional commentary outside the JSON. Return an array of the
   // 6) Save an insight locally
   const handleSaveInsight = (insight: Insight) => {
     setSavedInsights((prev) => [...prev, insight])
-    setInsights((prev) => prev.map((i) => (i.id === insight.id ? { ...i, saved: true } : i)))
+    setInsights((prev) =>
+      prev.map((i) => (i.id === insight.id ? { ...i, saved: true } : i))
+    )
   }
 
   const handleDeleteSavedInsight = (insightId: string) => {
     setSavedInsights((prev) => prev.filter((i) => i.id !== insightId))
   }
 
-  // Filter by tab
+  // Filter insights by active tab
   const filteredInsights = activeTab === "all" ? insights : insights.filter((insight) => insight.type === activeTab)
 
-  // 7) Render
   return (
     <div className={`${cardClass} rounded-xl p-4 sm:p-6 shadow-lg animate-fadeIn`}>
       <div className="flex items-center justify-between mb-4">
@@ -470,7 +460,7 @@ Please do not add additional commentary outside the JSON. Return an array of the
         </button>
       </div>
 
-      {/* Tabs */}
+      {/* Tabs for filtering */}
       <div className="flex flex-wrap gap-2 mb-4 overflow-x-auto pb-1">
         {["all", "priority", "deadline", "suggestion", "achievement"].map((tab) => (
           <button
@@ -512,7 +502,6 @@ Please do not add additional commentary outside the JSON. Return an array of the
       {/* Insights List */}
       <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
         {isLoading ? (
-          // Loading state
           Array.from({ length: 3 }).map((_, index) => (
             <div
               key={index}
@@ -530,9 +519,7 @@ Please do not add additional commentary outside the JSON. Return an array of the
           filteredInsights.map((insight) => (
             <div
               key={insight.id}
-              className={`p-3 rounded-lg ${
-                isIlluminateEnabled ? "bg-gray-200/80" : "bg-gray-700/50"
-              } transition-all duration-300 hover:shadow-md
+              className={`p-3 rounded-lg ${isIlluminateEnabled ? "bg-gray-200/80" : "bg-gray-700/50"} transition-all duration-300 hover:shadow-md
                 ${insight.accepted ? "border-l-4 border-green-500" : ""}
                 ${insight.declined ? "opacity-50" : ""}
               `}
@@ -550,25 +537,18 @@ Please do not add additional commentary outside the JSON. Return an array of the
                   </span>
                 )}
               </div>
-
               <p className="text-sm mb-2">{insight.text}</p>
-
               {insight.action && (
-                <div
-                  className={`text-xs ${isIlluminateEnabled ? "text-blue-700" : "text-blue-400"} mb-2 flex items-center`}
-                >
+                <div className={`text-xs ${isIlluminateEnabled ? "text-blue-700" : "text-blue-400"} mb-2 flex items-center`}>
                   <ArrowUpRight className="w-3 h-3 mr-1" />
                   Suggested action: {insight.action}
                 </div>
               )}
-
-              {/* If you want to display the raw JSON for debugging */}
               {insight.actionJson && (
                 <div className="text-xs p-2 bg-gray-900/10 rounded-md mt-1 break-words">
                   <strong>Action JSON:</strong> {insight.actionJson}
                 </div>
               )}
-
               <div className="flex items-center justify-between mt-2">
                 <div className="flex gap-1">
                   {!insight.accepted && !insight.declined && (
@@ -602,12 +582,9 @@ Please do not add additional commentary outside the JSON. Return an array of the
                     </span>
                   )}
                 </div>
-
                 <button
                   onClick={() => handleSaveInsight(insight)}
-                  className={`p-1 rounded-full hover:bg-blue-500/20 transition-colors ${
-                    insight.saved ? "text-blue-500" : ""
-                  }`}
+                  className={`p-1 rounded-full hover:bg-blue-500/20 transition-colors ${insight.saved ? "text-blue-500" : ""}`}
                   title="Save insight"
                   disabled={insight.saved}
                 >
@@ -633,30 +610,22 @@ Please do not add additional commentary outside the JSON. Return an array of the
             <Bookmark className="w-4 h-4 mr-1" />
             Saved Insights
           </h3>
-          <div
-            className={`p-2 rounded-lg ${
-              isIlluminateEnabled ? "bg-gray-200/50" : "bg-gray-700/30"
-            } max-h-[150px] overflow-y-auto`}
-          >
+          <div className={`p-2 rounded-lg ${isIlluminateEnabled ? "bg-gray-200/50" : "bg-gray-700/30"} max-h-[150px] overflow-y-auto`}>
             {savedInsights.map((insight) => (
               <div
                 key={insight.id}
-                className={`p-2 mb-1 rounded text-xs flex items-center justify-between ${
-                  isIlluminateEnabled ? "bg-white/50" : "bg-gray-800/50"
-                }`}
+                className={`p-2 mb-1 rounded text-xs flex items-center justify-between ${isIlluminateEnabled ? "bg-white/50" : "bg-gray-800/50"}`}
               >
                 <div className="flex items-center gap-1 overflow-hidden">
-                  <span
-                    className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                      insight.type === "priority"
-                        ? "bg-red-500"
-                        : insight.type === "deadline"
+                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                    insight.type === "priority"
+                      ? "bg-red-500"
+                      : insight.type === "deadline"
                         ? "bg-orange-500"
                         : insight.type === "suggestion"
-                        ? "bg-blue-500"
-                        : "bg-green-500"
-                    }`}
-                  />
+                          ? "bg-blue-500"
+                          : "bg-green-500"
+                  }`} />
                   <p className="truncate">{insight.text}</p>
                 </div>
                 <button

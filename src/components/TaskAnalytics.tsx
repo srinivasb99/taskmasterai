@@ -14,38 +14,43 @@ import {
   Bookmark,
   Trash,
 } from "lucide-react"
+
+// AI helpers
 import { geminiEndpoint, streamResponse, extractCandidateText } from "../lib/ai-helpers"
-// Import the Gemini API key from Firebase config and rename it for clarity
+
+// Firebase (dashboard) module
 import {
   geminiApiKey as defaultGeminiApiKey,
-  onFirebaseAuthStateChanged,
-  onCollectionSnapshot,
-  createTask,
-  createGoal,
-  createProject,
-  updateDashboardLastSeen,
-  createPlan,
-  addCustomTimer,
-  onCustomTimersSnapshot,
-  updateItem,
-  deleteItem,
-  markItemComplete,
-  updateCustomTimer,
-  deleteCustomTimer,
-  weatherApiKey,
-  hfApiKey,
-} from '../lib/dashboard-firebase';
+  updateItem, // optional if you need it
+} from "../lib/dashboard-firebase"
+
+// AI-actions to create new tasks/goals/projects/plans
+import { createUserTask } from "../lib/ai-actions-firebase"
+
+// Firestore functions to store accepted insights
+import { db } from "../lib/firebase" // or from "dashboard-firebase" if that's where you export `db`
+import { collection, addDoc, serverTimestamp } from "firebase/firestore"
 
 interface TaskAnalyticsProps {
   tasks: Array<{ id: string; data: any }>
   goals: Array<{ id: string; data: any }>
   projects: Array<{ id: string; data: any }>
   plans: Array<{ id: string; data: any }>
-  userName: string
+  userId: string
   isIlluminateEnabled: boolean
   geminiApiKey?: string
+
+  /**
+   * Called when the user accepts an insight (optional).
+   * For example, you might track analytics or do further logic.
+   */
   onAcceptInsight?: (insightId: string, action: string) => void
-  onUpdateData?: (type: string, itemId: string, updates: any) => void
+
+  /**
+   * Called if the user wants to update the existing item in Firestore.
+   * E.g., if an insight says "Set priority to high," you can update the doc.
+   */
+  onUpdateData?: (collectionName: string, itemId: string, updates: any) => void
 }
 
 interface Insight {
@@ -70,13 +75,13 @@ export function TaskAnalytics({
   goals,
   projects,
   plans,
-  userName,
+  userId,
   isIlluminateEnabled,
   geminiApiKey,
   onAcceptInsight,
   onUpdateData,
 }: TaskAnalyticsProps) {
-  // Use the provided geminiApiKey prop if available, otherwise fall back to the default
+  // Fallback to the default Gemini key if none provided
   const effectiveGeminiApiKey = geminiApiKey || defaultGeminiApiKey
 
   const [insights, setInsights] = useState<Insight[]>([])
@@ -84,11 +89,11 @@ export function TaskAnalytics({
   const [activeTab, setActiveTab] = useState<"all" | "priority" | "deadline" | "suggestion" | "achievement">("all")
   const [savedInsights, setSavedInsights] = useState<Insight[]>([])
 
-  // Cache for last analyzed data to prevent unnecessary API calls
+  // Cache for last-analyzed data to avoid repeated AI calls
   const lastAnalyzedDataRef = useRef<string>("")
   const analysisTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Define color classes based on theme
+  // Classes based on theme
   const headingClass = isIlluminateEnabled ? "text-gray-900" : "text-white"
   const cardClass = isIlluminateEnabled ? "bg-gray-100 text-gray-900" : "bg-gray-800 text-gray-300"
 
@@ -106,17 +111,16 @@ export function TaskAnalytics({
     achievement: <Award className="w-4 h-4" />,
   }
 
-  // Debounced function to generate insights
+  // Debounced function to generate insights after data changes
   const debouncedGenerateInsights = useCallback(() => {
     if (analysisTimeoutRef.current) {
       clearTimeout(analysisTimeoutRef.current)
     }
     analysisTimeoutRef.current = setTimeout(() => {
       generateInsights()
-    }, 2000) // 2 second delay
+    }, 2000)
   }, [tasks, goals, projects, plans])
 
-  // Effect to monitor data changes and trigger analysis
   useEffect(() => {
     const currentData = JSON.stringify({ tasks, goals, projects, plans })
     if (currentData !== lastAnalyzedDataRef.current) {
@@ -130,16 +134,15 @@ export function TaskAnalytics({
     }
   }, [tasks, goals, projects, plans, debouncedGenerateInsights])
 
+  // 1) Generate insights from AI or fallback
   const generateInsights = async () => {
     if (!effectiveGeminiApiKey) {
       console.error("Gemini API key is not provided")
       return
     }
-
     setIsLoading(true)
 
     try {
-      // Format items for analysis with improved type handling
       const formatItems = (items: Array<{ id: string; data: any }>, type: string) => {
         return items.map((item) => ({
           id: item.id,
@@ -166,7 +169,7 @@ export function TaskAnalytics({
       const formattedPlans = formatItems(plans, "Plan")
       const allItems = [...formattedTasks, ...formattedGoals, ...formattedProjects, ...formattedPlans]
 
-      // Build the prompt for Gemini
+      // Build prompt for Gemini
       const prompt = `
 [INST] <<SYS>>
 You are TaskMaster, an advanced AI productivity assistant. Analyze the following items and generate actionable insights:
@@ -195,7 +198,6 @@ Current date: ${new Date().toISOString().split("T")[0]}
 <</SYS>>[/INST]
 `
 
-      // Call Gemini API
       const geminiOptions = {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -204,6 +206,7 @@ Current date: ${new Date().toISOString().split("T")[0]}
         }),
       }
 
+      // Stream the response
       const resultResponse = await streamResponse(
         `${geminiEndpoint}?key=${effectiveGeminiApiKey}`,
         geminiOptions,
@@ -237,15 +240,18 @@ Current date: ${new Date().toISOString().split("T")[0]}
     }
   }
 
-  // Fallback insights if AI generation fails
+  // 2) Fallback if AI fails
   const generateFallbackInsights = (items: any[]) => {
     const fallbackInsights: Insight[] = []
+
+    // Example suggestion
     fallbackInsights.push({
       id: Math.random().toString(36).substring(2, 11),
       text: "Consider reviewing and updating the priorities of your tasks to stay organized.",
       type: "suggestion",
       createdAt: new Date(),
     })
+
     // Check for upcoming deadlines
     const now = new Date()
     const upcomingDeadlines = items.filter(
@@ -265,6 +271,7 @@ Current date: ${new Date().toISOString().split("T")[0]}
         createdAt: new Date(),
       })
     })
+
     // Recognize recently completed items
     const recentlyCompleted = items.filter(
       (item) => item.completed && item.createdAt > new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000),
@@ -272,84 +279,107 @@ Current date: ${new Date().toISOString().split("T")[0]}
     if (recentlyCompleted.length > 0) {
       fallbackInsights.push({
         id: Math.random().toString(36).substring(2, 11),
-        text: `Great job! You've completed ${recentlyCompleted.length} item${recentlyCompleted.length > 1 ? "s" : ""} recently.`,
+        text: `Great job! You've completed ${recentlyCompleted.length} item${
+          recentlyCompleted.length > 1 ? "s" : ""
+        } recently.`,
         type: "achievement",
         createdAt: new Date(),
       })
     }
+
     setInsights(fallbackInsights)
   }
 
+  /**
+   * Save an accepted insight to Firestore (in a "acceptedInsights" collection).
+   * This is purely optional but helps keep track of accepted insights.
+   */
+  async function storeAcceptedInsight(userId: string, insight: Insight) {
+    try {
+      await addDoc(collection(db, "acceptedInsights"), {
+        userId,
+        ...insight,
+        acceptedAt: serverTimestamp(),
+      })
+    } catch (error) {
+      console.error("Error saving accepted insight:", error)
+    }
+  }
+
+  // 3) Handle acceptance of an insight
   const handleAcceptInsight = async (insight: Insight) => {
+    // Mark the insight as accepted locally
     setInsights((prev) => prev.map((i) => (i.id === insight.id ? { ...i, accepted: true, declined: false } : i)))
     setSavedInsights((prev) => [...prev, { ...insight, accepted: true }])
+
+    // If there's an action, handle it
     if (insight.action) {
-      let updates = {}
-      const itemType = insight.relatedItemType || ""
+      let updates: Record<string, any> = {}
+      const collectionName = insight.relatedItemType || ""
+
       switch (insight.type) {
         case "priority":
+          // Example: set the priority to "high"
           updates = { priority: "high" }
           break
+
         case "deadline":
+          // If it's "reschedule", we set the dueDate 3 days later
           if (insight.action === "reschedule") {
             const newDate = new Date()
             newDate.setDate(newDate.getDate() + 3)
             updates = { dueDate: newDate }
           }
           break
+
         case "suggestion":
+          // Example: if it says "create_reminder", we add a reminder
           if (insight.action === "create_reminder") {
             updates = { hasReminder: true, reminderDate: new Date() }
           }
+          // Example: if it says "create_subtasks", we create a brand new task
+          if (insight.action === "create_subtasks") {
+            // You can parse the text to figure out a better name, or do multiple tasks
+            const newTaskTitle = `Follow-up on: ${insight.text}`
+            try {
+              await createUserTask(userId, {
+                task: newTaskTitle,
+                dueDate: new Date(), // set some default due date
+              })
+            } catch (err) {
+              console.error("Error creating subtask:", err)
+            }
+          }
           break
+
         case "achievement":
-          if (insight.action.includes("complete")) {
+          // If the user wants to "complete" something
+          if (insight.action?.includes("complete")) {
             updates = { completed: true }
           }
           break
       }
+
+      // If there's a related item to update, call onUpdateData
       if (onUpdateData && insight.relatedItemId && Object.keys(updates).length > 0) {
-        onUpdateData(itemType, insight.relatedItemId, updates)
-      }
-      if (onAcceptInsight) {
-        onAcceptInsight(insight.id, insight.action)
-      }
-      const followUpInsight = generateFollowUpInsight(insight)
-      if (followUpInsight) {
-        setInsights((prev) => [...prev, followUpInsight])
+        onUpdateData(collectionName, insight.relatedItemId, updates)
       }
     }
-  }
 
-  const generateFollowUpInsight = (insight: Insight): Insight | null => {
-    switch (insight.type) {
-      case "priority":
-        return {
-          id: Math.random().toString(36).substring(2, 11),
-          text: `Would you like to break down "${insight.text.split('"')[1]}" into smaller tasks?`,
-          type: "suggestion",
-          relatedItemId: insight.relatedItemId,
-          relatedItemType: insight.relatedItemType,
-          action: "create_subtasks",
-          createdAt: new Date(),
-        }
-      case "deadline":
-        return {
-          id: Math.random().toString(36).substring(2, 11),
-          text: `Would you like to set up regular progress check-ins for this item?`,
-          type: "suggestion",
-          relatedItemId: insight.relatedItemId,
-          relatedItemType: insight.relatedItemType,
-          action: "setup_checkins",
-          createdAt: new Date(),
-        }
-      default:
-        return null
+    // Optionally call the parent's callback
+    if (onAcceptInsight) {
+      onAcceptInsight(insight.id, insight.action || "")
     }
+
+    // Save the accepted insight to Firestore (optional)
+    await storeAcceptedInsight(userId, insight)
   }
 
+  // 4) Handle declines
   const handleDeclineInsight = (insight: Insight) => {
     setInsights((prev) => prev.map((i) => (i.id === insight.id ? { ...i, accepted: false, declined: true } : i)))
+
+    // Optionally present an alternative
     if (insight.type === "priority" || insight.type === "deadline") {
       const alternativeInsight: Insight = {
         id: Math.random().toString(36).substring(2, 11),
@@ -364,6 +394,7 @@ Current date: ${new Date().toISOString().split("T")[0]}
     }
   }
 
+  // 5) Save an insight locally (e.g., for quick reference)
   const handleSaveInsight = (insight: Insight) => {
     setSavedInsights((prev) => [...prev, insight])
     setInsights((prev) => prev.map((i) => (i.id === insight.id ? { ...i, saved: true } : i)))
@@ -392,6 +423,7 @@ Current date: ${new Date().toISOString().split("T")[0]}
         </button>
       </div>
 
+      {/* Tabs */}
       <div className="flex flex-wrap gap-2 mb-4 overflow-x-auto pb-1">
         {["all", "priority", "deadline", "suggestion", "achievement"].map((tab) => (
           <button
@@ -400,8 +432,8 @@ Current date: ${new Date().toISOString().split("T")[0]}
               activeTab === tab
                 ? "bg-gradient-to-r from-purple-500 to-indigo-500 text-white shadow-md"
                 : isIlluminateEnabled
-                  ? "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                  : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                ? "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                : "bg-gray-700 text-gray-300 hover:bg-gray-600"
             }`}
             onClick={() => setActiveTab(tab as any)}
           >
@@ -430,6 +462,7 @@ Current date: ${new Date().toISOString().split("T")[0]}
         ))}
       </div>
 
+      {/* Insights List */}
       <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
         {isLoading ? (
           Array.from({ length: 3 }).map((_, index) => (
@@ -438,19 +471,20 @@ Current date: ${new Date().toISOString().split("T")[0]}
               className={`animate-pulse p-3 rounded-lg ${isIlluminateEnabled ? "bg-gray-200" : "bg-gray-700"}`}
             >
               <div className="flex items-center gap-2 mb-2">
-                <div className={`w-4 h-4 rounded-full ${isIlluminateEnabled ? "bg-gray-300" : "bg-gray-600"}`}></div>
-                <div className={`h-4 w-24 rounded ${isIlluminateEnabled ? "bg-gray-300" : "bg-gray-600"}`}></div>
+                <div className={`w-4 h-4 rounded-full ${isIlluminateEnabled ? "bg-gray-300" : "bg-gray-600"}`} />
+                <div className={`h-4 w-24 rounded ${isIlluminateEnabled ? "bg-gray-300" : "bg-gray-600"}`} />
               </div>
-              <div className={`h-4 w-full rounded ${isIlluminateEnabled ? "bg-gray-300" : "bg-gray-600"} mb-2`}></div>
-              <div className={`h-4 w-3/4 rounded ${isIlluminateEnabled ? "bg-gray-300" : "bg-gray-600"}`}></div>
+              <div className={`h-4 w-full rounded ${isIlluminateEnabled ? "bg-gray-300" : "bg-gray-600"} mb-2`} />
+              <div className={`h-4 w-3/4 rounded ${isIlluminateEnabled ? "bg-gray-300" : "bg-gray-600"}`} />
             </div>
           ))
         ) : filteredInsights.length > 0 ? (
           filteredInsights.map((insight) => (
             <div
               key={insight.id}
-              className={`p-3 rounded-lg ${isIlluminateEnabled ? "bg-gray-200/80" : "bg-gray-700/50"} 
-                transition-all duration-300 hover:shadow-md
+              className={`p-3 rounded-lg ${
+                isIlluminateEnabled ? "bg-gray-200/80" : "bg-gray-700/50"
+              } transition-all duration-300 hover:shadow-md
                 ${insight.accepted ? "border-l-4 border-green-500" : ""}
                 ${insight.declined ? "opacity-50" : ""}
               `}
@@ -516,7 +550,9 @@ Current date: ${new Date().toISOString().split("T")[0]}
 
                 <button
                   onClick={() => handleSaveInsight(insight)}
-                  className={`p-1 rounded-full hover:bg-blue-500/20 transition-colors ${insight.saved ? "text-blue-500" : ""}`}
+                  className={`p-1 rounded-full hover:bg-blue-500/20 transition-colors ${
+                    insight.saved ? "text-blue-500" : ""
+                  }`}
                   title="Save insight"
                   disabled={insight.saved}
                 >
@@ -535,6 +571,7 @@ Current date: ${new Date().toISOString().split("T")[0]}
         )}
       </div>
 
+      {/* Saved Insights Section */}
       {savedInsights.length > 0 && (
         <div className="mt-6">
           <h3 className={`text-sm font-medium mb-2 ${headingClass} flex items-center`}>
@@ -542,12 +579,16 @@ Current date: ${new Date().toISOString().split("T")[0]}
             Saved Insights
           </h3>
           <div
-            className={`p-2 rounded-lg ${isIlluminateEnabled ? "bg-gray-200/50" : "bg-gray-700/30"} max-h-[150px] overflow-y-auto`}
+            className={`p-2 rounded-lg ${
+              isIlluminateEnabled ? "bg-gray-200/50" : "bg-gray-700/30"
+            } max-h-[150px] overflow-y-auto`}
           >
             {savedInsights.map((insight) => (
               <div
                 key={insight.id}
-                className={`p-2 mb-1 rounded text-xs flex items-center justify-between ${isIlluminateEnabled ? "bg-white/50" : "bg-gray-800/50"}`}
+                className={`p-2 mb-1 rounded text-xs flex items-center justify-between ${
+                  isIlluminateEnabled ? "bg-white/50" : "bg-gray-800/50"
+                }`}
               >
                 <div className="flex items-center gap-1 overflow-hidden">
                   <span
@@ -555,12 +596,12 @@ Current date: ${new Date().toISOString().split("T")[0]}
                       insight.type === "priority"
                         ? "bg-red-500"
                         : insight.type === "deadline"
-                          ? "bg-orange-500"
-                          : insight.type === "suggestion"
-                            ? "bg-blue-500"
-                            : "bg-green-500"
+                        ? "bg-orange-500"
+                        : insight.type === "suggestion"
+                        ? "bg-blue-500"
+                        : "bg-green-500"
                     }`}
-                  ></span>
+                  />
                   <p className="truncate">{insight.text}</p>
                 </div>
                 <button

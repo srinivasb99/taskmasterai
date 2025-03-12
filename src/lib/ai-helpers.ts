@@ -23,6 +23,9 @@ export const streamResponse = async (
   timeout = 30000,
 ) => {
   const response = await fetchWithTimeout(url, options, timeout)
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`)
+  }
   if (!response.body) {
     const text = await response.text()
     onStreamUpdate(text)
@@ -66,6 +69,8 @@ export const extractCandidateText = (text: string): string => {
 
 // Function to analyze task priority
 export const analyzeTaskPriority = (task: any): "high" | "medium" | "low" => {
+  if (!task?.data) return "medium"
+
   // Default to medium priority
   let priority: "high" | "medium" | "low" = "medium"
 
@@ -105,6 +110,8 @@ export const analyzeTaskPriority = (task: any): "high" | "medium" | "low" => {
 
 // Function to get task status
 export const getTaskStatus = (task: any): "completed" | "overdue" | "upcoming" | "in-progress" => {
+  if (!task?.data) return "in-progress"
+
   if (task.data.completed) {
     return "completed"
   }

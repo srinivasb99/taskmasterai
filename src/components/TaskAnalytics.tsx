@@ -223,21 +223,32 @@ Please do not add additional commentary outside the JSON. Return an array of the
         () => {},
         45000
       )
-      const rawText = extractCandidateText(resultResponse) || ""
 
-      // Attempt to find an array of insights
+      // If the server responded 429, you might not get a valid JSON
+      // (Your streamResponse function might or might not expose status code.)
+      // For demonstration, we do:
+      if (!resultResponse) {
+        console.warn("No response from AI or 429 error. Try again later.")
+        setIsLoading(false)
+        return
+      }
+
+      // Extract the text from the streaming
+      let rawText = extractCandidateText(resultResponse) || ""
+
+      // 1) Sanitize the AI's raw text to remove ASCII control chars
+      rawText = rawText.replace(/[\u0000-\u001F]+/g, "")
+
+      // 2) Then find the JSON array
       const jsonMatch = rawText.match(/\[\s*\{.*\}\s*\]/s)
       if (jsonMatch) {
         try {
           const insightsData = JSON.parse(jsonMatch[0]) as any[]
 
-          // For each insight, we can parse out the triple-backtick JSON block
+          // For each insight, parse out the triple-backtick JSON block if present
           const processedInsights = insightsData.map((insightObj) => {
-            // We'll store the entire triple-backtick block in `actionJson` if present
             let storedJson = ""
             if (typeof insightObj.actionJson === "string") {
-              // We expect something like ```json { ... } ```
-              // Let's attempt to extract only the JSON portion
               const blockMatch = insightObj.actionJson.match(/```json([\s\S]*?)```/i)
               if (blockMatch) {
                 storedJson = blockMatch[1].trim()
@@ -260,7 +271,7 @@ Please do not add additional commentary outside the JSON. Return an array of the
         console.error("No JSON array found in response")
         generateFallbackInsights(allItems)
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error generating insights:", error)
       generateFallbackInsights([])
     } finally {
@@ -318,10 +329,15 @@ Please do not add additional commentary outside the JSON. Return an array of the
   }
 
   // 3) Save accepted insight to Firestore
-  async function storeAcceptedInsight(userId: string, insight: Insight) {
+  async function storeAcceptedInsight(uid: string, insight: Insight) {
     try {
+      // Check userId is not undefined
+      if (!uid) {
+        console.error("No userId found, skipping accepted insight save")
+        return
+      }
       await addDoc(collection(db, "acceptedInsights"), {
-        userId,
+        userId: uid, // must be a valid string
         ...insight,
         acceptedAt: serverTimestamp(),
       })

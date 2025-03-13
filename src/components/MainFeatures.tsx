@@ -1137,15 +1137,6 @@ function CommunitySection() {
                 </motion.span>
               </div>
               
-              <motion.button
-                onClick={() => setShowUploadModal(true)}
-                className="group inline-flex items-center px-6 py-3 bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-full text-lg font-semibold transition-all transform hover:scale-105 hover:shadow-lg hover:shadow-pink-500/25"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <Upload className="w-5 h-5 mr-2" />
-                <span>Upload File</span>
-              </motion.button>
               
               <motion.a 
                 href="/community" 

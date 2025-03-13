@@ -215,7 +215,13 @@ User Context:
       const formattedPlans = formatItems(plans, "Plan")
       const allItems = [...formattedTasks, ...formattedGoals, ...formattedProjects, ...formattedPlans]
 
-      const prompt = `
+// Generate a formatted text block for the user's items
+const itemsText = allItems.map(item => {
+  return `${item.type}: ${item.title} [Completed: ${item.completed ? 'Yes' : 'No'}]${item.dueDate ? ` (Due: ${new Date(item.dueDate).toLocaleDateString()})` : ''}`
+}).join('\n')
+
+// Modify your prompt to include the itemsText:
+const prompt = `
 [INST] <<SYS>>
 Current Date: ${currentDateTime.date}
 Current Time: ${currentDateTime.time}
@@ -223,9 +229,14 @@ Current Time: ${currentDateTime.time}
 User's Name: ${currentUser?.displayName || currentUser?.email || "Unknown"}
 ${contextSection}
 
-You are TaskMaster, an advanced AI productivity assistant. Analyze the following items and generate 5-7 actionable insights.
+User Items:
+${itemsText}
 
-Allowed actions are only: "createTask", "createGoal", "createPlan", "createProject".
+You are TaskMaster, an advanced AI productivity assistant. Based on the user's current tasks, goals, projects, and plans, generate 5-7 actionable insights that will improve their productivity.
+
+You must decide the best course of action based on the user's context and explicitly generate the necessary action(s). Do not suggest actions to the user—execute them directly.
+
+Allowed actions: "createTask", "createGoal", "createPlan", "createProject".
 
 Each insight must be a JSON object with exactly these fields:
 {
@@ -233,7 +244,6 @@ Each insight must be a JSON object with exactly these fields:
   "type": "priority | deadline | suggestion | achievement",
   "relatedItemId": "The ID of the related item if applicable (or null)",
   "relatedItemType": "task | goal | project | plan (or null)",
-  "action": "A short description of what will be done",
   "actionJson": "A triple-backtick JSON block with no extra text, for example:
   \\\`\`\`json
   {
@@ -246,6 +256,8 @@ Each insight must be a JSON object with exactly these fields:
   \\\`\`\`
   If no action is needed, omit this field."
 }
+
+Ensure that your decisions are based on the user's existing workload, priorities, and deadlines.
 
 Return an array of these JSON objects and nothing else.
 <</SYS>>[/INST]

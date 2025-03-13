@@ -538,7 +538,7 @@ Return an array of these JSON objects and nothing else.
           filteredInsights.map((insight) => (
             <div
               key={insight.id}
-              className={`p-3 rounded-lg border border-gray-200/20 transition-all duration-300 hover:shadow-md
+              className={`p-3 rounded-lg ${isIlluminateEnabled ? "bg-gray-200/80" : "bg-gray-700/50"} transition-all duration-300 hover:shadow-md
                 ${insight.accepted ? "border-l-4 border-green-500" : ""}
                 ${insight.declined ? "opacity-50" : ""}
               `}
@@ -622,8 +622,10 @@ Return an array of these JSON objects and nothing else.
       {/* Accepted Insights Section - Updated with proper theme support */}
       {acceptedInsights.length > 0 && (
         <div
-          className={`mt-8 p-4 rounded-lg border border-gray-200/20 ${
-            isIlluminateEnabled ? "text-gray-900" : "text-gray-300"
+          className={`mt-8 p-4 rounded-lg ${
+            isIlluminateEnabled
+              ? "bg-gray-50 border border-gray-200 text-gray-900"
+              : "bg-gray-800 border border-gray-700 text-gray-300"
           }`}
         >
           <h3 className={`text-lg font-semibold mb-3 ${isIlluminateEnabled ? "text-gray-900" : "text-white"}`}>
@@ -633,8 +635,10 @@ Return an array of these JSON objects and nothing else.
             {acceptedInsights.map((insight) => (
               <div
                 key={insight.id}
-                className={`p-3 rounded-lg shadow-sm flex justify-between border border-gray-200/20 ${
-                  isIlluminateEnabled ? "text-gray-800" : "text-gray-200"
+                className={`p-3 rounded-lg shadow-sm flex justify-between ${
+                  isIlluminateEnabled
+                    ? "bg-white text-gray-800 border border-gray-100"
+                    : "bg-gray-700 text-gray-200 border border-gray-600"
                 }`}
               >
                 <div className="flex-1">
@@ -678,4 +682,3 @@ Return an array of these JSON objects and nothing else.
     </div>
   )
 }
-

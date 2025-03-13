@@ -1,3 +1,5 @@
+"use client"
+
 import { useState, useEffect, useCallback, useRef } from "react"
 import {
   Lightbulb,
@@ -26,7 +28,7 @@ import { createUserTask, createUserGoal, createUserPlan, createUserProject } fro
 
 // Firestore functions for saving accepted insights
 import { db } from "../lib/firebase"
-import { collection, addDoc, serverTimestamp } from "firebase/firestore"
+import { collection, addDoc, serverTimestamp, query, where, getDocs, orderBy } from "firebase/firestore"
 
 // Firebase Auth imports
 import { auth } from "../lib/firebase"
@@ -101,6 +103,42 @@ export function TaskAnalytics({
         setUserContext(context)
       })
       return () => unsubscribeContext()
+    }
+  }, [currentUser])
+
+  // After the userContext useEffect, add this new useEffect to load accepted insights
+  useEffect(() => {
+    if (currentUser?.uid) {
+      // Fetch accepted insights from Firestore
+      const fetchAcceptedInsights = async () => {
+        try {
+          const acceptedInsightsQuery = query(
+            collection(db, "acceptedInsights"),
+            where("userId", "==", currentUser.uid),
+            orderBy("acceptedAt", "desc"),
+          )
+          const snapshot = await getDocs(acceptedInsightsQuery)
+          const insightsData = snapshot.docs.map((doc) => {
+            const data = doc.data()
+            return {
+              id: doc.id,
+              text: data.text,
+              type: data.type,
+              relatedItemId: data.relatedItemId,
+              relatedItemType: data.relatedItemType,
+              action: data.action,
+              actionJson: data.actionJson,
+              accepted: true,
+              createdAt: data.createdAt?.toDate() || new Date(),
+            } as Insight
+          })
+          setAcceptedInsights(insightsData)
+        } catch (error) {
+          console.error("Error fetching accepted insights:", error)
+        }
+      }
+
+      fetchAcceptedInsights()
     }
   }, [currentUser])
 
@@ -538,7 +576,7 @@ Return an array of these JSON objects and nothing else.
           filteredInsights.map((insight) => (
             <div
               key={insight.id}
-              className={`p-3 rounded-lg ${isIlluminateEnabled ? "bg-gray-200/80" : "bg-gray-700/50"} transition-all duration-300 hover:shadow-md
+              className={`p-3 rounded-lg border border-gray-200/20 transition-all duration-300 hover:shadow-md
                 ${insight.accepted ? "border-l-4 border-green-500" : ""}
                 ${insight.declined ? "opacity-50" : ""}
               `}
@@ -622,10 +660,8 @@ Return an array of these JSON objects and nothing else.
       {/* Accepted Insights Section - Updated with proper theme support */}
       {acceptedInsights.length > 0 && (
         <div
-          className={`mt-8 p-4 rounded-lg ${
-            isIlluminateEnabled
-              ? "bg-gray-50 border border-gray-200 text-gray-900"
-              : "bg-gray-800 border border-gray-700 text-gray-300"
+          className={`mt-8 p-4 rounded-lg border border-gray-200/20 ${
+            isIlluminateEnabled ? "text-gray-900" : "text-gray-300"
           }`}
         >
           <h3 className={`text-lg font-semibold mb-3 ${isIlluminateEnabled ? "text-gray-900" : "text-white"}`}>
@@ -635,10 +671,8 @@ Return an array of these JSON objects and nothing else.
             {acceptedInsights.map((insight) => (
               <div
                 key={insight.id}
-                className={`p-3 rounded-lg shadow-sm flex justify-between ${
-                  isIlluminateEnabled
-                    ? "bg-white text-gray-800 border border-gray-100"
-                    : "bg-gray-700 text-gray-200 border border-gray-600"
+                className={`p-3 rounded-lg shadow-sm flex justify-between border border-gray-200/20 ${
+                  isIlluminateEnabled ? "text-gray-800" : "text-gray-200"
                 }`}
               >
                 <div className="flex-1">
@@ -682,3 +716,4 @@ Return an array of these JSON objects and nothing else.
     </div>
   )
 }
+

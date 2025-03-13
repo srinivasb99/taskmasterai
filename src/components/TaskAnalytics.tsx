@@ -110,7 +110,7 @@ export function TaskAnalytics({
 
   // Theme-based classes.
   const headingClass = isIlluminateEnabled ? "text-gray-900" : "text-white"
-  const cardClass = isIlluminateEnabled ? "bg-gray-100 text-gray-900" : "bg-gray-800 text-gray-300"
+  const cardClass = isIlluminateEnabled ? "text-gray-900" : "text-gray-300"
 
   // Colors and icons per insight type.
   const typeColors = {
@@ -463,6 +463,7 @@ Return an array of these JSON objects and nothing else.
   const filteredInsights = activeTab === "all" ? insights : insights.filter((insight) => insight.type === activeTab)
 
   return (
+    <div className={`${cardClass} rounded-xl p-4 sm:p-6 shadow-lg animate-fadeIn`}>
       <div className="flex items-center justify-between mb-4">
         <h2 className={`text-lg sm:text-xl font-semibold ${headingClass} flex items-center`}>
           <Zap className="w-5 h-5 mr-2 text-yellow-400 animate-pulse" />

@@ -1,3 +1,5 @@
+"use client"
+
 import { useState, useEffect, useCallback, useRef } from "react"
 import {
   Lightbulb,
@@ -22,12 +24,7 @@ import { geminiEndpoint, streamResponse, extractCandidateText } from "../lib/ai-
 import { geminiApiKey as defaultGeminiApiKey } from "../lib/dashboard-firebase"
 
 // AI-actions to create new items in Firestore
-import {
-  createUserTask,
-  createUserGoal,
-  createUserPlan,
-  createUserProject,
-} from "../lib/ai-actions-firebase"
+import { createUserTask, createUserGoal, createUserPlan, createUserProject } from "../lib/ai-actions-firebase"
 
 // Firestore functions for saving accepted insights
 import { db } from "../lib/firebase"
@@ -35,10 +32,10 @@ import { collection, addDoc, serverTimestamp } from "firebase/firestore"
 
 // Firebase Auth imports
 import { auth } from "../lib/firebase"
-import { User, onAuthStateChanged } from "firebase/auth"
+import { type User, onAuthStateChanged } from "firebase/auth"
 
 // Import user context functions/types from ai-context-firebase
-import { onUserContextChange, UserContext } from "../lib/ai-context-firebase"
+import { onUserContextChange, type UserContext } from "../lib/ai-context-firebase"
 
 interface TaskAnalyticsProps {
   tasks: Array<{ id: string; data: any }>
@@ -246,7 +243,7 @@ Return an array of these JSON objects and nothing else.
         `${geminiEndpoint}?key=${effectiveGeminiApiKey}`,
         geminiOptions,
         () => {},
-        45000
+        45000,
       )
 
       if (!resultResponse) {
@@ -309,7 +306,7 @@ Return an array of these JSON objects and nothing else.
         item.dueDate &&
         !item.completed &&
         item.dueDate > now &&
-        item.dueDate < new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000)
+        item.dueDate < new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000),
     )
     upcomingDeadlines.forEach((item) => {
       fallbackInsights.push({
@@ -322,7 +319,7 @@ Return an array of these JSON objects and nothing else.
       })
     })
     const recentlyCompleted = items.filter(
-      (item) => item.completed && item.createdAt > new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+      (item) => item.completed && item.createdAt > new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000),
     )
     if (recentlyCompleted.length > 0) {
       fallbackInsights.push({
@@ -355,9 +352,7 @@ Return an array of these JSON objects and nothing else.
 
   // 4) Handle Accept: mark as accepted, process action, and store.
   const handleAcceptInsight = async (insight: Insight) => {
-    setInsights((prev) =>
-      prev.map((i) => (i.id === insight.id ? { ...i, accepted: true, declined: false } : i))
-    )
+    setInsights((prev) => prev.map((i) => (i.id === insight.id ? { ...i, accepted: true, declined: false } : i)))
     setAcceptedInsights((prev) => [...prev, { ...insight, accepted: true }])
     const effectiveUserId = currentUser?.uid
     if (!effectiveUserId) {
@@ -407,7 +402,7 @@ Return an array of these JSON objects and nothing else.
     // Process any short action (like "reschedule") via onUpdateData.
     if (insight.action) {
       const collectionName = insight.relatedItemType || ""
-      let updates: Record<string, any> = {}
+      const updates: Record<string, any> = {}
       if (insight.action === "reschedule") {
         const newDate = new Date()
         newDate.setDate(newDate.getDate() + 1)
@@ -425,9 +420,7 @@ Return an array of these JSON objects and nothing else.
 
   // 5) Handle Decline.
   const handleDeclineInsight = (insight: Insight) => {
-    setInsights((prev) =>
-      prev.map((i) => (i.id === insight.id ? { ...i, accepted: false, declined: true } : i))
-    )
+    setInsights((prev) => prev.map((i) => (i.id === insight.id ? { ...i, accepted: false, declined: true } : i)))
     if (insight.type === "priority" || insight.type === "deadline") {
       const alternativeInsight: Insight = {
         id: Math.random().toString(36).substring(2, 11),
@@ -445,9 +438,7 @@ Return an array of these JSON objects and nothing else.
   // 6) Handle Save (if needed)
   const handleSaveInsight = (insight: Insight) => {
     setAcceptedInsights((prev) => [...prev, insight])
-    setInsights((prev) =>
-      prev.map((i) => (i.id === insight.id ? { ...i, saved: true } : i))
-    )
+    setInsights((prev) => prev.map((i) => (i.id === insight.id ? { ...i, saved: true } : i)))
   }
 
   const handleDeleteSavedInsight = (insightId: string) => {
@@ -483,8 +474,8 @@ Return an array of these JSON objects and nothing else.
               activeTab === tab
                 ? "bg-gradient-to-r from-purple-500 to-indigo-500 text-white shadow-md"
                 : isIlluminateEnabled
-                ? "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                  ? "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                  : "bg-gray-700 text-gray-300 hover:bg-gray-600"
             }`}
             onClick={() => setActiveTab(tab as any)}
           >
@@ -539,7 +530,9 @@ Return an array of these JSON objects and nothing else.
               `}
             >
               <div className="flex items-center gap-2 mb-1.5">
-                <span className={`px-2 py-0.5 rounded-full text-xs font-medium flex items-center gap-1 ${typeColors[insight.type]}`}>
+                <span
+                  className={`px-2 py-0.5 rounded-full text-xs font-medium flex items-center gap-1 ${typeColors[insight.type]}`}
+                >
                   {typeIcons[insight.type]}
                   {insight.type.charAt(0).toUpperCase() + insight.type.slice(1)}
                 </span>
@@ -551,7 +544,9 @@ Return an array of these JSON objects and nothing else.
               </div>
               <p className="text-sm mb-2">{insight.text}</p>
               {insight.action && (
-                <div className={`text-xs ${isIlluminateEnabled ? "text-blue-700" : "text-blue-400"} mb-2 flex items-center`}>
+                <div
+                  className={`text-xs ${isIlluminateEnabled ? "text-blue-700" : "text-blue-400"} mb-2 flex items-center`}
+                >
                   <ArrowUpRight className="w-3 h-3 mr-1" />
                   Suggested action: {insight.action}
                 </div>
@@ -560,10 +555,18 @@ Return an array of these JSON objects and nothing else.
                 <div className="flex gap-1">
                   {!insight.accepted && !insight.declined && (
                     <>
-                      <button onClick={() => handleAcceptInsight(insight)} className="p-1 rounded-full hover:bg-green-500/20 transition-colors" title="Accept insight">
+                      <button
+                        onClick={() => handleAcceptInsight(insight)}
+                        className="p-1 rounded-full hover:bg-green-500/20 transition-colors"
+                        title="Accept insight"
+                      >
                         <ThumbsUp className="w-4 h-4 text-green-500" />
                       </button>
-                      <button onClick={() => handleDeclineInsight(insight)} className="p-1 rounded-full hover:bg-red-500/20 transition-colors" title="Decline insight">
+                      <button
+                        onClick={() => handleDeclineInsight(insight)}
+                        className="p-1 rounded-full hover:bg-red-500/20 transition-colors"
+                        title="Decline insight"
+                      >
                         <ThumbsDown className="w-4 h-4 text-red-500" />
                       </button>
                     </>
@@ -581,7 +584,12 @@ Return an array of these JSON objects and nothing else.
                     </span>
                   )}
                 </div>
-                <button onClick={() => handleSaveInsight(insight)} className={`p-1 rounded-full hover:bg-blue-500/20 transition-colors ${insight.saved ? "text-blue-500" : ""}`} title="Save insight" disabled={insight.saved}>
+                <button
+                  onClick={() => handleSaveInsight(insight)}
+                  className={`p-1 rounded-full hover:bg-blue-500/20 transition-colors ${insight.saved ? "text-blue-500" : ""}`}
+                  title="Save insight"
+                  disabled={insight.saved}
+                >
                   <Bookmark className="w-4 h-4" />
                 </button>
               </div>
@@ -597,27 +605,61 @@ Return an array of these JSON objects and nothing else.
         )}
       </div>
 
-      {/* Accepted Insights Section */}
+      {/* Accepted Insights Section - Updated with proper theme support */}
       {acceptedInsights.length > 0 && (
-        <div className={`mt-8 p-4 rounded-lg ${isIlluminateEnabled ? "bg-gray-100 border border-gray-300 text-gray-900" : "bg-gray-800 border border-gray-700 text-gray-300"}`}>
-          <h3 className="text-lg font-semibold mb-2">Accepted Insights</h3>
+        <div
+          className={`mt-8 p-4 rounded-lg ${
+            isIlluminateEnabled
+              ? "bg-gray-50 border border-gray-200 text-gray-900"
+              : "bg-gray-800 border border-gray-700 text-gray-300"
+          }`}
+        >
+          <h3 className={`text-lg font-semibold mb-3 ${isIlluminateEnabled ? "text-gray-900" : "text-white"}`}>
+            Accepted Insights
+          </h3>
           <div className="space-y-3">
             {acceptedInsights.map((insight) => (
-              <div key={insight.id} className="p-3 bg-white shadow rounded-lg">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm font-medium">
-                    {insight.type.charAt(0).toUpperCase() + insight.type.slice(1)}
-                  </span>
-                  <span className="text-xs text-gray-500">
-                    {insight.createdAt.toLocaleDateString()}
-                  </span>
-                </div>
-                <p className="text-sm">{insight.text}</p>
-                {insight.action && (
-                  <div className="text-xs text-blue-700 mt-1">
-                    <strong>Action:</strong> {insight.action}
+              <div
+                key={insight.id}
+                className={`p-3 rounded-lg shadow-sm flex justify-between ${
+                  isIlluminateEnabled
+                    ? "bg-white text-gray-800 border border-gray-100"
+                    : "bg-gray-700 text-gray-200 border border-gray-600"
+                }`}
+              >
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-xs font-medium flex items-center gap-1 ${typeColors[insight.type]}`}
+                    >
+                      {typeIcons[insight.type]}
+                      {insight.type.charAt(0).toUpperCase() + insight.type.slice(1)}
+                    </span>
+                    <span className={`text-xs ${isIlluminateEnabled ? "text-gray-500" : "text-gray-400"}`}>
+                      {insight.createdAt.toLocaleDateString()}
+                    </span>
                   </div>
-                )}
+                  <p className="text-sm">{insight.text}</p>
+                  {insight.action && (
+                    <div
+                      className={`text-xs mt-1 ${
+                        isIlluminateEnabled ? "text-blue-600" : "text-blue-400"
+                      } flex items-center`}
+                    >
+                      <ArrowUpRight className="w-3 h-3 mr-1" />
+                      {insight.action}
+                    </div>
+                  )}
+                </div>
+                <button
+                  onClick={() => handleDeleteSavedInsight(insight.id)}
+                  className={`self-start p-1.5 rounded-full ${
+                    isIlluminateEnabled ? "hover:bg-red-50 text-red-500" : "hover:bg-red-900/20 text-red-400"
+                  }`}
+                  title="Remove insight"
+                >
+                  <Trash className="w-4 h-4" />
+                </button>
               </div>
             ))}
           </div>
@@ -626,3 +668,4 @@ Return an array of these JSON objects and nothing else.
     </div>
   )
 }
+

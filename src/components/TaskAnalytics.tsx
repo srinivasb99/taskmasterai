@@ -1,5 +1,3 @@
-"use client"
-
 import { useState, useEffect, useCallback, useRef } from "react"
 import {
   Lightbulb,
@@ -157,6 +155,18 @@ export function TaskAnalytics({
     time: new Date().toLocaleTimeString(),
   }
 
+  // Format user context for the prompt
+  let contextSection = ""
+  if (userContext) {
+    contextSection = `
+User Context:
+- Work: ${userContext.workDescription}
+- Short-term Focus: ${userContext.shortTermFocus}
+- Long-term Goals: ${userContext.longTermGoals}
+- Additional Context: ${userContext.otherContext}
+`
+  }
+
   // 1) Generate insights using Gemini.
   const generateInsights = async () => {
     if (!effectiveGeminiApiKey) {
@@ -198,10 +208,14 @@ Current Date: ${currentDateTime.date}
 Current Time: ${currentDateTime.time}
 [CONTEXT]
 User's Name: ${currentUser?.displayName || currentUser?.email || "Unknown"}
+${
+  contextSection ||
+  `
 Work Description: ${userContext?.workDescription || ""}
 Short Term Focus: ${userContext?.shortTermFocus || ""}
 Long Term Goals: ${userContext?.longTermGoals || ""}
-Other Context: ${userContext?.otherContext || ""}
+Other Context: ${userContext?.otherContext || ""}`
+}
 
 You are TaskMaster, an advanced AI productivity assistant. Analyze the following items and generate 5-7 actionable insights.
 

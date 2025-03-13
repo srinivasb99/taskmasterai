@@ -2012,13 +2012,19 @@ Keep it brief, actionable, impersonal, and readable.
               
               {showAnalytics ? (
                 <div className="animate-fadeIn">
-                  <TaskAnalytics 
-                    tasks={tasks}
-                    goals={goals}
-                    projects={projects}
-                    plans={plans}
-                    isIlluminateEnabled={isIlluminateEnabled}
-                  />
+<TaskAnalytics
+  tasks={userTasks}
+  goals={userGoals}
+  projects={userProjects}
+  plans={userPlans}
+  isIlluminateEnabled={themeMode === 'illuminate'}
+  onAcceptInsight={(insightId, action) => {
+    console.log(`Insight ${insightId} accepted with action: ${action}`);
+  }}
+  onUpdateData={(collection, itemId, updates) => {
+    updateDocument(collection, itemId, updates);
+  }}
+/>
                 </div>
               ) : (
                 <div className="space-y-4 animate-fadeIn">

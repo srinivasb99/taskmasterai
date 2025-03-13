@@ -2293,198 +2293,230 @@ Keep it brief, actionable, impersonal, and readable.
               })()}
             </div>
 
-    <div className={`${cardClass} rounded-xl p-4 sm:p-6 shadow-md max-w-full overflow-hidden`}>
-      {/* Tabs */}
-      <div className="flex flex-wrap gap-2 mb-4">
-        {["tasks", "goals", "projects", "plans"].map((tab) => (
-          <button
-            key={tab}
-            className={`px-3 py-1.5 rounded-lg text-sm transition-all ${
-              activeTab === tab
-                ? "bg-primary text-white"
-                : isIlluminateEnabled
-                  ? "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                  : "bg-gray-700 text-gray-200 hover:bg-gray-600"
-            }`}
-            onClick={() => handleTabChange(tab)}
-          >
-            {tab === "tasks" && <Clipboard className="w-4 h-4 inline-block mr-1" />}
-            {tab === "goals" && <Target className="w-4 h-4 inline-block mr-1" />}
-            {tab === "projects" && <Layers className="w-4 h-4 inline-block mr-1" />}
-            {tab === "plans" && <Rocket className="w-4 h-4 inline-block mr-1" />}
-            {tab.charAt(0).toUpperCase() + tab.slice(1)}
-          </button>
-        ))}
-      </div>
-
-      {/* Input Form */}
-      <div className="grid grid-cols-1 gap-3 mb-6">
-        <input
-          type="text"
-          className={`w-full ${inputBg} border border-gray-600 rounded-lg p-2 focus:ring-2 focus:ring-primary focus:border-transparent`}
-          placeholder={`Enter new ${activeTab}...`}
-          value={newItemText}
-          onChange={(e) => setNewItemText(e.target.value)}
-        />
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          <input
-            type="date"
-            className={`w-full ${inputBg} border border-gray-600 rounded-lg p-2 focus:ring-2 focus:ring-primary focus:border-transparent`}
-            value={newItemDate}
-            onChange={(e) => setNewItemDate(e.target.value)}
-          />
-          <select
-            className={`w-full ${inputBg} border border-gray-600 rounded-lg p-2 focus:ring-2 focus:ring-primary focus:border-transparent`}
-            value={newItemPriority}
-            onChange={(e) => setNewItemPriority(e.target.value as "high" | "medium" | "low")}
-          >
-            <option value="high">High Priority</option>
-            <option value="medium">Medium Priority</option>
-            <option value="low">Low Priority</option>
-          </select>
-          <button
-            className="w-full sm:w-auto bg-primary text-white px-4 py-2 rounded-lg font-medium hover:bg-primary/90 transition-colors"
-            onClick={handleCreate}
-          >
-            <PlusCircle className="w-4 h-4 inline-block mr-1" />
-            Add
-          </button>
-        </div>
-      </div>
-
-      <ul className="space-y-3">
-        {currentItems.length === 0 ? (
-          <li className="text-gray-400 text-center py-8">No {activeTab} yet...</li>
-        ) : (
-          currentItems.map((item, index) => {
-            const itemId = item.id
-            const textValue = item.data[titleField] || "Untitled"
-            const isCompleted = item.data.completed || false
-            let overdue = false
-            let dueDateStr = ""
-            if (item.data.dueDate) {
-              const dueDateObj = item.data.dueDate.toDate ? item.data.dueDate.toDate() : new Date(item.data.dueDate)
-              dueDateStr = dueDateObj.toLocaleDateString()
-              overdue = dueDateObj < new Date()
-            }
-            const isEditing = editingItemId === itemId
-            const priority = item.data.priority || calculatePriority(item)
-
-            return (
-              <li
-                key={item.id}
-                className={`p-3 rounded-lg ${
-                  isCompleted
-                    ? isIlluminateEnabled
-                      ? "bg-green-100 opacity-75"
-                      : "bg-green-900/30 opacity-75"
-                    : overdue
-                      ? isIlluminateEnabled
-                        ? "bg-red-100"
-                        : "bg-red-900/50"
-                      : isIlluminateEnabled
-                        ? "bg-gray-200"
-                        : "bg-gray-700/50"
+      {/* Tabs & List */}
+      <div
+        className={`${cardClass} rounded-xl p-6 transform hover:scale-[1.02] transition-all duration-300 shadow-lg animate-fadeIn`}
+      >
+        {/* Tabs List - Fixed with proper container */}
+        <div className="flex overflow-x-auto no-scrollbar mb-6">
+          <div className="flex space-x-2 w-full">
+            {["tasks", "goals", "projects", "plans"].map((tab) => (
+              <button
+                key={tab}
+                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-full transition-all duration-300 transform hover:scale-105 text-sm sm:text-base flex items-center whitespace-nowrap ${
+                  activeTab === tab
+                    ? "bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-lg"
+                    : isIlluminateEnabled
+                      ? "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                      : "bg-gray-700 text-gray-200 hover:bg-gray-600"
                 }`}
+                onClick={() => handleTabChange(tab as "tasks" | "goals" | "projects" | "plans")}
               >
-                {!isEditing ? (
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className={`font-medium ${isCompleted ? "line-through text-gray-400" : ""}`}>
-                        {textValue}
-                      </span>
-                      <PriorityBadge priority={priority} isIlluminateEnabled={isIlluminateEnabled} />
-                      {dueDateStr && (
-                        <span
-                          className={`text-xs px-2 py-0.5 rounded-full ${
-                            isIlluminateEnabled ? "bg-gray-300 text-gray-800" : "bg-gray-600"
-                          } flex items-center`}
-                        >
-                          <Calendar className="w-3 h-3 mr-1" />
-                          {dueDateStr}
-                        </span>
-                      )}
-                      {isCompleted && (
-                        <span
-                          className={`text-xs px-2 py-0.5 rounded-full ${
-                            isIlluminateEnabled ? "bg-green-300 text-green-800" : "bg-green-600"
-                          } flex items-center`}
-                        >
-                          <CheckCircle className="w-3 h-3 mr-1" />
-                          Completed
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex gap-1 mt-2 sm:mt-0">
-                      {!isCompleted && (
-                        <button
-                          className="bg-green-500 p-1.5 rounded-md text-white"
-                          onClick={() => handleMarkComplete(itemId)}
-                        >
-                          <CheckCircle className="w-4 h-4" />
-                        </button>
-                      )}
-                      <button
-                        className="bg-blue-500 p-1.5 rounded-md text-white"
-                        onClick={() => handleEditClick(itemId, textValue, item.data.dueDate)}
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button className="bg-red-500 p-1.5 rounded-md text-white" onClick={() => handleDelete(itemId)}>
-                        <Trash className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
+                {tab === "tasks" && <Clipboard className="w-4 h-4 mr-1" />}
+                {tab === "goals" && <Target className="w-4 h-4 mr-1" />}
+                {tab === "projects" && <Layers className="w-4 h-4 mr-1" />}
+                {tab === "plans" && <Rocket className="w-4 h-4 mr-1" />}
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              </button>
+            ))}
+          </div>
+        </div>
+
+              <div className="flex flex-col md:flex-row gap-2 mb-6">
+                <input
+                  type="text"
+                  className={`flex-grow ${inputBg} border border-gray-700 rounded-full p-2 md:p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 shadow-inner`} 
+                  placeholder={`Enter new ${activeTab}...`}
+                  value={newItemText}
+                  onChange={(e) => setNewItemText(e.target.value)}
+                />
+                <div className="flex gap-2">
+                  <input
+                    type="date"
+                    className={`${inputBg} border border-gray-700 rounded-full p-2 md:p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 w-full md:w-auto shadow-inner`} 
+                    value={newItemDate}
+                    onChange={(e) => setNewItemDate(e.target.value)}
+                  />
+                  <select
+                    className={`${inputBg} border border-gray-700 rounded-full p-2 md:p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 shadow-inner`}
+                    value={newItemPriority}
+                    onChange={(e) => setNewItemPriority(e.target.value as 'high' | 'medium' | 'low')}
+                  >
+                    <option value="high">High Priority</option>
+                    <option value="medium">Medium Priority</option>
+                    <option value="low">Low Priority</option>
+                  </select>
+            <button
+              className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white p-3 rounded-full flex items-center justify-center hover:shadow-lg hover:shadow-purple-500/20 transition-all duration-300 transform hover:scale-105 min-w-[48px] min-h-[48px]"
+              onClick={handleCreate}
+            >
+              <PlusCircle className="w-5 h-5" />
+            </button>
+                </div>
+              </div>
+
+              <ul className="space-y-3">
+                {currentItems.length === 0 ? (
+                  <li className="text-gray-400 text-center py-8 animate-pulse">
+                    No {activeTab} yet...
+                  </li>
                 ) : (
-                  <div className="grid gap-3">
-                    <input
-                      className={`w-full ${inputBg} border border-gray-600 rounded-lg p-2 focus:ring-2 focus:ring-primary focus:border-transparent`}
-                      value={editingText}
-                      onChange={(e) => setEditingText(e.target.value)}
-                    />
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <input
-                        type="date"
-                        className={`w-full ${inputBg} border border-gray-600 rounded-lg p-2 focus:ring-2 focus:ring-primary focus:border-transparent`}
-                        value={editingDate}
-                        onChange={(e) => setEditingDate(e.target.value)}
-                      />
-                      <select
-                        className={`w-full ${inputBg} border border-gray-600 rounded-lg p-2 focus:ring-2 focus:ring-primary focus:border-transparent`}
-                        value={editingPriority}
-                        onChange={(e) => setEditingPriority(e.target.value as "high" | "medium" | "low")}
-                      >
-                        <option value="high">High Priority</option>
-                        <option value="medium">Medium Priority</option>
-                        <option value="low">Low Priority</option>
-                      </select>
-                    </div>
-                    <div className="flex gap-2 justify-end">
-                      <button
-                        className="bg-green-500 px-3 py-1.5 rounded-md text-white text-sm"
-                        onClick={() => handleEditSave(itemId)}
-                      >
-                        Save
-                      </button>
-                      <button
-                        className="bg-gray-500 px-3 py-1.5 rounded-md text-white text-sm"
-                        onClick={() => {
-                          setEditingItemId(null)
-                          setEditingText("")
-                          setEditingDate("")
+                  currentItems.map((item, index) => {
+                    const itemId = item.id;
+                    const textValue = item.data[titleField] || 'Untitled';
+                    const isCompleted = item.data.completed || false;
+                    let overdue = false;
+                    let dueDateStr = '';
+                    if (item.data.dueDate) {
+                      const dueDateObj = item.data.dueDate.toDate
+                        ? item.data.dueDate.toDate()
+                        : new Date(item.data.dueDate);
+                      dueDateStr = dueDateObj.toLocaleDateString();
+                      overdue = dueDateObj < new Date();
+                    }
+                    const isEditing = editingItemId === itemId;
+                    const priority = item.data.priority || calculatePriority(item);
+
+                    return (
+                      <li
+                        key={item.id}
+                        className={`p-3 md:p-4 rounded-lg flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-3 
+                          ${
+                            isCompleted
+                              ? isIlluminateEnabled
+                                ? 'bg-green-100 opacity-75'
+                                : 'bg-green-900/30 opacity-75'
+                              : overdue
+                              ? isIlluminateEnabled
+                                ? 'bg-red-100'
+                                : 'bg-red-900/50'
+                              : isIlluminateEnabled
+                              ? 'bg-gray-200'
+                              : 'bg-gray-700/50'
+                          }
+                          backdrop-blur-sm transform transition-all duration-300 hover:scale-[1.02] hover:shadow-lg animate-slideInUp
+                        `}
+                        style={{
+                          animationDelay: `${index * 100}ms`,
                         }}
                       >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
+                        {!isEditing ? (
+                          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                            <span
+                              className={`font-bold text-base sm:text-lg ${
+                                isCompleted
+                                  ? 'line-through text-gray-400'
+                                  : isIlluminateEnabled
+                                  ? 'text-gray-900'
+                                  : ''
+                              }`}
+                            >
+                              {textValue}
+                            </span>
+                            <PriorityBadge priority={priority} isIlluminateEnabled={isIlluminateEnabled} />
+                            {dueDateStr && (
+                              <span
+                                className={`text-xs sm:text-sm font-medium px-2 sm:px-3 py-0.5 sm:py-1 rounded-full ${
+                                  isIlluminateEnabled
+                                    ? 'bg-gray-300 text-gray-800'
+                                    : 'bg-gray-600'
+                                } flex items-center`}
+                              >
+                                <Calendar className="w-3 h-3 mr-1" />
+                                {dueDateStr}
+                              </span>
+                            )}
+                            {isCompleted && (
+                              <span
+                                className={`text-xs sm:text-sm font-medium px-2 sm:px-3 py-0.5 sm:py-1 rounded-full ${
+                                  isIlluminateEnabled
+                                    ? 'bg-green-300 text-green-800'
+                                    : 'bg-green-600'
+                                } flex items-center`}
+                              >
+                                <CheckCircle className="w-3 h-3 mr-1" />
+                                Completed
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full">
+                            <input
+                              className={`flex-grow ${inputBg} border border-gray-600 rounded-full p-2 sm:p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 shadow-inner`}
+                              value={editingText}
+                              onChange={(e) => setEditingText(e.target.value)}
+                            />
+                            <input
+                              type="date"
+                              className={`flex-grow ${inputBg} border border-gray-600 rounded-full p-2 sm:p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 shadow-inner`}
+                              value={editingDate}
+                              onChange={(e) => setEditingDate(e.target.value)}
+                            />
+                            <select
+                              className={`${inputBg} border border-gray-600 rounded-full p-2 sm:p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 shadow-inner`}
+                              value={editingPriority}
+                              onChange={(e) => setEditingPriority(e.target.value as 'high' | 'medium' | 'low')}
+                            >
+                              <option value="high">High Priority</option>
+                              <option value="medium">Medium Priority</option>
+                              <option value="low">Low Priority</option>
+                            </select>
+                          </div>
+                        )}
+                        <div className="flex gap-2 mt-2 sm:mt-0">
+                          {!isEditing ? (
+                            <>
+                              {!isCompleted && (
+                                <button
+                                  className="bg-gradient-to-r from-green-400 to-green-600 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-white flex items-center gap-2 hover:shadow-lg hover:shadow-green-500/20 transition-all duration-300 transform hover:scale-105"
+                                  onClick={() => handleMarkComplete(itemId)}
+                                >
+                                  <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4" />
+                                </button>
+                              )}
+                              <button
+                                className="bg-gradient-to-r from-blue-400 to-blue-600 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-white flex items-center gap-2 hover:shadow-lg hover:shadow-blue-500/20 transition-all duration-300 transform hover:scale-105"
+                                onClick={() =>
+                                  handleEditClick(itemId, textValue, item.data.dueDate)
+                                }
+                              >
+                                <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
+                              </button>
+                              <button
+                                className="bg-gradient-to-r from-red-400 to-red-600 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-white flex items-center gap-2 hover:shadow-lg hover:shadow-red-500/20 transition-all duration-300 transform hover:scale-105"
+                                onClick={() => handleDelete(itemId)}
+                              >
+                                <Trash className="w-3 h-3 sm:w-4 sm:h-4" />
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                className="bg-gradient-to-r from-green-400 to-green-600 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-white hover:shadow-lg hover:shadow-green-500/20 transition-all duration-300 transform hover:scale-105 text-sm sm:text-base"
+                                onClick={() => handleEditSave(itemId)}
+                              >
+                                Save
+                              </button>
+                              <button
+                                className="bg-gradient-to-r from-gray-400 to-gray-600 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-white hover:shadow-lg hover:shadow-gray-500/20 transition-all duration-300 transform hover:scale-105 text-sm sm:text-base"
+                                onClick={() => {
+                                  setEditingItemId(null);
+                                  setEditingText('');
+                                  setEditingDate('');
+                                }}
+                              >
+                                Cancel
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </li>
+                    );
+                  })
                 )}
-              </li>
-            )
-          })
-        )}
-      </ul>
-    </div>
+              </ul>
+            </div>
+          </div>
 
           {/* RIGHT COLUMN */}
           <div className="flex flex-col gap-6">

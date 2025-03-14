@@ -27,27 +27,46 @@ import './index.css';
 import NotesOutage from './outage-pages/NotesOutage';
 import Status from './status/Status'; // Import the new Status page
 
+// Global Helmet component to include favicon and related tags
+const DefaultHelmet = () => (
+  <Helmet>
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="apple-touch-icon" sizes="57x57" href="/apple-icon-57x57.png" />
+    <link rel="apple-touch-icon" sizes="60x60" href="/apple-icon-60x60.png" />
+    <link rel="apple-touch-icon" sizes="72x72" href="/apple-icon-72x72.png" />
+    <link rel="apple-touch-icon" sizes="76x76" href="/apple-icon-76x76.png" />
+    <link rel="apple-touch-icon" sizes="114x114" href="/apple-icon-114x114.png" />
+    <link rel="apple-touch-icon" sizes="120x120" href="/apple-icon-120x120.png" />
+    <link rel="apple-touch-icon" sizes="144x144" href="/apple-icon-144x144.png" />
+    <link rel="apple-touch-icon" sizes="152x152" href="/apple-icon-152x152.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-icon-180x180.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/android-icon-192x192.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="msapplication-TileColor" content="#ffffff" />
+    <meta name="msapplication-TileImage" content="/ms-icon-144x144.png" />
+    <meta name="theme-color" content="#ffffff" />
+  </Helmet>
+);
 
 // Updated NotFound component with Illuminate & Blackout support
 const NotFound = () => {
-  // Read the mode settings from localStorage (or from context/state if available)
   const isIlluminateEnabled = JSON.parse(localStorage.getItem('isIlluminateEnabled') || 'false');
   const isBlackoutEnabled = JSON.parse(localStorage.getItem('isBlackoutEnabled') || 'false');
 
-  // Compute container classes similar to your Settings logic
   const containerClass = isIlluminateEnabled
     ? 'bg-white text-gray-900'
     : isBlackoutEnabled
     ? 'bg-gray-950 text-white'
     : 'bg-gray-900 text-white';
 
-  // Set text colors for headings and subheadings accordingly
   const headingColor = isIlluminateEnabled ? 'text-gray-900' : 'text-white';
   const subheadingColor = isIlluminateEnabled ? 'text-gray-700' : 'text-gray-300';
 
   return (
     <div className={`relative flex flex-col items-center justify-center h-screen overflow-hidden ${containerClass} font-poppins`}>
-      {/* Animated Background Elements */}
       <motion.div
         className="absolute bg-indigo-500 rounded-full opacity-30"
         style={{ width: 350, height: 350, top: '-100px', left: '-100px' }}
@@ -73,7 +92,6 @@ const NotFound = () => {
         transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
       />
       
-      {/* Logo Section */}
       <motion.div
         className="text-center mb-6 md:mb-10 relative z-10"
         initial={{ scale: 0, opacity: 0 }}
@@ -97,7 +115,6 @@ const NotFound = () => {
         </motion.div>
       </motion.div>
       
-      {/* 404 Heading */}
       <motion.h1
         className={`text-9xl font-extrabold relative z-10 ${headingColor}`}
         initial={{ y: -150, scale: 0.7, opacity: 0 }}
@@ -107,7 +124,6 @@ const NotFound = () => {
         404
       </motion.h1>
       
-      {/* Description */}
       <motion.p
         className={`mt-4 text-2xl relative z-10 ${subheadingColor}`}
         initial={{ x: -150, opacity: 0 }}
@@ -117,7 +133,6 @@ const NotFound = () => {
         Oops! The page you're looking for doesn't exist.
       </motion.p>
       
-      {/* Dashboard Button */}
       <motion.div
         className="mt-8 relative z-10"
         initial={{ scale: 0 }}
@@ -145,7 +160,7 @@ const PageTitle = ({ title, children }: { title: string; children: React.ReactNo
   </>
 );
 
-// Special root title component that doesn't add the "| TaskMaster AI" suffix
+// Special root title component without suffix
 const RootTitle = ({ children }: { children: React.ReactNode }) => (
   <>
     <Helmet>
@@ -158,6 +173,8 @@ const RootTitle = ({ children }: { children: React.ReactNode }) => (
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <HelmetProvider>
+      {/* Add the default Helmet to load favicon links and meta tags */}
+      <DefaultHelmet />
       <BrowserRouter>
         <AuthProvider>
           <Routes>

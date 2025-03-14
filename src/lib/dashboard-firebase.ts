@@ -8,7 +8,7 @@ import { auth, db } from './firebase';
 export const weatherApiKey = 'e3f77d4d29e24862b4f190231241611';
 export const hfApiKey = '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';
 // Gemini API key added below:
-export const geminiApiKey = 'AIzaSyB2AxMlMJVd8SqJo-6q0UlvkoAW7vYPWfk';
+export const geminiApiKey = 'AIzaSyAfWn25V7MGf1OmtlWyGRNbpczsIYe-XxQ';
 
 import {
   User,

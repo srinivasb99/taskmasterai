@@ -1,10 +1,6 @@
 import type React from "react"
 import { useState, useRef, useEffect } from "react"
-import { X, Send } from "lucide-react"
-import ReactMarkdown from "react-markdown"
-import remarkMath from "remark-math"
-import remarkGfm from "remark-gfm"
-import rehypeKatex from "rehype-katex"
+import { X, Send, MessageCircle, TimerIcon } from "lucide-react"
 import { Timer } from "../Timer"
 import { FlashcardsQuestions } from "../FlashcardsQuestions"
 
@@ -510,26 +506,13 @@ Follow these instructions strictly.
                       : "bg-gray-700 text-gray-200"
                 } shadow-md transform transition-all duration-300 hover:scale-[1.02]`}
               >
-                <ReactMarkdown
-                  remarkPlugins={[remarkMath, remarkGfm]}
-                  rehypePlugins={[rehypeKatex]}
-                  components={{
-                    p: ({ children }) => <p className="mb-2">{children}</p>,
-                    ul: ({ children }) => <ul className="list-disc ml-4 mb-2">{children}</ul>,
-                    ol: ({ children }) => <ol className="list-decimal ml-4 mb-2">{children}</ol>,
-                    li: ({ children }) => <li className="mb-1">{children}</li>,
-                    code: ({ inline, children }) =>
-                      inline ? (
-                        <code className="bg-gray-800 px-1 rounded">{children}</code>
-                      ) : (
-                        <pre className="bg-gray-800 p-2 rounded-lg overflow-x-auto">
-                          <code>{children}</code>
-                        </pre>
-                      ),
-                  }}
-                >
-                  {message.content}
-                </ReactMarkdown>
+                <div className="whitespace-pre-wrap break-words">
+                  {message.content.split("\n").map((line, i) => (
+                    <p key={i} className="mb-2">
+                      {line}
+                    </p>
+                  ))}
+                </div>
                 {message.timer && (
                   <div className="mt-2">
                     <div

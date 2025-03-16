@@ -1291,7 +1291,7 @@ export function Folders() {
           {/* Top Bar with Actions */}
           <div className={`${cardClass} rounded-xl p-4 flex items-center justify-between shadow-md`}>
             <div className="flex items-center space-x-4">
-              <h1 className={`text-xl font-bold ${headingClass}`}>Knowledge Library</h1>
+              <h1 className={`text-xl font-bold ${headingClass}`}>Folders</h1>
               <div className="hidden md:flex space-x-2">
                 <button
                   onClick={() => setViewMode("grid")}
@@ -3165,17 +3165,17 @@ export function Folders() {
                   >
                     <Sparkles className="w-12 h-12 text-blue-400 mb-4" />
                     <h2 className={`text-xl font-semibold ${headingClass} mb-2 text-center`}>
-                      Welcome to Your Knowledge Library
+                      No Folder Selected
                     </h2>
                     <p className={`${subheadingClass} text-center max-w-md mb-6`}>
-                      Create folders to organize your flashcards, quiz questions, and other learning materials. Select a folder from the list to view its contents.
+                      Create folders to organize your flashcards, quiz questions, and other learning materials. Select a folder from the list to view its contents, or create one. 
                     </p>
                     <button
                       onClick={() => setIsCreatingFolder(true)}
                       className={`px-4 py-2 rounded-lg ${buttonPrimary} inline-flex items-center`}
                     >
                       <FolderPlus className="w-5 h-5 mr-2" />
-                      Create your first folder
+                      Create a folder
                     </button>
                   </div>
                 )}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react"
 import { useNavigate } from "react-router-dom"
-import { Folder, FolderPlus, Edit, Trash, Search, X, ChevronRight, ChevronDown, FileText, Brain, Star, MoreHorizontal, Plus, Clock, Calendar, CheckCircle, AlertCircle, Sparkles, MessageCircle, Play, BookOpen, Tag, Download, Upload, Copy, Printer, Share2, Settings, Filter, SortAsc, Bookmark, Layers, LayoutGrid, List, Zap, Award, Repeat, Shuffle, ArrowLeft, ArrowRight, Eye, EyeOff, RefreshCw } from 'lucide-react'
+import { Folder, FolderPlus, Edit, Trash, Search, X, ChevronRight, ChevronDown, FileText, Brain, Star, MoreHorizontal, Plus, Clock, Calendar, CheckCircle, AlertCircle, Sparkles, MessageCircle, Play, BookOpen, Tag, Download, Upload, Copy, Printer, Share2, Settings, Filter, SortAsc, Bookmark, Layers, LayoutGrid, List, Zap, Award, Repeat, Shuffle, ArrowLeft, ArrowRight, Eye, EyeOff, RefreshCw, Lightbulb, Flame, Target, PenTool, Gamepad2, FolderTree, BarChart } from 'lucide-react'
 import { Sidebar } from "./Sidebar"
 import { auth } from "../lib/firebase"
 import {
@@ -25,7 +25,10 @@ import {
   removeTagFromFolder,
   getAllTags,
   updateFlashcard,
-  updateQuestion
+  updateQuestion,
+  createSubFolder,
+  getSubFolders,
+  deleteSubFolder
 } from "../lib/folders-firebase"
 
 export function Folders() {
@@ -33,8 +36,10 @@ export function Folders() {
   const [user, setUser] = useState<any>(null)
   const [userName, setUserName] = useState<string>("User")
   const [folders, setFolders] = useState<FolderWithItems[]>([])
+  const [subFolders, setSubFolders] = useState<{[parentId: string]: FolderWithItems[]}>({})
   const [searchQuery, setSearchQuery] = useState("")
   const [isCreatingFolder, setIsCreatingFolder] = useState(false)
+  const [isCreatingSubFolder, setIsCreatingSubFolder] = useState(false)
   const [newFolderName, setNewFolderName] = useState("")
   const [newFolderDescription, setNewFolderDescription] = useState("")
   const [newFolderType, setNewFolderType] = useState<"flashcard" | "question" | "mixed">("mixed")
@@ -63,10 +68,6 @@ export function Folders() {
   const [isAddingItem, setIsAddingItem] = useState(false)
   const [newItemType, setNewItemType] = useState<"flashcard" | "question">("flashcard")
   const [cardVisible, setCardVisible] = useState(false)
-  const [isStudyMode, setIsStudyMode] = useState(false)
-  const [studyItems, setStudyItems] = useState<FolderItem[]>([])
-  const [currentStudyIndex, setCurrentStudyIndex] = useState(0)
-  const [isFlipped, setIsFlipped] = useState(false)
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
   const [sortBy, setSortBy] = useState<"name" | "date" | "lastStudied">("date")
   const [tags, setTags] = useState<string[]>([])
@@ -74,29 +75,50 @@ export function Folders() {
   const [newTag, setNewTag] = useState("")
   const [folderTags, setFolderTags] = useState<{[folderId: string]: string[]}>({})
   const [showTagsDropdown, setShowTagsDropdown] = useState(false)
-  const [studyProgress, setStudyProgress] = useState<{[itemId: string]: number}>({})
   const [showImportModal, setShowImportModal] = useState(false)
   const [importText, setImportText] = useState("")
   const [importSeparator, setImportSeparator] = useState("\t")
   const [showFilterPanel, setShowFilterPanel] = useState(false)
   const [activeDropdownId, setActiveDropdownId] = useState<string | null>(null)
   const [editingItem, setEditingItem] = useState<{id: string, type: "flashcard" | "question"} | null>(null)
+  const [showAnswers, setShowAnswers] = useState<{[id: string]: boolean}>({})
+  
+  // Study modes
+  const [activeStudyMode, setActiveStudyMode] = useState<"flashcards" | "learn" | "test" | "match" | "quiz" | null>(null)
+  const [studyItems, setStudyItems] = useState<FolderItem[]>([])
+  const [currentStudyIndex, setCurrentStudyIndex] = useState(0)
+  const [isFlipped, setIsFlipped] = useState(false)
+  const [matchingPairs, setMatchingPairs] = useState<{id: string, content: string, matched: boolean, selected: boolean, type: "term" | "definition"}[]>([])
+  const [selectedMatchingCard, setSelectedMatchingCard] = useState<string | null>(null)
+  const [matchingScore, setMatchingScore] = useState(0)
+  const [testQuestions, setTestQuestions] = useState<any[]>([])
+  const [testAnswers, setTestAnswers] = useState<{[id: string]: any}>({})
+  const [testScore, setTestScore] = useState<number | null>(null)
+  const [quizQuestions, setQuizQuestions] = useState<Question[]>([])
+  const [currentQuizIndex, setCurrentQuizIndex] = useState(0)
+  const [quizAnswers, setQuizAnswers] = useState<{[id: string]: number}>({})
+  const [quizScore, setQuizScore] = useState<number | null>(null)
+  const [quizCompleted, setQuizCompleted] = useState(false)
+  const [learnProgress, setLearnProgress] = useState<{[id: string]: "new" | "learning" | "known"}>({})
+  const [learnQueue, setLearnQueue] = useState<string[]>([])
+
+  // State for flashcard form
+  const [flashcardTerm, setFlashcardTerm] = useState("")
+  const [flashcardDefinition, setFlashcardDefinition] = useState("")
+  const [flashcardTopic, setFlashcardTopic] = useState("")
+  const [flashcardTags, setFlashcardTags] = useState<string[]>([])
+  const [newFlashcardTag, setNewFlashcardTag] = useState("")
 
   // State for question form
   const [questionOptions, setQuestionOptions] = useState<string[]>(["", "", "", ""])
   const [questionCorrectAnswer, setQuestionCorrectAnswer] = useState<number>(0)
-
-  // Rich text editing for flashcards
-  const [flashcardQuestion, setFlashcardQuestion] = useState("")
-  const [flashcardAnswer, setFlashcardAnswer] = useState("")
-  const [flashcardTopic, setFlashcardTopic] = useState("")
-  const [flashcardTags, setFlashcardTags] = useState<string[]>([])
-  const [newFlashcardTag, setNewFlashcardTag] = useState("")
-  const [showAnswers, setShowAnswers] = useState<{[id: string]: boolean}>({})
+  const [questionText, setQuestionText] = useState("")
+  const [questionExplanation, setQuestionExplanation] = useState("")
 
   const navigate = useNavigate()
   const tagsDropdownRef = useRef<HTMLDivElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const flashcardRef = useRef<HTMLDivElement>(null)
 
   // Effect for card animation on mount
   useEffect(() => {
@@ -186,6 +208,8 @@ export function Folders() {
       // Fetch tags for each folder
       folderData.forEach((folder) => {
         fetchFolderTags(user.uid, folder.id)
+        // Fetch subfolders for each folder
+        fetchSubFolders(user.uid, folder.id)
       })
     })
 
@@ -212,6 +236,23 @@ export function Folders() {
       }))
     } catch (error) {
       console.error("Error fetching folder tags:", error)
+    }
+  }
+
+  // Fetch subfolders for a specific folder
+  const fetchSubFolders = async (userId: string, folderId: string) => {
+    try {
+      const subFolderData = await getSubFolders(userId, folderId)
+      setSubFolders(prev => ({
+        ...prev,
+        [folderId]: subFolderData.map(folder => ({
+          ...folder,
+          items: [],
+          isExpanded: false
+        }))
+      }))
+    } catch (error) {
+      console.error("Error fetching subfolders:", error)
     }
   }
 
@@ -269,6 +310,40 @@ export function Folders() {
     }
   }
 
+  // Create a new subfolder
+  const handleCreateSubFolder = async () => {
+    if (!user || !selectedFolder || !newFolderName.trim()) return
+
+    try {
+      const subFolderId = await createSubFolder(
+        user.uid, 
+        selectedFolder.id, 
+        newFolderName, 
+        newFolderType, 
+        newFolderDescription
+      )
+
+      // Add tags if any
+      if (flashcardTags.length > 0) {
+        for (const tag of flashcardTags) {
+          await addTagToFolder(user.uid, subFolderId, tag)
+        }
+      }
+
+      // Refresh subfolders
+      fetchSubFolders(user.uid, selectedFolder.id)
+
+      // Reset form
+      setNewFolderName("")
+      setNewFolderDescription("")
+      setNewFolderType("mixed")
+      setFlashcardTags([])
+      setIsCreatingSubFolder(false)
+    } catch (error) {
+      console.error("Error creating subfolder:", error)
+    }
+  }
+
   // Update folder
   const handleUpdateFolder = async () => {
     if (!user || !editingFolderId || !newFolderName.trim()) return
@@ -306,6 +381,23 @@ export function Folders() {
       }
     } catch (error) {
       console.error("Error deleting folder:", error)
+    }
+  }
+
+  // Delete subfolder
+  const handleDeleteSubFolder = async (parentId: string, subFolderId: string) => {
+    if (!user) return
+
+    const confirmDelete = window.confirm("Are you sure you want to delete this subfolder and all its contents?")
+    if (!confirmDelete) return
+
+    try {
+      await deleteSubFolder(user.uid, parentId, subFolderId)
+      
+      // Refresh subfolders
+      fetchSubFolders(user.uid, parentId)
+    } catch (error) {
+      console.error("Error deleting subfolder:", error)
     }
   }
 
@@ -383,11 +475,9 @@ export function Folders() {
         setSelectedFolder(folder)
       }
 
-      // Exit study mode if active
-      if (isStudyMode) {
-        setIsStudyMode(false)
-        setStudyItems([])
-      }
+      // Exit any active study mode
+      setActiveStudyMode(null)
+      setStudyItems([])
       
       // Close any open dropdown
       setActiveDropdownId(null)
@@ -396,45 +486,191 @@ export function Folders() {
     }
   }
 
-  // Start study mode for a folder
-  const handleStartStudy = async (folderId: string) => {
-    if (!user) return
+  // Start flashcards mode
+  const handleStartFlashcards = async () => {
+    if (!user || !selectedFolder) return
 
     try {
-      // Get items for study (prioritizing those not recently reviewed)
-      const items = await getItemsForStudy(user.uid, folderId)
+      // Get flashcard items
+      const items = await getFolderItems(user.uid, selectedFolder.id, "flashcard")
 
       if (items.length === 0) {
-        alert("No items to study in this folder.")
+        alert("No flashcards in this folder. Add some flashcards first.")
         return
       }
 
       setStudyItems(items)
       setCurrentStudyIndex(0)
       setIsFlipped(false)
-      setIsStudyMode(true)
-
-      // Find and select the folder
-      const folder = folders.find((f) => f.id === folderId)
-      if (folder) {
-        setSelectedFolder({ ...folder, items })
-      }
+      setActiveStudyMode("flashcards")
       
       // Close any open dropdown
       setActiveDropdownId(null)
     } catch (error) {
-      console.error("Error starting study session:", error)
+      console.error("Error starting flashcards:", error)
     }
   }
 
-  // Handle study navigation
+  // Start learn mode
+  const handleStartLearn = async () => {
+    if (!user || !selectedFolder) return
+
+    try {
+      // Get flashcard items
+      const items = await getFolderItems(user.uid, selectedFolder.id, "flashcard")
+
+      if (items.length === 0) {
+        alert("No flashcards in this folder. Add some flashcards first.")
+        return
+      }
+
+      // Initialize learn progress for each item
+      const initialProgress: {[id: string]: "new" | "learning" | "known"} = {}
+      const initialQueue: string[] = []
+      
+      items.forEach(item => {
+        initialProgress[item.id] = "new"
+        initialQueue.push(item.id)
+      })
+      
+      setStudyItems(items)
+      setLearnProgress(initialProgress)
+      setLearnQueue(initialQueue)
+      setCurrentStudyIndex(0)
+      setIsFlipped(false)
+      setActiveStudyMode("learn")
+      
+      // Close any open dropdown
+      setActiveDropdownId(null)
+    } catch (error) {
+      console.error("Error starting learn mode:", error)
+    }
+  }
+
+  // Start test mode
+  const handleStartTest = async () => {
+    if (!user || !selectedFolder) return
+
+    try {
+      // Get flashcard items
+      const items = await getFolderItems(user.uid, selectedFolder.id, "flashcard")
+
+      if (items.length === 0) {
+        alert("No flashcards in this folder. Add some flashcards first.")
+        return
+      }
+
+      // Create test questions from flashcards
+      const questions = items.map(item => {
+        const flashcard = item as Flashcard
+        return {
+          id: flashcard.id,
+          term: flashcard.term,
+          definition: flashcard.definition,
+          type: Math.random() > 0.5 ? "term" : "definition" // Randomly test on term or definition
+        }
+      })
+
+      setTestQuestions(questions)
+      setTestAnswers({})
+      setTestScore(null)
+      setActiveStudyMode("test")
+      
+      // Close any open dropdown
+      setActiveDropdownId(null)
+    } catch (error) {
+      console.error("Error starting test:", error)
+    }
+  }
+
+  // Start matching game
+  const handleStartMatching = async () => {
+    if (!user || !selectedFolder) return
+
+    try {
+      // Get flashcard items
+      const items = await getFolderItems(user.uid, selectedFolder.id, "flashcard")
+
+      if (items.length === 0) {
+        alert("No flashcards in this folder. Add some flashcards first.")
+        return
+      }
+
+      // Limit to 10 items for matching game
+      const gameItems = items.slice(0, 10) as Flashcard[]
+      
+      // Create matching pairs
+      const pairs: {id: string, content: string, matched: boolean, selected: boolean, type: "term" | "definition"}[] = []
+      
+      gameItems.forEach(item => {
+        pairs.push({
+          id: `term-${item.id}`,
+          content: item.term,
+          matched: false,
+          selected: false,
+          type: "term"
+        })
+        
+        pairs.push({
+          id: `def-${item.id}`,
+          content: item.definition,
+          matched: false,
+          selected: false,
+          type: "definition"
+        })
+      })
+      
+      // Shuffle the pairs
+      const shuffledPairs = [...pairs].sort(() => Math.random() - 0.5)
+      
+      setMatchingPairs(shuffledPairs)
+      setSelectedMatchingCard(null)
+      setMatchingScore(0)
+      setActiveStudyMode("match")
+      
+      // Close any open dropdown
+      setActiveDropdownId(null)
+    } catch (error) {
+      console.error("Error starting matching game:", error)
+    }
+  }
+
+  // Start quiz mode
+  const handleStartQuiz = async () => {
+    if (!user || !selectedFolder) return
+
+    try {
+      // Get question items
+      const items = await getFolderItems(user.uid, selectedFolder.id, "question")
+
+      if (items.length === 0) {
+        alert("No questions in this folder. Add some questions first.")
+        return
+      }
+
+      setQuizQuestions(items as Question[])
+      setCurrentQuizIndex(0)
+      setQuizAnswers({})
+      setQuizScore(null)
+      setQuizCompleted(false)
+      setActiveStudyMode("quiz")
+      
+      // Close any open dropdown
+      setActiveDropdownId(null)
+    } catch (error) {
+      console.error("Error starting quiz:", error)
+    }
+  }
+
+  // Handle flashcard navigation
   const handleNextCard = () => {
     if (currentStudyIndex < studyItems.length - 1) {
       setCurrentStudyIndex(currentStudyIndex + 1)
       setIsFlipped(false)
     } else {
-      // End of study session
-      handleStudyComplete()
+      // Loop back to the beginning
+      setCurrentStudyIndex(0)
+      setIsFlipped(false)
     }
   }
 
@@ -442,58 +678,196 @@ export function Folders() {
     if (currentStudyIndex > 0) {
       setCurrentStudyIndex(currentStudyIndex - 1)
       setIsFlipped(false)
+    } else {
+      // Loop to the end
+      setCurrentStudyIndex(studyItems.length - 1)
+      setIsFlipped(false)
     }
   }
 
   const handleFlipCard = () => {
     setIsFlipped(!isFlipped)
     
-    // Mark as reviewed when flipped to answer
+    // Mark as reviewed when flipped to definition
     if (!isFlipped && studyItems[currentStudyIndex]) {
       const item = studyItems[currentStudyIndex]
       updateLastReviewed(user.uid, selectedFolder!.id, item.id)
     }
   }
 
-  // Handle study completion
-  const handleStudyComplete = async () => {
-    // Exit study mode
-    setIsStudyMode(false)
-    setStudyItems([])
-    setCurrentStudyIndex(0)
-
-    // Refresh the selected folder if needed
-    if (selectedFolder) {
-      try {
-        const items = await getFolderItems(user.uid, selectedFolder.id)
-        setSelectedFolder({ ...selectedFolder, items })
-      } catch (error) {
-        console.error("Error refreshing folder after study:", error)
-      }
+  // Handle learn mode actions
+  const handleLearnResponse = (response: "easy" | "good" | "hard") => {
+    const currentItem = studyItems[currentStudyIndex]
+    if (!currentItem) return
+    
+    // Update progress based on response
+    const newProgress = {...learnProgress}
+    
+    if (response === "easy") {
+      newProgress[currentItem.id] = "known"
+    } else if (response === "good") {
+      newProgress[currentItem.id] = learnProgress[currentItem.id] === "new" ? "learning" : "known"
+    } else {
+      newProgress[currentItem.id] = "learning"
+    }
+    
+    setLearnProgress(newProgress)
+    
+    // Update queue - remove if known, move to end if still learning
+    let newQueue = [...learnQueue]
+    
+    if (newProgress[currentItem.id] === "known") {
+      newQueue = newQueue.filter(id => id !== currentItem.id)
+    } else {
+      newQueue = newQueue.filter(id => id !== currentItem.id)
+      newQueue.push(currentItem.id)
+    }
+    
+    setLearnQueue(newQueue)
+    
+    // Move to next card or end if queue is empty
+    if (newQueue.length === 0) {
+      alert("Congratulations! You've learned all the flashcards.")
+      setActiveStudyMode(null)
+    } else {
+      // Find the index of the next item in the queue
+      const nextItemId = newQueue[0]
+      const nextIndex = studyItems.findIndex(item => item.id === nextItemId)
+      setCurrentStudyIndex(nextIndex)
+      setIsFlipped(false)
     }
   }
 
-  // Toggle showing answer for a specific item
-  const toggleShowAnswer = (itemId: string) => {
-    setShowAnswers(prev => ({
-      ...prev,
-      [itemId]: !prev[itemId]
-    }))
+  // Handle matching game card selection
+  const handleMatchingCardSelect = (cardId: string) => {
+    // If the card is already matched, do nothing
+    const card = matchingPairs.find(p => p.id === cardId)
+    if (!card || card.matched) return
+    
+    // If no card is selected, select this one
+    if (!selectedMatchingCard) {
+      setMatchingPairs(matchingPairs.map(p => 
+        p.id === cardId ? {...p, selected: true} : p
+      ))
+      setSelectedMatchingCard(cardId)
+      return
+    }
+    
+    // If this card is already selected, deselect it
+    if (selectedMatchingCard === cardId) {
+      setMatchingPairs(matchingPairs.map(p => 
+        p.id === cardId ? {...p, selected: false} : p
+      ))
+      setSelectedMatchingCard(null)
+      return
+    }
+    
+    // Otherwise, we have two cards selected - check for a match
+    const firstCard = matchingPairs.find(p => p.id === selectedMatchingCard)!
+    const secondCard = card
+    
+    // Check if they're a match (term and definition from same flashcard)
+    const isMatch = 
+      (firstCard.id.startsWith('term-') && secondCard.id.startsWith('def-') && 
+       firstCard.id.substring(5) === secondCard.id.substring(4)) ||
+      (firstCard.id.startsWith('def-') && secondCard.id.startsWith('term-') && 
+       firstCard.id.substring(4) === secondCard.id.substring(5))
+    
+    if (isMatch) {
+      // Mark both cards as matched
+      setMatchingPairs(matchingPairs.map(p => 
+        p.id === firstCard.id || p.id === secondCard.id 
+          ? {...p, matched: true, selected: false} 
+          : p
+      ))
+      setMatchingScore(matchingScore + 1)
+      
+      // Check if all pairs are matched
+      const allMatched = matchingPairs.every(p => 
+        p.id === firstCard.id || p.id === secondCard.id || p.matched
+      )
+      
+      if (allMatched) {
+        setTimeout(() => {
+          alert("Congratulations! You've matched all the pairs!")  {
+        setTimeout(() => {
+          alert("Congratulations! You've matched all the pairs!")
+          setActiveStudyMode(null)
+        }, 1000)
+      }
+    } else {
+      // Not a match - briefly show both cards, then flip them back
+      setMatchingPairs(matchingPairs.map(p => 
+        p.id === secondCard.id ? {...p, selected: true} : p
+      ))
+      
+      setTimeout(() => {
+        setMatchingPairs(matchingPairs.map(p => 
+          (p.id === firstCard.id || p.id === secondCard.id) && !p.matched
+            ? {...p, selected: false} 
+            : p
+        ))
+        setSelectedMatchingCard(null)
+      }, 1000)
+    }
+  }
+
+  // Handle test submission
+  const handleSubmitTest = () => {
+    // Calculate score
+    let correct = 0
+    
+    testQuestions.forEach(question => {
+      const userAnswer = testAnswers[question.id] || ""
+      const correctAnswer = question.type === "term" ? question.definition : question.term
+      
+      if (userAnswer.trim().toLowerCase() === correctAnswer.trim().toLowerCase()) {
+        correct++
+      }
+    })
+    
+    const score = Math.round((correct / testQuestions.length) * 100)
+    setTestScore(score)
+  }
+
+  // Handle quiz answer selection
+  const handleQuizAnswerSelect = (questionId: string, answerIndex: number) => {
+    setQuizAnswers({
+      ...quizAnswers,
+      [questionId]: answerIndex
+    })
+  }
+
+  // Handle quiz submission
+  const handleSubmitQuiz = () => {
+    // Calculate score
+    let correct = 0
+    
+    quizQuestions.forEach(question => {
+      const userAnswer = quizAnswers[question.id]
+      if (userAnswer === question.correctAnswer) {
+        correct++
+      }
+    })
+    
+    const score = Math.round((correct / quizQuestions.length) * 100)
+    setQuizScore(score)
+    setQuizCompleted(true)
   }
 
   // Add a new flashcard
   const handleAddFlashcard = async () => {
     if (!user || !selectedFolder) return
 
-    if (!flashcardQuestion.trim() || !flashcardAnswer.trim()) {
-      alert("Question and answer are required")
+    if (!flashcardTerm.trim() || !flashcardDefinition.trim()) {
+      alert("Term and definition are required")
       return
     }
 
     try {
       await addFlashcard(user.uid, selectedFolder.id, {
-        question: flashcardQuestion,
-        answer: flashcardAnswer,
+        term: flashcardTerm,
+        definition: flashcardDefinition,
         topic: flashcardTopic,
       })
 
@@ -511,8 +885,8 @@ export function Folders() {
       )
 
       // Reset form
-      setFlashcardQuestion("")
-      setFlashcardAnswer("")
+      setFlashcardTerm("")
+      setFlashcardDefinition("")
       setFlashcardTopic("")
       setFlashcardTags([])
       setIsAddingItem(false)
@@ -525,20 +899,17 @@ export function Folders() {
   const handleAddQuestion = async () => {
     if (!user || !selectedFolder) return
 
-    const question = document.getElementById("quiz-question") as HTMLTextAreaElement
-    const explanation = document.getElementById("quiz-explanation") as HTMLTextAreaElement
-
-    if (!question.value.trim() || questionOptions.some((opt) => !opt.trim())) {
+    if (!questionText.trim() || questionOptions.some((opt) => !opt.trim())) {
       alert("Question and all options are required")
       return
     }
 
     try {
       await addQuestion(user.uid, selectedFolder.id, {
-        question: question.value,
+        question: questionText,
         options: questionOptions,
         correctAnswer: questionCorrectAnswer,
-        explanation: explanation?.value || "",
+        explanation: questionExplanation || "",
       })
 
       // Refresh folder items
@@ -555,8 +926,8 @@ export function Folders() {
       )
 
       // Reset form
-      question.value = ""
-      if (explanation) explanation.value = ""
+      setQuestionText("")
+      setQuestionExplanation("")
       setQuestionOptions(["", "", "", ""])
       setQuestionCorrectAnswer(0)
       setIsAddingItem(false)
@@ -567,26 +938,19 @@ export function Folders() {
 
   // Edit an existing item
   const handleEditItem = (item: FolderItem) => {
-    if ('answer' in item) {
+    if ('definition' in item) {
       // Flashcard
       setEditingItem({ id: item.id, type: 'flashcard' })
-      setFlashcardQuestion(item.question)
-      setFlashcardAnswer(item.answer)
+      setFlashcardTerm(item.term)
+      setFlashcardDefinition(item.definition)
       setFlashcardTopic(item.topic || '')
     } else {
       // Question
       setEditingItem({ id: item.id, type: 'question' })
+      setQuestionText(item.question)
       setQuestionOptions([...item.options])
       setQuestionCorrectAnswer(item.correctAnswer)
-      
-      // Set values for the form elements that will be rendered
-      setTimeout(() => {
-        const questionElem = document.getElementById("edit-quiz-question") as HTMLTextAreaElement
-        const explanationElem = document.getElementById("edit-quiz-explanation") as HTMLTextAreaElement
-        
-        if (questionElem) questionElem.value = item.question
-        if (explanationElem) explanationElem.value = item.explanation || ''
-      }, 0)
+      setQuestionExplanation(item.explanation || '')
     }
   }
 
@@ -594,15 +958,15 @@ export function Folders() {
   const handleUpdateFlashcard = async () => {
     if (!user || !selectedFolder || !editingItem) return
 
-    if (!flashcardQuestion.trim() || !flashcardAnswer.trim()) {
-      alert("Question and answer are required")
+    if (!flashcardTerm.trim() || !flashcardDefinition.trim()) {
+      alert("Term and definition are required")
       return
     }
 
     try {
       await updateFlashcard(user.uid, selectedFolder.id, editingItem.id, {
-        question: flashcardQuestion,
-        answer: flashcardAnswer,
+        term: flashcardTerm,
+        definition: flashcardDefinition,
         topic: flashcardTopic,
       })
 
@@ -620,8 +984,8 @@ export function Folders() {
       )
 
       // Reset form
-      setFlashcardQuestion("")
-      setFlashcardAnswer("")
+      setFlashcardTerm("")
+      setFlashcardDefinition("")
       setFlashcardTopic("")
       setEditingItem(null)
     } catch (error) {
@@ -633,20 +997,17 @@ export function Folders() {
   const handleUpdateQuestion = async () => {
     if (!user || !selectedFolder || !editingItem) return
 
-    const question = document.getElementById("edit-quiz-question") as HTMLTextAreaElement
-    const explanation = document.getElementById("edit-quiz-explanation") as HTMLTextAreaElement
-
-    if (!question.value.trim() || questionOptions.some((opt) => !opt.trim())) {
+    if (!questionText.trim() || questionOptions.some((opt) => !opt.trim())) {
       alert("Question and all options are required")
       return
     }
 
     try {
       await updateQuestion(user.uid, selectedFolder.id, editingItem.id, {
-        question: question.value,
+        question: questionText,
         options: questionOptions,
         correctAnswer: questionCorrectAnswer,
-        explanation: explanation?.value || "",
+        explanation: questionExplanation || "",
       })
 
       // Refresh folder items
@@ -663,6 +1024,8 @@ export function Folders() {
       )
 
       // Reset form
+      setQuestionText("")
+      setQuestionExplanation("")
       setQuestionOptions(["", "", "", ""])
       setQuestionCorrectAnswer(0)
       setEditingItem(null)
@@ -708,14 +1071,14 @@ export function Folders() {
     if (!user || !selectedFolder || !importText.trim()) return
 
     const lines = importText.trim().split("\n")
-    const importedItems: {question: string; answer: string; topic?: string}[] = []
+    const importedItems: {term: string; definition: string; topic?: string}[] = []
 
     lines.forEach((line) => {
       const parts = line.split(importSeparator)
       if (parts.length >= 2) {
         importedItems.push({
-          question: parts[0].trim(),
-          answer: parts[1].trim(),
+          term: parts[0].trim(),
+          definition: parts[1].trim(),
           topic: parts[2]?.trim(),
         })
       }
@@ -765,9 +1128,9 @@ export function Folders() {
     let exportText = ""
 
     selectedFolder.items.forEach((item) => {
-      if ("answer" in item) {
+      if ("definition" in item) {
         // Flashcard
-        exportText += `${item.question}${importSeparator}${item.answer}${importSeparator}${item.topic || ""}\n`
+        exportText += `${item.term}${importSeparator}${item.definition}${importSeparator}${item.topic || ""}\n`
       } else {
         // Question - more complex, could be handled differently
         exportText += `${item.question}${importSeparator}${item.options.join(",")}${importSeparator}${item.correctAnswer}\n`
@@ -1064,17 +1427,17 @@ export function Folders() {
             </div>
           </div>
 
-          {/* Study Mode */}
-          {isStudyMode && selectedFolder && studyItems.length > 0 && (
+          {/* Flashcards Mode */}
+          {activeStudyMode === "flashcards" && selectedFolder && studyItems.length > 0 && (
             <div className={`${cardClass} rounded-xl p-4 sm:p-6 animate-fadeIn shadow-lg`}>
               <div className="flex items-center justify-between mb-4">
                 <h2 className={`text-xl font-semibold ${headingClass} flex items-center`}>
                   <BookOpen className="w-5 h-5 mr-2" />
-                  Study Session: {selectedFolder.name}
+                  Flashcards: {selectedFolder.name}
                 </h2>
                 <div className="flex items-center space-x-2">
                   <button
-                    onClick={handleStudyComplete}
+                    onClick={() => setActiveStudyMode(null)}
                     className={`${buttonSecondary} px-3 py-1.5 rounded-lg text-sm`}
                   >
                     Exit
@@ -1082,70 +1445,54 @@ export function Folders() {
                 </div>
               </div>
 
-              {/* Study Card */}
+              {/* Flashcard */}
               <div className="flex flex-col items-center justify-center">
                 <div className="text-sm mb-2">
                   Card {currentStudyIndex + 1} of {studyItems.length}
                 </div>
                 
                 <div 
+                  ref={flashcardRef}
                   className={`w-full max-w-xl h-64 rounded-xl ${cardClass} shadow-lg cursor-pointer transition-all duration-300 transform hover:scale-[1.02] relative overflow-hidden`}
                   onClick={handleFlipCard}
+                  style={{
+                    perspective: "1000px",
+                    transformStyle: "preserve-3d"
+                  }}
                 >
-                  <div className={`absolute inset-0 flex items-center justify-center p-6 transition-all duration-500 ${isFlipped ? 'opacity-0 rotate-y-180' : 'opacity-100'}`}>
+                  <div 
+                    className={`absolute inset-0 flex items-center justify-center p-6 transition-all duration-500 backface-visibility-hidden`}
+                    style={{
+                      transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
+                      opacity: isFlipped ? 0 : 1,
+                      backfaceVisibility: 'hidden'
+                    }}
+                  >
                     <div className="text-center">
-                      <h3 className={`text-xl font-semibold ${headingClass} mb-4`}>Question</h3>
+                      <h3 className={`text-xl font-semibold ${headingClass} mb-4`}>Term</h3>
                       <p className={`${defaultTextColor} text-lg`}>
-                        {studyItems[currentStudyIndex] && 'question' in studyItems[currentStudyIndex] 
-                          ? studyItems[currentStudyIndex].question 
+                        {studyItems[currentStudyIndex] && 'term' in studyItems[currentStudyIndex] 
+                          ? studyItems[currentStudyIndex].term 
                           : ''}
                       </p>
-                      
-                      {'options' in studyItems[currentStudyIndex] && (
-                        <div className="mt-4 space-y-2 text-left">
-                          {(studyItems[currentStudyIndex] as Question).options.map((option, idx) => (
-                            <div key={idx} className={`p-2 rounded-lg ${isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700'}`}>
-                              {option}
-                            </div>
-                          ))}
-                        </div>
-                      )}
                     </div>
                   </div>
                   
-                  <div className={`absolute inset-0 flex items-center justify-center p-6 transition-all duration-500 ${isFlipped ? 'opacity-100' : 'opacity-0 rotate-y-180'}`}>
+                  <div 
+                    className={`absolute inset-0 flex items-center justify-center p-6 transition-all duration-500 backface-visibility-hidden`}
+                    style={{
+                      transform: isFlipped ? 'rotateY(0deg)' : 'rotateY(-180deg)',
+                      opacity: isFlipped ? 1 : 0,
+                      backfaceVisibility: 'hidden'
+                    }}
+                  >
                     <div className="text-center">
-                      <h3 className={`text-xl font-semibold ${headingClass} mb-4`}>Answer</h3>
-                      {'answer' in studyItems[currentStudyIndex] ? (
-                        <p className={`${defaultTextColor} text-lg`}>
-                          {studyItems[currentStudyIndex].answer}
-                        </p>
-                      ) : (
-                        <div className="space-y-2 text-left">
-                          {(studyItems[currentStudyIndex] as Question).options.map((option, idx) => (
-                            <div 
-                              key={idx} 
-                              className={`p-2 rounded-lg ${
-                                idx === (studyItems[currentStudyIndex] as Question).correctAnswer
-                                  ? isIlluminateEnabled ? 'bg-green-100 text-green-800' : 'bg-green-900/30 text-green-400'
-                                  : isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700'
-                              }`}
-                            >
-                              {idx === (studyItems[currentStudyIndex] as Question).correctAnswer && (
-                                <CheckCircle className="w-4 h-4 inline-block mr-2 text-green-500" />
-                              )}
-                              {option}
-                            </div>
-                          ))}
-                          
-                          {(studyItems[currentStudyIndex] as Question).explanation && (
-                            <div className="mt-4">
-                              <p className={`${headingClass} font-medium`}>Explanation:</p>
-                              <p className={defaultTextColor}>{(studyItems[currentStudyIndex] as Question).explanation}</p>
-                            </div>
-                          )}
-                        </div>
-                      )}
+                      <h3 className={`text-xl font-semibold ${headingClass} mb-4`}>Definition</h3>
+                      <p className={`${defaultTextColor} text-lg`}>
+                        {studyItems[currentStudyIndex] && 'definition' in studyItems[currentStudyIndex] 
+                          ? studyItems[currentStudyIndex].definition 
+                          : ''}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -1153,8 +1500,7 @@ export function Folders() {
                 <div className="flex items-center justify-between w-full max-w-xl mt-4">
                   <button
                     onClick={handlePrevCard}
-                    disabled={currentStudyIndex === 0}
-                    className={`${buttonSecondary} p-2 rounded-lg ${currentStudyIndex === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    className={`${buttonSecondary} p-2 rounded-lg`}
                   >
                     <ArrowLeft className="w-5 h-5" />
                   </button>
@@ -1164,7 +1510,7 @@ export function Folders() {
                       onClick={handleFlipCard}
                       className={`${buttonPrimary} px-4 py-2 rounded-lg`}
                     >
-                      {isFlipped ? 'Show Question' : 'Show Answer'}
+                      {isFlipped ? 'Show Term' : 'Show Definition'}
                     </button>
                   </div>
                   
@@ -1172,19 +1518,433 @@ export function Folders() {
                     onClick={handleNextCard}
                     className={`${buttonPrimary} p-2 rounded-lg`}
                   >
-                    {currentStudyIndex === studyItems.length - 1 ? (
-                      <CheckCircle className="w-5 h-5" />
-                    ) : (
-                      <ArrowRight className="w-5 h-5" />
-                    )}
+                    <ArrowRight className="w-5 h-5" />
                   </button>
                 </div>
               </div>
             </div>
           )}
 
+          {/* Learn Mode */}
+          {activeStudyMode === "learn" && selectedFolder && studyItems.length > 0 && (
+            <div className={`${cardClass} rounded-xl p-4 sm:p-6 animate-fadeIn shadow-lg`}>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className={`text-xl font-semibold ${headingClass} flex items-center`}>
+                  <Lightbulb className="w-5 h-5 mr-2" />
+                  Learn: {selectedFolder.name}
+                </h2>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => setActiveStudyMode(null)}
+                    className={`${buttonSecondary} px-3 py-1.5 rounded-lg text-sm`}
+                  >
+                    Exit
+                  </button>
+                </div>
+              </div>
+
+              {/* Progress Bar */}
+              <div className="mb-4">
+                <div className="flex justify-between text-sm mb-1">
+                  <span>Progress</span>
+                  <span>
+                    {Object.values(learnProgress).filter(p => p === "known").length} / {studyItems.length} learned
+                  </span>
+                </div>
+                <div className="w-full bg-gray-600 rounded-full h-2.5">
+                  <div 
+                    className="bg-green-500 h-2.5 rounded-full" 
+                    style={{ 
+                      width: `${(Object.values(learnProgress).filter(p => p === "known").length / studyItems.length) * 100}%` 
+                    }}
+                  ></div>
+                </div>
+              </div>
+
+              {/* Flashcard */}
+              <div className="flex flex-col items-center justify-center">
+                <div 
+                  ref={flashcardRef}
+                  className={`w-full max-w-xl h-64 rounded-xl ${cardClass} shadow-lg cursor-pointer transition-all duration-300 transform hover:scale-[1.02] relative overflow-hidden`}
+                  onClick={handleFlipCard}
+                  style={{
+                    perspective: "1000px",
+                    transformStyle: "preserve-3d"
+                  }}
+                >
+                  <div 
+                    className={`absolute inset-0 flex items-center justify-center p-6 transition-all duration-500 backface-visibility-hidden`}
+                    style={{
+                      transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
+                      opacity: isFlipped ? 0 : 1,
+                      backfaceVisibility: 'hidden'
+                    }}
+                  >
+                    <div className="text-center">
+                      <h3 className={`text-xl font-semibold ${headingClass} mb-4`}>Term</h3>
+                      <p className={`${defaultTextColor} text-lg`}>
+                        {studyItems[currentStudyIndex] && 'term' in studyItems[currentStudyIndex] 
+                          ? studyItems[currentStudyIndex].term 
+                          : ''}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div 
+                    className={`absolute inset-0 flex items-center justify-center p-6 transition-all duration-500 backface-visibility-hidden`}
+                    style={{
+                      transform: isFlipped ? 'rotateY(0deg)' : 'rotateY(-180deg)',
+                      opacity: isFlipped ? 1 : 0,
+                      backfaceVisibility: 'hidden'
+                    }}
+                  >
+                    <div className="text-center">
+                      <h3 className={`text-xl font-semibold ${headingClass} mb-4`}>Definition</h3>
+                      <p className={`${defaultTextColor} text-lg`}>
+                        {studyItems[currentStudyIndex] && 'definition' in studyItems[currentStudyIndex] 
+                          ? studyItems[currentStudyIndex].definition 
+                          : ''}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Learning controls - only show when card is flipped */}
+                {isFlipped && (
+                  <div className="flex items-center justify-center w-full max-w-xl mt-4 space-x-2">
+                    <button
+                      onClick={() => handleLearnResponse("hard")}
+                      className={`${buttonDanger} px-4 py-2 rounded-lg flex-1`}
+                    >
+                      Hard
+                    </button>
+                    <button
+                      onClick={() => handleLearnResponse("good")}
+                      className={`${buttonPrimary} px-4 py-2 rounded-lg flex-1`}
+                    >
+                      Good
+                    </button>
+                    <button
+                      onClick={() => handleLearnResponse("easy")}
+                      className={`${buttonSuccess} px-4 py-2 rounded-lg flex-1`}
+                    >
+                      Easy
+                    </button>
+                  </div>
+                )}
+                
+                {!isFlipped && (
+                  <div className="flex items-center justify-center w-full max-w-xl mt-4">
+                    <button
+                      onClick={handleFlipCard}
+                      className={`${buttonPrimary} px-4 py-2 rounded-lg`}
+                    >
+                      Show Definition
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Test Mode */}
+          {activeStudyMode === "test" && selectedFolder && testQuestions.length > 0 && (
+            <div className={`${cardClass} rounded-xl p-4 sm:p-6 animate-fadeIn shadow-lg`}>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className={`text-xl font-semibold ${headingClass} flex items-center`}>
+                  <Target className="w-5 h-5 mr-2" />
+                  Test: {selectedFolder.name}
+                </h2>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => setActiveStudyMode(null)}
+                    className={`${buttonSecondary} px-3 py-1.5 rounded-lg text-sm`}
+                  >
+                    Exit
+                  </button>
+                </div>
+              </div>
+
+              {testScore !== null ? (
+                <div className="text-center py-8">
+                  <h3 className={`text-2xl font-bold ${headingClass} mb-4`}>Your Score: {testScore}%</h3>
+                  <p className={`${subheadingClass} mb-6`}>
+                    You got {Math.round((testScore / 100) * testQuestions.length)} out of {testQuestions.length} correct.
+                  </p>
+                  <button
+                    onClick={() => {
+                      setTestScore(null)
+                      setTestAnswers({})
+                    }}
+                    className={`${buttonPrimary} px-4 py-2 rounded-lg mr-2`}
+                  >
+                    Try Again
+                  </button>
+                  <button
+                    onClick={() => setActiveStudyMode(null)}
+                    className={`${buttonSecondary} px-4 py-2 rounded-lg`}
+                  >
+                    Back to Folder
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  <div className="space-y-6 mb-6">
+                    {testQuestions.map((question, index) => (
+                      <div key={question.id} className="p-4 rounded-lg bg-gray-700/50">
+                        <div className="flex items-center mb-2">
+                          <span className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-white font-medium mr-2">
+                            {index + 1}
+                          </span>
+                          <h3 className={`font-medium ${headingClass}`}>
+                            {question.type === "term" ? "Define this term:" : "What is the term for this definition:"}
+                          </h3>
+                        </div>
+                        <p className={`${defaultTextColor} mb-3 p-3 rounded-lg ${isIlluminateEnabled ? "bg-gray-200" : "bg-gray-600"}`}>
+                          {question.type === "term" ? question.term : question.definition}
+                        </p>
+                        <div>
+                          <label className={`block text-sm font-medium mb-1 ${subheadingClass}`}>Your Answer:</label>
+                          <input
+                            type="text"
+                            value={testAnswers[question.id] || ""}
+                            onChange={(e) => setTestAnswers({...testAnswers, [question.id]: e.target.value})}
+                            className={`w-full p-2 rounded-lg ${inputBg} border border-gray-600`}
+                            placeholder="Type your answer here..."
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  <div className="flex justify-end">
+                    <button
+                      onClick={handleSubmitTest}
+                      className={`${buttonSuccess} px-4 py-2 rounded-lg`}
+                      disabled={Object.keys(testAnswers).length < testQuestions.length}
+                    >
+                      Submit Test
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Matching Game */}
+          {activeStudyMode === "match" && selectedFolder && matchingPairs.length > 0 && (
+            <div className={`${cardClass} rounded-xl p-4 sm:p-6 animate-fadeIn shadow-lg`}>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className={`text-xl font-semibold ${headingClass} flex items-center`}>
+                  <Gamepad2 className="w-5 h-5 mr-2" />
+                  Matching Game: {selectedFolder.name}
+                </h2>
+                <div className="flex items-center space-x-2">
+                  <span className={`${headingClass} font-medium`}>
+                    Matches: {matchingScore} / {matchingPairs.length / 2}
+                  </span>
+                  <button
+                    onClick={() => setActiveStudyMode(null)}
+                    className={`${buttonSecondary} px-3 py-1.5 rounded-lg text-sm`}
+                  >
+                    Exit
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {matchingPairs.map((pair) => (
+                  <div
+                    key={pair.id}
+                    onClick={() => !pair.matched && handleMatchingCardSelect(pair.id)}
+                    className={`aspect-w-3 aspect-h-4 rounded-lg cursor-pointer transition-all duration-300 transform ${
+                      pair.matched 
+                        ? isIlluminateEnabled ? 'bg-green-100 text-green-800' : 'bg-green-900/30 text-green-400'
+                        : pair.selected
+                          ? isIlluminateEnabled ? 'bg-blue-100 text-blue-800' : 'bg-blue-900/30 text-blue-400'
+                          : isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700'
+                    } ${pair.matched || pair.selected ? 'scale-[1.02]' : 'hover:scale-[1.02]'}`}
+                  >
+                    <div className="flex items-center justify-center p-2 text-center">
+                      {pair.matched || pair.selected ? (
+                        <p className="text-sm">{pair.content}</p>
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <span className={`${isIlluminateEnabled ? 'text-gray-400' : 'text-gray-500'}`}>
+                            {pair.type === "term" ? "Term" : "Definition"}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Quiz Mode */}
+          {activeStudyMode === "quiz" && selectedFolder && quizQuestions.length > 0 && (
+            <div className={`${cardClass} rounded-xl p-4 sm:p-6 animate-fadeIn shadow-lg`}>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className={`text-xl font-semibold ${headingClass} flex items-center`}>
+                  <Brain className="w-5 h-5 mr-2" />
+                  Quiz: {selectedFolder.name}
+                </h2>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => setActiveStudyMode(null)}
+                    className={`${buttonSecondary} px-3 py-1.5 rounded-lg text-sm`}
+                  >
+                    Exit
+                  </button>
+                </div>
+              </div>
+
+              {quizCompleted ? (
+                <div className="text-center py-8">
+                  <h3 className={`text-2xl font-bold ${headingClass} mb-4`}>Your Score: {quizScore}%</h3>
+                  <p className={`${subheadingClass} mb-6`}>
+                    You got {Math.round((quizScore! / 100) * quizQuestions.length)} out of {quizQuestions.length} correct.
+                  </p>
+                  
+                  <div className="space-y-4 mb-6 text-left">
+                    <h4 className={`font-medium ${headingClass}`}>Review Your Answers:</h4>
+                    {quizQuestions.map((question, index) => (
+                      <div key={question.id} className={`p-3 rounded-lg ${
+                        quizAnswers[question.id] === question.correctAnswer
+                          ? isIlluminateEnabled ? 'bg-green-100' : 'bg-green-900/30'
+                          : isIlluminateEnabled ? 'bg-red-100' : 'bg-red-900/30'
+                      }`}>
+                        <p className={`font-medium ${
+                          quizAnswers[question.id] === question.correctAnswer
+                            ? isIlluminateEnabled ? 'text-green-800' : 'text-green-400'
+                            : isIlluminateEnabled ? 'text-red-800' : 'text-red-400'
+                        }`}>
+                          Question {index + 1}: {question.question}
+                        </p>
+                        <div className="mt-2 space-y-1">
+                          {question.options.map((option, optIndex) => (
+                            <div key={optIndex} className={`p-2 rounded-lg ${
+                              optIndex === question.correctAnswer
+                                ? isIlluminateEnabled ? 'bg-green-200 text-green-800' : 'bg-green-900/50 text-green-400'
+                                : optIndex === quizAnswers[question.id] && optIndex !== question.correctAnswer
+                                  ? isIlluminateEnabled ? 'bg-red-200 text-red-800' : 'bg-red-900/50 text-red-400'
+                                  : isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700'
+                            }`}>
+                              {optIndex === question.correctAnswer && (
+                                <CheckCircle className="w-4 h-4 inline-block mr-2 text-green-500" />
+                              )}
+                              {option}
+                            </div>
+                          ))}
+                        </div>
+                        {question.explanation && (
+                          <div className="mt-2 p-2 rounded-lg bg-gray-700/30">
+                            <p className={`text-sm ${subheadingClass}`}>Explanation: {question.explanation}</p>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  
+                  <button
+                    onClick={() => {
+                      setQuizCompleted(false)
+                      setQuizAnswers({})
+                      setCurrentQuizIndex(0)
+                      setQuizScore(null)
+                    }}
+                    className={`${buttonPrimary} px-4 py-2 rounded-lg mr-2`}
+                  >
+                    Try Again
+                  </button>
+                  <button
+                    onClick={() => setActiveStudyMode(null)}
+                    className={`${buttonSecondary} px-4 py-2 rounded-lg`}
+                  >
+                    Back to Folder
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  <div className="mb-4">
+                    <div className="flex justify-between text-sm mb-1">
+                      <span>Question {currentQuizIndex + 1} of {quizQuestions.length}</span>
+                      <span>
+                        {Object.keys(quizAnswers).length} / {quizQuestions.length} answered
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-600 rounded-full h-2.5">
+                      <div 
+                        className="bg-blue-500 h-2.5 rounded-full" 
+                        style={{ 
+                          width: `${(currentQuizIndex / quizQuestions.length) * 100}%` 
+                        }}
+                      ></div>
+                    </div>
+                  </div>
+                  
+                  <div className="p-4 rounded-lg bg-gray-700/50 mb-6">
+                    <h3 className={`text-xl font-medium ${headingClass} mb-4`}>
+                      {quizQuestions[currentQuizIndex].question}
+                    </h3>
+                    
+                    <div className="space-y-2">
+                      {quizQuestions[currentQuizIndex].options.map((option, index) => (
+                        <div
+                          key={index}
+                          onClick={() => handleQuizAnswerSelect(quizQuestions[currentQuizIndex].id, index)}
+                          className={`p-3 rounded-lg cursor-pointer ${
+                            quizAnswers[quizQuestions[currentQuizIndex].id] === index
+                              ? buttonPrimary
+                              : isIlluminateEnabled ? 'bg-gray-200 hover:bg-gray-300' : 'bg-gray-600 hover:bg-gray-500'
+                          }`}
+                        >
+                          {option}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-between">
+                    <button
+                      onClick={() => {
+                        if (currentQuizIndex > 0) {
+                          setCurrentQuizIndex(currentQuizIndex - 1)
+                        }
+                      }}
+                      className={`${buttonSecondary} px-4 py-2 rounded-lg`}
+                      disabled={currentQuizIndex === 0}
+                    >
+                      Previous
+                    </button>
+                    
+                    {currentQuizIndex < quizQuestions.length - 1 ? (
+                      <button
+                        onClick={() => {
+                          setCurrentQuizIndex(currentQuizIndex + 1)
+                        }}
+                        className={`${buttonPrimary} px-4 py-2 rounded-lg`}
+                      >
+                        Next
+                      </button>
+                    ) : (
+                      <button
+                        onClick={handleSubmitQuiz}
+                        className={`${buttonSuccess} px-4 py-2 rounded-lg`}
+                        disabled={Object.keys(quizAnswers).length < quizQuestions.length}
+                      >
+                        Submit Quiz
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Main Content */}
-          {!isStudyMode && (
+          {!activeStudyMode && (
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
               {/* Left Column - Folders List */}
               <div className="lg:col-span-1">
@@ -1443,11 +2203,39 @@ export function Folders() {
                                       View Contents
                                     </button>
                                     <button
-                                      onClick={() => handleStartStudy(folder.id)}
+                                      onClick={() => handleStartFlashcards(folder.id)}
                                       className="w-full text-left px-3 py-1.5 hover:bg-gray-700 flex items-center text-sm"
                                     >
-                                      <Play className="w-3 h-3 mr-2" />
-                                      Study
+                                      <BookOpen className="w-3 h-3 mr-2" />
+                                      Flashcards
+                                    </button>
+                                    <button
+                                      onClick={() => handleStartLearn(folder.id)}
+                                      className="w-full text-left px-3 py-1.5 hover:bg-gray-700 flex items-center text-sm"
+                                    >
+                                      <Lightbulb className="w-3 h-3 mr-2" />
+                                      Learn
+                                    </button>
+                                    <button
+                                      onClick={() => handleStartTest(folder.id)}
+                                      className="w-full text-left px-3 py-1.5 hover:bg-gray-700 flex items-center text-sm"
+                                    >
+                                      <Target className="w-3 h-3 mr-2" />
+                                      Test
+                                    </button>
+                                    <button
+                                      onClick={() => handleStartMatching(folder.id)}
+                                      className="w-full text-left px-3 py-1.5 hover:bg-gray-700 flex items-center text-sm"
+                                    >
+                                      <Gamepad2 className="w-3 h-3 mr-2" />
+                                      Match
+                                    </button>
+                                    <button
+                                      onClick={() => handleStartQuiz(folder.id)}
+                                      className="w-full text-left px-3 py-1.5 hover:bg-gray-700 flex items-center text-sm"
+                                    >
+                                      <Brain className="w-3 h-3 mr-2" />
+                                      Quiz
                                     </button>
                                     <button
                                       onClick={() => handleToggleStar(folder.id)}
@@ -1501,30 +2289,76 @@ export function Folders() {
                           )}
 
                           {/* Expanded folder items preview */}
-                          {folder.isExpanded && folder.items.length > 0 && (
+                          {folder.isExpanded && (
                             <div className="mt-2 pl-5 space-y-1">
-                              {folder.items.slice(0, 3).map((item) => (
-                                <div
-                                  key={item.id}
-                                  className="text-xs py-1 px-2 rounded hover:bg-gray-600 flex items-center"
-                                  onClick={() => handleSelectFolder(folder)}
-                                >
-                                  {"options" in item ? (
-                                    <Brain className="w-3 h-3 mr-1 text-purple-400" />
-                                  ) : (
-                                    <FileText className="w-3 h-3 mr-1 text-blue-400" />
-                                  )}
-                                  <span className="truncate">
-                                    {item.question.length > 30 ? item.question.substring(0, 30) + "..." : item.question}
-                                  </span>
+                              {/* Subfolders */}
+                              {subFolders[folder.id]?.length > 0 && (
+                                <div className="mb-2">
+                                  <div className="text-xs font-medium mb-1 flex items-center">
+                                    <FolderTree className="w-3 h-3 mr-1" />
+                                    Subfolders
+                                  </div>
+                                  {subFolders[folder.id].map(subfolder => (
+                                    <div 
+                                      key={subfolder.id}
+                                      className="text-xs py-1 px-2 rounded hover:bg-gray-600 flex items-center justify-between"
+                                    >
+                                      <div className="flex items-center truncate">
+                                        <Folder className="w-3 h-3 mr-1 text-blue-400" />
+                                        <span className="truncate">{subfolder.name}</span>
+                                      </div>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          handleDeleteSubFolder(folder.id, subfolder.id)
+                                        }}
+                                        className="text-red-400 hover:text-red-300"
+                                      >
+                                        <Trash className="w-2.5 h-2.5" />
+                                      </button>
+                                    </div>
+                                  ))}
                                 </div>
-                              ))}
-                              {folder.items.length > 3 && (
-                                <div
-                                  className="text-xs text-center py-1 text-gray-400 hover:text-gray-300 cursor-pointer"
-                                  onClick={() => handleSelectFolder(folder)}
-                                >
-                                  + {folder.items.length - 3} more items
+                              )}
+                              
+                              {/* Items preview */}
+                              {folder.items.length > 0 ? (
+                                <>
+                                  <div className="text-xs font-medium mb-1 flex items-center">
+                                    <FileText className="w-3 h-3 mr-1" />
+                                    Items
+                                  </div>
+                                  {folder.items.slice(0, 3).map((item) => (
+                                    <div
+                                      key={item.id}
+                                      className="text-xs py-1 px-2 rounded hover:bg-gray-600 flex items-center"
+                                      onClick={() => handleSelectFolder(folder)}
+                                    >
+                                      {"options" in item ? (
+                                        <Brain className="w-3 h-3 mr-1 text-purple-400" />
+                                      ) : (
+                                        <FileText className="w-3 h-3 mr-1 text-blue-400" />
+                                      )}
+                                      <span className="truncate">
+                                        {"definition" in item 
+                                          ? (item.term.length > 30 ? item.term.substring(0, 30) + "..." : item.term)
+                                          : (item.question.length > 30 ? item.question.substring(0, 30) + "..." : item.question)
+                                        }
+                                      </span>
+                                    </div>
+                                  ))}
+                                  {folder.items.length > 3 && (
+                                    <div
+                                      className="text-xs text-center py-1 text-gray-400 hover:text-gray-300 cursor-pointer"
+                                      onClick={() => handleSelectFolder(folder)}
+                                    >
+                                      + {folder.items.length - 3} more items
+                                    </div>
+                                  )}
+                                </>
+                              ) : (
+                                <div className="text-xs text-gray-500 py-1">
+                                  No items in this folder
                                 </div>
                               )}
                             </div>
@@ -1564,11 +2398,11 @@ export function Folders() {
                       <div className="flex items-center space-x-2">
                         <div className="flex space-x-1">
                           <button
-                            onClick={() => handleStartStudy(selectedFolder.id)}
-                            className={`p-2 rounded-lg ${buttonSuccess} text-white`}
-                            title="Study Flashcards"
+                            onClick={() => setIsCreatingSubFolder(true)}
+                            className={`p-2 rounded-lg ${buttonSecondary}`}
+                            title="Create Subfolder"
                           >
-                            <Play className="w-4 h-4" />
+                            <FolderTree className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => setShowImportModal(true)}
@@ -1592,9 +2426,11 @@ export function Folders() {
                             // Reset form states
                             setQuestionOptions(["", "", "", ""])
                             setQuestionCorrectAnswer(0)
-                            setFlashcardQuestion("")
-                            setFlashcardAnswer("")
+                            setFlashcardTerm("")
+                            setFlashcardDefinition("")
                             setFlashcardTopic("")
+                            setQuestionText("")
+                            setQuestionExplanation("")
                           }}
                           className={`p-2 rounded-lg ${buttonPrimary} flex items-center space-x-1`}
                         >
@@ -1651,6 +2487,155 @@ export function Folders() {
                       </div>
                     </div>
 
+                    {/* Study Mode Buttons */}
+                    <div className="flex flex-wrap gap-2 mb-6">
+                      <button
+                        onClick={handleStartFlashcards}
+                        className={`px-3 py-1.5 rounded-lg text-sm ${buttonPrimary} flex items-center`}
+                      >
+                        <BookOpen className="w-4 h-4 mr-1" />
+                        Flashcards
+                      </button>
+                      <button
+                        onClick={handleStartLearn}
+                        className={`px-3 py-1.5 rounded-lg text-sm ${buttonSuccess} flex items-center`}
+                      >
+                        <Lightbulb className="w-4 h-4 mr-1" />
+                        Learn
+                      </button>
+                      <button
+                        onClick={handleStartTest}
+                        className={`px-3 py-1.5 rounded-lg text-sm ${buttonSecondary} flex items-center`}
+                      >
+                        <Target className="w-4 h-4 mr-1" />
+                        Test
+                      </button>
+                      <button
+                        onClick={handleStartMatching}
+                        className={`px-3 py-1.5 rounded-lg text-sm ${buttonSecondary} flex items-center`}
+                      >
+                        <Gamepad2 className="w-4 h-4 mr-1" />
+                        Match
+                      </button>
+                      {selectedFolder.items.some(item => 'options' in item) && (
+                        <button
+                          onClick={handleStartQuiz}
+                          className={`px-3 py-1.5 rounded-lg text-sm ${buttonSecondary} flex items-center`}
+                        >
+                          <Brain className="w-4 h-4 mr-1" />
+                          Quiz
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Create Subfolder Form */}
+                    {isCreatingSubFolder && (
+                      <div className={`mb-6 p-4 rounded-lg ${isIlluminateEnabled ? "bg-gray-200" : "bg-gray-700"}`}>
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className={`text-lg font-medium ${headingClass}`}>
+                            Create Subfolder
+                          </h3>
+                        </div>
+
+                        <div className="space-y-2">
+                          <div>
+                            <input
+                              type="text"
+                              value={newFolderName}
+                              onChange={(e) => setNewFolderName(e.target.value)}
+                              placeholder="Subfolder Name"
+                              className={`w-full p-2 rounded-lg ${inputBg} border border-gray-600 text-sm`}
+                            />
+                          </div>
+                          <div>
+                            <textarea
+                              value={newFolderDescription}
+                              onChange={(e) => setNewFolderDescription(e.target.value)}
+                              placeholder="Description (optional)"
+                              className={`w-full p-2 rounded-lg ${inputBg} border border-gray-600 text-sm`}
+                              rows={2}
+                            />
+                          </div>
+                          <div>
+                            <select
+                              value={newFolderType}
+                              onChange={(e) => setNewFolderType(e.target.value as "flashcard" | "question" | "mixed")}
+                              className={`w-full p-2 rounded-lg ${inputBg} border border-gray-600 text-sm`}
+                            >
+                              <option value="flashcard">Flashcards Only</option>
+                              <option value="question">Questions Only</option>
+                              <option value="mixed">Mixed Content</option>
+                            </select>
+                          </div>
+
+                          {/* Tags for subfolder */}
+                          <div>
+                            <div className="flex items-center space-x-1 mb-1">
+                              <input
+                                type="text"
+                                value={newFlashcardTag}
+                                onChange={(e) => setNewFlashcardTag(e.target.value)}
+                                placeholder="Add tags..."
+                                className={`flex-1 p-1.5 rounded-lg ${inputBg} border border-gray-600 text-sm`}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" && newFlashcardTag.trim()) {
+                                    setFlashcardTags([...flashcardTags, newFlashcardTag.trim()])
+                                    setNewFlashcardTag("")
+                                    e.preventDefault()
+                                  }
+                                }}
+                              />
+                              <button
+                                onClick={() => {
+                                  if (newFlashcardTag.trim()) {
+                                    setFlashcardTags([...flashcardTags, newFlashcardTag.trim()])
+                                    setNewFlashcardTag("")
+                                  }
+                                }}
+                                className={`p-1.5 rounded-lg ${buttonPrimary} text-sm`}
+                              >
+                                <Plus className="w-4 h-4" />
+                              </button>
+                            </div>
+
+                            <div className="flex flex-wrap gap-1">
+                              {flashcardTags.map((tag, index) => (
+                                <div
+                                  key={index}
+                                  className={`px-2 py-0.5 rounded-full text-xs flex items-center space-x-1 ${getTagColorClass(
+                                    tag,
+                                  )}`}
+                                >
+                                  <span>{tag}</span>
+                                  <button
+                                    onClick={() => setFlashcardTags(flashcardTags.filter((_, i) => i !== index))}
+                                    className="hover:text-red-500"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="flex justify-end space-x-2 pt-1">
+                            <button
+                              onClick={() => setIsCreatingSubFolder(false)}
+                              className={`px-3 py-1.5 rounded-lg text-xs ${buttonSecondary}`}
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={handleCreateSubFolder}
+                              className={`px-3 py-1.5 rounded-lg text-xs ${buttonPrimary}`}
+                            >
+                              Create
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Add Item Form */}
                     {isAddingItem && (
                       <div className={`mb-6 p-4 rounded-lg ${isIlluminateEnabled ? "bg-gray-200" : "bg-gray-700"}`}>
@@ -1664,6 +2649,8 @@ export function Folders() {
                                 onClick={() => {
                                   setNewItemType("flashcard")
                                   // Reset question form state when switching to flashcard
+                                  setQuestionText("")
+                                  setQuestionExplanation("")
                                   setQuestionOptions(["", "", "", ""])
                                   setQuestionCorrectAnswer(0)
                                 }}
@@ -1680,9 +2667,10 @@ export function Folders() {
                               <button
                                 onClick={() => {
                                   setNewItemType("question")
-                                  // Reset question form state when switching to question
-                                  setQuestionOptions(["", "", "", ""])
-                                  setQuestionCorrectAnswer(0)
+                                  // Reset flashcard form state when switching to question
+                                  setFlashcardTerm("")
+                                  setFlashcardDefinition("")
+                                  setFlashcardTopic("")
                                 }}
                                 className={`px-3 py-1.5 rounded-lg text-sm ${
                                   newItemType === "question"
@@ -1701,23 +2689,23 @@ export function Folders() {
                         {newItemType === "flashcard" ? (
                           <div className="space-y-4">
                             <div>
-                              <label className={`block text-sm font-medium mb-1 ${subheadingClass}`}>Question</label>
+                              <label className={`block text-sm font-medium mb-1 ${subheadingClass}`}>Term</label>
                               <textarea
-                                value={flashcardQuestion}
-                                onChange={(e) => setFlashcardQuestion(e.target.value)}
+                                value={flashcardTerm}
+                                onChange={(e) => setFlashcardTerm(e.target.value)}
                                 className={`w-full p-2 rounded-lg ${inputBg} border border-gray-600`}
-                                rows={3}
-                                placeholder="Enter your question"
+                                rows={2}
+                                placeholder="Enter the term"
                               />
                             </div>
                             <div>
-                              <label className={`block text-sm font-medium mb-1 ${subheadingClass}`}>Answer</label>
+                              <label className={`block text-sm font-medium mb-1 ${subheadingClass}`}>Definition</label>
                               <textarea
-                                value={flashcardAnswer}
-                                onChange={(e) => setFlashcardAnswer(e.target.value)}
+                                value={flashcardDefinition}
+                                onChange={(e) => setFlashcardDefinition(e.target.value)}
                                 className={`w-full p-2 rounded-lg ${inputBg} border border-gray-600`}
                                 rows={3}
-                                placeholder="Enter the answer"
+                                placeholder="Enter the definition"
                               />
                             </div>
                             <div>
@@ -1750,10 +2738,11 @@ export function Folders() {
                             <div>
                               <label className={`block text-sm font-medium mb-1 ${subheadingClass}`}>Question</label>
                               <textarea
+                                value={questionText}
+                                onChange={(e) => setQuestionText(e.target.value)}
                                 className={`w-full p-2 rounded-lg ${inputBg} border border-gray-600`}
                                 rows={3}
                                 placeholder="Enter your question"
-                                id="quiz-question"
                               />
                             </div>
                             <div>
@@ -1786,10 +2775,11 @@ export function Folders() {
                             <div>
                               <label className={`block text-sm font-medium mb-1 ${subheadingClass}`}>Explanation</label>
                               <textarea
+                                value={questionExplanation}
+                                onChange={(e) => setQuestionExplanation(e.target.value)}
                                 className={`w-full p-2 rounded-lg ${inputBg} border border-gray-600`}
                                 rows={2}
                                 placeholder="Explain why the correct answer is right"
-                                id="quiz-explanation"
                               />
                             </div>
                             <div className="flex justify-end space-x-2 pt-2">
@@ -1823,23 +2813,23 @@ export function Folders() {
                         {editingItem.type === "flashcard" ? (
                           <div className="space-y-4">
                             <div>
-                              <label className={`block text-sm font-medium mb-1 ${subheadingClass}`}>Question</label>
+                              <label className={`block text-sm font-medium mb-1 ${subheadingClass}`}>Term</label>
                               <textarea
-                                value={flashcardQuestion}
-                                onChange={(e) => setFlashcardQuestion(e.target.value)}
+                                value={flashcardTerm}
+                                onChange={(e) => setFlashcardTerm(e.target.value)}
                                 className={`w-full p-2 rounded-lg ${inputBg} border border-gray-600`}
-                                rows={3}
-                                placeholder="Enter your question"
+                                rows={2}
+                                placeholder="Enter the term"
                               />
                             </div>
                             <div>
-                              <label className={`block text-sm font-medium mb-1 ${subheadingClass}`}>Answer</label>
+                              <label className={`block text-sm font-medium mb-1 ${subheadingClass}`}>Definition</label>
                               <textarea
-                                value={flashcardAnswer}
-                                onChange={(e) => setFlashcardAnswer(e.target.value)}
+                                value={flashcardDefinition}
+                                onChange={(e) => setFlashcardDefinition(e.target.value)}
                                 className={`w-full p-2 rounded-lg ${inputBg} border border-gray-600`}
                                 rows={3}
-                                placeholder="Enter the answer"
+                                placeholder="Enter the definition"
                               />
                             </div>
                             <div>
@@ -1872,10 +2862,11 @@ export function Folders() {
                             <div>
                               <label className={`block text-sm font-medium mb-1 ${subheadingClass}`}>Question</label>
                               <textarea
+                                value={questionText}
+                                onChange={(e) => setQuestionText(e.target.value)}
                                 className={`w-full p-2 rounded-lg ${inputBg} border border-gray-600`}
                                 rows={3}
                                 placeholder="Enter your question"
-                                id="edit-quiz-question"
                               />
                             </div>
                             <div>
@@ -1908,10 +2899,11 @@ export function Folders() {
                             <div>
                               <label className={`block text-sm font-medium mb-1 ${subheadingClass}`}>Explanation</label>
                               <textarea
+                                value={questionExplanation}
+                                onChange={(e) => setQuestionExplanation(e.target.value)}
                                 className={`w-full p-2 rounded-lg ${inputBg} border border-gray-600`}
                                 rows={2}
                                 placeholder="Explain why the correct answer is right"
-                                id="edit-quiz-explanation"
                               />
                             </div>
                             <div className="flex justify-end space-x-2 pt-2">
@@ -1933,192 +2925,239 @@ export function Folders() {
                       </div>
                     )}
 
-                    {/* Folder Items */}
-                    {selectedFolder.items.length === 0 ? (
-                      <div className="text-center py-12">
-                        <p className={`${subheadingClass} mb-4`}>This folder is empty</p>
-                        <button
-                          onClick={() => {
-                            setIsAddingItem(true)
-                            setNewItemType(selectedFolder.type === "question" ? "question" : "flashcard")
-                            // Reset form states
-                            setQuestionOptions(["", "", "", ""])
-                            setQuestionCorrectAnswer(0)
-                            setFlashcardQuestion("")
-                            setFlashcardAnswer("")
-                            setFlashcardTopic("")
-                          }}
-                          className={`px-4 py-2 rounded-lg ${buttonPrimary} inline-flex items-center`}
-                        >
-                          <Plus className="w-4 h-4 mr-2" />
-                          Add your first {selectedFolder.type === "question" ? "question" : "flashcard"}
-                        </button>
-                      </div>
-                    ) : (
-                      <div className={viewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 gap-4" : "space-y-4"}>
-                        {selectedFolder.items.map((item) => (
-                          <div
-                            key={item.id}
-                            className={`p-4 rounded-lg ${
-                              isIlluminateEnabled
-                                ? "bg-gray-200"
-                                : "bg-gray-700/50"
-                            } hover:bg-opacity-90 transition-all`}
-                          >
-                            {"answer" in item ? (
-                              // Flashcard
-                              <div>
-                                <div className="flex items-center justify-between mb-2">
-                                  <div className="flex items-center">
-                                    <FileText className="w-4 h-4 mr-2 text-blue-400" />
-                                    <h3 className={`font-medium ${headingClass}`}>Flashcard</h3>
-                                  </div>
-                                  <div className="flex items-center space-x-2">
-                                    <button
-                                      onClick={() => toggleShowAnswer(item.id)}
-                                      className="p-1 rounded-full hover:bg-gray-600"
-                                      title={showAnswers[item.id] ? "Hide Answer" : "Show Answer"}
-                                    >
-                                      {showAnswers[item.id] ? (
-                                        <EyeOff className="w-4 h-4" />
-                                      ) : (
-                                        <Eye className="w-4 h-4" />
-                                      )}
-                                    </button>
-                                    <button
-                                      onClick={() => handleEditItem(item)}
-                                      className="p-1 rounded-full hover:bg-gray-600 text-blue-400"
-                                    >
-                                      <Edit className="w-4 h-4" />
-                                    </button>
-                                    <button
-                                      onClick={() => handleDeleteItem(item.id)}
-                                      className="p-1 rounded-full hover:bg-gray-600 text-red-400"
-                                    >
-                                      <Trash className="w-4 h-4" />
-                                    </button>
-                                  </div>
+                    {/* Subfolders Section */}
+                    {subFolders[selectedFolder.id]?.length > 0 && (
+                      <div className="mb-6">
+                        <h3 className={`text-lg font-medium ${headingClass} mb-3 flex items-center`}>
+                          <FolderTree className="w-5 h-5 mr-2" />
+                          Subfolders
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                          {subFolders[selectedFolder.id].map(subfolder => (
+                            <div 
+                              key={subfolder.id}
+                              className={`p-3 rounded-lg ${isIlluminateEnabled ? "bg-gray-200" : "bg-gray-700/50"} hover:bg-opacity-90 transition-all`}
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center">
+                                  <Folder className="w-4 h-4 mr-2 text-blue-400" />
+                                  <h4 className={`font-medium ${headingClass}`}>{subfolder.name}</h4>
                                 </div>
-                                <div className="mb-2">
-                                  <p className={`font-medium ${headingClass}`}>Question:</p>
-                                  <p className={defaultTextColor}>{item.question}</p>
-                                </div>
-                                {(showAnswers[item.id]) && (
-                                  <div className="mb-2">
-                                    <p className={`font-medium ${headingClass}`}>Answer:</p>
-                                    <p className={defaultTextColor}>{item.answer}</p>
-                                  </div>
-                                )}
-                                {item.topic && (
-                                  <div className="flex items-center">
-                                    <span
-                                      className={`text-xs px-2 py-0.5 rounded-full ${
-                                        isIlluminateEnabled ? "bg-blue-100 text-blue-700" : "bg-blue-900/30 text-blue-300"
-                                      }`}
-                                    >
-                                      {item.topic}
-                                    </span>
-                                  </div>
-                                )}
-                                <div className="mt-2 text-xs text-gray-400 flex items-center">
-                                  <Clock className="w-3 h-3 mr-1" />
-                                  Created: {item.createdAt.toLocaleDateString()}
-                                  {item.lastReviewed && (
-                                    <>
-                                      <span className="mx-2">•</span>
-                                      <Calendar className="w-3 h-3 mr-1" />
-                                      Last reviewed: {item.lastReviewed.toLocaleDateString()}
-                                    </>
-                                  )}
-                                </div>
+                                <button
+                                  onClick={() => handleDeleteSubFolder(selectedFolder.id, subfolder.id)}
+                                  className="p-1 rounded-full hover:bg-gray-600 text-red-400"
+                                >
+                                  <Trash className="w-4 h-4" />
+                                </button>
                               </div>
-                            ) : (
-                              // Question
-                              <div>
-                                <div className="flex items-center justify-between mb-2">
-                                  <div className="flex items-center">
-                                    <Brain className="w-4 h-4 mr-2 text-purple-400" />
-                                    <h3 className={`font-medium ${headingClass}`}>Quiz Question</h3>
-                                  </div>
-                                  <div className="flex items-center space-x-2">
-                                    <button
-                                      onClick={() => toggleShowAnswer(item.id)}
-                                      className="p-1 rounded-full hover:bg-gray-600"
-                                      title={showAnswers[item.id] ? "Hide Answer" : "Show Answer"}
-                                    >
-                                      {showAnswers[item.id] ? (
-                                        <EyeOff className="w-4 h-4" />
-                                      ) : (
-                                        <Eye className="w-4 h-4" />
-                                      )}
-                                    </button>
-                                    <button
-                                      onClick={() => handleEditItem(item)}
-                                      className="p-1 rounded-full hover:bg-gray-600 text-blue-400"
-                                    >
-                                      <Edit className="w-4 h-4" />
-                                    </button>
-                                    <button
-                                      onClick={() => handleDeleteItem(item.id)}
-                                      className="p-1 rounded-full hover:bg-gray-600 text-red-400"
-                                    >
-                                      <Trash className="w-4 h-4" />
-                                    </button>
-                                  </div>
-                                </div>
-                                <div className="mb-3">
-                                  <p className={`font-medium ${headingClass}`}>Question:</p>
-                                  <p className={defaultTextColor}>{item.question}</p>
-                                </div>
-                                {showAnswers[item.id] && (
-                                  <>
-                                    <div className="mb-3">
-                                      <p className={`font-medium ${headingClass}`}>Options:</p>
-                                      <div className="space-y-1 ml-2">
-                                        {item.options.map((option, index) => (
-                                          <div
-                                            key={index}
-                                            className={`flex items-center p-2 rounded-lg ${
-                                              index === item.correctAnswer
-                                                ? isIlluminateEnabled ? "bg-green-100 text-green-700" : "bg-green-900/30 text-green-300"
-                                                : isIlluminateEnabled ? "bg-gray-300" : "bg-gray-600"
-                                            }`}
-                                          >
-                                            {index === item.correctAnswer ? (
-                                              <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
-                                            ) : (
-                                              <div className="w-4 h-4 mr-2 rounded-full border border-gray-400 flex-shrink-0" />
-                                            )}
-                                            <span>{option}</span>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </div>
-                                    {item.explanation && (
-                                      <div className="mb-2">
-                                        <p className={`font-medium ${headingClass}`}>Explanation:</p>
-                                        <p className={defaultTextColor}>{item.explanation}</p>
-                                      </div>
-                                    )}
-                                  </>
-                                )}
-                                <div className="mt-2 text-xs text-gray-400 flex items-center">
-                                  <Clock className="w-3 h-3 mr-1" />
-                                  Created: {item.createdAt.toLocaleDateString()}
-                                  {item.lastReviewed && (
-                                    <>
-                                      <span className="mx-2">•</span>
-                                      <Calendar className="w-3 h-3 mr-1" />
-                                      Last reviewed: {item.lastReviewed.toLocaleDateString()}
-                                    </>
-                                  )}
-                                </div>
+                              {subfolder.description && (
+                                <p className={`text-sm ${subheadingClass} mb-2`}>{subfolder.description}</p>
+                              )}
+                              <div className="flex items-center justify-between">
+                                <span className={`text-xs px-1.5 py-0.5 rounded-full ${folderTypeColors[subfolder.type]} bg-opacity-20`}>
+                                  {subfolder.type === "flashcard" ? "Flashcards" : subfolder.type === "question" ? "Questions" : "Mixed"}
+                                </span>
+                                <span className="text-xs text-gray-400">{subfolder.itemCount || 0} items</span>
                               </div>
-                            )}
-                          </div>
-                        ))}
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
+
+                    {/* Folder Items */}
+                    <div>
+                      <h3 className={`text-lg font-medium ${headingClass} mb-3 flex items-center`}>
+                        <FileText className="w-5 h-5 mr-2" />
+                        Items
+                      </h3>
+                      
+                      {selectedFolder.items.length === 0 ? (
+                        <div className="text-center py-12">
+                          <p className={`${subheadingClass} mb-4`}>This folder is empty</p>
+                          <button
+                            onClick={() => {
+                              setIsAddingItem(true)
+                              setNewItemType(selectedFolder.type === "question" ? "question" : "flashcard")
+                              // Reset form states
+                              setQuestionOptions(["", "", "", ""])
+                              setQuestionCorrectAnswer(0)
+                              setFlashcardTerm("")
+                              setFlashcardDefinition("")
+                              setFlashcardTopic("")
+                            }}
+                            className={`px-4 py-2 rounded-lg ${buttonPrimary} inline-flex items-center`}
+                          >
+                            <Plus className="w-4 h-4 mr-2" />
+                            Add your first {selectedFolder.type === "question" ? "question" : "flashcard"}
+                          </button>
+                        </div>
+                      ) : (
+                        <div className={viewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 gap-4" : "space-y-4"}>
+                          {selectedFolder.items.map((item) => (
+                            <div
+                              key={item.id}
+                              className={`p-4 rounded-lg ${
+                                isIlluminateEnabled
+                                  ? "bg-gray-200"
+                                  : "bg-gray-700/50"
+                              } hover:bg-opacity-90 transition-all`}
+                            >
+                              {"definition" in item ? (
+                                // Flashcard
+                                <div>
+                                  <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center">
+                                      <FileText className="w-4 h-4 mr-2 text-blue-400" />
+                                      <h3 className={`font-medium ${headingClass}`}>Flashcard</h3>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                      <button
+                                        onClick={() => toggleShowAnswer(item.id)}
+                                        className="p-1 rounded-full hover:bg-gray-600"
+                                        title={showAnswers[item.id] ? "Hide Definition" : "Show Definition"}
+                                      >
+                                        {showAnswers[item.id] ? (
+                                          <EyeOff className="w-4 h-4" />
+                                        ) : (
+                                          <Eye className="w-4 h-4" />
+                                        )}
+                                      </button>
+                                      <button
+                                        onClick={() => handleEditItem(item)}
+                                        className="p-1 rounded-full hover:bg-gray-600 text-blue-400"
+                                      >
+                                        <Edit className="w-4 h-4" />
+                                      </button>
+                                      <button
+                                        onClick={() => handleDeleteItem(item.id)}
+                                        className="p-1 rounded-full hover:bg-gray-600 text-red-400"
+                                      >
+                                        <Trash className="w-4 h-4" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                  <div className="mb-2">
+                                    <p className={`font-medium ${headingClass}`}>Term:</p>
+                                    <p className={defaultTextColor}>{item.term}</p>
+                                  </div>
+                                  {(showAnswers[item.id]) && (
+                                    <div className="mb-2">
+                                      <p className={`font-medium ${headingClass}`}>Definition:</p>
+                                      <p className={defaultTextColor}>{item.definition}</p>
+                                    </div>
+                                  )}
+                                  {item.topic && (
+                                    <div className="flex items-center">
+                                      <span
+                                        className={`text-xs px-2 py-0.5 rounded-full ${
+                                          isIlluminateEnabled ? "bg-blue-100 text-blue-700" : "bg-blue-900/30 text-blue-300"
+                                        }`}
+                                      >
+                                        {item.topic}
+                                      </span>
+                                    </div>
+                                  )}
+                                  <div className="mt-2 text-xs text-gray-400 flex items-center">
+                                    <Clock className="w-3 h-3 mr-1" />
+                                    Created: {item.createdAt.toLocaleDateString()}
+                                    {item.lastReviewed && (
+                                      <>
+                                        <span className="mx-2">•</span>
+                                        <Calendar className="w-3 h-3 mr-1" />
+                                        Last reviewed: {item.lastReviewed.toLocaleDateString()}
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              ) : (
+                                // Question
+                                <div>
+                                  <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center">
+                                      <Brain className="w-4 h-4 mr-2 text-purple-400" />
+                                      <h3 className={`font-medium ${headingClass}`}>Quiz Question</h3>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                      <button
+                                        onClick={() => toggleShowAnswer(item.id)}
+                                        className="p-1 rounded-full hover:bg-gray-600"
+                                        title={showAnswers[item.id] ? "Hide Answer" : "Show Answer"}
+                                      >
+                                        {showAnswers[item.id] ? (
+                                          <EyeOff className="w-4 h-4" />
+                                        ) : (
+                                          <Eye className="w-4 h-4" />
+                                        )}
+                                      </button>
+                                      <button
+                                        onClick={() => handleEditItem(item)}
+                                        className="p-1 rounded-full hover:bg-gray-600 text-blue-400"
+                                      >
+                                        <Edit className="w-4 h-4" />
+                                      </button>
+                                      <button
+                                        onClick={() => handleDeleteItem(item.id)}
+                                        className="p-1 rounded-full hover:bg-gray-600 text-red-400"
+                                      >
+                                        <Trash className="w-4 h-4" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                  <div className="mb-3">
+                                    <p className={`font-medium ${headingClass}`}>Question:</p>
+                                    <p className={defaultTextColor}>{item.question}</p>
+                                  </div>
+                                  {showAnswers[item.id] && (
+                                    <>
+                                      <div className="mb-3">
+                                        <p className={`font-medium ${headingClass}`}>Options:</p>
+                                        <div className="space-y-1 ml-2">
+                                          {item.options.map((option, index) => (
+                                            <div
+                                              key={index}
+                                              className={`flex items-center p-2 rounded-lg ${
+                                                index === item.correctAnswer
+                                                  ? isIlluminateEnabled ? "bg-green-100 text-green-700" : "bg-green-900/30 text-green-300"
+                                                  : isIlluminateEnabled ? "bg-gray-300" : "bg-gray-600"
+                                              }`}
+                                            >
+                                              {index === item.correctAnswer ? (
+                                                <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
+                                              ) : (
+                                                <div className="w-4 h-4 mr-2 rounded-full border border-gray-400 flex-shrink-0" />
+                                              )}
+                                              <span>{option}</span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                      {item.explanation && (
+                                        <div className="mb-2">
+                                          <p className={`font-medium ${headingClass}`}>Explanation:</p>
+                                          <p className={defaultTextColor}>{item.explanation}</p>
+                                        </div>
+                                      )}
+                                    </>
+                                  )}
+                                  <div className="mt-2 text-xs text-gray-400 flex items-center">
+                                    <Clock className="w-3 h-3 mr-1" />
+                                    Created: {item.createdAt.toLocaleDateString()}
+                                    {item.lastReviewed && (
+                                      <>
+                                        <span className="mx-2">•</span>
+                                        <Calendar className="w-3 h-3 mr-1" />
+                                        Last reviewed: {item.lastReviewed.toLocaleDateString()}
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ) : (
                   <div
@@ -2153,45 +3192,45 @@ export function Folders() {
                     <div className="flex items-center justify-between mb-4">
                       <h2 className={`text-xl font-semibold ${illuminateTextBlue} flex items-center`}>
                         <MessageCircle className="w-5 h-5 mr-2" />
-                        Organization Tips
+                        Study Tips
                       </h2>
                     </div>
                     <div className="space-y-3">
                       <div className={`p-3 rounded-lg ${isIlluminateEnabled ? "bg-blue-100" : "bg-blue-900/20"}`}>
                         <div className="flex items-start">
-                          <Zap className={`w-5 h-5 mr-2 mt-0.5 ${isIlluminateEnabled ? 'text-blue-600' : 'text-blue-400'}`} />
+                          <BookOpen className={`w-5 h-5 mr-2 mt-0.5 ${isIlluminateEnabled ? 'text-blue-600' : 'text-blue-400'}`} />
                           <div>
                             <p className={`font-medium ${isIlluminateEnabled ? 'text-blue-700' : 'text-blue-300'}`}>
-                              Use Tags for Organization
+                              Flashcards Mode
                             </p>
                             <p className={defaultTextColor}>
-                              Add tags to your folders to categorize and filter your content more effectively.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                      <div className={`p-3 rounded-lg ${isIlluminateEnabled ? 'bg-purple-100' : 'bg-purple-900/20'}`}>
-                        <div className="flex items-start">
-                          <Brain className={`w-5 h-5 mr-2 mt-0.5 ${isIlluminateEnabled ? 'text-purple-600' : 'text-purple-400'}`} />
-                          <div>
-                            <p className={`font-medium ${isIlluminateEnabled ? 'text-purple-700' : 'text-purple-300'}`}>
-                              Create Topic-Based Folders
-                            </p>
-                            <p className={defaultTextColor}>
-                              Organize your flashcards and questions by subject or topic for more focused learning.
+                              Review your terms and definitions with interactive flashcards that you can flip through.
                             </p>
                           </div>
                         </div>
                       </div>
                       <div className={`p-3 rounded-lg ${isIlluminateEnabled ? 'bg-green-100' : 'bg-green-900/20'}`}>
                         <div className="flex items-start">
-                          <Repeat className={`w-5 h-5 mr-2 mt-0.5 ${isIlluminateEnabled ? 'text-green-600' : 'text-green-400'}`} />
+                          <Lightbulb className={`w-5 h-5 mr-2 mt-0.5 ${isIlluminateEnabled ? 'text-green-600' : 'text-green-400'}`} />
                           <div>
                             <p className={`font-medium ${isIlluminateEnabled ? 'text-green-700' : 'text-green-300'}`}>
-                              Import and Export
+                              Learn Mode
                             </p>
                             <p className={defaultTextColor}>
-                              Use the import/export features to back up your content or share it with others.
+                              Adaptive learning that focuses on terms you find difficult until you master them.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className={`p-3 rounded-lg ${isIlluminateEnabled ? 'bg-purple-100' : 'bg-purple-900/20'}`}>
+                        <div className="flex items-start">
+                          <Target className={`w-5 h-5 mr-2 mt-0.5 ${isIlluminateEnabled ? 'text-purple-600' : 'text-purple-400'}`} />
+                          <div>
+                            <p className={`font-medium ${isIlluminateEnabled ? 'text-purple-700' : 'text-purple-300'}`}>
+                              Test & Match Modes
+                            </p>
+                            <p className={defaultTextColor}>
+                              Challenge yourself with written tests or play matching games to reinforce your knowledge.
                             </p>
                           </div>
                         </div>
@@ -2211,7 +3250,7 @@ export function Folders() {
           <div className={`${cardClass} rounded-xl p-6 max-w-lg w-full shadow-xl animate-fadeIn`}>
             <h2 className={`text-xl font-semibold ${headingClass} mb-4`}>Import Flashcards</h2>
             <p className={`${subheadingClass} mb-4 text-sm`}>
-              Enter your flashcards in the format: Question{importSeparator}Answer{importSeparator}Topic (optional)
+              Enter your flashcards in the format: Term{importSeparator}Definition{importSeparator}Topic (optional)
               <br />
               One flashcard per line.
             </p>
@@ -2237,7 +3276,7 @@ export function Folders() {
                 onChange={(e) => setImportText(e.target.value)}
                 className={`w-full p-2 rounded-lg ${inputBg} border border-gray-600 text-sm`}
                 rows={10}
-                placeholder={`Question${importSeparator}Answer${importSeparator}Topic\nWhat is the capital of France?${importSeparator}Paris${importSeparator}Geography`}
+                placeholder={`Term${importSeparator}Definition${importSeparator}Topic\nMitochondria${importSeparator}Powerhouse of the cell${importSeparator}Biology`}
               />
             </div>
 

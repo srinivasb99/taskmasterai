@@ -3060,8 +3060,6 @@ return (
                                 <div className="mt-2 text-xs text-gray-400 flex items-center">
                                   <Clock className="w-3 h-3 mr-1" />
                                   Created: {item.createdAt.toLocaleDateString()}
-                                  />
-                                  Created: {item.createdAt.toLocaleDateString()}
                                   {item.lastReviewed && (
                                     <>
                                       <span className="mx-2">•</span>

@@ -1,60 +1,32 @@
-"use client"
-
-import { useState, useEffect, useRef } from "react"
+import React, { useState, useEffect, useRef } from "react"
 import { useNavigate } from "react-router-dom"
-import {
-  Folder,
-  FolderPlus,
-  Edit,
-  Trash,
-  Search,
-  X,
-  ChevronRight,
-  ChevronDown,
-  FileText,
-  Brain,
-  Star,
-  MoreHorizontal,
-  Plus,
-  Clock,
-  Calendar,
-  CheckCircle,
-  Sparkles,
-  MessageCircle,
-  Play,
-  BookOpen,
-  Tag,
-  Download,
-  Upload,
-  Filter,
-  LayoutGrid,
-  List,
-  Zap,
-  Repeat,
-} from "lucide-react"
+import { Folder, FolderPlus, Edit, Trash, Search, X, ChevronRight, ChevronDown, FileText, Brain, Star, MoreHorizontal, Plus, Clock, Calendar, CheckCircle, AlertCircle, Sparkles, MessageCircle, Play, BookOpen, Tag, Download, Upload, Copy, Printer, Share2, Settings, Filter, SortAsc, Bookmark, Layers, LayoutGrid, List, Zap, Award, Repeat, Shuffle, ArrowLeft, ArrowRight, Eye, EyeOff, RefreshCw } from 'lucide-react'
 import { Sidebar } from "./Sidebar"
-import { FlashcardsQuestions } from "./FlashcardsQuestions"
 import { auth } from "../lib/firebase"
 import {
-  type FolderWithItems,
-  type FolderItem,
+  FolderData,
+  FolderWithItems,
+  Flashcard,
+  Question,
+  FolderItem,
   createFolder,
   updateFolder,
   deleteFolder,
   toggleFolderStar,
   onFoldersSnapshot,
   getFolderItems,
+  onFolderItemsSnapshot,
   addFlashcard,
   addQuestion,
   deleteItem,
+  updateLastReviewed,
   getItemsForStudy,
   addTagToFolder,
   removeTagFromFolder,
   getAllTags,
+  updateFlashcard,
+  updateQuestion
 } from "../lib/folders-firebase"
-
-// Study modes
-type StudyMode = "flashcards" | "quiz" | "match" | "learn" | "test"
 
 export function Folders() {
   // State variables
@@ -92,20 +64,23 @@ export function Folders() {
   const [newItemType, setNewItemType] = useState<"flashcard" | "question">("flashcard")
   const [cardVisible, setCardVisible] = useState(false)
   const [isStudyMode, setIsStudyMode] = useState(false)
-  const [studyMode, setStudyMode] = useState<StudyMode>("flashcards")
   const [studyItems, setStudyItems] = useState<FolderItem[]>([])
+  const [currentStudyIndex, setCurrentStudyIndex] = useState(0)
+  const [isFlipped, setIsFlipped] = useState(false)
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
   const [sortBy, setSortBy] = useState<"name" | "date" | "lastStudied">("date")
   const [tags, setTags] = useState<string[]>([])
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [newTag, setNewTag] = useState("")
-  const [folderTags, setFolderTags] = useState<{ [folderId: string]: string[] }>({})
+  const [folderTags, setFolderTags] = useState<{[folderId: string]: string[]}>({})
   const [showTagsDropdown, setShowTagsDropdown] = useState(false)
-  const [studyProgress, setStudyProgress] = useState<{ [itemId: string]: number }>({})
+  const [studyProgress, setStudyProgress] = useState<{[itemId: string]: number}>({})
   const [showImportModal, setShowImportModal] = useState(false)
   const [importText, setImportText] = useState("")
   const [importSeparator, setImportSeparator] = useState("\t")
   const [showFilterPanel, setShowFilterPanel] = useState(false)
+  const [activeDropdownId, setActiveDropdownId] = useState<string | null>(null)
+  const [editingItem, setEditingItem] = useState<{id: string, type: "flashcard" | "question"} | null>(null)
 
   // State for question form
   const [questionOptions, setQuestionOptions] = useState<string[]>(["", "", "", ""])
@@ -117,9 +92,11 @@ export function Folders() {
   const [flashcardTopic, setFlashcardTopic] = useState("")
   const [flashcardTags, setFlashcardTags] = useState<string[]>([])
   const [newFlashcardTag, setNewFlashcardTag] = useState("")
+  const [showAnswers, setShowAnswers] = useState<{[id: string]: boolean}>({})
 
   const navigate = useNavigate()
   const tagsDropdownRef = useRef<HTMLDivElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
   // Effect for card animation on mount
   useEffect(() => {
@@ -162,6 +139,10 @@ export function Folders() {
     function handleClickOutside(event: MouseEvent) {
       if (tagsDropdownRef.current && !tagsDropdownRef.current.contains(event.target as Node)) {
         setShowTagsDropdown(false)
+      }
+      
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setActiveDropdownId(null)
       }
     }
     document.addEventListener("mousedown", handleClickOutside)
@@ -245,7 +226,9 @@ export function Folders() {
           const items = await getFolderItems(user.uid, folderId)
 
           setFolders((prevFolders) =>
-            prevFolders.map((folder) => (folder.id === folderId ? { ...folder, items, isExpanded: true } : folder)),
+            prevFolders.map((folder) =>
+              folder.id === folderId ? { ...folder, items, isExpanded: true } : folder,
+            ),
           )
         } catch (error) {
           console.error("Error fetching folder items:", error)
@@ -405,13 +388,16 @@ export function Folders() {
         setIsStudyMode(false)
         setStudyItems([])
       }
+      
+      // Close any open dropdown
+      setActiveDropdownId(null)
     } catch (error) {
       console.error("Error selecting folder:", error)
     }
   }
 
   // Start study mode for a folder
-  const handleStartStudy = async (folderId: string, mode: StudyMode = "flashcards") => {
+  const handleStartStudy = async (folderId: string) => {
     if (!user) return
 
     try {
@@ -424,7 +410,8 @@ export function Folders() {
       }
 
       setStudyItems(items)
-      setStudyMode(mode)
+      setCurrentStudyIndex(0)
+      setIsFlipped(false)
       setIsStudyMode(true)
 
       // Find and select the folder
@@ -432,8 +419,39 @@ export function Folders() {
       if (folder) {
         setSelectedFolder({ ...folder, items })
       }
+      
+      // Close any open dropdown
+      setActiveDropdownId(null)
     } catch (error) {
       console.error("Error starting study session:", error)
+    }
+  }
+
+  // Handle study navigation
+  const handleNextCard = () => {
+    if (currentStudyIndex < studyItems.length - 1) {
+      setCurrentStudyIndex(currentStudyIndex + 1)
+      setIsFlipped(false)
+    } else {
+      // End of study session
+      handleStudyComplete()
+    }
+  }
+
+  const handlePrevCard = () => {
+    if (currentStudyIndex > 0) {
+      setCurrentStudyIndex(currentStudyIndex - 1)
+      setIsFlipped(false)
+    }
+  }
+
+  const handleFlipCard = () => {
+    setIsFlipped(!isFlipped)
+    
+    // Mark as reviewed when flipped to answer
+    if (!isFlipped && studyItems[currentStudyIndex]) {
+      const item = studyItems[currentStudyIndex]
+      updateLastReviewed(user.uid, selectedFolder!.id, item.id)
     }
   }
 
@@ -442,6 +460,7 @@ export function Folders() {
     // Exit study mode
     setIsStudyMode(false)
     setStudyItems([])
+    setCurrentStudyIndex(0)
 
     // Refresh the selected folder if needed
     if (selectedFolder) {
@@ -452,6 +471,14 @@ export function Folders() {
         console.error("Error refreshing folder after study:", error)
       }
     }
+  }
+
+  // Toggle showing answer for a specific item
+  const toggleShowAnswer = (itemId: string) => {
+    setShowAnswers(prev => ({
+      ...prev,
+      [itemId]: !prev[itemId]
+    }))
   }
 
   // Add a new flashcard
@@ -538,6 +565,112 @@ export function Folders() {
     }
   }
 
+  // Edit an existing item
+  const handleEditItem = (item: FolderItem) => {
+    if ('answer' in item) {
+      // Flashcard
+      setEditingItem({ id: item.id, type: 'flashcard' })
+      setFlashcardQuestion(item.question)
+      setFlashcardAnswer(item.answer)
+      setFlashcardTopic(item.topic || '')
+    } else {
+      // Question
+      setEditingItem({ id: item.id, type: 'question' })
+      setQuestionOptions([...item.options])
+      setQuestionCorrectAnswer(item.correctAnswer)
+      
+      // Set values for the form elements that will be rendered
+      setTimeout(() => {
+        const questionElem = document.getElementById("edit-quiz-question") as HTMLTextAreaElement
+        const explanationElem = document.getElementById("edit-quiz-explanation") as HTMLTextAreaElement
+        
+        if (questionElem) questionElem.value = item.question
+        if (explanationElem) explanationElem.value = item.explanation || ''
+      }, 0)
+    }
+  }
+
+  // Update an existing flashcard
+  const handleUpdateFlashcard = async () => {
+    if (!user || !selectedFolder || !editingItem) return
+
+    if (!flashcardQuestion.trim() || !flashcardAnswer.trim()) {
+      alert("Question and answer are required")
+      return
+    }
+
+    try {
+      await updateFlashcard(user.uid, selectedFolder.id, editingItem.id, {
+        question: flashcardQuestion,
+        answer: flashcardAnswer,
+        topic: flashcardTopic,
+      })
+
+      // Refresh folder items
+      const items = await getFolderItems(user.uid, selectedFolder.id)
+
+      // Update selected folder
+      setSelectedFolder({ ...selectedFolder, items })
+
+      // Update folder in folders array
+      setFolders((prevFolders) =>
+        prevFolders.map((folder) =>
+          folder.id === selectedFolder.id ? { ...folder, items, itemCount: items.length } : folder,
+        ),
+      )
+
+      // Reset form
+      setFlashcardQuestion("")
+      setFlashcardAnswer("")
+      setFlashcardTopic("")
+      setEditingItem(null)
+    } catch (error) {
+      console.error("Error updating flashcard:", error)
+    }
+  }
+
+  // Update an existing question
+  const handleUpdateQuestion = async () => {
+    if (!user || !selectedFolder || !editingItem) return
+
+    const question = document.getElementById("edit-quiz-question") as HTMLTextAreaElement
+    const explanation = document.getElementById("edit-quiz-explanation") as HTMLTextAreaElement
+
+    if (!question.value.trim() || questionOptions.some((opt) => !opt.trim())) {
+      alert("Question and all options are required")
+      return
+    }
+
+    try {
+      await updateQuestion(user.uid, selectedFolder.id, editingItem.id, {
+        question: question.value,
+        options: questionOptions,
+        correctAnswer: questionCorrectAnswer,
+        explanation: explanation?.value || "",
+      })
+
+      // Refresh folder items
+      const items = await getFolderItems(user.uid, selectedFolder.id)
+
+      // Update selected folder
+      setSelectedFolder({ ...selectedFolder, items })
+
+      // Update folder in folders array
+      setFolders((prevFolders) =>
+        prevFolders.map((folder) =>
+          folder.id === selectedFolder.id ? { ...folder, items, itemCount: items.length } : folder,
+        ),
+      )
+
+      // Reset form
+      setQuestionOptions(["", "", "", ""])
+      setQuestionCorrectAnswer(0)
+      setEditingItem(null)
+    } catch (error) {
+      console.error("Error updating question:", error)
+    }
+  }
+
   // Delete an item
   const handleDeleteItem = async (itemId: string) => {
     if (!user || !selectedFolder) return
@@ -575,7 +708,7 @@ export function Folders() {
     if (!user || !selectedFolder || !importText.trim()) return
 
     const lines = importText.trim().split("\n")
-    const importedItems: { question: string; answer: string; topic?: string }[] = []
+    const importedItems: {question: string; answer: string; topic?: string}[] = []
 
     lines.forEach((line) => {
       const parts = line.split(importSeparator)
@@ -643,12 +776,22 @@ export function Folders() {
 
     // Create download link
     const element = document.createElement("a")
-    const file = new Blob([exportText], { type: "text/plain" })
+    const file = new Blob([exportText], {type: "text/plain"})
     element.href = URL.createObjectURL(file)
     element.download = `${selectedFolder.name}_export.txt`
     document.body.appendChild(element)
     element.click()
     document.body.removeChild(element)
+  }
+
+  // Toggle dropdown menu for a folder
+  const toggleDropdown = (folderId: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (activeDropdownId === folderId) {
+      setActiveDropdownId(null)
+    } else {
+      setActiveDropdownId(folderId)
+    }
   }
 
   // Filter folders based on search query and selected tags
@@ -659,7 +802,8 @@ export function Folders() {
       folder.description?.toLowerCase().includes(searchQuery.toLowerCase())
 
     // Filter by selected tags
-    const matchesTags = selectedTags.length === 0 || selectedTags.some((tag) => folderTags[folder.id]?.includes(tag))
+    const matchesTags =
+      selectedTags.length === 0 || selectedTags.some((tag) => folderTags[folder.id]?.includes(tag))
 
     return matchesSearch && matchesTags
   })
@@ -786,7 +930,7 @@ export function Folders() {
           {/* Top Bar with Actions */}
           <div className={`${cardClass} rounded-xl p-4 flex items-center justify-between shadow-md`}>
             <div className="flex items-center space-x-4">
-              <h1 className={`text-xl font-bold ${headingClass}`}>Study Materials</h1>
+              <h1 className={`text-xl font-bold ${headingClass}`}>Knowledge Library</h1>
               <div className="hidden md:flex space-x-2">
                 <button
                   onClick={() => setViewMode("grid")}
@@ -813,7 +957,9 @@ export function Folders() {
               <div className="relative">
                 <button
                   onClick={() => setShowFilterPanel(!showFilterPanel)}
-                  className={`p-2 rounded-lg transition-colors ${showFilterPanel ? buttonPrimary : buttonSecondary}`}
+                  className={`p-2 rounded-lg transition-colors ${
+                    showFilterPanel ? buttonPrimary : buttonSecondary
+                  }`}
                   title="Filter"
                 >
                   <Filter className="w-4 h-4" />
@@ -927,33 +1073,8 @@ export function Folders() {
                   Study Session: {selectedFolder.name}
                 </h2>
                 <div className="flex items-center space-x-2">
-                  <div className="flex bg-gray-700 rounded-lg overflow-hidden">
-                    <button
-                      onClick={() => setStudyMode("flashcards")}
-                      className={`px-3 py-1.5 text-sm ${
-                        studyMode === "flashcards" ? buttonPrimary : "hover:bg-gray-600"
-                      }`}
-                    >
-                      Flashcards
-                    </button>
-                    <button
-                      onClick={() => setStudyMode("quiz")}
-                      className={`px-3 py-1.5 text-sm ${studyMode === "quiz" ? buttonPrimary : "hover:bg-gray-600"}`}
-                    >
-                      Quiz
-                    </button>
-                    <button
-                      onClick={() => setStudyMode("match")}
-                      className={`px-3 py-1.5 text-sm ${studyMode === "match" ? buttonPrimary : "hover:bg-gray-600"}`}
-                    >
-                      Match
-                    </button>
-                  </div>
                   <button
-                    onClick={() => {
-                      setIsStudyMode(false)
-                      setStudyItems([])
-                    }}
+                    onClick={handleStudyComplete}
                     className={`${buttonSecondary} px-3 py-1.5 rounded-lg text-sm`}
                   >
                     Exit
@@ -961,15 +1082,103 @@ export function Folders() {
                 </div>
               </div>
 
-              {/* Render FlashcardsQuestions component */}
-              <div className="mt-4">
-                {studyItems.length > 0 && (
-                  <FlashcardsQuestions
-                    type={studyItems[0].hasOwnProperty("answer") ? "flashcard" : "question"}
-                    data={studyItems as any[]}
-                    onComplete={handleStudyComplete}
-                  />
-                )}
+              {/* Study Card */}
+              <div className="flex flex-col items-center justify-center">
+                <div className="text-sm mb-2">
+                  Card {currentStudyIndex + 1} of {studyItems.length}
+                </div>
+                
+                <div 
+                  className={`w-full max-w-xl h-64 rounded-xl ${cardClass} shadow-lg cursor-pointer transition-all duration-300 transform hover:scale-[1.02] relative overflow-hidden`}
+                  onClick={handleFlipCard}
+                >
+                  <div className={`absolute inset-0 flex items-center justify-center p-6 transition-all duration-500 ${isFlipped ? 'opacity-0 rotate-y-180' : 'opacity-100'}`}>
+                    <div className="text-center">
+                      <h3 className={`text-xl font-semibold ${headingClass} mb-4`}>Question</h3>
+                      <p className={`${defaultTextColor} text-lg`}>
+                        {studyItems[currentStudyIndex] && 'question' in studyItems[currentStudyIndex] 
+                          ? studyItems[currentStudyIndex].question 
+                          : ''}
+                      </p>
+                      
+                      {'options' in studyItems[currentStudyIndex] && (
+                        <div className="mt-4 space-y-2 text-left">
+                          {(studyItems[currentStudyIndex] as Question).options.map((option, idx) => (
+                            <div key={idx} className={`p-2 rounded-lg ${isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700'}`}>
+                              {option}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div className={`absolute inset-0 flex items-center justify-center p-6 transition-all duration-500 ${isFlipped ? 'opacity-100' : 'opacity-0 rotate-y-180'}`}>
+                    <div className="text-center">
+                      <h3 className={`text-xl font-semibold ${headingClass} mb-4`}>Answer</h3>
+                      {'answer' in studyItems[currentStudyIndex] ? (
+                        <p className={`${defaultTextColor} text-lg`}>
+                          {studyItems[currentStudyIndex].answer}
+                        </p>
+                      ) : (
+                        <div className="space-y-2 text-left">
+                          {(studyItems[currentStudyIndex] as Question).options.map((option, idx) => (
+                            <div 
+                              key={idx} 
+                              className={`p-2 rounded-lg ${
+                                idx === (studyItems[currentStudyIndex] as Question).correctAnswer
+                                  ? isIlluminateEnabled ? 'bg-green-100 text-green-800' : 'bg-green-900/30 text-green-400'
+                                  : isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700'
+                              }`}
+                            >
+                              {idx === (studyItems[currentStudyIndex] as Question).correctAnswer && (
+                                <CheckCircle className="w-4 h-4 inline-block mr-2 text-green-500" />
+                              )}
+                              {option}
+                            </div>
+                          ))}
+                          
+                          {(studyItems[currentStudyIndex] as Question).explanation && (
+                            <div className="mt-4">
+                              <p className={`${headingClass} font-medium`}>Explanation:</p>
+                              <p className={defaultTextColor}>{(studyItems[currentStudyIndex] as Question).explanation}</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex items-center justify-between w-full max-w-xl mt-4">
+                  <button
+                    onClick={handlePrevCard}
+                    disabled={currentStudyIndex === 0}
+                    className={`${buttonSecondary} p-2 rounded-lg ${currentStudyIndex === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    <ArrowLeft className="w-5 h-5" />
+                  </button>
+                  
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={handleFlipCard}
+                      className={`${buttonPrimary} px-4 py-2 rounded-lg`}
+                    >
+                      {isFlipped ? 'Show Question' : 'Show Answer'}
+                    </button>
+                  </div>
+                  
+                  <button
+                    onClick={handleNextCard}
+                    className={`${buttonPrimary} p-2 rounded-lg`}
+                  >
+                    {currentStudyIndex === studyItems.length - 1 ? (
+                      <CheckCircle className="w-5 h-5" />
+                    ) : (
+                      <ArrowRight className="w-5 h-5" />
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -1214,53 +1423,65 @@ export function Folders() {
                               >
                                 {folder.itemCount}
                               </span>
-                              <div className="relative group">
-                                <button className="p-1 rounded-full hover:bg-gray-600">
+                              <div className="relative">
+                                <button 
+                                  className="p-1 rounded-full hover:bg-gray-600"
+                                  onClick={(e) => toggleDropdown(folder.id, e)}
+                                >
                                   <MoreHorizontal className="w-3 h-3" />
                                 </button>
-                                <div className="absolute right-0 mt-1 w-48 bg-gray-800 rounded-lg shadow-lg overflow-hidden z-10 hidden group-hover:block">
-                                  <button
-                                    onClick={() => handleSelectFolder(folder)}
-                                    className="w-full text-left px-3 py-1.5 hover:bg-gray-700 flex items-center text-sm"
+                                {activeDropdownId === folder.id && (
+                                  <div 
+                                    ref={dropdownRef}
+                                    className="absolute right-0 mt-1 w-48 bg-gray-800 rounded-lg shadow-lg overflow-hidden z-10"
                                   >
-                                    <FileText className="w-3 h-3 mr-2" />
-                                    View Contents
-                                  </button>
-                                  <button
-                                    onClick={() => handleStartStudy(folder.id, "flashcards")}
-                                    className="w-full text-left px-3 py-1.5 hover:bg-gray-700 flex items-center text-sm"
-                                  >
-                                    <Play className="w-3 h-3 mr-2" />
-                                    Study
-                                  </button>
-                                  <button
-                                    onClick={() => handleToggleStar(folder.id)}
-                                    className="w-full text-left px-3 py-1.5 hover:bg-gray-700 flex items-center text-sm"
-                                  >
-                                    <Star className="w-3 h-3 mr-2" />
-                                    {folder.isStarred ? "Unstar" : "Star"}
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      setEditingFolderId(folder.id)
-                                      setIsCreatingFolder(false)
-                                      setNewFolderName(folder.name)
-                                      setNewFolderDescription(folder.description || "")
-                                      setNewFolderType(folder.type)
-                                    }}
-                                    className="w-full text-left px-3 py-1.5 hover:bg-gray-700 flex items-center text-sm"
-                                  >
-                                    <Edit className="w-3 h-3 mr-2" />
-                                    Edit
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteFolder(folder.id)}
-                                    className="w-full text-left px-3 py-1.5 hover:bg-gray-700 text-red-400 flex items-center text-sm"
-                                  >
-                                    <Trash className="w-3 h-3 mr-2" />
-                                    Delete
-                                  </button>
-                                </div>
+                                    <button
+                                      onClick={() => handleSelectFolder(folder)}
+                                      className="w-full text-left px-3 py-1.5 hover:bg-gray-700 flex items-center text-sm"
+                                    >
+                                      <FileText className="w-3 h-3 mr-2" />
+                                      View Contents
+                                    </button>
+                                    <button
+                                      onClick={() => handleStartStudy(folder.id)}
+                                      className="w-full text-left px-3 py-1.5 hover:bg-gray-700 flex items-center text-sm"
+                                    >
+                                      <Play className="w-3 h-3 mr-2" />
+                                      Study
+                                    </button>
+                                    <button
+                                      onClick={() => handleToggleStar(folder.id)}
+                                      className="w-full text-left px-3 py-1.5 hover:bg-gray-700 flex items-center text-sm"
+                                    >
+                                      <Star className="w-3 h-3 mr-2" />
+                                      {folder.isStarred ? "Unstar" : "Star"}
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        setEditingFolderId(folder.id)
+                                        setIsCreatingFolder(false)
+                                        setNewFolderName(folder.name)
+                                        setNewFolderDescription(folder.description || "")
+                                        setNewFolderType(folder.type)
+                                        setActiveDropdownId(null)
+                                      }}
+                                      className="w-full text-left px-3 py-1.5 hover:bg-gray-700 flex items-center text-sm"
+                                    >
+                                      <Edit className="w-3 h-3 mr-2" />
+                                      Edit
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        handleDeleteFolder(folder.id)
+                                        setActiveDropdownId(null)
+                                      }}
+                                      className="w-full text-left px-3 py-1.5 hover:bg-gray-700 text-red-400 flex items-center text-sm"
+                                    >
+                                      <Trash className="w-3 h-3 mr-2" />
+                                      Delete
+                                    </button>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -1343,7 +1564,7 @@ export function Folders() {
                       <div className="flex items-center space-x-2">
                         <div className="flex space-x-1">
                           <button
-                            onClick={() => handleStartStudy(selectedFolder.id, "flashcards")}
+                            onClick={() => handleStartStudy(selectedFolder.id)}
                             className={`p-2 rounded-lg ${buttonSuccess} text-white`}
                             title="Study Flashcards"
                           >
@@ -1356,7 +1577,11 @@ export function Folders() {
                           >
                             <Upload className="w-4 h-4" />
                           </button>
-                          <button onClick={handleExport} className={`p-2 rounded-lg ${buttonSecondary}`} title="Export">
+                          <button
+                            onClick={handleExport}
+                            className={`p-2 rounded-lg ${buttonSecondary}`}
+                            title="Export"
+                          >
                             <Download className="w-4 h-4" />
                           </button>
                         </div>
@@ -1496,9 +1721,7 @@ export function Folders() {
                               />
                             </div>
                             <div>
-                              <label className={`block text-sm font-medium mb-1 ${subheadingClass}`}>
-                                Topic (optional)
-                              </label>
+                              <label className={`block text-sm font-medium mb-1 ${subheadingClass}`}>Topic (optional)</label>
                               <input
                                 type="text"
                                 value={flashcardTopic}
@@ -1514,7 +1737,10 @@ export function Folders() {
                               >
                                 Cancel
                               </button>
-                              <button onClick={handleAddFlashcard} className={`px-4 py-2 rounded-lg ${buttonPrimary}`}>
+                              <button
+                                onClick={handleAddFlashcard}
+                                className={`px-4 py-2 rounded-lg ${buttonPrimary}`}
+                              >
                                 Save Flashcard
                               </button>
                             </div>
@@ -1573,8 +1799,133 @@ export function Folders() {
                               >
                                 Cancel
                               </button>
-                              <button onClick={handleAddQuestion} className={`px-4 py-2 rounded-lg ${buttonPrimary}`}>
+                              <button
+                                onClick={handleAddQuestion}
+                                className={`px-4 py-2 rounded-lg ${buttonPrimary}`}
+                              >
                                 Save Question
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Edit Item Form */}
+                    {editingItem && (
+                      <div className={`mb-6 p-4 rounded-lg ${isIlluminateEnabled ? "bg-gray-200" : "bg-gray-700"}`}>
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className={`text-lg font-medium ${headingClass}`}>
+                            Edit {editingItem.type === "flashcard" ? "Flashcard" : "Question"}
+                          </h3>
+                        </div>
+
+                        {editingItem.type === "flashcard" ? (
+                          <div className="space-y-4">
+                            <div>
+                              <label className={`block text-sm font-medium mb-1 ${subheadingClass}`}>Question</label>
+                              <textarea
+                                value={flashcardQuestion}
+                                onChange={(e) => setFlashcardQuestion(e.target.value)}
+                                className={`w-full p-2 rounded-lg ${inputBg} border border-gray-600`}
+                                rows={3}
+                                placeholder="Enter your question"
+                              />
+                            </div>
+                            <div>
+                              <label className={`block text-sm font-medium mb-1 ${subheadingClass}`}>Answer</label>
+                              <textarea
+                                value={flashcardAnswer}
+                                onChange={(e) => setFlashcardAnswer(e.target.value)}
+                                className={`w-full p-2 rounded-lg ${inputBg} border border-gray-600`}
+                                rows={3}
+                                placeholder="Enter the answer"
+                              />
+                            </div>
+                            <div>
+                              <label className={`block text-sm font-medium mb-1 ${subheadingClass}`}>Topic (optional)</label>
+                              <input
+                                type="text"
+                                value={flashcardTopic}
+                                onChange={(e) => setFlashcardTopic(e.target.value)}
+                                className={`w-full p-2 rounded-lg ${inputBg} border border-gray-600`}
+                                placeholder="E.g., Math, Science, History"
+                              />
+                            </div>
+                            <div className="flex justify-end space-x-2 pt-2">
+                              <button
+                                onClick={() => setEditingItem(null)}
+                                className={`px-4 py-2 rounded-lg ${buttonSecondary}`}
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                onClick={handleUpdateFlashcard}
+                                className={`px-4 py-2 rounded-lg ${buttonPrimary}`}
+                              >
+                                Update Flashcard
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="space-y-4">
+                            <div>
+                              <label className={`block text-sm font-medium mb-1 ${subheadingClass}`}>Question</label>
+                              <textarea
+                                className={`w-full p-2 rounded-lg ${inputBg} border border-gray-600`}
+                                rows={3}
+                                placeholder="Enter your question"
+                                id="edit-quiz-question"
+                              />
+                            </div>
+                            <div>
+                              <label className={`block text-sm font-medium mb-1 ${subheadingClass}`}>Options</label>
+                              <div className="space-y-2">
+                                {questionOptions.map((option, index) => (
+                                  <div key={index} className="flex items-center space-x-2">
+                                    <input
+                                      type="radio"
+                                      name="edit-correct-answer"
+                                      checked={questionCorrectAnswer === index}
+                                      onChange={() => setQuestionCorrectAnswer(index)}
+                                      className="w-4 h-4"
+                                    />
+                                    <input
+                                      type="text"
+                                      value={option}
+                                      onChange={(e) => {
+                                        const newOptions = [...questionOptions]
+                                        newOptions[index] = e.target.value
+                                        setQuestionOptions(newOptions)
+                                      }}
+                                      className={`flex-1 p-2 rounded-lg ${inputBg} border border-gray-600`}
+                                      placeholder={`Option ${index + 1}`}
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                            <div>
+                              <label className={`block text-sm font-medium mb-1 ${subheadingClass}`}>Explanation</label>
+                              <textarea
+                                className={`w-full p-2 rounded-lg ${inputBg} border border-gray-600`}
+                                rows={2}
+                                placeholder="Explain why the correct answer is right"
+                                id="edit-quiz-explanation"
+                              />
+                            </div>
+                            <div className="flex justify-end space-x-2 pt-2">
+                              <button
+                                onClick={() => setEditingItem(null)}
+                                className={`px-4 py-2 rounded-lg ${buttonSecondary}`}
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                onClick={handleUpdateQuestion}
+                                className={`px-4 py-2 rounded-lg ${buttonPrimary}`}
+                              >
+                                Update Question
                               </button>
                             </div>
                           </div>
@@ -1609,7 +1960,9 @@ export function Folders() {
                           <div
                             key={item.id}
                             className={`p-4 rounded-lg ${
-                              isIlluminateEnabled ? "bg-gray-200" : "bg-gray-700/50"
+                              isIlluminateEnabled
+                                ? "bg-gray-200"
+                                : "bg-gray-700/50"
                             } hover:bg-opacity-90 transition-all`}
                           >
                             {"answer" in item ? (
@@ -1622,6 +1975,23 @@ export function Folders() {
                                   </div>
                                   <div className="flex items-center space-x-2">
                                     <button
+                                      onClick={() => toggleShowAnswer(item.id)}
+                                      className="p-1 rounded-full hover:bg-gray-600"
+                                      title={showAnswers[item.id] ? "Hide Answer" : "Show Answer"}
+                                    >
+                                      {showAnswers[item.id] ? (
+                                        <EyeOff className="w-4 h-4" />
+                                      ) : (
+                                        <Eye className="w-4 h-4" />
+                                      )}
+                                    </button>
+                                    <button
+                                      onClick={() => handleEditItem(item)}
+                                      className="p-1 rounded-full hover:bg-gray-600 text-blue-400"
+                                    >
+                                      <Edit className="w-4 h-4" />
+                                    </button>
+                                    <button
                                       onClick={() => handleDeleteItem(item.id)}
                                       className="p-1 rounded-full hover:bg-gray-600 text-red-400"
                                     >
@@ -1633,17 +2003,17 @@ export function Folders() {
                                   <p className={`font-medium ${headingClass}`}>Question:</p>
                                   <p className={defaultTextColor}>{item.question}</p>
                                 </div>
-                                <div className="mb-2">
-                                  <p className={`font-medium ${headingClass}`}>Answer:</p>
-                                  <p className={defaultTextColor}>{item.answer}</p>
-                                </div>
+                                {(showAnswers[item.id]) && (
+                                  <div className="mb-2">
+                                    <p className={`font-medium ${headingClass}`}>Answer:</p>
+                                    <p className={defaultTextColor}>{item.answer}</p>
+                                  </div>
+                                )}
                                 {item.topic && (
                                   <div className="flex items-center">
                                     <span
                                       className={`text-xs px-2 py-0.5 rounded-full ${
-                                        isIlluminateEnabled
-                                          ? "bg-blue-100 text-blue-700"
-                                          : "bg-blue-900/30 text-blue-300"
+                                        isIlluminateEnabled ? "bg-blue-100 text-blue-700" : "bg-blue-900/30 text-blue-300"
                                       }`}
                                     >
                                       {item.topic}
@@ -1672,6 +2042,23 @@ export function Folders() {
                                   </div>
                                   <div className="flex items-center space-x-2">
                                     <button
+                                      onClick={() => toggleShowAnswer(item.id)}
+                                      className="p-1 rounded-full hover:bg-gray-600"
+                                      title={showAnswers[item.id] ? "Hide Answer" : "Show Answer"}
+                                    >
+                                      {showAnswers[item.id] ? (
+                                        <EyeOff className="w-4 h-4" />
+                                      ) : (
+                                        <Eye className="w-4 h-4" />
+                                      )}
+                                    </button>
+                                    <button
+                                      onClick={() => handleEditItem(item)}
+                                      className="p-1 rounded-full hover:bg-gray-600 text-blue-400"
+                                    >
+                                      <Edit className="w-4 h-4" />
+                                    </button>
+                                    <button
                                       onClick={() => handleDeleteItem(item.id)}
                                       className="p-1 rounded-full hover:bg-gray-600 text-red-400"
                                     >
@@ -1683,37 +2070,37 @@ export function Folders() {
                                   <p className={`font-medium ${headingClass}`}>Question:</p>
                                   <p className={defaultTextColor}>{item.question}</p>
                                 </div>
-                                <div className="mb-3">
-                                  <p className={`font-medium ${headingClass}`}>Options:</p>
-                                  <div className="space-y-1 ml-2">
-                                    {item.options.map((option, index) => (
-                                      <div
-                                        key={index}
-                                        className={`flex items-center p-2 rounded-lg ${
-                                          index === item.correctAnswer
-                                            ? isIlluminateEnabled
-                                              ? "bg-green-100 text-green-700"
-                                              : "bg-green-900/30 text-green-300"
-                                            : isIlluminateEnabled
-                                              ? "bg-gray-300"
-                                              : "bg-gray-600"
-                                        }`}
-                                      >
-                                        {index === item.correctAnswer ? (
-                                          <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
-                                        ) : (
-                                          <div className="w-4 h-4 mr-2 rounded-full border border-gray-400 flex-shrink-0" />
-                                        )}
-                                        <span>{option}</span>
+                                {showAnswers[item.id] && (
+                                  <>
+                                    <div className="mb-3">
+                                      <p className={`font-medium ${headingClass}`}>Options:</p>
+                                      <div className="space-y-1 ml-2">
+                                        {item.options.map((option, index) => (
+                                          <div
+                                            key={index}
+                                            className={`flex items-center p-2 rounded-lg ${
+                                              index === item.correctAnswer
+                                                ? isIlluminateEnabled ? "bg-green-100 text-green-700" : "bg-green-900/30 text-green-300"
+                                                : isIlluminateEnabled ? "bg-gray-300" : "bg-gray-600"
+                                            }`}
+                                          >
+                                            {index === item.correctAnswer ? (
+                                              <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
+                                            ) : (
+                                              <div className="w-4 h-4 mr-2 rounded-full border border-gray-400 flex-shrink-0" />
+                                            )}
+                                            <span>{option}</span>
+                                          </div>
+                                        ))}
                                       </div>
-                                    ))}
-                                  </div>
-                                </div>
-                                {item.explanation && (
-                                  <div className="mb-2">
-                                    <p className={`font-medium ${headingClass}`}>Explanation:</p>
-                                    <p className={defaultTextColor}>{item.explanation}</p>
-                                  </div>
+                                    </div>
+                                    {item.explanation && (
+                                      <div className="mb-2">
+                                        <p className={`font-medium ${headingClass}`}>Explanation:</p>
+                                        <p className={defaultTextColor}>{item.explanation}</p>
+                                      </div>
+                                    )}
+                                  </>
                                 )}
                                 <div className="mt-2 text-xs text-gray-400 flex items-center">
                                   <Clock className="w-3 h-3 mr-1" />
@@ -1741,11 +2128,10 @@ export function Folders() {
                   >
                     <Sparkles className="w-12 h-12 text-blue-400 mb-4" />
                     <h2 className={`text-xl font-semibold ${headingClass} mb-2 text-center`}>
-                      Welcome to Your Study Materials
+                      Welcome to Your Knowledge Library
                     </h2>
                     <p className={`${subheadingClass} text-center max-w-md mb-6`}>
-                      Create folders to organize your flashcards and quiz questions. Select a folder from the list to
-                      view its contents.
+                      Create folders to organize your flashcards, quiz questions, and other learning materials. Select a folder from the list to view its contents.
                     </p>
                     <button
                       onClick={() => setIsCreatingFolder(true)}
@@ -1757,7 +2143,7 @@ export function Folders() {
                   </div>
                 )}
 
-                {/* Study Tips Card */}
+                {/* Organization Tips Card */}
                 {!selectedFolder && (
                   <div
                     className={`${cardClass} rounded-xl p-4 sm:p-6 mt-6 shadow-lg animate-fadeIn relative overflow-hidden ${
@@ -1767,51 +2153,45 @@ export function Folders() {
                     <div className="flex items-center justify-between mb-4">
                       <h2 className={`text-xl font-semibold ${illuminateTextBlue} flex items-center`}>
                         <MessageCircle className="w-5 h-5 mr-2" />
-                        Study Tips
+                        Organization Tips
                       </h2>
                     </div>
                     <div className="space-y-3">
                       <div className={`p-3 rounded-lg ${isIlluminateEnabled ? "bg-blue-100" : "bg-blue-900/20"}`}>
                         <div className="flex items-start">
-                          <Zap
-                            className={`w-5 h-5 mr-2 mt-0.5 ${isIlluminateEnabled ? "text-blue-600" : "text-blue-400"}`}
-                          />
+                          <Zap className={`w-5 h-5 mr-2 mt-0.5 ${isIlluminateEnabled ? 'text-blue-600' : 'text-blue-400'}`} />
                           <div>
-                            <p className={`font-medium ${isIlluminateEnabled ? "text-blue-700" : "text-blue-300"}`}>
-                              Spaced Repetition
+                            <p className={`font-medium ${isIlluminateEnabled ? 'text-blue-700' : 'text-blue-300'}`}>
+                              Use Tags for Organization
                             </p>
                             <p className={defaultTextColor}>
-                              Review your flashcards at increasing intervals to improve long-term retention.
+                              Add tags to your folders to categorize and filter your content more effectively.
                             </p>
                           </div>
                         </div>
                       </div>
-                      <div className={`p-3 rounded-lg ${isIlluminateEnabled ? "bg-purple-100" : "bg-purple-900/20"}`}>
+                      <div className={`p-3 rounded-lg ${isIlluminateEnabled ? 'bg-purple-100' : 'bg-purple-900/20'}`}>
                         <div className="flex items-start">
-                          <Brain
-                            className={`w-5 h-5 mr-2 mt-0.5 ${isIlluminateEnabled ? "text-purple-600" : "text-purple-400"}`}
-                          />
+                          <Brain className={`w-5 h-5 mr-2 mt-0.5 ${isIlluminateEnabled ? 'text-purple-600' : 'text-purple-400'}`} />
                           <div>
-                            <p className={`font-medium ${isIlluminateEnabled ? "text-purple-700" : "text-purple-300"}`}>
-                              Active Recall
+                            <p className={`font-medium ${isIlluminateEnabled ? 'text-purple-700' : 'text-purple-300'}`}>
+                              Create Topic-Based Folders
                             </p>
                             <p className={defaultTextColor}>
-                              Test yourself regularly with quiz questions to strengthen memory connections.
+                              Organize your flashcards and questions by subject or topic for more focused learning.
                             </p>
                           </div>
                         </div>
                       </div>
-                      <div className={`p-3 rounded-lg ${isIlluminateEnabled ? "bg-green-100" : "bg-green-900/20"}`}>
+                      <div className={`p-3 rounded-lg ${isIlluminateEnabled ? 'bg-green-100' : 'bg-green-900/20'}`}>
                         <div className="flex items-start">
-                          <Repeat
-                            className={`w-5 h-5 mr-2 mt-0.5 ${isIlluminateEnabled ? "text-green-600" : "text-green-400"}`}
-                          />
+                          <Repeat className={`w-5 h-5 mr-2 mt-0.5 ${isIlluminateEnabled ? 'text-green-600' : 'text-green-400'}`} />
                           <div>
-                            <p className={`font-medium ${isIlluminateEnabled ? "text-green-700" : "text-green-300"}`}>
-                              Mix It Up
+                            <p className={`font-medium ${isIlluminateEnabled ? 'text-green-700' : 'text-green-300'}`}>
+                              Import and Export
                             </p>
                             <p className={defaultTextColor}>
-                              Use different study modes (flashcards, quizzes, matching) to reinforce learning.
+                              Use the import/export features to back up your content or share it with others.
                             </p>
                           </div>
                         </div>
@@ -1862,10 +2242,16 @@ export function Folders() {
             </div>
 
             <div className="flex justify-end space-x-2">
-              <button onClick={() => setShowImportModal(false)} className={`px-4 py-2 rounded-lg ${buttonSecondary}`}>
+              <button
+                onClick={() => setShowImportModal(false)}
+                className={`px-4 py-2 rounded-lg ${buttonSecondary}`}
+              >
                 Cancel
               </button>
-              <button onClick={handleImport} className={`px-4 py-2 rounded-lg ${buttonPrimary}`}>
+              <button
+                onClick={handleImport}
+                className={`px-4 py-2 rounded-lg ${buttonPrimary}`}
+              >
                 Import
               </button>
             </div>
@@ -1875,4 +2261,3 @@ export function Folders() {
     </div>
   )
 }
-

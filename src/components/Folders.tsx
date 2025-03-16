@@ -2369,11 +2369,13 @@ export function Folders() {
                 </div>
               </div>
 
-              {/* Right Column - Selected Folder Content */}
-              <div className="lg:col-span-3">
-                {selectedFolder ? (
-                  <div
-                    className={`${cardClass} rounded-xl p-4 shadow-lg animate-fadeIn relative overflow-hidden ${
+            {/* Right Columns - Selected Folder Content + AI Chat */}
+            <div className="lg:col-span-3">
+              {selectedFolder ? (
+                <div className="flex flex-col lg:flex-row gap-6">
+                  {/* Selected Folder Content - Now in a flex container */}
+                  <div 
+                    className={`${cardClass} rounded-xl p-4 shadow-lg animate-fadeIn relative overflow-hidden flex-1 ${
                       cardVisible ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
                     }`}
                   >
@@ -3157,30 +3159,61 @@ export function Folders() {
                         </div>
                       )}
                     </div>
-{/* AI Integration - Add this section */}
-{selectedFolder && (
-  <AIFolders
-    selectedFolder={selectedFolder}
-    userName={userName}
-    isIlluminateEnabled={isIlluminateEnabled}
-    isBlackoutEnabled={isBlackoutEnabled}
-    onFolderUpdated={() => {
-      // Refresh folder items
-      if (user && selectedFolder) {
-        getFolderItems(user.uid, selectedFolder.id).then(items => {
-          setSelectedFolder({ ...selectedFolder, items });
-          
-          // Update folder in folders array
-          setFolders(prevFolders =>
-            prevFolders.map(folder =>
-              folder.id === selectedFolder.id ? { ...folder, items, itemCount: items.length } : folder
-            )
-          );
-        });
-      }
-    }}
-  />
-)}
+                {/* AI Chat Interface - Now positioned on the right side */}
+                  <div className={`${cardClass} rounded-xl p-4 shadow-lg animate-fadeIn w-full lg:w-96 h-auto lg:max-h-[calc(100vh-200px)] overflow-y-auto`}>
+                    <div className="flex items-center justify-between mb-4">
+                      <h2 className={`text-lg font-semibold ${headingClass} flex items-center`}>
+                        <MessageCircle className="w-5 h-5 mr-2" />
+                        AI Assistant
+                      </h2>
+                    </div>
+                    
+                    {/* AI Folders component */}
+                    <AIFolders
+                      selectedFolder={selectedFolder}
+                      userName={userName}
+                      isIlluminateEnabled={isIlluminateEnabled}
+                      isBlackoutEnabled={isBlackoutEnabled}
+                      onFolderUpdated={() => {
+                        // Refresh folder items
+                        if (user && selectedFolder) {
+                          getFolderItems(user.uid, selectedFolder.id).then(items => {
+                            setSelectedFolder({ ...selectedFolder, items });
+                            
+                            // Update folder in folders array
+                            setFolders(prevFolders =>
+                              prevFolders.map(folder =>
+                                folder.id === selectedFolder.id ? { ...folder, items, itemCount: items.length } : folder
+                              )
+                            );
+                          });
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div
+                  className={`${cardClass} rounded-xl p-6 flex flex-col items-center justify-center min-h-[400px] shadow-lg animate-fadeIn relative overflow-hidden ${
+                    cardVisible ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
+                  }`}
+                >
+                  <Sparkles className="w-12 h-12 text-blue-400 mb-4" />
+                  <h2 className={`text-xl font-semibold ${headingClass} mb-2 text-center`}>
+                    No Folder Selected
+                  </h2>
+                  <p className={`${subheadingClass} text-center max-w-md mb-6`}>
+                    Create folders to organize your flashcards, quiz questions, and other learning materials. Select a folder from the list to view its contents, or create one. 
+                  </p>
+                  <button
+                    onClick={() => setIsCreatingFolder(true)}
+                    className={`px-4 py-2 rounded-lg ${buttonPrimary} inline-flex items-center`}
+                  >
+                    <FolderPlus className="w-5 h-5 mr-2" />
+                    Create a folder
+                  </button>
+                </div>
+              )}
                   </div>
                 ) : (
                   <div

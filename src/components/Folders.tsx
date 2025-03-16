@@ -1931,7 +1931,6 @@ export function Folders() {
                       <button
                         onClick={handleSubmitQuiz}
                         className={`${buttonSuccess} px-4 py-2 rounded-lg`}
-                        disabled={Object.keys(quizAnswers).length < quiz  px-4 py-2 rounded-lg`}
                         disabled={Object.keys(quizAnswers).length < quizQuestions.length}
                       >
                         Submit Quiz

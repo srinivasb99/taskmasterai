@@ -13,8 +13,8 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Menu,
-  X,
   Folders,
+  X,
 } from "lucide-react"
 import { Logo } from "./Logo"
 import { useLocation, useNavigate } from "react-router-dom"
@@ -138,37 +138,28 @@ export function Sidebar({
         >
           {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
         </button>
+
       </div>
 
       {/* Main Content Wrapper - Add top padding on mobile for the header */}
       <div className="md:ml-0 md:pt-0">
         {/* Semi-transparent overlay when mobile menu is open */}
         {isMobileMenuOpen && (
-          <div 
-            className="fixed inset-0 bg-black/50 z-40 md:hidden backdrop-blur-sm transition-opacity duration-300" 
-            onClick={() => setIsMobileMenuOpen(false)} 
-          />
+          <div className="fixed inset-0 bg-black/50 z-40 md:hidden" onClick={() => setIsMobileMenuOpen(false)} />
         )}
         {/* Sidebar */}
         <div
           className={`
             fixed top-0 left-0 h-full ${sidebarContainerBg} flex flex-col
             py-6 px-3 font-poppins border-r z-50
-            transform will-change-transform
+            transition-all duration-300 ease-in-out
             ${isCollapsed ? "md:w-20" : "md:w-64"}
             ${isMobileMenuOpen ? "w-64 translate-x-0" : "-translate-x-full md:translate-x-0"}
-            transition-[width,transform] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]
             md:mt-0 h-full
           `}
-          style={{
-            backfaceVisibility: 'hidden',
-            perspective: '1000px',
-            WebkitBackfaceVisibility: 'hidden',
-            WebkitPerspective: '1000px'
-          }}
         >
           {/* Logo Section - Show on mobile when menu is open */}
-          <div className="mb-6 flex items-center pl-3 transition-transform duration-300">
+          <div className="mb-6 flex items-center pl-3">
             {isCollapsed && !isMobileMenuOpen ? (
               <a href="/">
                 <svg
@@ -207,14 +198,11 @@ export function Sidebar({
                     ${defaultTextColor}
                     ${hoverClasses}
                     ${isActive ? isActiveClasses : ""}
-                    transform transition-all duration-200 hover:scale-[1.02]
-                    overflow-hidden whitespace-nowrap
+                    transition-transform duration-200 hover:scale-[1.02]
                   `}
                 >
-                  <Icon className="w-5 h-5 min-w-[1.25rem] transition-transform duration-200" strokeWidth={2} />
-                  <span className={`transition-opacity duration-200 ${isCollapsed && !isMobileMenuOpen ? 'opacity-0 w-0' : 'opacity-100'}`}>
-                    {item.label}
-                  </span>
+                  <Icon className="w-5 h-5 min-w-[1.25rem]" strokeWidth={2} />
+                  {(!isCollapsed || isMobileMenuOpen) && <span>{item.label}</span>}
                 </button>
               )
             })}
@@ -223,7 +211,7 @@ export function Sidebar({
             {onToggle && (
               <button
                 onClick={onToggle}
-                className={`absolute -right-4 top-6 p-1.5 rounded-full border transition-all duration-200 ${toggleButtonBg} hidden md:block hover:scale-110`}
+                className={`absolute -right-4 top-6 p-1.5 rounded-full border transition-colors z-50 ${toggleButtonBg} hidden md:block`}
               >
                 {isCollapsed ? (
                   <PanelLeftOpen className="w-4 h-4 min-w-[1rem]" strokeWidth={2} />
@@ -234,7 +222,7 @@ export function Sidebar({
             )}
           </div>
 
-            {/* Bottom Section: Premium Button and User Profile */}
+          {/* Bottom Section: Premium Button and User Profile */}
           <div className="mt-auto flex flex-col gap-4">
             {/* Premium Button - Always show when not on settings page */}
             {!isSettingsPage && (
@@ -287,19 +275,21 @@ export function Sidebar({
               </div>
 
               {/* Show name and plan only if not collapsed or in mobile menu */}
-              <div className={`flex flex-col items-start min-w-0 transition-opacity duration-200 ${isCollapsed && !isMobileMenuOpen ? 'opacity-0 w-0' : 'opacity-100'}`}>
-                <span className="text-left text-sm font-medium truncate max-w-[160px]">
-                  {userName || "Loading..."}
-                </span>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs text-gray-500">Basic Plan</span>
-                  {isDev && (
-                    <span className="px-1 py-0.5 text-[9px] font-semibold bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-full leading-none">
-                      DEV
-                    </span>
-                  )}
+              {(!isCollapsed || isMobileMenuOpen) && (
+                <div className="flex flex-col items-start min-w-0">
+                  <span className="text-left text-sm font-medium truncate max-w-[160px]">
+                    {userName || "Loading..."}
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-gray-500">Basic Plan</span>
+                    {isDev && (
+                      <span className="px-1 py-0.5 text-[9px] font-semibold bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-full leading-none">
+                        DEV
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
             </button>
           </div>
         </div>

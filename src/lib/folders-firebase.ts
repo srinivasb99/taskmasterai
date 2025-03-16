@@ -4,6 +4,7 @@ import {
   where,
   getDocs,
   doc,
+  setDoc,
   deleteDoc,
   updateDoc,
   onSnapshot,
@@ -12,6 +13,8 @@ import {
   getDoc,
   orderBy,
   writeBatch,
+  arrayUnion,
+  arrayRemove,
 } from "firebase/firestore"
 import { db } from "./firebase"
 
@@ -47,6 +50,7 @@ export interface FolderData {
   itemCount: number
   color?: string
   isStarred?: boolean
+  tags?: string[]
 }
 
 export interface FolderWithItems extends FolderData {
@@ -98,6 +102,7 @@ export const createFolder = async (
       itemCount: 0,
       isStarred: false,
       color: color || "",
+      tags: [],
     }
 
     const docRef = await addDoc(foldersRef, folderData)
@@ -202,6 +207,7 @@ export const getFolders = async (userId: string): Promise<FolderData[]> => {
         itemCount: data.itemCount || 0,
         color: data.color || "",
         isStarred: data.isStarred || false,
+        tags: data.tags || [],
       })
     })
 
@@ -235,6 +241,7 @@ export const onFoldersSnapshot = (userId: string, callback: (folders: FolderData
           itemCount: data.itemCount || 0,
           color: data.color || "",
           isStarred: data.isStarred || false,
+          tags: data.tags || [],
         })
       })
 
@@ -278,6 +285,7 @@ export const getFolder = async (userId: string, folderId: string): Promise<Folde
       itemCount: data.itemCount || 0,
       color: data.color || "",
       isStarred: data.isStarred || false,
+      tags: data.tags || [],
     }
   } catch (error) {
     console.error("Error getting folder:", error)
@@ -641,155 +649,83 @@ export const getItemsForStudy = async (userId: string, folderId: string, limit =
 }
 
 /**
- * Move an item to a different folder
+ * Add a tag to a folder
  */
-export const moveItem = async (
-  userId: string,
-  sourceFolderId: string,
-  targetFolderId: string,
-  itemId: string,
-): Promise<void> => {
+export const addTagToFolder = async (userId: string, folderId: string, tag: string): Promise<void> => {
   try {
-    // Get source and target folders
-    const sourceFolderRef = doc(db, "users", userId, "folders", sourceFolderId)
-    const targetFolderRef = doc(db, "users", userId, "folders", targetFolderId)
+    const folderRef = doc(db, "users", userId, "folders", folderId)
 
-    const [sourceFolderSnap, targetFolderSnap] = await Promise.all([getDoc(sourceFolderRef), getDoc(targetFolderRef)])
-
-    if (!sourceFolderSnap.exists() || !targetFolderSnap.exists()) {
-      throw new Error("One or both folders not found")
-    }
-
-    // Get the item
-    const itemRef = doc(db, "users", userId, "folders", sourceFolderId, "items", itemId)
-    const itemSnap = await getDoc(itemRef)
-
-    if (!itemSnap.exists()) {
-      throw new Error("Item not found")
-    }
-
-    const itemData = itemSnap.data()
-
-    // Check if target folder type is compatible with item type
-    const targetFolderData = targetFolderSnap.data()
-    if (
-      (targetFolderData.type === "flashcard" && itemData.type !== "flashcard") ||
-      (targetFolderData.type === "question" && itemData.type !== "question")
-    ) {
-      throw new Error("Item type is not compatible with target folder type")
-    }
-
-    // Use a batch to move the item
-    const batch = writeBatch(db)
-
-    // Add item to target folder
-    const newItemRef = doc(db, "users", userId, "folders", targetFolderId, "items", itemId)
-    batch.set(newItemRef, itemData)
-
-    // Delete item from source folder
-    batch.delete(itemRef)
-
-    // Update item counts
-    const sourceFolderData = sourceFolderSnap.data()
-    batch.update(sourceFolderRef, {
-      itemCount: Math.max(0, (sourceFolderData.itemCount || 0) - 1),
+    await updateDoc(folderRef, {
+      tags: arrayUnion(tag),
       updatedAt: serverTimestamp(),
     })
 
-    batch.update(targetFolderRef, {
-      itemCount: (targetFolderData.itemCount || 0) + 1,
-      updatedAt: serverTimestamp(),
-    })
+    // Also add to user's tags collection for global tag management
+    const userTagsRef = doc(db, "users", userId, "metadata", "tags")
+    const userTagsSnap = await getDoc(userTagsRef)
 
-    // Commit the batch
-    await batch.commit()
+    if (userTagsSnap.exists()) {
+      await updateDoc(userTagsRef, {
+        allTags: arrayUnion(tag),
+      })
+    } else {
+      await setDoc(userTagsRef, {
+        allTags: [tag],
+      })
+    }
   } catch (error) {
-    console.error("Error moving item:", error)
+    console.error("Error adding tag to folder:", error)
     throw error
   }
 }
 
 /**
- * Get study statistics for a user
+ * Remove a tag from a folder
  */
-export const getStudyStats = async (
-  userId: string,
-): Promise<{
-  totalFolders: number
-  totalItems: number
-  totalFlashcards: number
-  totalQuestions: number
-  reviewedLast7Days: number
-  reviewedLast30Days: number
-}> => {
+export const removeTagFromFolder = async (userId: string, folderId: string, tag: string): Promise<void> => {
   try {
-    // Get all folders
-    const foldersRef = collection(db, "users", userId, "folders")
-    const foldersSnapshot = await getDocs(foldersRef)
+    const folderRef = doc(db, "users", userId, "folders", folderId)
 
-    let totalFolders = 0
-    let totalItems = 0
-    let totalFlashcards = 0
-    let totalQuestions = 0
-    let reviewedLast7Days = 0
-    let reviewedLast30Days = 0
-
-    // Calculate dates for 7 and 30 days ago
-    const now = new Date()
-    const sevenDaysAgo = new Date(now)
-    sevenDaysAgo.setDate(now.getDate() - 7)
-
-    const thirtyDaysAgo = new Date(now)
-    thirtyDaysAgo.setDate(now.getDate() - 30)
-
-    // Process each folder
-    const folderPromises = foldersSnapshot.docs.map(async (folderDoc) => {
-      totalFolders++
-      const folderData = folderDoc.data()
-      totalItems += folderData.itemCount || 0
-
-      // Get all items in the folder
-      const itemsRef = collection(db, "users", userId, "folders", folderDoc.id, "items")
-      const itemsSnapshot = await getDocs(itemsRef)
-
-      itemsSnapshot.forEach((itemDoc) => {
-        const itemData = itemDoc.data()
-
-        // Count by type
-        if (itemData.type === "flashcard") {
-          totalFlashcards++
-        } else {
-          totalQuestions++
-        }
-
-        // Count recently reviewed items
-        if (itemData.lastReviewed) {
-          const lastReviewed = itemData.lastReviewed.toDate()
-
-          if (lastReviewed >= sevenDaysAgo) {
-            reviewedLast7Days++
-          }
-
-          if (lastReviewed >= thirtyDaysAgo) {
-            reviewedLast30Days++
-          }
-        }
-      })
+    await updateDoc(folderRef, {
+      tags: arrayRemove(tag),
+      updatedAt: serverTimestamp(),
     })
+  } catch (error) {
+    console.error("Error removing tag from folder:", error)
+    throw error
+  }
+}
 
-    // Wait for all folder processing to complete
-    await Promise.all(folderPromises)
+/**
+ * Get all tags for a user or for a specific folder
+ */
+export const getAllTags = async (userId: string, folderId?: string): Promise<string[]> => {
+  try {
+    if (folderId) {
+      // Get tags for a specific folder
+      const folderRef = doc(db, "users", userId, "folders", folderId)
+      const folderSnap = await getDoc(folderRef)
 
-    return {
-      totalFolders,
-      totalItems,
-      totalFlashcards,
-      totalQuestions,
-      reviewedLast7Days,
-      reviewedLast30Days,
+      if (!folderSnap.exists()) {
+        return []
+      }
+
+      const folderData = folderSnap.data()
+      return folderData.tags || []
+    } else {
+      // Get all tags for the user
+      const userTagsRef = doc(db, "users", userId, "metadata", "tags")
+      const userTagsSnap = await getDoc(userTagsRef)
+
+      if (!userTagsSnap.exists()) {
+        return []
+      }
+
+      const userTagsData = userTagsSnap.data()
+      return userTagsData.allTags || []
     }
   } catch (error) {
-    console.error("Error getting study stats:", error)
+    console.error("Error getting tags:", error)
     throw error
   }
 }

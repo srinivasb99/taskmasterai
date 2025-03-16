@@ -3213,7 +3213,6 @@ export function Folders() {
                     Create a folder
                   </button>
                 </div>
-              )}
                   </div>
                 ) : (
                   <div

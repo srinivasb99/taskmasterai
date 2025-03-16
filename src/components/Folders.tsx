@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react"
 import { useNavigate } from "react-router-dom"
-import { Folder, FolderPlus, Edit, Bot, Trash, Search, X, ChevronRight, ChevronDown, FileText, Brain, Star, MoreHorizontal, Plus, Clock, Calendar, CheckCircle, AlertCircle, Sparkles, MessageCircle, Play, BookOpen, Tag, Download, Upload, Copy, Printer, Share2, Settings, Filter, SortAsc, Bookmark, Layers, LayoutGrid, List, Zap, Award, Repeat, Shuffle, ArrowLeft, ArrowRight, Eye, EyeOff, RefreshCw, Lightbulb, Flame, Target, PenTool, Gamepad2, FolderTree, BarChart } from 'lucide-react'
+import { Folder, FolderPlus, Edit, Trash, Search, X, ChevronRight, ChevronDown, FileText, Brain, Star, MoreHorizontal, Plus, Clock, Calendar, CheckCircle, AlertCircle, Sparkles, MessageCircle, Play, BookOpen, Tag, Download, Upload, Copy, Printer, Share2, Settings, Filter, SortAsc, Bookmark, Layers, LayoutGrid, List, Zap, Award, Repeat, Shuffle, ArrowLeft, ArrowRight, Eye, EyeOff, RefreshCw, Lightbulb, Flame, Target, PenTool, Gamepad2, FolderTree, BarChart } from 'lucide-react'
 import { Sidebar } from "./Sidebar"
 import { auth } from "../lib/firebase"
 import { AIFolders } from "./AI-Folders";
@@ -3157,154 +3157,30 @@ export function Folders() {
                         </div>
                       )}
                     </div>
-  {/* Right Column - AI Assistant */}
-  <div className="lg:w-96 flex-shrink-0">
-    <div className={`${cardClass} rounded-xl shadow-lg sticky top-4`}>
-      <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Bot className="w-5 h-5 text-blue-500" />
-          <div>
-            <h2 className={`text-lg font-semibold ${headingClass}`}>Study Assistant</h2>
-            <p className={`text-xs `}>
-              {selectedFolder ? `Folder: ${selectedFolder.name}` : 'No folder selected'}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Chat Messages */}
-      <div className="h-[calc(100vh-350px)] overflow-y-auto p-4 space-y-4">
-        {/* Welcome message */}
-        {chatHistory.length === 0 && (
-          <div className="flex justify-start">
-            <div className={`max-w-[90%] rounded-lg p-3 ${
-              isIlluminateEnabled ? 'bg-blue-50 text-blue-800' : 'bg-blue-900/20 text-blue-200'
-            }`}>
-              <p>
-                Hi {userName.split(' ')[0]}! I'm your Study Assistant. I can help you with:
-              </p>
-              <ul className="list-disc ml-5 mt-2">
-                <li>Creating flashcards and quizzes</li>
-                <li>Generating study tips</li>
-                <li>Explaining difficult concepts</li>
-                <li>Summarizing content</li>
-              </ul>
-              <p className="mt-2">
-                How can I help you study today?
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Chat history */}
-        {chatHistory.map((message, index) => (
-          <div
-            key={index}
-            className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
-            <div
-              className={`max-w-[90%] rounded-lg p-3 ${
-                message.role === 'user' 
-                  ? isIlluminateEnabled 
-                    ? 'bg-blue-500 text-white' 
-                    : 'bg-blue-600 text-white'
-                  : isIlluminateEnabled
-                    ? 'bg-gray-100 text-gray-800'
-                    : 'bg-gray-800 text-gray-200'
-              }`}
-            >
-              <ReactMarkdown
-                remarkPlugins={[remarkMath, remarkGfm]}
-                rehypePlugins={[rehypeKatex]}
-                components={{
-                  p: ({ children }) => <p className="mb-2">{children}</p>,
-                  ul: ({ children }) => <ul className="list-disc ml-4 mb-2">{children}</ul>,
-                  ol: ({ children }) => <ol className="list-decimal ml-4 mb-2">{children}</ol>,
-                  li: ({ children }) => <li className="mb-1">{children}</li>,
-                  code: ({ inline, children }) => inline 
-                    ? <code className={`px-1 rounded ${
-                        isIlluminateEnabled 
-                          ? 'bg-gray-200 text-gray-800' 
-                          : 'bg-gray-700 text-gray-200'
-                      }`}>{children}</code>
-                    : <pre className={`p-2 rounded-lg overflow-x-auto ${
-                        isIlluminateEnabled
-                          ? 'bg-gray-200 text-gray-800'
-                          : 'bg-gray-700 text-gray-200'
-                      }`}><code>{children}</code></pre>
-                }}
-              >
-                {message.content}
-              </ReactMarkdown>
-            </div>
-          </div>
-        ))}
-
-        {/* Streaming content and loading indicators */}
-        {isChatLoading && !streamingAssistantContent && (
-          <div className="flex justify-start">
-            <div className={`max-w-[80%] rounded-lg p-3 ${
-              isIlluminateEnabled ? 'bg-gray-100' : 'bg-gray-800'
-            }`}>
-              <div className="flex space-x-2">
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100"></div>
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200"></div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Study tip suggestions */}
-      {!isChatLoading && selectedFolder && (
-        <div className="px-4 py-2 border-t border-gray-200 dark:border-gray-700">
-          <p className={`text-xs mb-2 }`}>Suggestions:</p>
-          <div className="flex flex-wrap gap-2 max-h-20 overflow-y-auto">
-            {studyTipSuggestions.map((tip, index) => (
-              <button
-                key={index}
-                onClick={() => setChatMessage(tip)}
-                className={`px-2 py-1 rounded-lg text-xs ${
-                  isIlluminateEnabled
-                    ? 'bg-blue-50 text-blue-700 hover:bg-blue-100'
-                    : 'bg-blue-900/20 text-blue-300 hover:bg-blue-900/30'
-                } transition-colors flex items-center`}
-              >
-                <Lightbulb className="w-3 h-3 mr-1" />
-                {tip}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Chat Input */}
-      <form onSubmit={handleChatSubmit} className="p-4 border-t border-gray-200 dark:border-gray-700">
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={chatMessage}
-            onChange={(e) => setChatMessage(e.target.value)}
-            placeholder={selectedFolder ? "Ask about this folder..." : "Select a folder first"}
-            disabled={!selectedFolder}
-            className={`flex-1 rounded-lg px-3 py-2 ${inputBg} border ${
-              isIlluminateEnabled 
-                ? 'border-gray-300 focus:border-blue-500' 
-                : 'border-gray-600 focus:border-blue-500'
-            } focus:outline-none focus:ring-2 focus:ring-blue-500/50`}
-          />
-          <button
-            type="submit"
-            disabled={isChatLoading || !selectedFolder}
-            className={`${buttonPrimary} p-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed`}
-          >
-            <Send className="w-5 h-5" />
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
+{/* AI Integration - Add this section */}
+{selectedFolder && (
+  <AIFolders
+    selectedFolder={selectedFolder}
+    userName={userName}
+    isIlluminateEnabled={isIlluminateEnabled}
+    isBlackoutEnabled={isBlackoutEnabled}
+    onFolderUpdated={() => {
+      // Refresh folder items
+      if (user && selectedFolder) {
+        getFolderItems(user.uid, selectedFolder.id).then(items => {
+          setSelectedFolder({ ...selectedFolder, items });
+          
+          // Update folder in folders array
+          setFolders(prevFolders =>
+            prevFolders.map(folder =>
+              folder.id === selectedFolder.id ? { ...folder, items, itemCount: items.length } : folder
+            )
+          );
+        });
+      }
+    }}
+  />
+)}
                   </div>
                 ) : (
                   <div

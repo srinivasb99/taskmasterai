@@ -234,23 +234,28 @@ export function Sidebar({
             )}
           </div>
 
-          {/* Bottom Section: Premium Button and User Profile */}
+            {/* Bottom Section: Premium Button and User Profile */}
           <div className="mt-auto flex flex-col gap-4">
             {/* Premium Button - Always show when not on settings page */}
             {!isSettingsPage && (
               <button
                 onClick={handleUpgradeClick}
                 className={`
-                  mx-3 flex items-center justify-center gap-2
-                  text-white rounded-lg bg-[#6366f1]
-                  transition-all duration-200 hover:bg-[#4f46e5]
+                  mx-3 flex items-center justify-center
+                  text-white rounded-lg
+                  transition-all duration-200 bg-gradient-to-r from-violet-600 to-indigo-600
+                  hover:from-violet-500 hover:to-indigo-500 shadow-lg shadow-indigo-500/20
+                  hover:scale-[1.02]
                   ${isCollapsed && !isMobileMenuOpen ? "aspect-square p-2.5" : "px-4 py-2.5"}
                 `}
               >
-                <Crown className="w-5 h-5 min-w-[1.25rem]" strokeWidth={2} />
-                <span className={`text-sm font-semibold transition-opacity duration-200 ${isCollapsed && !isMobileMenuOpen ? 'opacity-0 w-0' : 'opacity-100 whitespace-nowrap'}`}>
-                  Upgrade to Premium
-                </span>
+                <Crown
+                  className={`min-w-[1.25rem] ${isCollapsed && !isMobileMenuOpen ? "w-6 h-6" : "w-5 h-5 mr-2"}`}
+                  strokeWidth={2}
+                />
+                {(!isCollapsed || isMobileMenuOpen) && (
+                  <span className="text-sm font-medium whitespace-nowrap">Upgrade to Premium</span>
+                )}
               </button>
             )}
 
@@ -258,25 +263,25 @@ export function Sidebar({
             <button
               onClick={() => navigate("/settings")}
               className={`
-                mx-3 flex items-center gap-3 rounded-lg
+                mx-3 flex items-center gap-3 rounded-lg transition-colors
                 ${userProfileText}
                 ${userProfileHoverBg}
-                ${isCollapsed && !isMobileMenuOpen ? "justify-center aspect-square p-2" : "px-4 py-2.5"}
-                transform transition-all duration-200 hover:scale-[1.02]
-                overflow-hidden
+                ${isCollapsed && !isMobileMenuOpen ? "justify-center aspect-square" : "px-4 py-2.5"}
+                hover:scale-[1.02] transition-transform duration-200
               `}
             >
-              <div className="relative flex-shrink-0">
-                <div className="w-9 h-9 rounded-full overflow-hidden bg-gray-800 flex items-center justify-center">
+              <div className="relative flex-shrink-0 w-8 h-8">
+                <div className="w-full h-full rounded-full overflow-hidden bg-gray-800">
                   {currentUser?.photoURL ? (
                     <img
                       src={currentUser.photoURL || "/placeholder.svg"}
                       alt={userName}
                       className="w-full h-full object-cover"
-                      style={{ aspectRatio: '1/1' }}
                     />
                   ) : (
-                    <CircleUserRound className="w-5 h-5 min-w-[1.25rem]" strokeWidth={2} />
+                    <div className="w-full h-full flex items-center justify-center">
+                      <CircleUserRound className="w-5 h-5 min-w-[1.25rem]" strokeWidth={2} />
+                    </div>
                   )}
                 </div>
               </div>

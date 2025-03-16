@@ -18,7 +18,7 @@ import ForgotPassword from './components/Forgot-Password';
 import PrivacyPolicy from './components/Privacy-Policy';
 import { Dashboard } from './components/Dashboard';
 import Contact from './components/Contact';
-import Folders from './components/Folders';
+import { Folders }from './components/Folders';
 import AIChat from './components/AI-Chat';
 import Notes from './components/Notes';
 import Calendar from './components/Calendar';

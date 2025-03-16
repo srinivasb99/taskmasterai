@@ -266,23 +266,22 @@ export function Sidebar({
                 mx-3 flex items-center gap-3 rounded-lg
                 ${userProfileText}
                 ${userProfileHoverBg}
-                ${isCollapsed && !isMobileMenuOpen ? "justify-center aspect-square" : "px-4 py-2.5"}
+                ${isCollapsed && !isMobileMenuOpen ? "justify-center aspect-square p-2" : "px-4 py-2.5"}
                 transform transition-all duration-200 hover:scale-[1.02]
                 overflow-hidden
               `}
             >
-              <div className="relative flex-shrink-0 w-8 h-8">
-                <div className="w-full h-full rounded-full overflow-hidden bg-gray-800">
+              <div className="relative flex-shrink-0">
+                <div className="w-9 h-9 rounded-full overflow-hidden bg-gray-800 flex items-center justify-center">
                   {currentUser?.photoURL ? (
                     <img
                       src={currentUser.photoURL || "/placeholder.svg"}
                       alt={userName}
                       className="w-full h-full object-cover"
+                      style={{ aspectRatio: '1/1' }}
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <CircleUserRound className="w-5 h-5 min-w-[1.25rem]" strokeWidth={2} />
-                    </div>
+                    <CircleUserRound className="w-5 h-5 min-w-[1.25rem]" strokeWidth={2} />
                   )}
                 </div>
               </div>
@@ -308,3 +307,4 @@ export function Sidebar({
     </>
   )
 }
+

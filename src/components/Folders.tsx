@@ -3165,7 +3165,7 @@ export function Folders() {
           <Bot className="w-5 h-5 text-blue-500" />
           <div>
             <h2 className={`text-lg font-semibold ${headingClass}`}>Study Assistant</h2>
-            <p className={`text-xs ${subTextColor}`}>
+            <p className={`text-xs `}>
               {selectedFolder ? `Folder: ${selectedFolder.name}` : 'No folder selected'}
             </p>
           </div>
@@ -3259,7 +3259,7 @@ export function Folders() {
       {/* Study tip suggestions */}
       {!isChatLoading && selectedFolder && (
         <div className="px-4 py-2 border-t border-gray-200 dark:border-gray-700">
-          <p className={`text-xs mb-2 ${subTextColor}`}>Suggestions:</p>
+          <p className={`text-xs mb-2 }`}>Suggestions:</p>
           <div className="flex flex-wrap gap-2 max-h-20 overflow-y-auto">
             {studyTipSuggestions.map((tip, index) => (
               <button

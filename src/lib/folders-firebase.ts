@@ -382,3 +382,34 @@ export const deleteSubFolder = async (userId: string, parentId: string, subFolde
   }
 }
 
+export const getAllTags = async (userId: string, folderId?: string): Promise<string[]> => {
+  try {
+    if (folderId) {
+      // Get tags for a specific folder
+      const folderRef = doc(db, "users", userId, "folders", folderId)
+      const folderSnap = await getDoc(folderRef)
+
+      if (!folderSnap.exists()) {
+        return []
+      }
+
+      const folderData = folderSnap.data()
+      return folderData.tags || []
+    } else {
+      // Get all tags for the user
+      const userTagsRef = doc(db, "users", userId, "metadata", "tags")
+      const userTagsSnap = await getDoc(userTagsRef)
+
+      if (!userTagsSnap.exists()) {
+        return []
+      }
+
+      const userTagsData = userTagsSnap.data()
+      return userTagsData.allTags || []
+    }
+  } catch (error) {
+    console.error("Error getting tags:", error)
+    throw error
+  }
+}
+

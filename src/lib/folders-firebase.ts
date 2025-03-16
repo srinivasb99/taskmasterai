@@ -312,6 +312,48 @@ export const getSubFolders = async (userId: string, parentId: string): Promise<F
   }
 }
 
+
+export const onFoldersSnapshot = (userId: string, callback: (folders: FolderData[]) => void): (() => void) => {
+  try {
+    const foldersRef = collection(db, "users", userId, "folders")
+    const q = query(foldersRef)
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const folders: FolderData[] = []
+
+      snapshot.forEach((doc) => {
+        const data = doc.data()
+        folders.push({
+          id: doc.id,
+          name: data.name,
+          description: data.description || "",
+          type: data.type || "mixed",
+          createdAt: data.createdAt?.toDate() || new Date(),
+          updatedAt: data.updatedAt?.toDate() || new Date(),
+          itemCount: data.itemCount || 0,
+          color: data.color || "",
+          isStarred: data.isStarred || false,
+        })
+      })
+
+      // Sort folders: starred first, then alphabetically
+      folders.sort((a, b) => {
+        if (a.isStarred && !b.isStarred) return -1
+        if (!a.isStarred && b.isStarred) return 1
+        return a.name.localeCompare(b.name)
+      })
+
+      callback(folders)
+    })
+
+    return unsubscribe
+  } catch (error) {
+    console.error("Error setting up folders snapshot:", error)
+    throw error
+  }
+}
+
+
 // Function to delete a subfolder
 export const deleteSubFolder = async (userId: string, parentId: string, subFolderId: string): Promise<void> => {
   try {

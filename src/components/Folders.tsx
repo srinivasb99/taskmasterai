@@ -789,8 +789,6 @@ export function Folders() {
       
       if (allMatched) {
         setTimeout(() => {
-          alert("Congratulations! You've matched all the pairs!")  {
-        setTimeout(() => {
           alert("Congratulations! You've matched all the pairs!")
           setActiveStudyMode(null)
         }, 1000)

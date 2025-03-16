@@ -18,6 +18,7 @@ import ForgotPassword from './components/Forgot-Password';
 import PrivacyPolicy from './components/Privacy-Policy';
 import { Dashboard } from './components/Dashboard';
 import Contact from './components/Contact';
+import Folders from './components/Folders';
 import AIChat from './components/AI-Chat';
 import Notes from './components/Notes';
 import Calendar from './components/Calendar';
@@ -189,6 +190,7 @@ createRoot(document.getElementById('root')!).render(
             <Route path="/forgot-password" element={<PageTitle title="Reset Password"><ForgotPassword /></PageTitle>} />
             <Route path="/dashboard" element={<PageTitle title="Dashboard"><Dashboard /></PageTitle>} />
             <Route path="/contact" element={<PageTitle title="Contact Us"><Contact /></PageTitle>} />
+            <Route path="/folders" element={<PageTitle title="Folders"><Folders /></PageTitle>} />
             <Route path="/ai" element={<PageTitle title="AI Assistant"><AIChat /></PageTitle>} />
             <Route path="/calendar" element={<PageTitle title="Calendar"><Calendar /></PageTitle>} />
             <Route path="/notes" element={<PageTitle title="Notes"><NotesOutage /></PageTitle>} />

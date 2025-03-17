@@ -2691,41 +2691,6 @@ return (
                                     View Contents
                                   </button>
                                   <button
-                                    onClick={() => handleStartFlashcards(folder.id)}
-                                    className="w-full text-left px-3 py-1.5 hover:bg-gray-700 flex items-center text-sm"
-                                  >
-                                    <BookOpen className="w-3 h-3 mr-2" />
-                                    Flashcards
-                                  </button>
-                                  <button
-                                    onClick={() => handleStartLearn(folder.id)}
-                                    className="w-full text-left px-3 py-1.5 hover:bg-gray-700 flex items-center text-sm"
-                                  >
-                                    <Lightbulb className="w-3 h-3 mr-2" />
-                                    Learn
-                                  </button>
-                                  <button
-                                    onClick={() => handleStartTest(folder.id)}
-                                    className="w-full text-left px-3 py-1.5 hover:bg-gray-700 flex items-center text-sm"
-                                  >
-                                    <Target className="w-3 h-3 mr-2" />
-                                    Test
-                                  </button>
-                                  <button
-                                    onClick={() => handleStartMatching(folder.id)}
-                                    className="w-full text-left px-3 py-1.5 hover:bg-gray-700 flex items-center text-sm"
-                                  >
-                                    <Gamepad2 className="w-3 h-3 mr-2" />
-                                    Match
-                                  </button>
-                                  <button
-                                    onClick={() => handleStartQuiz(folder.id)}
-                                    className="w-full text-left px-3 py-1.5 hover:bg-gray-700 flex items-center text-sm"
-                                  >
-                                    <Brain className="w-3 h-3 mr-2" />
-                                    Quiz
-                                  </button>
-                                  <button
                                     onClick={() => handleToggleStar(folder.id)}
                                     className="w-full text-left px-3 py-1.5 hover:bg-gray-700 flex items-center text-sm"
                                   >

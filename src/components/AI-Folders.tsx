@@ -1,6 +1,3 @@
-"use client"
-
-// src/components/AI-Folders.tsx
 import type React from "react"
 import { useState, useRef, useEffect } from "react"
 import { Send, Bot, Brain, MessageSquare, Sparkles, X, Lightbulb, FileText, Folder } from "lucide-react"
@@ -140,12 +137,6 @@ export function AIFolders({
   const [streamingAssistantContent, setStreamingAssistantContent] = useState("")
   const chatEndRef = useRef<HTMLDivElement>(null)
   const [user, setUser] = useState<any>(null)
-
-  // Add this function to handle toggling the chat visibility if needed
-  const toggleChat = () => {
-    // This function is no longer needed since the chat is always visible,
-    // but we'll keep it for potential future use
-  }
 
   // Reset chat when folder changes
   useEffect(() => {
@@ -442,234 +433,231 @@ Follow these instructions strictly.
     "Generate practice questions",
   ]
 
+  // Study Assistant Button Component
+  const StudyAssistantButton = () => {
+    return (
+      <div
+        className={`mb-6 p-4 rounded-lg ${isIlluminateEnabled ? "bg-blue-50" : "bg-blue-900/20"} border ${isIlluminateEnabled ? "border-blue-200" : "border-blue-800"}`}
+      >
+        <div className="flex items-center justify-between">
+          <h3
+            className={`text-lg font-medium flex items-center ${isIlluminateEnabled ? "text-blue-700" : "text-blue-400"}`}
+          >
+            <Sparkles className="w-5 h-5 mr-2" />
+            AI Study Assistant
+          </h3>
+          <button
+            onClick={() => setIsAIChatOpen(true)}
+            className="px-3 py-1 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors flex items-center"
+          >
+            <MessageSquare className="w-4 h-4 mr-1" />
+            Chat
+          </button>
+        </div>
+        <p className={isIlluminateEnabled ? "text-blue-700" : "text-blue-300"}>
+          Get personalized study tips, create flashcards, and generate quizzes with AI assistance.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            onClick={() => {
+              setIsAIChatOpen(true)
+              setChatMessage("Generate study tips for this folder")
+            }}
+            className="px-2 py-1 bg-blue-600/20 text-blue-400 rounded-lg text-sm hover:bg-blue-600/30 transition-colors flex items-center"
+          >
+            <Lightbulb className="w-4 h-4 mr-1" />
+            Study Tips
+          </button>
+          <button
+            onClick={() => {
+              setIsAIChatOpen(true)
+              setChatMessage("Create flashcards about this topic")
+            }}
+            className="px-2 py-1 bg-blue-600/20 text-blue-400 rounded-lg text-sm hover:bg-blue-600/30 transition-colors flex items-center"
+          >
+            <FileText className="w-4 h-4 mr-1" />
+            Create Flashcards
+          </button>
+          <button
+            onClick={() => {
+              setIsAIChatOpen(true)
+              setChatMessage("Make a quiz from this content")
+            }}
+            className="px-2 py-1 bg-blue-600/20 text-blue-400 rounded-lg text-sm hover:bg-blue-600/30 transition-colors flex items-center"
+          >
+            <Brain className="w-4 h-4 mr-1" />
+            Generate Quiz
+          </button>
+          <button
+            onClick={() => {
+              setIsAIChatOpen(true)
+              setChatMessage("Summarize the content in this folder")
+            }}
+            className="px-2 py-1 bg-blue-600/20 text-blue-400 rounded-lg text-sm hover:bg-blue-600/30 transition-colors flex items-center"
+          >
+            <Folder className="w-4 h-4 mr-1" />
+            Summarize Folder
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="relative">
-      {/* AI Chat Button */}
-      {!isAIChatOpen && (
-        <button
-          onClick={() => setIsAIChatOpen(true)}
-          className="fixed bottom-6 right-6 bg-blue-600 text-white p-3 rounded-full shadow-lg hover:bg-blue-700 transition-colors z-10"
-        >
-          <MessageSquare className="w-6 h-6" />
-        </button>
-      )}
+      {/* Study Assistant Button - to be placed before the Items section */}
+      {selectedFolder && !isAIChatOpen && <StudyAssistantButton />}
 
-      {/* AI Chat Panel */}
+      {/* AI Chat Panel - fixed to the right side when open */}
       {isAIChatOpen && (
-        <div
-          className={`fixed inset-0 md:inset-auto md:right-6 md:bottom-6 md:w-96 md:h-[600px] ${containerBg} rounded-none md:rounded-xl shadow-xl z-50 flex flex-col`}
-        >
-          {/* Header */}
-          <div className="p-4 border-b border-gray-700 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Bot className="w-5 h-5 text-blue-400" />
-              <div>
-                <h2 className={`text-lg font-semibold ${textColor}`}>Study Assistant</h2>
-                <p className={`text-xs ${subTextColor}`}>
-                  {selectedFolder ? `Folder: ${selectedFolder.name}` : "No folder selected"}
-                </p>
-              </div>
-            </div>
-            <button onClick={() => setIsAIChatOpen(false)} className="p-1 rounded-full hover:bg-gray-700">
-              <X className="w-5 h-5 text-gray-400" />
-            </button>
-          </div>
-
-          {/* Chat Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {/* Welcome message */}
-            {chatHistory.length === 0 && (
-              <div className="flex justify-start">
-                <div className={`max-w-[80%] rounded-lg p-3 ${assistantBubble}`}>
-                  <p>Hi {userName.split(" ")[0]}! I'm your Study Assistant. I can help you with:</p>
-                  <ul className="list-disc ml-5 mt-2">
-                    <li>Creating flashcards and quizzes</li>
-                    <li>Generating study tips</li>
-                    <li>Explaining difficult concepts</li>
-                    <li>Summarizing content</li>
-                  </ul>
-                  <p className="mt-2">How can I help you study today?</p>
+        <div className="fixed right-0 top-0 h-full w-96 z-50 shadow-xl">
+          <div className={`h-full ${containerBg} flex flex-col`}>
+            {/* Header */}
+            <div className="p-4 border-b border-gray-700 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Bot className="w-5 h-5 text-blue-400" />
+                <div>
+                  <h2 className={`text-lg font-semibold ${textColor}`}>Study Assistant</h2>
+                  <p className={`text-xs ${subTextColor}`}>
+                    {selectedFolder ? `Folder: ${selectedFolder.name}` : "No folder selected"}
+                  </p>
                 </div>
               </div>
-            )}
-
-            {/* Chat history */}
-            {chatHistory.map((message, index) => (
-              <div key={index} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
-                <div className={`max-w-[80%] rounded-lg p-3 ${message.role === "user" ? userBubble : assistantBubble}`}>
-                  <ReactMarkdown
-                    remarkPlugins={[remarkMath, remarkGfm]}
-                    rehypePlugins={[rehypeKatex]}
-                    components={{
-                      p: ({ children }) => <p className="mb-2">{children}</p>,
-                      ul: ({ children }) => <ul className="list-disc ml-4 mb-2">{children}</ul>,
-                      ol: ({ children }) => <ol className="list-decimal ml-4 mb-2">{children}</ol>,
-                      li: ({ children }) => <li className="mb-1">{children}</li>,
-                      code: ({ inline, children }) =>
-                        inline ? (
-                          <code
-                            className={
-                              isBlackoutEnabled
-                                ? "bg-gray-800 px-1 rounded"
-                                : isIlluminateEnabled
-                                  ? "bg-gray-300 px-1 rounded"
-                                  : "bg-gray-800 px-1 rounded"
-                            }
-                          >
-                            {children}
-                          </code>
-                        ) : (
-                          <pre
-                            className={
-                              isBlackoutEnabled
-                                ? "bg-gray-800 p-2 rounded-lg overflow-x-auto"
-                                : isIlluminateEnabled
-                                  ? "bg-gray-300 p-2 rounded-lg overflow-x-auto"
-                                  : "bg-gray-800 p-2 rounded-lg overflow-x-auto"
-                            }
-                          >
-                            <code>{children}</code>
-                          </pre>
-                        ),
-                    }}
-                  >
-                    {message.content}
-                  </ReactMarkdown>
-                </div>
-              </div>
-            ))}
-
-            {/* Streaming partial content */}
-            {streamingAssistantContent && (
-              <div className="flex justify-start">
-                <div className={`max-w-[80%] rounded-lg p-3 ${assistantBubble}`}>
-                  <ReactMarkdown>{streamingAssistantContent}</ReactMarkdown>
-                </div>
-              </div>
-            )}
-
-            {/* Loading dots */}
-            {isChatLoading && !streamingAssistantContent && (
-              <div className="flex justify-start">
-                <div className={`max-w-[80%] rounded-lg p-3 ${assistantBubble}`}>
-                  <div className="flex space-x-2">
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100"></div>
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200"></div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div ref={chatEndRef} />
-          </div>
-
-          {/* Study tip suggestions */}
-          {!isChatLoading && selectedFolder && (
-            <div className="px-4 py-2 border-t border-gray-700">
-              <p className={`text-xs mb-2 ${subTextColor}`}>Suggestions:</p>
-              <div className="flex flex-wrap gap-2 max-h-20 overflow-y-auto">
-                {studyTipSuggestions.map((tip, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setChatMessage(tip)}
-                    className="px-2 py-1 bg-blue-600/20 text-blue-400 rounded-lg text-xs hover:bg-blue-600/30 transition-colors flex items-center"
-                  >
-                    <Lightbulb className="w-3 h-3 mr-1" />
-                    {tip}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Chat Input */}
-          <form onSubmit={handleChatSubmit} className="p-4 border-t border-gray-700">
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={chatMessage}
-                onChange={(e) => setChatMessage(e.target.value)}
-                placeholder={selectedFolder ? "Ask about this folder..." : "Select a folder first"}
-                disabled={!selectedFolder}
-                className={`flex-1 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputBg}`}
-              />
-              <button
-                type="submit"
-                disabled={isChatLoading || !selectedFolder}
-                className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Send className="w-5 h-5" />
+              <button onClick={() => setIsAIChatOpen(false)} className="p-1 rounded-full hover:bg-gray-700">
+                <X className="w-5 h-5 text-gray-400" />
               </button>
             </div>
-          </form>
-        </div>
-      )}
 
-      {/* Study Tips Card (when no chat is open) */}
-      {!isAIChatOpen && selectedFolder && (
-        <div
-          className={`mt-6 p-4 rounded-lg ${isIlluminateEnabled ? "bg-blue-50" : "bg-blue-900/20"} border ${isIlluminateEnabled ? "border-blue-200" : "border-blue-800"}`}
-        >
-          <div className="flex items-center justify-between mb-3">
-            <h3
-              className={`text-lg font-medium flex items-center ${isIlluminateEnabled ? "text-blue-700" : "text-blue-400"}`}
-            >
-              <Sparkles className="w-5 h-5 mr-2" />
-              AI Study Assistant
-            </h3>
-            <button
-              onClick={() => setIsAIChatOpen(true)}
-              className="px-3 py-1 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors flex items-center"
-            >
-              <MessageSquare className="w-4 h-4 mr-1" />
-              Chat
-            </button>
-          </div>
-          <p className={isIlluminateEnabled ? "text-blue-700" : "text-blue-300"}>
-            Get personalized study tips, create flashcards, and generate quizzes with AI assistance.
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              onClick={() => {
-                setIsAIChatOpen(true)
-                setChatMessage("Generate study tips for this folder")
-              }}
-              className="px-2 py-1 bg-blue-600/20 text-blue-400 rounded-lg text-sm hover:bg-blue-600/30 transition-colors flex items-center"
-            >
-              <Lightbulb className="w-4 h-4 mr-1" />
-              Study Tips
-            </button>
-            <button
-              onClick={() => {
-                setIsAIChatOpen(true)
-                setChatMessage("Create flashcards about this topic")
-              }}
-              className="px-2 py-1 bg-blue-600/20 text-blue-400 rounded-lg text-sm hover:bg-blue-600/30 transition-colors flex items-center"
-            >
-              <FileText className="w-4 h-4 mr-1" />
-              Create Flashcards
-            </button>
-            <button
-              onClick={() => {
-                setIsAIChatOpen(true)
-                setChatMessage("Make a quiz from this content")
-              }}
-              className="px-2 py-1 bg-blue-600/20 text-blue-400 rounded-lg text-sm hover:bg-blue-600/30 transition-colors flex items-center"
-            >
-              <Brain className="w-4 h-4 mr-1" />
-              Generate Quiz
-            </button>
-            <button
-              onClick={() => {
-                setIsAIChatOpen(true)
-                setChatMessage("Summarize the content in this folder")
-              }}
-              className="px-2 py-1 bg-blue-600/20 text-blue-400 rounded-lg text-sm hover:bg-blue-600/30 transition-colors flex items-center"
-            >
-              <Folder className="w-4 h-4 mr-1" />
-              Summarize Folder
-            </button>
+            {/* Chat Messages */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {/* Welcome message */}
+              {chatHistory.length === 0 && (
+                <div className="flex justify-start">
+                  <div className={`max-w-[80%] rounded-lg p-3 ${assistantBubble}`}>
+                    <p>Hi {userName.split(" ")[0]}! I'm your Study Assistant. I can help you with:</p>
+                    <ul className="list-disc ml-5 mt-2">
+                      <li>Creating flashcards and quizzes</li>
+                      <li>Generating study tips</li>
+                      <li>Explaining difficult concepts</li>
+                      <li>Summarizing content</li>
+                    </ul>
+                    <p className="mt-2">How can I help you study today?</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Chat history */}
+              {chatHistory.map((message, index) => (
+                <div key={index} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
+                  <div
+                    className={`max-w-[80%] rounded-lg p-3 ${message.role === "user" ? userBubble : assistantBubble}`}
+                  >
+                    <ReactMarkdown
+                      remarkPlugins={[remarkMath, remarkGfm]}
+                      rehypePlugins={[rehypeKatex]}
+                      components={{
+                        p: ({ children }) => <p className="mb-2">{children}</p>,
+                        ul: ({ children }) => <ul className="list-disc ml-4 mb-2">{children}</ul>,
+                        ol: ({ children }) => <ol className="list-decimal ml-4 mb-2">{children}</ol>,
+                        li: ({ children }) => <li className="mb-1">{children}</li>,
+                        code: ({ inline, children }) =>
+                          inline ? (
+                            <code
+                              className={
+                                isBlackoutEnabled
+                                  ? "bg-gray-800 px-1 rounded"
+                                  : isIlluminateEnabled
+                                    ? "bg-gray-300 px-1 rounded"
+                                    : "bg-gray-800 px-1 rounded"
+                              }
+                            >
+                              {children}
+                            </code>
+                          ) : (
+                            <pre
+                              className={
+                                isBlackoutEnabled
+                                  ? "bg-gray-800 p-2 rounded-lg overflow-x-auto"
+                                  : isIlluminateEnabled
+                                    ? "bg-gray-300 p-2 rounded-lg overflow-x-auto"
+                                    : "bg-gray-800 p-2 rounded-lg overflow-x-auto"
+                              }
+                            >
+                              <code>{children}</code>
+                            </pre>
+                          ),
+                      }}
+                    >
+                      {message.content}
+                    </ReactMarkdown>
+                  </div>
+                </div>
+              ))}
+
+              {/* Streaming partial content */}
+              {streamingAssistantContent && (
+                <div className="flex justify-start">
+                  <div className={`max-w-[80%] rounded-lg p-3 ${assistantBubble}`}>
+                    <ReactMarkdown>{streamingAssistantContent}</ReactMarkdown>
+                  </div>
+                </div>
+              )}
+
+              {/* Loading dots */}
+              {isChatLoading && !streamingAssistantContent && (
+                <div className="flex justify-start">
+                  <div className={`max-w-[80%] rounded-lg p-3 ${assistantBubble}`}>
+                    <div className="flex space-x-2">
+                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100"></div>
+                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200"></div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div ref={chatEndRef} />
+            </div>
+
+            {/* Study tip suggestions */}
+            {!isChatLoading && selectedFolder && (
+              <div className="px-4 py-2 border-t border-gray-700">
+                <p className={`text-xs mb-2 ${subTextColor}`}>Suggestions:</p>
+                <div className="flex flex-wrap gap-2 max-h-20 overflow-y-auto">
+                  {studyTipSuggestions.map((tip, index) => (
+                    <button
+                      key={index}
+                      onClick={() => setChatMessage(tip)}
+                      className="px-2 py-1 bg-blue-600/20 text-blue-400 rounded-lg text-xs hover:bg-blue-600/30 transition-colors flex items-center"
+                    >
+                      <Lightbulb className="w-3 h-3 mr-1" />
+                      {tip}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Chat Input */}
+            <form onSubmit={handleChatSubmit} className="p-4 border-t border-gray-700">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={chatMessage}
+                  onChange={(e) => setChatMessage(e.target.value)}
+                  placeholder={selectedFolder ? "Ask about this folder..." : "Select a folder first"}
+                  disabled={!selectedFolder}
+                  className={`flex-1 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputBg}`}
+                />
+                <button
+                  type="submit"
+                  disabled={isChatLoading || !selectedFolder}
+                  className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Send className="w-5 h-5" />
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

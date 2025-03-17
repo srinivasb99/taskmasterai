@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react"
 import { useNavigate } from "react-router-dom"
 import { 
-  Folder, FolderPlus, Edit, Bot, Trash, Search, X, MessageSquare, ChevronRight, ChevronDown, 
+  Folder, Folders, FolderPlus, Edit, Bot, Trash, Search, X, MessageSquare, ChevronRight, ChevronDown, 
   FileText, Brain, Star, MoreHorizontal, Plus, Clock, Calendar, CheckCircle, AlertCircle, 
   Sparkles, MessageCircle, Play, BookOpen, Tag, Download, Upload, Copy, Printer, Share2, 
   Settings, Filter, SortAsc, Bookmark, Layers, LayoutGrid, List, Zap, Award, Repeat, Shuffle, 
@@ -1747,7 +1747,8 @@ return (
         {/* Top Bar with Actions */}
         <div className={`${cardClass} rounded-xl p-4 flex items-center justify-between shadow-md`}>
           <div className="flex items-center space-x-4">
-            <h1 className={`text-xl font-bold ${headingClass}`}>Folders</h1>
+            <Folders className="w-6 h-6 text-gray-500" />
+<h1 className={`text-xl font-bold ${headingClass}`}>Folders</h1>
             <div className="hidden md:flex space-x-2">
               <button
                 onClick={() => setViewMode("grid")}
@@ -2436,14 +2437,23 @@ return (
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
             {/* Left Column - Folders List */}
             <div className="lg:col-span-1">
-              <div
-                className={`${cardClass} rounded-xl p-4 shadow-lg animate-fadeIn relative overflow-hidden ${
-                  cardVisible ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
-                }`}
-              >
+      <div
+        className={`
+          ${cardClass}
+          rounded-xl
+          p-4
+          shadow-lg
+          animate-fadeIn
+          relative
+          overflow-hidden
+          ${cardVisible ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"}
+          h-[700px]           /* Adjust the fixed height here */
+          overflow-y-auto     /* Allows scrolling when content exceeds the fixed height */
+        `}
+      >
                 <div className="flex items-center justify-between mb-4">
                   <h2 className={`text-lg font-semibold ${headingClass} flex items-center`}>
-                    <Folder className="w-5 h-5 mr-2" />
+                    <Folders className="w-5 h-5 mr-2" />
                     Your Folders
                   </h2>
                   <div className="flex space-x-1">

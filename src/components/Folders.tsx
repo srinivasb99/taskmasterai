@@ -121,6 +121,14 @@ export function Folders() {
   const dropdownRef = useRef<HTMLDivElement>(null)
   const flashcardRef = useRef<HTMLDivElement>(null)
 
+  // AI Chat State
+  const [isAIChatOpen, setIsAIChatOpen] = useState(false)
+  const [chatMessage, setChatMessage] = useState("")
+  const [chatHistory, setChatHistory] = useState<{ role: "user" | "assistant"; content: string }[]>([])
+  const [isChatLoading, setIsChatLoading] = useState(false)
+  const [streamingAssistantContent, setStreamingAssistantContent] = useState<string | null>(null)
+  const chatEndRef = useRef<HTMLDivElement>(null)
+
   // Effect for card animation on mount
   useEffect(() => {
     setCardVisible(true)

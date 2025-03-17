@@ -1653,6 +1653,9 @@ Follow these instructions strictly.
       ? "bg-gray-200 text-gray-900"
       : "bg-gray-700 text-gray-200"
 
+  const textColor = isIlluminateEnabled ? "text-gray-900" : isBlackoutEnabled ? "text-white" : "text-white"
+  const subTextColor = isIlluminateEnabled ? "text-gray-600" : isBlackoutEnabled ? "text-gray-400" : "text-gray-400"
+
     // Study Assistant Button Component
   const StudyAssistantButton = () => {
     return (

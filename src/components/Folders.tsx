@@ -2343,6 +2343,8 @@ export function Folders() {
                         }}
                       />
                     )}
+                                                </div>
+
 
                               
                               {/* Items preview */}

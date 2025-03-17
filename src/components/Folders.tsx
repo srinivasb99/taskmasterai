@@ -2319,6 +2319,31 @@ export function Folders() {
                                   ))}
                                 </div>
                               )}
+                  {/* AI Study Assistant - placed before Items section */}
+                    {selectedFolder && (
+                      <AIFolders
+                        selectedFolder={selectedFolder}
+                        userName={userName}
+                        isIlluminateEnabled={isIlluminateEnabled}
+                        isBlackoutEnabled={isBlackoutEnabled}
+                        onFolderUpdated={() => {
+                          // Refresh folder items
+                          if (user && selectedFolder) {
+                            getFolderItems(user.uid, selectedFolder.id).then(items => {
+                              setSelectedFolder({ ...selectedFolder, items });
+                              
+                              // Update folder in folders array
+                              setFolders(prevFolders =>
+                                prevFolders.map(folder =>
+                                  folder.id === selectedFolder.id ? { ...folder, items, itemCount: items.length } : folder
+                                )
+                              );
+                            });
+                          }
+                        }}
+                      />
+                    )}
+
                               
                               {/* Items preview */}
                               {folder.items.length > 0 ? (
@@ -3157,31 +3182,7 @@ export function Folders() {
                         </div>
                       )}
                     </div>
-{/* AI Integration - Add this section */}
-{selectedFolder && (
-  <AIFolders
-    selectedFolder={selectedFolder}
-    userName={userName}
-    isIlluminateEnabled={isIlluminateEnabled}
-    isBlackoutEnabled={isBlackoutEnabled}
-    onFolderUpdated={() => {
-      // Refresh folder items
-      if (user && selectedFolder) {
-        getFolderItems(user.uid, selectedFolder.id).then(items => {
-          setSelectedFolder({ ...selectedFolder, items });
-          
-          // Update folder in folders array
-          setFolders(prevFolders =>
-            prevFolders.map(folder =>
-              folder.id === selectedFolder.id ? { ...folder, items, itemCount: items.length } : folder
-            )
-          );
-        });
-      }
-    }}
-  />
-)}
-                  </div>
+              </div>
                 ) : (
                   <div
                     className={`${cardClass} rounded-xl p-6 flex flex-col items-center justify-center min-h-[400px] shadow-lg animate-fadeIn relative overflow-hidden ${

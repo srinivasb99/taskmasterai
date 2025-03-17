@@ -1634,6 +1634,13 @@ Follow these instructions strictly.
     return isIlluminateEnabled ? getTagColor(tag) : getTagColorDark(tag)
   }
 
+    // Define theming classes
+  const containerBg = isBlackoutEnabled
+    ? "bg-gray-950"
+    : isIlluminateEnabled
+      ? "bg-white"
+      : "bg-gray-900"
+  
     const userBubble = isBlackoutEnabled
     ? "bg-blue-500 text-white"
     : isIlluminateEnabled

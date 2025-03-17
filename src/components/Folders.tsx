@@ -1271,1107 +1271,1142 @@ export function Folders() {
     return isIlluminateEnabled ? getTagColor(tag) : getTagColorDark(tag)
   }
 
-  return (
-    <div className={`${containerClass} min-h-screen w-full overflow-x-hidden`}>
-      {/* Pass collapse state & toggle handler to Sidebar */}
-      <Sidebar
-        userName={userName}
-        isCollapsed={isSidebarCollapsed}
-        onToggle={handleToggleSidebar}
-        isBlackoutEnabled={isBlackoutEnabled && isSidebarBlackoutEnabled}
-        isIlluminateEnabled={isIlluminateEnabled && isSidebarIlluminateEnabled}
-      />
+return (
+  <div className={`${containerClass} min-h-screen w-full overflow-x-hidden`}>
+    {/* Pass collapse state & toggle handler to Sidebar */}
+    <Sidebar
+      userName={userName}
+      isCollapsed={isSidebarCollapsed}
+      onToggle={handleToggleSidebar}
+      isBlackoutEnabled={isBlackoutEnabled && isSidebarBlackoutEnabled}
+      isIlluminateEnabled={isIlluminateEnabled && isSidebarIlluminateEnabled}
+    />
 
-      <main
-        className={`transition-all duration-500 ease-in-out min-h-screen
-          ${isSidebarCollapsed ? "ml-20 md:ml-20" : "ml-0 md:ml-64"} 
-          p-3 md:p-4 lg:p-8 overflow-x-hidden`}
-      >
-        {/* Main Content Area */}
-        <div className="flex flex-col space-y-6">
-          {/* Top Bar with Actions */}
-          <div className={`${cardClass} rounded-xl p-4 flex items-center justify-between shadow-md`}>
-            <div className="flex items-center space-x-4">
-              <h1 className={`text-xl font-bold ${headingClass}`}>Folders</h1>
-              <div className="hidden md:flex space-x-2">
-                <button
-                  onClick={() => setViewMode("grid")}
-                  className={`p-2 rounded-lg transition-colors ${
-                    viewMode === "grid" ? buttonPrimary : buttonSecondary
-                  }`}
-                  title="Grid View"
-                >
-                  <LayoutGrid className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => setViewMode("list")}
-                  className={`p-2 rounded-lg transition-colors ${
-                    viewMode === "list" ? buttonPrimary : buttonSecondary
-                  }`}
-                  title="List View"
-                >
-                  <List className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <div className="relative">
-                <button
-                  onClick={() => setShowFilterPanel(!showFilterPanel)}
-                  className={`p-2 rounded-lg transition-colors ${
-                    showFilterPanel ? buttonPrimary : buttonSecondary
-                  }`}
-                  title="Filter"
-                >
-                  <Filter className="w-4 h-4" />
-                </button>
-
-                {showFilterPanel && (
-                  <div className={`absolute right-0 mt-2 w-64 ${cardClass} rounded-lg shadow-lg p-3 z-10`}>
-                    <h3 className={`${headingClass} text-sm font-medium mb-2`}>Sort By</h3>
-                    <div className="flex flex-col space-y-1 mb-3">
-                      <button
-                        onClick={() => setSortBy("name")}
-                        className={`text-left px-2 py-1 rounded-md text-sm ${
-                          sortBy === "name" ? buttonPrimary : "hover:bg-opacity-10 hover:bg-white"
-                        }`}
-                      >
-                        Name
-                      </button>
-                      <button
-                        onClick={() => setSortBy("date")}
-                        className={`text-left px-2 py-1 rounded-md text-sm ${
-                          sortBy === "date" ? buttonPrimary : "hover:bg-opacity-10 hover:bg-white"
-                        }`}
-                      >
-                        Date Created
-                      </button>
-                      <button
-                        onClick={() => setSortBy("lastStudied")}
-                        className={`text-left px-2 py-1 rounded-md text-sm ${
-                          sortBy === "lastStudied" ? buttonPrimary : "hover:bg-opacity-10 hover:bg-white"
-                        }`}
-                      >
-                        Last Studied
-                      </button>
-                    </div>
-
-                    <h3 className={`${headingClass} text-sm font-medium mb-2`}>Filter by Tags</h3>
-                    <div className="flex flex-wrap gap-1 mb-2">
-                      {tags.map((tag) => (
-                        <button
-                          key={tag}
-                          onClick={() => {
-                            if (selectedTags.includes(tag)) {
-                              setSelectedTags(selectedTags.filter((t) => t !== tag))
-                            } else {
-                              setSelectedTags([...selectedTags, tag])
-                            }
-                          }}
-                          className={`px-2 py-0.5 rounded-full text-xs ${
-                            selectedTags.includes(tag) ? buttonPrimary : getTagColorClass(tag)
-                          }`}
-                        >
-                          {tag}
-                        </button>
-                      ))}
-                    </div>
-
-                    {selectedTags.length > 0 && (
-                      <button
-                        onClick={() => setSelectedTags([])}
-                        className={`text-xs ${subheadingClass} hover:underline`}
-                      >
-                        Clear filters
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Search folders..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className={`w-40 md:w-60 p-2 rounded-lg ${inputBg} border border-gray-600 text-sm`}
-                />
-                <Search className="absolute right-3 top-2.5 w-4 h-4 text-gray-400" />
-                {searchQuery && (
-                  <button
-                    onClick={() => setSearchQuery("")}
-                    className="absolute right-10 top-2.5 text-gray-400 hover:text-gray-300"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-
+    <main
+      className={`transition-all duration-500 ease-in-out min-h-screen
+      ${isSidebarCollapsed ? "ml-20 md:ml-20" : "ml-0 md:ml-64"} 
+      p-3 md:p-4 lg:p-8 overflow-x-hidden ${isAIChatOpen ? 'pr-[384px]' : ''}`}
+    >
+      {/* Main Content Area */}
+      <div className="flex flex-col space-y-6">
+        {/* Top Bar with Actions */}
+        <div className={`${cardClass} rounded-xl p-4 flex items-center justify-between shadow-md`}>
+          <div className="flex items-center space-x-4">
+            <h1 className={`text-xl font-bold ${headingClass}`}>Folders</h1>
+            <div className="hidden md:flex space-x-2">
               <button
-                onClick={() => {
-                  setIsCreatingFolder(true)
-                  setEditingFolderId(null)
-                  setNewFolderName("")
-                  setNewFolderDescription("")
-                  setNewFolderType("mixed")
-                  setFlashcardTags([])
-                }}
-                className={`${buttonPrimary} p-2 rounded-lg flex items-center space-x-1`}
+                onClick={() => setViewMode("grid")}
+                className={`p-2 rounded-lg transition-colors ${
+                  viewMode === "grid" ? buttonPrimary : buttonSecondary
+                }`}
+                title="Grid View"
               >
-                <FolderPlus className="w-4 h-4" />
-                <span className="hidden md:inline">New Folder</span>
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setViewMode("list")}
+                className={`p-2 rounded-lg transition-colors ${
+                  viewMode === "list" ? buttonPrimary : buttonSecondary
+                }`}
+                title="List View"
+              >
+                <List className="w-4 h-4" />
               </button>
             </div>
           </div>
 
-          {/* Flashcards Mode */}
-          {activeStudyMode === "flashcards" && selectedFolder && studyItems.length > 0 && (
-            <div className={`${cardClass} rounded-xl p-4 sm:p-6 animate-fadeIn shadow-lg`}>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className={`text-xl font-semibold ${headingClass} flex items-center`}>
-                  <BookOpen className="w-5 h-5 mr-2" />
-                  Flashcards: {selectedFolder.name}
-                </h2>
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={() => setActiveStudyMode(null)}
-                    className={`${buttonSecondary} px-3 py-1.5 rounded-lg text-sm`}
-                  >
-                    Exit
-                  </button>
-                </div>
-              </div>
+          <div className="flex items-center space-x-2">
+            <div className="relative">
+              <button
+                onClick={() => setShowFilterPanel(!showFilterPanel)}
+                className={`p-2 rounded-lg transition-colors ${
+                  showFilterPanel ? buttonPrimary : buttonSecondary
+                }`}
+                title="Filter"
+              >
+                <Filter className="w-4 h-4" />
+              </button>
 
-              {/* Flashcard */}
-              <div className="flex flex-col items-center justify-center">
-                <div className="text-sm mb-2">
-                  Card {currentStudyIndex + 1} of {studyItems.length}
-                </div>
-                
-                <div 
-                  ref={flashcardRef}
-                  className={`w-full max-w-xl h-64 rounded-xl ${cardClass} shadow-lg cursor-pointer transition-all duration-300 transform hover:scale-[1.02] relative overflow-hidden`}
-                  onClick={handleFlipCard}
-                  style={{
-                    perspective: "1000px",
-                    transformStyle: "preserve-3d"
-                  }}
-                >
-                  <div 
-                    className={`absolute inset-0 flex items-center justify-center p-6 transition-all duration-500 backface-visibility-hidden`}
-                    style={{
-                      transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
-                      opacity: isFlipped ? 0 : 1,
-                      backfaceVisibility: 'hidden'
-                    }}
-                  >
-                    <div className="text-center">
-                      <h3 className={`text-xl font-semibold ${headingClass} mb-4`}>Term</h3>
-                      <p className={`${defaultTextColor} text-lg`}>
-                        {studyItems[currentStudyIndex] && 'term' in studyItems[currentStudyIndex] 
-                          ? studyItems[currentStudyIndex].term 
-                          : ''}
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <div 
-                    className={`absolute inset-0 flex items-center justify-center p-6 transition-all duration-500 backface-visibility-hidden`}
-                    style={{
-                      transform: isFlipped ? 'rotateY(0deg)' : 'rotateY(-180deg)',
-                      opacity: isFlipped ? 1 : 0,
-                      backfaceVisibility: 'hidden'
-                    }}
-                  >
-                    <div className="text-center">
-                      <h3 className={`text-xl font-semibold ${headingClass} mb-4`}>Definition</h3>
-                      <p className={`${defaultTextColor} text-lg`}>
-                        {studyItems[currentStudyIndex] && 'definition' in studyItems[currentStudyIndex] 
-                          ? studyItems[currentStudyIndex].definition 
-                          : ''}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="flex items-center justify-between w-full max-w-xl mt-4">
-                  <button
-                    onClick={handlePrevCard}
-                    className={`${buttonSecondary} p-2 rounded-lg`}
-                  >
-                    <ArrowLeft className="w-5 h-5" />
-                  </button>
-                  
-                  <div className="flex space-x-2">
+              {showFilterPanel && (
+                <div className={`absolute right-0 mt-2 w-64 ${cardClass} rounded-lg shadow-lg p-3 z-10`}>
+                  <h3 className={`${headingClass} text-sm font-medium mb-2`}>Sort By</h3>
+                  <div className="flex flex-col space-y-1 mb-3">
                     <button
-                      onClick={handleFlipCard}
-                      className={`${buttonPrimary} px-4 py-2 rounded-lg`}
+                      onClick={() => setSortBy("name")}
+                      className={`text-left px-2 py-1 rounded-md text-sm ${
+                        sortBy === "name" ? buttonPrimary : "hover:bg-opacity-10 hover:bg-white"
+                      }`}
                     >
-                      {isFlipped ? 'Show Term' : 'Show Definition'}
-                    </button>
-                  </div>
-                  
-                  <button
-                    onClick={handleNextCard}
-                    className={`${buttonPrimary} p-2 rounded-lg`}
-                  >
-                    <ArrowRight className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Learn Mode */}
-          {activeStudyMode === "learn" && selectedFolder && studyItems.length > 0 && (
-            <div className={`${cardClass} rounded-xl p-4 sm:p-6 animate-fadeIn shadow-lg`}>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className={`text-xl font-semibold ${headingClass} flex items-center`}>
-                  <Lightbulb className="w-5 h-5 mr-2" />
-                  Learn: {selectedFolder.name}
-                </h2>
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={() => setActiveStudyMode(null)}
-                    className={`${buttonSecondary} px-3 py-1.5 rounded-lg text-sm`}
-                  >
-                    Exit
-                  </button>
-                </div>
-              </div>
-
-              {/* Progress Bar */}
-              <div className="mb-4">
-                <div className="flex justify-between text-sm mb-1">
-                  <span>Progress</span>
-                  <span>
-                    {Object.values(learnProgress).filter(p => p === "known").length} / {studyItems.length} learned
-                  </span>
-                </div>
-                <div className="w-full bg-gray-600 rounded-full h-2.5">
-                  <div 
-                    className="bg-green-500 h-2.5 rounded-full" 
-                    style={{ 
-                      width: `${(Object.values(learnProgress).filter(p => p === "known").length / studyItems.length) * 100}%` 
-                    }}
-                  ></div>
-                </div>
-              </div>
-
-              {/* Flashcard */}
-              <div className="flex flex-col items-center justify-center">
-                <div 
-                  ref={flashcardRef}
-                  className={`w-full max-w-xl h-64 rounded-xl ${cardClass} shadow-lg cursor-pointer transition-all duration-300 transform hover:scale-[1.02] relative overflow-hidden`}
-                  onClick={handleFlipCard}
-                  style={{
-                    perspective: "1000px",
-                    transformStyle: "preserve-3d"
-                  }}
-                >
-                  <div 
-                    className={`absolute inset-0 flex items-center justify-center p-6 transition-all duration-500 backface-visibility-hidden`}
-                    style={{
-                      transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
-                      opacity: isFlipped ? 0 : 1,
-                      backfaceVisibility: 'hidden'
-                    }}
-                  >
-                    <div className="text-center">
-                      <h3 className={`text-xl font-semibold ${headingClass} mb-4`}>Term</h3>
-                      <p className={`${defaultTextColor} text-lg`}>
-                        {studyItems[currentStudyIndex] && 'term' in studyItems[currentStudyIndex] 
-                          ? studyItems[currentStudyIndex].term 
-                          : ''}
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <div 
-                    className={`absolute inset-0 flex items-center justify-center p-6 transition-all duration-500 backface-visibility-hidden`}
-                    style={{
-                      transform: isFlipped ? 'rotateY(0deg)' : 'rotateY(-180deg)',
-                      opacity: isFlipped ? 1 : 0,
-                      backfaceVisibility: 'hidden'
-                    }}
-                  >
-                    <div className="text-center">
-                      <h3 className={`text-xl font-semibold ${headingClass} mb-4`}>Definition</h3>
-                      <p className={`${defaultTextColor} text-lg`}>
-                        {studyItems[currentStudyIndex] && 'definition' in studyItems[currentStudyIndex] 
-                          ? studyItems[currentStudyIndex].definition 
-                          : ''}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Learning controls - only show when card is flipped */}
-                {isFlipped && (
-                  <div className="flex items-center justify-center w-full max-w-xl mt-4 space-x-2">
-                    <button
-                      onClick={() => handleLearnResponse("hard")}
-                      className={`${buttonDanger} px-4 py-2 rounded-lg flex-1`}
-                    >
-                      Hard
+                      Name
                     </button>
                     <button
-                      onClick={() => handleLearnResponse("good")}
-                      className={`${buttonPrimary} px-4 py-2 rounded-lg flex-1`}
+                      onClick={() => setSortBy("date")}
+                      className={`text-left px-2 py-1 rounded-md text-sm ${
+                        sortBy === "date" ? buttonPrimary : "hover:bg-opacity-10 hover:bg-white"
+                      }`}
                     >
-                      Good
+                      Date Created
                     </button>
                     <button
-                      onClick={() => handleLearnResponse("easy")}
-                      className={`${buttonSuccess} px-4 py-2 rounded-lg flex-1`}
+                      onClick={() => setSortBy("lastStudied")}
+                      className={`text-left px-2 py-1 rounded-md text-sm ${
+                        sortBy === "lastStudied" ? buttonPrimary : "hover:bg-opacity-10 hover:bg-white"
+                      }`}
                     >
-                      Easy
+                      Last Studied
                     </button>
                   </div>
-                )}
-                
-                {!isFlipped && (
-                  <div className="flex items-center justify-center w-full max-w-xl mt-4">
-                    <button
-                      onClick={handleFlipCard}
-                      className={`${buttonPrimary} px-4 py-2 rounded-lg`}
-                    >
-                      Show Definition
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
 
-          {/* Test Mode */}
-          {activeStudyMode === "test" && selectedFolder && testQuestions.length > 0 && (
-            <div className={`${cardClass} rounded-xl p-4 sm:p-6 animate-fadeIn shadow-lg`}>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className={`text-xl font-semibold ${headingClass} flex items-center`}>
-                  <Target className="w-5 h-5 mr-2" />
-                  Test: {selectedFolder.name}
-                </h2>
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={() => setActiveStudyMode(null)}
-                    className={`${buttonSecondary} px-3 py-1.5 rounded-lg text-sm`}
-                  >
-                    Exit
-                  </button>
-                </div>
-              </div>
-
-              {testScore !== null ? (
-                <div className="text-center py-8">
-                  <h3 className={`text-2xl font-bold ${headingClass} mb-4`}>Your Score: {testScore}%</h3>
-                  <p className={`${subheadingClass} mb-6`}>
-                    You got {Math.round((testScore / 100) * testQuestions.length)} out of {testQuestions.length} correct.
-                  </p>
-                  <button
-                    onClick={() => {
-                      setTestScore(null)
-                      setTestAnswers({})
-                    }}
-                    className={`${buttonPrimary} px-4 py-2 rounded-lg mr-2`}
-                  >
-                    Try Again
-                  </button>
-                  <button
-                    onClick={() => setActiveStudyMode(null)}
-                    className={`${buttonSecondary} px-4 py-2 rounded-lg`}
-                  >
-                    Back to Folder
-                  </button>
-                </div>
-              ) : (
-                <div>
-                  <div className="space-y-6 mb-6">
-                    {testQuestions.map((question, index) => (
-                      <div key={question.id} className="p-4 rounded-lg bg-gray-700/50">
-                        <div className="flex items-center mb-2">
-                          <span className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-white font-medium mr-2">
-                            {index + 1}
-                          </span>
-                          <h3 className={`font-medium ${headingClass}`}>
-                            {question.type === "term" ? "Define this term:" : "What is the term for this definition:"}
-                          </h3>
-                        </div>
-                        <p className={`${defaultTextColor} mb-3 p-3 rounded-lg ${isIlluminateEnabled ? "bg-gray-200" : "bg-gray-600"}`}>
-                          {question.type === "term" ? question.term : question.definition}
-                        </p>
-                        <div>
-                          <label className={`block text-sm font-medium mb-1 ${subheadingClass}`}>Your Answer:</label>
-                          <input
-                            type="text"
-                            value={testAnswers[question.id] || ""}
-                            onChange={(e) => setTestAnswers({...testAnswers, [question.id]: e.target.value})}
-                            className={`w-full p-2 rounded-lg ${inputBg} border border-gray-600`}
-                            placeholder="Type your answer here..."
-                          />
-                        </div>
-                      </div>
+                  <h3 className={`${headingClass} text-sm font-medium mb-2`}>Filter by Tags</h3>
+                  <div className="flex flex-wrap gap-1 mb-2">
+                    {tags.map((tag) => (
+                      <button
+                        key={tag}
+                        onClick={() => {
+                          if (selectedTags.includes(tag)) {
+                            setSelectedTags(selectedTags.filter((t) => t !== tag))
+                          } else {
+                            setSelectedTags([...selectedTags, tag])
+                          }
+                        }}
+                        className={`px-2 py-0.5 rounded-full text-xs ${
+                          selectedTags.includes(tag) ? buttonPrimary : getTagColorClass(tag)
+                        }`}
+                      >
+                        {tag}
+                      </button>
                     ))}
                   </div>
-                  
-                  <div className="flex justify-end">
+
+                  {selectedTags.length > 0 && (
                     <button
-                      onClick={handleSubmitTest}
-                      className={`${buttonSuccess} px-4 py-2 rounded-lg`}
-                      disabled={Object.keys(testAnswers).length < testQuestions.length}
+                      onClick={() => setSelectedTags([])}
+                      className={`text-xs ${subheadingClass} hover:underline`}
                     >
-                      Submit Test
+                      Clear filters
                     </button>
-                  </div>
+                  )}
                 </div>
               )}
             </div>
-          )}
 
-          {/* Matching Game */}
-          {activeStudyMode === "match" && selectedFolder && matchingPairs.length > 0 && (
-            <div className={`${cardClass} rounded-xl p-4 sm:p-6 animate-fadeIn shadow-lg`}>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className={`text-xl font-semibold ${headingClass} flex items-center`}>
-                  <Gamepad2 className="w-5 h-5 mr-2" />
-                  Matching Game: {selectedFolder.name}
-                </h2>
-                <div className="flex items-center space-x-2">
-                  <span className={`${headingClass} font-medium`}>
-                    Matches: {matchingScore} / {matchingPairs.length / 2}
-                  </span>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search folders..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className={`w-40 md:w-60 p-2 rounded-lg ${inputBg} border border-gray-600 text-sm`}
+              />
+              <Search className="absolute right-3 top-2.5 w-4 h-4 text-gray-400" />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-10 top-2.5 text-gray-400 hover:text-gray-300"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+
+            <button
+              onClick={() => {
+                setIsCreatingFolder(true)
+                setEditingFolderId(null)
+                setNewFolderName("")
+                setNewFolderDescription("")
+                setNewFolderType("mixed")
+                setFlashcardTags([])
+              }}
+              className={`${buttonPrimary} p-2 rounded-lg flex items-center space-x-1`}
+            >
+              <FolderPlus className="w-4 h-4" />
+              <span className="hidden md:inline">New Folder</span>
+            </button>
+          </div>
+        </div>
+
+        {/* AI Study Assistant Button - Moved to top */}
+        <div className={`${cardClass} rounded-xl p-4 shadow-md`}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <Bot className="w-5 h-5 mr-2 text-blue-500" />
+              <h2 className={`text-lg font-semibold ${headingClass}`}>AI Study Assistant</h2>
+            </div>
+            <button
+              onClick={() => setIsAIChatOpen(!isAIChatOpen)}
+              className={`${buttonPrimary} px-3 py-1.5 rounded-lg text-sm flex items-center space-x-1`}
+            >
+              <MessageSquare className="w-4 h-4" />
+              <span>{isAIChatOpen ? "Close Chat Panel" : "Open Chat Panel"}</span>
+            </button>
+          </div>
+          <p className={`${subheadingClass} text-sm mt-2`}>
+            Get help with studying, creating flashcards, or understanding difficult concepts.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {studyTipSuggestions.map((tip, index) => (
+              <button
+                key={index}
+                onClick={() => {
+                  setChatMessage(tip)
+                  setIsAIChatOpen(true)
+                }}
+                className={`px-2 py-1 rounded-lg text-xs ${buttonSecondary} hover:bg-opacity-80`}
+              >
+                {tip}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Flashcards Mode */}
+        {activeStudyMode === "flashcards" && selectedFolder && studyItems.length > 0 && (
+          <div className={`${cardClass} rounded-xl p-4 sm:p-6 animate-fadeIn shadow-lg`}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className={`text-xl font-semibold ${headingClass} flex items-center`}>
+                <BookOpen className="w-5 h-5 mr-2" />
+                Flashcards: {selectedFolder.name}
+              </h2>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setActiveStudyMode(null)}
+                  className={`${buttonSecondary} px-3 py-1.5 rounded-lg text-sm`}
+                >
+                  Exit
+                </button>
+              </div>
+            </div>
+
+            {/* Flashcard */}
+            <div className="flex flex-col items-center justify-center">
+              <div className="text-sm mb-2">
+                Card {currentStudyIndex + 1} of {studyItems.length}
+              </div>
+              
+              <div 
+                ref={flashcardRef}
+                className={`w-full max-w-xl h-64 rounded-xl ${cardClass} shadow-lg cursor-pointer transition-all duration-300 transform hover:scale-[1.02] relative overflow-hidden`}
+                onClick={handleFlipCard}
+                style={{
+                  perspective: "1000px",
+                  transformStyle: "preserve-3d"
+                }}
+              >
+                <div 
+                  className={`absolute inset-0 flex items-center justify-center p-6 transition-all duration-500 backface-visibility-hidden`}
+                  style={{
+                    transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
+                    opacity: isFlipped ? 0 : 1,
+                    backfaceVisibility: 'hidden'
+                  }}
+                >
+                  <div className="text-center">
+                    <h3 className={`text-xl font-semibold ${headingClass} mb-4`}>Term</h3>
+                    <p className={`${defaultTextColor} text-lg`}>
+                      {studyItems[currentStudyIndex] && 'term' in studyItems[currentStudyIndex] 
+                        ? studyItems[currentStudyIndex].term 
+                        : ''}
+                    </p>
+                  </div>
+                </div>
+                
+                <div 
+                  className={`absolute inset-0 flex items-center justify-center p-6 transition-all duration-500 backface-visibility-hidden`}
+                  style={{
+                    transform: isFlipped ? 'rotateY(0deg)' : 'rotateY(-180deg)',
+                    opacity: isFlipped ? 1 : 0,
+                    backfaceVisibility: 'hidden'
+                  }}
+                >
+                  <div className="text-center">
+                    <h3 className={`text-xl font-semibold ${headingClass} mb-4`}>Definition</h3>
+                    <p className={`${defaultTextColor} text-lg`}>
+                      {studyItems[currentStudyIndex] && 'definition' in studyItems[currentStudyIndex] 
+                        ? studyItems[currentStudyIndex].definition 
+                        : ''}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex items-center justify-between w-full max-w-xl mt-4">
+                <button
+                  onClick={handlePrevCard}
+                  className={`${buttonSecondary} p-2 rounded-lg`}
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                </button>
+                
+                <div className="flex space-x-2">
                   <button
-                    onClick={() => setActiveStudyMode(null)}
-                    className={`${buttonSecondary} px-3 py-1.5 rounded-lg text-sm`}
+                    onClick={handleFlipCard}
+                    className={`${buttonPrimary} px-4 py-2 rounded-lg`}
                   >
-                    Exit
+                    {isFlipped ? 'Show Term' : 'Show Definition'}
+                  </button>
+                </div>
+                
+                <button
+                  onClick={handleNextCard}
+                  className={`${buttonPrimary} p-2 rounded-lg`}
+                >
+                  <ArrowRight className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Learn Mode */}
+        {activeStudyMode === "learn" && selectedFolder && studyItems.length > 0 && (
+          <div className={`${cardClass} rounded-xl p-4 sm:p-6 animate-fadeIn shadow-lg`}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className={`text-xl font-semibold ${headingClass} flex items-center`}>
+                <Lightbulb className="w-5 h-5 mr-2" />
+                Learn: {selectedFolder.name}
+              </h2>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setActiveStudyMode(null)}
+                  className={`${buttonSecondary} px-3 py-1.5 rounded-lg text-sm`}
+                >
+                  Exit
+                </button>
+              </div>
+            </div>
+
+            {/* Progress Bar */}
+            <div className="mb-4">
+              <div className="flex justify-between text-sm mb-1">
+                <span>Progress</span>
+                <span>
+                  {Object.values(learnProgress).filter(p => p === "known").length} / {studyItems.length} learned
+                </span>
+              </div>
+              <div className="w-full bg-gray-600 rounded-full h-2.5">
+                <div 
+                  className="bg-green-500 h-2.5 rounded-full" 
+                  style={{ 
+                    width: `${(Object.values(learnProgress).filter(p => p === "known").length / studyItems.length) * 100}%` 
+                  }}
+                ></div>
+              </div>
+            </div>
+
+            {/* Flashcard */}
+            <div className="flex flex-col items-center justify-center">
+              <div 
+                ref={flashcardRef}
+                className={`w-full max-w-xl h-64 rounded-xl ${cardClass} shadow-lg cursor-pointer transition-all duration-300 transform hover:scale-[1.02] relative overflow-hidden`}
+                onClick={handleFlipCard}
+                style={{
+                  perspective: "1000px",
+                  transformStyle: "preserve-3d"
+                }}
+              >
+                <div 
+                  className={`absolute inset-0 flex items-center justify-center p-6 transition-all duration-500 backface-visibility-hidden`}
+                  style={{
+                    transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
+                    opacity: isFlipped ? 0 : 1,
+                    backfaceVisibility: 'hidden'
+                  }}
+                >
+                  <div className="text-center">
+                    <h3 className={`text-xl font-semibold ${headingClass} mb-4`}>Term</h3>
+                    <p className={`${defaultTextColor} text-lg`}>
+                      {studyItems[currentStudyIndex] && 'term' in studyItems[currentStudyIndex] 
+                        ? studyItems[currentStudyIndex].term 
+                        : ''}
+                    </p>
+                  </div>
+                </div>
+                
+                <div 
+                  className={`absolute inset-0 flex items-center justify-center p-6 transition-all duration-500 backface-visibility-hidden`}
+                  style={{
+                    transform: isFlipped ? 'rotateY(0deg)' : 'rotateY(-180deg)',
+                    opacity: isFlipped ? 1 : 0,
+                    backfaceVisibility: 'hidden'
+                  }}
+                >
+                  <div className="text-center">
+                    <h3 className={`text-xl font-semibold ${headingClass} mb-4`}>Definition</h3>
+                    <p className={`${defaultTextColor} text-lg`}>
+                      {studyItems[currentStudyIndex] && 'definition' in studyItems[currentStudyIndex] 
+                        ? studyItems[currentStudyIndex].definition 
+                        : ''}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Learning controls - only show when card is flipped */}
+              {isFlipped && (
+                <div className="flex items-center justify-center w-full max-w-xl mt-4 space-x-2">
+                  <button
+                    onClick={() => handleLearnResponse("hard")}
+                    className={`${buttonDanger} px-4 py-2 rounded-lg flex-1`}
+                  >
+                    Hard
+                  </button>
+                  <button
+                    onClick={() => handleLearnResponse("good")}
+                    className={`${buttonPrimary} px-4 py-2 rounded-lg flex-1`}
+                  >
+                    Good
+                  </button>
+                  <button
+                    onClick={() => handleLearnResponse("easy")}
+                    className={`${buttonSuccess} px-4 py-2 rounded-lg flex-1`}
+                  >
+                    Easy
+                  </button>
+                </div>
+              )}
+              
+              {!isFlipped && (
+                <div className="flex items-center justify-center w-full max-w-xl mt-4">
+                  <button
+                    onClick={handleFlipCard}
+                    className={`${buttonPrimary} px-4 py-2 rounded-lg`}
+                  >
+                    Show Definition
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Test Mode */}
+        {activeStudyMode === "test" && selectedFolder && testQuestions.length > 0 && (
+          <div className={`${cardClass} rounded-xl p-4 sm:p-6 animate-fadeIn shadow-lg`}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className={`text-xl font-semibold ${headingClass} flex items-center`}>
+                <Target className="w-5 h-5 mr-2" />
+                Test: {selectedFolder.name}
+              </h2>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setActiveStudyMode(null)}
+                  className={`${buttonSecondary} px-3 py-1.5 rounded-lg text-sm`}
+                >
+                  Exit
+                </button>
+              </div>
+            </div>
+
+            {testScore !== null ? (
+              <div className="text-center py-8">
+                <h3 className={`text-2xl font-bold ${headingClass} mb-4`}>Your Score: {testScore}%</h3>
+                <p className={`${subheadingClass} mb-6`}>
+                  You got {Math.round((testScore / 100) * testQuestions.length)} out of {testQuestions.length} correct.
+                </p>
+                <button
+                  onClick={() => {
+                    setTestScore(null)
+                    setTestAnswers({})
+                  }}
+                  className={`${buttonPrimary} px-4 py-2 rounded-lg mr-2`}
+                >
+                  Try Again
+                </button>
+                <button
+                  onClick={() => setActiveStudyMode(null)}
+                  className={`${buttonSecondary} px-4 py-2 rounded-lg`}
+                >
+                  Back to Folder
+                </button>
+              </div>
+            ) : (
+              <div>
+                <div className="space-y-6 mb-6">
+                  {testQuestions.map((question, index) => (
+                    <div key={question.id} className="p-4 rounded-lg bg-gray-700/50">
+                      <div className="flex items-center mb-2">
+                        <span className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-white font-medium mr-2">
+                          {index + 1}
+                        </span>
+                        <h3 className={`font-medium ${headingClass}`}>
+                          {question.type === "term" ? "Define this term:" : "What is the term for this definition:"}
+                        </h3>
+                      </div>
+                      <p className={`${defaultTextColor} mb-3 p-3 rounded-lg ${isIlluminateEnabled ? "bg-gray-200" : "bg-gray-600"}`}>
+                        {question.type === "term" ? question.term : question.definition}
+                      </p>
+                      <div>
+                        <label className={`block text-sm font-medium mb-1 ${subheadingClass}`}>Your Answer:</label>
+                        <input
+                          type="text"
+                          value={testAnswers[question.id] || ""}
+                          onChange={(e) => setTestAnswers({...testAnswers, [question.id]: e.target.value})}
+                          className={`w-full p-2 rounded-lg ${inputBg} border border-gray-600`}
+                          placeholder="Type your answer here..."
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="flex justify-end">
+                  <button
+                    onClick={handleSubmitTest}
+                    className={`${buttonSuccess} px-4 py-2 rounded-lg`}
+                    disabled={Object.keys(testAnswers).length < testQuestions.length}
+                  >
+                    Submit Test
                   </button>
                 </div>
               </div>
+            )}
+          </div>
+        )}
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {matchingPairs.map((pair) => (
-                  <div
-                    key={pair.id}
-                    onClick={() => !pair.matched && handleMatchingCardSelect(pair.id)}
-                    className={`aspect-w-3 aspect-h-4 rounded-lg cursor-pointer transition-all duration-300 transform ${
-                      pair.matched 
-                        ? isIlluminateEnabled ? 'bg-green-100 text-green-800' : 'bg-green-900/30 text-green-400'
-                        : pair.selected
-                          ? isIlluminateEnabled ? 'bg-blue-100 text-blue-800' : 'bg-blue-900/30 text-blue-400'
-                          : isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700'
-                    } ${pair.matched || pair.selected ? 'scale-[1.02]' : 'hover:scale-[1.02]'}`}
+        {/* Matching Game */}
+        {activeStudyMode === "match" && selectedFolder && matchingPairs.length > 0 && (
+          <div className={`${cardClass} rounded-xl p-4 sm:p-6 animate-fadeIn shadow-lg`}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className={`text-xl font-semibold ${headingClass} flex items-center`}>
+                <Gamepad2 className="w-5 h-5 mr-2" />
+                Matching Game: {selectedFolder.name}
+              </h2>
+              <div className="flex items-center space-x-2">
+                <span className={`${headingClass} font-medium`}>
+                  Matches: {matchingScore} / {matchingPairs.length / 2}
+                </span>
+                <button
+                  onClick={() => setActiveStudyMode(null)}
+                  className={`${buttonSecondary} px-3 py-1.5 rounded-lg text-sm`}
+                >
+                  Exit
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {matchingPairs.map((pair) => (
+                <div
+                  key={pair.id}
+                  onClick={() => !pair.matched && handleMatchingCardSelect(pair.id)}
+                  className={`aspect-w-3 aspect-h-4 rounded-lg cursor-pointer transition-all duration-300 transform ${
+                    pair.matched 
+                      ? isIlluminateEnabled ? 'bg-green-100 text-green-800' : 'bg-green-900/30 text-green-400'
+                      : pair.selected
+                        ? isIlluminateEnabled ? 'bg-blue-100 text-blue-800' : 'bg-blue-900/30 text-blue-400'
+                        : isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700'
+                  } ${pair.matched || pair.selected ? 'scale-[1.02]' : 'hover:scale-[1.02]'}`}
+                >
+                  <div className="flex items-center justify-center p-2 text-center">
+                    {pair.matched || pair.selected ? (
+                      <p className="text-sm">{pair.content}</p>
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <span className={`${isIlluminateEnabled ? 'text-gray-400' : 'text-gray-500'}`}>
+                          {pair.type === "term" ? "Term" : "Definition"}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Quiz Mode */}
+        {activeStudyMode === "quiz" && selectedFolder && quizQuestions.length > 0 && (
+          <div className={`${cardClass} rounded-xl p-4 sm:p-6 animate-fadeIn shadow-lg`}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className={`text-xl font-semibold ${headingClass} flex items-center`}>
+                <Brain className="w-5 h-5 mr-2" />
+                Quiz: {selectedFolder.name}
+              </h2>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setActiveStudyMode(null)}
+                  className={`${buttonSecondary} px-3 py-1.5 rounded-lg text-sm`}
+                >
+                  Exit
+                </button>
+              </div>
+            </div>
+
+            {quizCompleted ? (
+              <div className="text-center py-8">
+                <h3 className={`text-2xl font-bold ${headingClass} mb-4`}>Your Score: {quizScore}%</h3>
+                <p className={`${subheadingClass} mb-6`}>
+                  You got {Math.round((quizScore! / 100) * quizQuestions.length)} out of {quizQuestions.length} correct.
+                </p>
+                
+                <div className="space-y-4 mb-6 text-left">
+                  <h4 className={`font-medium ${headingClass}`}>Review Your Answers:</h4>
+                  {quizQuestions.map((question, index) => (
+                    <div key={question.id} className={`p-3 rounded-lg ${
+                      quizAnswers[question.id] === question.correctAnswer
+                        ? isIlluminateEnabled ? 'bg-green-100' : 'bg-green-900/30'
+                        : isIlluminateEnabled ? 'bg-red-100' : 'bg-red-900/30'
+                    }`}>
+                      <p className={`font-medium ${
+                        quizAnswers[question.id] === question.correctAnswer
+                          ? isIlluminateEnabled ? 'text-green-800' : 'text-green-400'
+                          : isIlluminateEnabled ? 'text-red-800' : 'text-red-400'
+                      }`}>
+                        Question {index + 1}: {question.question}
+                      </p>
+                      <div className="mt-2 space-y-1">
+                        {question.options.map((option, optIndex) => (
+                          <div key={optIndex} className={`p-2 rounded-lg ${
+                            optIndex === question.correctAnswer
+                              ? isIlluminateEnabled ? 'bg-green-200 text-green-800' : 'bg-green-900/50 text-green-400'
+                              : optIndex === quizAnswers[question.id] && optIndex !== question.correctAnswer
+                                ? isIlluminateEnabled ? 'bg-red-200 text-red-800' : 'bg-red-900/50 text-red-400'
+                                : isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700'
+                          }`}>
+                            {optIndex === question.correctAnswer && (
+                              <CheckCircle className="w-4 h-4 inline-block mr-2 text-green-500" />
+                            )}
+                            {option}
+                          </div>
+                        ))}
+                      </div>
+                      {question.explanation && (
+                        <div className="mt-2 p-2 rounded-lg bg-gray-700/30">
+                          <p className={`text-sm ${subheadingClass}`}>Explanation: {question.explanation}</p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                
+                <button
+                  onClick={() => {
+                    setQuizCompleted(false)
+                    setQuizAnswers({})
+                    setCurrentQuizIndex(0)
+                    setQuizScore(null)
+                  }}
+                  className={`${buttonPrimary} px-4 py-2 rounded-lg mr-2`}
+                >
+                  Try Again
+                </button>
+                <button
+                  onClick={() => setActiveStudyMode(null)}
+                  className={`${buttonSecondary} px-4 py-2 rounded-lg`}
+                >
+                  Back to Folder
+                </button>
+              </div>
+            ) : (
+              <div>
+                <div className="mb-4">
+                  <div className="flex justify-between text-sm mb-1">
+                    <span>Question {currentQuizIndex + 1} of {quizQuestions.length}</span>
+                    <span>
+                      {Object.keys(quizAnswers).length} / {quizQuestions.length} answered
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-600 rounded-full h-2.5">
+                    <div 
+                      className="bg-blue-500 h-2.5 rounded-full" 
+                      style={{ 
+                        width: `${(currentQuizIndex / quizQuestions.length) * 100}%` 
+                      }}
+                    ></div>
+                  </div>
+                </div>
+                
+                <div className="p-4 rounded-lg bg-gray-700/50 mb-6">
+                  <h3 className={`text-xl font-medium ${headingClass} mb-4`}>
+                    {quizQuestions[currentQuizIndex].question}
+                  </h3>
+                  
+                  <div className="space-y-2">
+                    {quizQuestions[currentQuizIndex].options.map((option, index) => (
+                      <div
+                        key={index}
+                        onClick={() => handleQuizAnswerSelect(quizQuestions[currentQuizIndex].id, index)}
+                        className={`p-3 rounded-lg cursor-pointer ${
+                          quizAnswers[quizQuestions[currentQuizIndex].id] === index
+                            ? buttonPrimary
+                            : isIlluminateEnabled ? 'bg-gray-200 hover:bg-gray-300' : 'bg-gray-600 hover:bg-gray-500'
+                        }`}
+                      >
+                        {option}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                
+                <div className="flex justify-between">
+                  <button
+                    onClick={() => {
+                      if (currentQuizIndex > 0) {
+                        setCurrentQuizIndex(currentQuizIndex - 1)
+                      }
+                    }}
+                    className={`${buttonSecondary} px-4 py-2 rounded-lg`}
+                    disabled={currentQuizIndex === 0}
                   >
-                    <div className="flex items-center justify-center p-2 text-center">
-                      {pair.matched || pair.selected ? (
-                        <p className="text-sm">{pair.content}</p>
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <span className={`${isIlluminateEnabled ? 'text-gray-400' : 'text-gray-500'}`}>
-                            {pair.type === "term" ? "Term" : "Definition"}
-                          </span>
+                    Previous
+                  </button>
+                  
+                  {currentQuizIndex < quizQuestions.length - 1 ? (
+                    <button
+                      onClick={() => {
+                        setCurrentQuizIndex(currentQuizIndex + 1)
+                      }}
+                      className={`${buttonPrimary} px-4 py-2 rounded-lg`}
+                    >
+                      Next
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleSubmitQuiz}
+                      className={`${buttonSuccess} px-4 py-2 rounded-lg`}
+                      disabled={Object.keys(quizAnswers).length < quizQuestions.length}
+                    >
+                      Submit Quiz
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Main Content */}
+        {!activeStudyMode && (
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            {/* Left Column - Folders List */}
+            <div className="lg:col-span-1">
+              <div
+                className={`${cardClass} rounded-xl p-4 shadow-lg animate-fadeIn relative overflow-hidden ${
+                  cardVisible ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
+                }`}
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className={`text-lg font-semibold ${headingClass} flex items-center`}>
+                    <Folder className="w-5 h-5 mr-2" />
+                    Folders
+                  </h2>
+                  <div className="flex space-x-1">
+                    <button
+                      onClick={() => {
+                        setIsCreatingFolder(true)
+                        setEditingFolderId(null)
+                        setNewFolderName("")
+                        setNewFolderDescription("")
+                        setNewFolderType("mixed")
+                        setFlashcardTags([])
+                      }}
+                      className="p-1.5 rounded-full bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                      title="Create Folder"
+                    >
+                      <FolderPlus className="w-4 h-4" />
+                    </button>
+                    <div className="relative">
+                      <button
+                        onClick={() => setShowTagsDropdown(!showTagsDropdown)}
+                        className="p-1.5 rounded-full bg-purple-600 text-white hover:bg-purple-700 transition-colors"
+                        title="Filter by Tags"
+                      >
+                        <Tag className="w-4 h-4" />
+                      </button>
+
+                      {showTagsDropdown && (
+                        <div
+                          ref={tagsDropdownRef}
+                          className={`absolute left-0 mt-1 w-48 ${cardClass} rounded-lg shadow-lg p-2 z-10`}
+                        >
+                          <h3 className={`${headingClass} text-sm font-medium mb-2`}>Filter by Tags</h3>
+                          <div className="flex flex-wrap gap-1 mb-2">
+                            {tags.map((tag) => (
+                              <button
+                                key={tag}
+                                onClick={() => {
+                                  if (selectedTags.includes(tag)) {
+                                    setSelectedTags(selectedTags.filter((t) => t !== tag))
+                                  } else {
+                                    setSelectedTags([...selectedTags, tag])
+                                  }
+                                }}
+                                className={`px-2 py-0.5 rounded-full text-xs ${
+                                  selectedTags.includes(tag) ? buttonPrimary : getTagColorClass(tag)
+                                }`}
+                              >
+                                {tag}
+                              </button>
+                            ))}
+                          </div>
+
+                          {selectedTags.length > 0 && (
+                            <button
+                              onClick={() => setSelectedTags([])}
+                              className={`text-xs ${subheadingClass} hover:underline`}
+                            >
+                              Clear filters
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Quiz Mode */}
-          {activeStudyMode === "quiz" && selectedFolder && quizQuestions.length > 0 && (
-            <div className={`${cardClass} rounded-xl p-4 sm:p-6 animate-fadeIn shadow-lg`}>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className={`text-xl font-semibold ${headingClass} flex items-center`}>
-                  <Brain className="w-5 h-5 mr-2" />
-                  Quiz: {selectedFolder.name}
-                </h2>
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={() => setActiveStudyMode(null)}
-                    className={`${buttonSecondary} px-3 py-1.5 rounded-lg text-sm`}
-                  >
-                    Exit
-                  </button>
                 </div>
-              </div>
 
-              {quizCompleted ? (
-                <div className="text-center py-8">
-                  <h3 className={`text-2xl font-bold ${headingClass} mb-4`}>Your Score: {quizScore}%</h3>
-                  <p className={`${subheadingClass} mb-6`}>
-                    You got {Math.round((quizScore! / 100) * quizQuestions.length)} out of {quizQuestions.length} correct.
-                  </p>
-                  
-                  <div className="space-y-4 mb-6 text-left">
-                    <h4 className={`font-medium ${headingClass}`}>Review Your Answers:</h4>
-                    {quizQuestions.map((question, index) => (
-                      <div key={question.id} className={`p-3 rounded-lg ${
-                        quizAnswers[question.id] === question.correctAnswer
-                          ? isIlluminateEnabled ? 'bg-green-100' : 'bg-green-900/30'
-                          : isIlluminateEnabled ? 'bg-red-100' : 'bg-red-900/30'
-                      }`}>
-                        <p className={`font-medium ${
-                          quizAnswers[question.id] === question.correctAnswer
-                            ? isIlluminateEnabled ? 'text-green-800' : 'text-green-400'
-                            : isIlluminateEnabled ? 'text-red-800' : 'text-red-400'
-                        }`}>
-                          Question {index + 1}: {question.question}
-                        </p>
-                        <div className="mt-2 space-y-1">
-                          {question.options.map((option, optIndex) => (
-                            <div key={optIndex} className={`p-2 rounded-lg ${
-                              optIndex === question.correctAnswer
-                                ? isIlluminateEnabled ? 'bg-green-200 text-green-800' : 'bg-green-900/50 text-green-400'
-                                : optIndex === quizAnswers[question.id] && optIndex !== question.correctAnswer
-                                  ? isIlluminateEnabled ? 'bg-red-200 text-red-800' : 'bg-red-900/50 text-red-400'
-                                  : isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700'
-                            }`}>
-                              {optIndex === question.correctAnswer && (
-                                <CheckCircle className="w-4 h-4 inline-block mr-2 text-green-500" />
-                              )}
-                              {option}
+                {/* Create/Edit Folder Form */}
+                {(isCreatingFolder || editingFolderId) && (
+                  <div className={`mb-4 p-3 rounded-lg ${isIlluminateEnabled ? "bg-gray-200" : "bg-gray-700"}`}>
+                    <h3 className={`text-sm font-medium mb-2 ${headingClass}`}>
+                      {editingFolderId ? "Edit Folder" : "Create New Folder"}
+                    </h3>
+                    <div className="space-y-2">
+                      <div>
+                        <input
+                          type="text"
+                          value={newFolderName}
+                          onChange={(e) => setNewFolderName(e.target.value)}
+                          placeholder="Folder Name"
+                          className={`w-full p-2 rounded-lg ${inputBg} border border-gray-600 text-sm`}
+                        />
+                      </div>
+                      <div>
+                        <textarea
+                          value={newFolderDescription}
+                          onChange={(e) => setNewFolderDescription(e.target.value)}
+                          placeholder="Description (optional)"
+                          className={`w-full p-2 rounded-lg ${inputBg} border border-gray-600 text-sm`}
+                          rows={2}
+                        />
+                      </div>
+                      <div>
+                        <select
+                          value={newFolderType}
+                          onChange={(e) => setNewFolderType(e.target.value as "flashcard" | "question" | "mixed")}
+                          className={`w-full p-2 rounded-lg ${inputBg} border border-gray-600 text-sm`}
+                        >
+                          <option value="flashcard">Flashcards Only</option>
+                          <option value="question">Questions Only</option>
+                          <option value="mixed">Mixed Content</option>
+                        </select>
+                      </div>
+
+                      {/* Tags for folder */}
+                      <div>
+                        <div className="flex items-center space-x-1 mb-1">
+                          <input
+                            type="text"
+                            value={newFlashcardTag}
+                            onChange={(e) => setNewFlashcardTag(e.target.value)}
+                            placeholder="Add tags..."
+                            className={`flex-1 p-1.5 rounded-lg ${inputBg} border border-gray-600 text-sm`}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && newFlashcardTag.trim()) {
+                                setFlashcardTags([...flashcardTags, newFlashcardTag.trim()])
+                                setNewFlashcardTag("")
+                                e.preventDefault()
+                              }
+                            }}
+                          />
+                          <button
+                            onClick={() => {
+                              if (newFlashcardTag.trim()) {
+                                setFlashcardTags([...flashcardTags, newFlashcardTag.trim()])
+                                setNewFlashcardTag("")
+                              }
+                            }}
+                            className={`p-1.5 rounded-lg ${buttonPrimary} text-sm`}
+                          >
+                            <Plus className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        <div className="flex flex-wrap gap-1">
+                          {flashcardTags.map((tag, index) => (
+                            <div
+                              key={index}
+                              className={`px-2 py-0.5 rounded-full text-xs flex items-center space-x-1 ${getTagColorClass(
+                                tag,
+                              )}`}
+                            >
+                              <span>{tag}</span>
+                              <button
+                                onClick={() => setFlashcardTags(flashcardTags.filter((_, i) => i !== index))}
+                                className="hover:text-red-500"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
                             </div>
                           ))}
                         </div>
-                        {question.explanation && (
-                          <div className="mt-2 p-2 rounded-lg bg-gray-700/30">
-                            <p className={`text-sm ${subheadingClass}`}>Explanation: {question.explanation}</p>
+                      </div>
+
+                      <div className="flex justify-end space-x-2 pt-1">
+                        <button
+                          onClick={() => {
+                            setIsCreatingFolder(false)
+                            setEditingFolderId(null)
+                          }}
+                          className={`px-3 py-1.5 rounded-lg text-xs ${buttonSecondary}`}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={editingFolderId ? handleUpdateFolder : handleCreateFolder}
+                          className={`px-3 py-1.5 rounded-lg text-xs ${buttonPrimary}`}
+                        >
+                          {editingFolderId ? "Update" : "Create"}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Folders List */}
+                <div className="space-y-2 max-h-[calc(100vh-300px)] overflow-y-auto pr-1">
+                  {sortedFolders.length === 0 ? (
+                    <div className="text-center py-6">
+                      <p className={`${subheadingClass} mb-2 text-sm`}>No folders found</p>
+                      <button
+                        onClick={() => setIsCreatingFolder(true)}
+                        className={`px-3 py-1.5 rounded-lg text-sm ${buttonPrimary} inline-flex items-center`}
+                      >
+                        <FolderPlus className="w-4 h-4 mr-2" />
+                        Create your first folder
+                      </button>
+                    </div>
+                  ) : (
+                    sortedFolders.map((folder) => (
+                      <div
+                        key={folder.id}
+                        className={`p-2 rounded-lg ${
+                          selectedFolder?.id === folder.id
+                            ? isIlluminateEnabled
+                              ? "bg-blue-100"
+                              : "bg-blue-900/30"
+                            : isIlluminateEnabled
+                              ? "bg-gray-200"
+                              : "bg-gray-700/50"
+                        } hover:bg-opacity-80 transition-all cursor-pointer`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div
+                            className="flex items-center flex-1 min-w-0"
+                            onClick={() => toggleFolderExpansion(folder.id)}
+                          >
+                            {folder.isExpanded ? (
+                              <ChevronDown className="w-4 h-4 mr-1 flex-shrink-0" />
+                            ) : (
+                              <ChevronRight className="w-4 h-4 mr-1 flex-shrink-0" />
+                            )}
+                            <div className="truncate">
+                              <div className="flex items-center">
+                                {folder.isStarred && <Star className="w-3 h-3 text-yellow-400 mr-1 flex-shrink-0" />}
+                                <span className="font-medium truncate text-sm">{folder.name}</span>
+                              </div>
+                              {folder.description && (
+                                <p className={`text-xs ${subheadingClass} truncate`}>{folder.description}</p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center ml-1 space-x-1">
+                            <span
+                              className={`text-xs px-1.5 py-0.5 rounded-full ${folderTypeColors[folder.type]} bg-opacity-20`}
+                            >
+                              {folder.itemCount}
+                            </span>
+                            <div className="relative">
+                              <button 
+                                className="p-1 rounded-full hover:bg-gray-600"
+                                onClick={(e) => toggleDropdown(folder.id, e)}
+                              >
+                                <MoreHorizontal className="w-3 h-3" />
+                              </button>
+                              {activeDropdownId === folder.id && (
+                                <div 
+                                  ref={dropdownRef}
+                                  className="absolute right-0 mt-1 w-48 bg-gray-800 rounded-lg shadow-lg overflow-hidden z-10"
+                                >
+                                  <button
+                                    onClick={() => handleSelectFolder(folder)}
+                                    className="w-full text-left px-3 py-1.5 hover:bg-gray-700 flex items-center text-sm"
+                                  >
+                                    <FileText className="w-3 h-3 mr-2" />
+                                    View Contents
+                                  </button>
+                                  <button
+                                    onClick={() => handleStartFlashcards(folder.id)}
+                                    className="w-full text-left px-3 py-1.5 hover:bg-gray-700 flex items-center text-sm"
+                                  >
+                                    <BookOpen className="w-3 h-3 mr-2" />
+                                    Flashcards
+                                  </button>
+                                  <button
+                                    onClick={() => handleStartLearn(folder.id)}
+                                    className="w-full text-left px-3 py-1.5 hover:bg-gray-700 flex items-center text-sm"
+                                  >
+                                    <Lightbulb className="w-3 h-3 mr-2" />
+                                    Learn
+                                  </button>
+                                  <button
+                                    onClick={() => handleStartTest(folder.id)}
+                                    className="w-full text-left px-3 py-1.5 hover:bg-gray-700 flex items-center text-sm"
+                                  >
+                                    <Target className="w-3 h-3 mr-2" />
+                                    Test
+                                  </button>
+                                  <button
+                                    onClick={() => handleStartMatching(folder.id)}
+                                    className="w-full text-left px-3 py-1.5 hover:bg-gray-700 flex items-center text-sm"
+                                  >
+                                    <Gamepad2 className="w-3 h-3 mr-2" />
+                                    Match
+                                  </button>
+                                  <button
+                                    onClick={() => handleStartQuiz(folder.id)}
+                                    className="w-full text-left px-3 py-1.5 hover:bg-gray-700 flex items-center text-sm"
+                                  >
+                                    <Brain className="w-3 h-3 mr-2" />
+                                    Quiz
+                                  </button>
+                                  <button
+                                    onClick={() => handleToggleStar(folder.id)}
+                                    className="w-full text-left px-3 py-1.5 hover:bg-gray-700 flex items-center text-sm"
+                                  >
+                                    <Star className="w-3 h-3 mr-2" />
+                                    {folder.isStarred ? "Unstar" : "Star"}
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setEditingFolderId(folder.id)
+                                      setIsCreatingFolder(false)
+                                      setNewFolderName(folder.name)
+                                      setNewFolderDescription(folder.description || "")
+                                      setNewFolderType(folder.type)
+                                      setActiveDropdownId(null)
+                                    }}
+                                    className="w-full text-left px-3 py-1.5 hover:bg-gray-700 flex items-center text-sm"
+                                  >
+                                    <Edit className="w-3 h-3 mr-2" />
+                                    Edit
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      handleDeleteFolder(folder.id)
+                                      setActiveDropdownId(null)
+                                    }}
+                                    className="w-full text-left px-3 py-1.5 hover:bg-gray-700 text-red-400 flex items-center text-sm"
+                                  >
+                                    <Trash className="w-3 h-3 mr-2" />
+                                    Delete
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Folder tags */}
+                        {folderTags[folder.id]?.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1 ml-5">
+                            {folderTags[folder.id].map((tag) => (
+                              <span
+                                key={tag}
+                                className={`px-1.5 py-0.5 rounded-full text-xs ${getTagColorClass(tag)}`}
+                              >
+                                {tag}
+                              </span>
+                            ))}
                           </div>
                         )}
-                      </div>
-                    ))}
-                  </div>
-                  
-                  <button
-                    onClick={() => {
-                      setQuizCompleted(false)
-                      setQuizAnswers({})
-                      setCurrentQuizIndex(0)
-                      setQuizScore(null)
-                    }}
-                    className={`${buttonPrimary} px-4 py-2 rounded-lg mr-2`}
-                  >
-                    Try Again
-                  </button>
-                  <button
-                    onClick={() => setActiveStudyMode(null)}
-                    className={`${buttonSecondary} px-4 py-2 rounded-lg`}
-                  >
-                    Back to Folder
-                  </button>
-                </div>
-              ) : (
-                <div>
-                  <div className="mb-4">
-                    <div className="flex justify-between text-sm mb-1">
-                      <span>Question {currentQuizIndex + 1} of {quizQuestions.length}</span>
-                      <span>
-                        {Object.keys(quizAnswers).length} / {quizQuestions.length} answered
-                      </span>
-                    </div>
-                    <div className="w-full bg-gray-600 rounded-full h-2.5">
-                      <div 
-                        className="bg-blue-500 h-2.5 rounded-full" 
-                        style={{ 
-                          width: `${(currentQuizIndex / quizQuestions.length) * 100}%` 
-                        }}
-                      ></div>
-                    </div>
-                  </div>
-                  
-                  <div className="p-4 rounded-lg bg-gray-700/50 mb-6">
-                    <h3 className={`text-xl font-medium ${headingClass} mb-4`}>
-                      {quizQuestions[currentQuizIndex].question}
-                    </h3>
-                    
-                    <div className="space-y-2">
-                      {quizQuestions[currentQuizIndex].options.map((option, index) => (
-                        <div
-                          key={index}
-                          onClick={() => handleQuizAnswerSelect(quizQuestions[currentQuizIndex].id, index)}
-                          className={`p-3 rounded-lg cursor-pointer ${
-                            quizAnswers[quizQuestions[currentQuizIndex].id] === index
-                              ? buttonPrimary
-                              : isIlluminateEnabled ? 'bg-gray-200 hover:bg-gray-300' : 'bg-gray-600 hover:bg-gray-500'
-                          }`}
-                        >
-                          {option}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  
-                  <div className="flex justify-between">
-                    <button
-                      onClick={() => {
-                        if (currentQuizIndex > 0) {
-                          setCurrentQuizIndex(currentQuizIndex - 1)
-                        }
-                      }}
-                      className={`${buttonSecondary} px-4 py-2 rounded-lg`}
-                      disabled={currentQuizIndex === 0}
-                    >
-                      Previous
-                    </button>
-                    
-                    {currentQuizIndex < quizQuestions.length - 1 ? (
-                      <button
-                        onClick={() => {
-                          setCurrentQuizIndex(currentQuizIndex + 1)
-                        }}
-                        className={`${buttonPrimary} px-4 py-2 rounded-lg`}
-                      >
-                        Next
-                      </button>
-                    ) : (
-                      <button
-                        onClick={handleSubmitQuiz}
-                        className={`${buttonSuccess} px-4 py-2 rounded-lg`}
-                        disabled={Object.keys(quizAnswers).length < quizQuestions.length}
-                      >
-                        Submit Quiz
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
 
-          {/* Main Content */}
-          {!activeStudyMode && (
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-              {/* Left Column - Folders List */}
-              <div className="lg:col-span-1">
-                <div
-                  className={`${cardClass} rounded-xl p-4 shadow-lg animate-fadeIn relative overflow-hidden ${
-                    cardVisible ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className={`text-lg font-semibold ${headingClass} flex items-center`}>
-                      <Folder className="w-5 h-5 mr-2" />
-                      Folders
-                    </h2>
-                    <div className="flex space-x-1">
-                      <button
-                        onClick={() => {
-                          setIsCreatingFolder(true)
-                          setEditingFolderId(null)
-                          setNewFolderName("")
-                          setNewFolderDescription("")
-                          setNewFolderType("mixed")
-                          setFlashcardTags([])
-                        }}
-                        className="p-1.5 rounded-full bg-blue-600 text-white hover:bg-blue-700 transition-colors"
-                        title="Create Folder"
-                      >
-                        <FolderPlus className="w-4 h-4" />
-                      </button>
-                      <div className="relative">
-                        <button
-                          onClick={() => setShowTagsDropdown(!showTagsDropdown)}
-                          className="p-1.5 rounded-full bg-purple-600 text-white hover:bg-purple-700 transition-colors"
-                          title="Filter by Tags"
-                        >
-                          <Tag className="w-4 h-4" />
-                        </button>
-
-                        {showTagsDropdown && (
-                          <div
-                            ref={tagsDropdownRef}
-                            className={`absolute left-0 mt-1 w-48 ${cardClass} rounded-lg shadow-lg p-2 z-10`}
-                          >
-                            <h3 className={`${headingClass} text-sm font-medium mb-2`}>Filter by Tags</h3>
-                            <div className="flex flex-wrap gap-1 mb-2">
-                              {tags.map((tag) => (
-                                <button
-                                  key={tag}
-                                  onClick={() => {
-                                    if (selectedTags.includes(tag)) {
-                                      setSelectedTags(selectedTags.filter((t) => t !== tag))
-                                    } else {
-                                      setSelectedTags([...selectedTags, tag])
-                                    }
-                                  }}
-                                  className={`px-2 py-0.5 rounded-full text-xs ${
-                                    selectedTags.includes(tag) ? buttonPrimary : getTagColorClass(tag)
-                                  }`}
-                                >
-                                  {tag}
-                                </button>
-                              ))}
-                            </div>
-
-                            {selectedTags.length > 0 && (
-                              <button
-                                onClick={() => setSelectedTags([])}
-                                className={`text-xs ${subheadingClass} hover:underline`}
-                              >
-                                Clear filters
-                              </button>
+                        {/* Expanded folder items preview */}
+                        {folder.isExpanded && (
+                          <div className="mt-2 pl-5 space-y-1">
+                            {/* Subfolders */}
+                            {subFolders[folder.id]?.length > 0 && (
+                              <div className="mb-2">
+                                <div className="text-xs font-medium mb-1 flex items-center">
+                                  <FolderTree className="w-3 h-3 mr-1" />
+                                  Subfolders
+                                </div>
+                                {subFolders[folder.id].map(subfolder => (
+                                  <div 
+                                    key={subfolder.id}
+                                    className="text-xs py-1 px-2 rounded hover:bg-gray-600 flex items-center justify-between"
+                                  >
+                                    <div className="flex items-center truncate">
+                                      <Folder className="w-3 h-3 mr-1 text-blue-400" />
+                                      <span className="truncate">{subfolder.name}</span>
+                                    </div>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        handleDeleteSubFolder(folder.id, subfolder.id)
+                                      }}
+                                      className="text-red-400 hover:text-red-300"
+                                    >
+                                      <Trash className="w-2.5 h-2.5" />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            
+                            {/* Items preview */}
+                            {folder.items.length > 0 ? (
+                              <>
+                                <div className="text-xs font-medium mb-1 flex items-center">
+                                  <FileText className="w-3 h-3 mr-1" />
+                                  Items
+                                </div>
+                                {folder.items.slice(0, 3).map((item) => (
+                                  <div
+                                    key={item.id}
+                                    className="text-xs py-1 px-2 rounded hover:bg-gray-600 flex items-center"
+                                    onClick={() => handleSelectFolder(folder)}
+                                  >
+                                    {"options" in item ? (
+                                      <Brain className="w-3 h-3 mr-1 text-purple-400" />
+                                    ) : (
+                                      <FileText className="w-3 h-3 mr-1 text-blue-400" />
+                                    )}
+                                    <span className="truncate">
+                                      {"definition" in item 
+                                        ? (item.term.length > 30 ? item.term.substring(0, 30) + "..." : item.term)
+                                        : (item.question.length > 30 ? item.question.substring(0, 30) + "..." : item.question)
+                                      }
+                                    </span>
+                                  </div>
+                                ))}
+                                {folder.items.length > 3 && (
+                                  <div
+                                    className="text-xs text-center py-1 text-gray-400 hover:text-gray-300 cursor-pointer"
+                                    onClick={() => handleSelectFolder(folder)}
+                                  >
+                                    + {folder.items.length - 3} more items
+                                  </div>
+                                )}
+                              </>
+                            ) : (
+                              <div className="text-xs text-gray-500 py-1">
+                                No items in this folder
+                              </div>
                             )}
                           </div>
                         )}
                       </div>
-                    </div>
-                  </div>
-
-                  {/* Create/Edit Folder Form */}
-                  {(isCreatingFolder || editingFolderId) && (
-                    <div className={`mb-4 p-3 rounded-lg ${isIlluminateEnabled ? "bg-gray-200" : "bg-gray-700"}`}>
-                      <h3 className={`text-sm font-medium mb-2 ${headingClass}`}>
-                        {editingFolderId ? "Edit Folder" : "Create New Folder"}
-                      </h3>
-                      <div className="space-y-2">
-                        <div>
-                          <input
-                            type="text"
-                            value={newFolderName}
-                            onChange={(e) => setNewFolderName(e.target.value)}
-                            placeholder="Folder Name"
-                            className={`w-full p-2 rounded-lg ${inputBg} border border-gray-600 text-sm`}
-                          />
-                        </div>
-                        <div>
-                          <textarea
-                            value={newFolderDescription}
-                            onChange={(e) => setNewFolderDescription(e.target.value)}
-                            placeholder="Description (optional)"
-                            className={`w-full p-2 rounded-lg ${inputBg} border border-gray-600 text-sm`}
-                            rows={2}
-                          />
-                        </div>
-                        <div>
-                          <select
-                            value={newFolderType}
-                            onChange={(e) => setNewFolderType(e.target.value as "flashcard" | "question" | "mixed")}
-                            className={`w-full p-2 rounded-lg ${inputBg} border border-gray-600 text-sm`}
-                          >
-                            <option value="flashcard">Flashcards Only</option>
-                            <option value="question">Questions Only</option>
-                            <option value="mixed">Mixed Content</option>
-                          </select>
-                        </div>
-
-                        {/* Tags for folder */}
-                        <div>
-                          <div className="flex items-center space-x-1 mb-1">
-                            <input
-                              type="text"
-                              value={newFlashcardTag}
-                              onChange={(e) => setNewFlashcardTag(e.target.value)}
-                              placeholder="Add tags..."
-                              className={`flex-1 p-1.5 rounded-lg ${inputBg} border border-gray-600 text-sm`}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter" && newFlashcardTag.trim()) {
-                                  setFlashcardTags([...flashcardTags, newFlashcardTag.trim()])
-                                  setNewFlashcardTag("")
-                                  e.preventDefault()
-                                }
-                              }}
-                            />
-                            <button
-                              onClick={() => {
-                                if (newFlashcardTag.trim()) {
-                                  setFlashcardTags([...flashcardTags, newFlashcardTag.trim()])
-                                  setNewFlashcardTag("")
-                                }
-                              }}
-                              className={`p-1.5 rounded-lg ${buttonPrimary} text-sm`}
-                            >
-                              <Plus className="w-4 h-4" />
-                            </button>
-                          </div>
-
-                          <div className="flex flex-wrap gap-1">
-                            {flashcardTags.map((tag, index) => (
-                              <div
-                                key={index}
-                                className={`px-2 py-0.5 rounded-full text-xs flex items-center space-x-1 ${getTagColorClass(
-                                  tag,
-                                )}`}
-                              >
-                                <span>{tag}</span>
-                                <button
-                                  onClick={() => setFlashcardTags(flashcardTags.filter((_, i) => i !== index))}
-                                  className="hover:text-red-500"
-                                >
-                                  <X className="w-3 h-3" />
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="flex justify-end space-x-2 pt-1">
-                          <button
-                            onClick={() => {
-                              setIsCreatingFolder(false)
-                              setEditingFolderId(null)
-                            }}
-                            className={`px-3 py-1.5 rounded-lg text-xs ${buttonSecondary}`}
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            onClick={editingFolderId ? handleUpdateFolder : handleCreateFolder}
-                            className={`px-3 py-1.5 rounded-lg text-xs ${buttonPrimary}`}
-                          >
-                            {editingFolderId ? "Update" : "Create"}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
+                    ))
                   )}
-
-                  {/* Folders List */}
-                  <div className="space-y-2 max-h-[calc(100vh-300px)] overflow-y-auto pr-1">
-                    {sortedFolders.length === 0 ? (
-                      <div className="text-center py-6">
-                        <p className={`${subheadingClass} mb-2 text-sm`}>No folders found</p>
-                        <button
-                          onClick={() => setIsCreatingFolder(true)}
-                          className={`px-3 py-1.5 rounded-lg text-sm ${buttonPrimary} inline-flex items-center`}
-                        >
-                          <FolderPlus className="w-4 h-4 mr-2" />
-                          Create your first folder
-                        </button>
-                      </div>
-                    ) : (
-                      sortedFolders.map((folder) => (
-                        <div
-                          key={folder.id}
-                          className={`p-2 rounded-lg ${
-                            selectedFolder?.id === folder.id
-                              ? isIlluminateEnabled
-                                ? "bg-blue-100"
-                                : "bg-blue-900/30"
-                              : isIlluminateEnabled
-                                ? "bg-gray-200"
-                                : "bg-gray-700/50"
-                          } hover:bg-opacity-80 transition-all cursor-pointer`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div
-                              className="flex items-center flex-1 min-w-0"
-                              onClick={() => toggleFolderExpansion(folder.id)}
-                            >
-                              {folder.isExpanded ? (
-                                <ChevronDown className="w-4 h-4 mr-1 flex-shrink-0" />
-                              ) : (
-                                <ChevronRight className="w-4 h-4 mr-1 flex-shrink-0" />
-                              )}
-                              <div className="truncate">
-                                <div className="flex items-center">
-                                  {folder.isStarred && <Star className="w-3 h-3 text-yellow-400 mr-1 flex-shrink-0" />}
-                                  <span className="font-medium truncate text-sm">{folder.name}</span>
-                                </div>
-                                {folder.description && (
-                                  <p className={`text-xs ${subheadingClass} truncate`}>{folder.description}</p>
-                                )}
-                              </div>
-                            </div>
-                            <div className="flex items-center ml-1 space-x-1">
-                              <span
-                                className={`text-xs px-1.5 py-0.5 rounded-full ${folderTypeColors[folder.type]} bg-opacity-20`}
-                              >
-                                {folder.itemCount}
-                              </span>
-                              <div className="relative">
-                                <button 
-                                  className="p-1 rounded-full hover:bg-gray-600"
-                                  onClick={(e) => toggleDropdown(folder.id, e)}
-                                >
-                                  <MoreHorizontal className="w-3 h-3" />
-                                </button>
-                                {activeDropdownId === folder.id && (
-                                  <div 
-                                    ref={dropdownRef}
-                                    className="absolute right-0 mt-1 w-48 bg-gray-800 rounded-lg shadow-lg overflow-hidden z-10"
-                                  >
-                                    <button
-                                      onClick={() => handleSelectFolder(folder)}
-                                      className="w-full text-left px-3 py-1.5 hover:bg-gray-700 flex items-center text-sm"
-                                    >
-                                      <FileText className="w-3 h-3 mr-2" />
-                                      View Contents
-                                    </button>
-                                    <button
-                                      onClick={() => handleStartFlashcards(folder.id)}
-                                      className="w-full text-left px-3 py-1.5 hover:bg-gray-700 flex items-center text-sm"
-                                    >
-                                      <BookOpen className="w-3 h-3 mr-2" />
-                                      Flashcards
-                                    </button>
-                                    <button
-                                      onClick={() => handleStartLearn(folder.id)}
-                                      className="w-full text-left px-3 py-1.5 hover:bg-gray-700 flex items-center text-sm"
-                                    >
-                                      <Lightbulb className="w-3 h-3 mr-2" />
-                                      Learn
-                                    </button>
-                                    <button
-                                      onClick={() => handleStartTest(folder.id)}
-                                      className="w-full text-left px-3 py-1.5 hover:bg-gray-700 flex items-center text-sm"
-                                    >
-                                      <Target className="w-3 h-3 mr-2" />
-                                      Test
-                                    </button>
-                                    <button
-                                      onClick={() => handleStartMatching(folder.id)}
-                                      className="w-full text-left px-3 py-1.5 hover:bg-gray-700 flex items-center text-sm"
-                                    >
-                                      <Gamepad2 className="w-3 h-3 mr-2" />
-                                      Match
-                                    </button>
-                                    <button
-                                      onClick={() => handleStartQuiz(folder.id)}
-                                      className="w-full text-left px-3 py-1.5 hover:bg-gray-700 flex items-center text-sm"
-                                    >
-                                      <Brain className="w-3 h-3 mr-2" />
-                                      Quiz
-                                    </button>
-                                    <button
-                                      onClick={() => handleToggleStar(folder.id)}
-                                      className="w-full text-left px-3 py-1.5 hover:bg-gray-700 flex items-center text-sm"
-                                    >
-                                      <Star className="w-3 h-3 mr-2" />
-                                      {folder.isStarred ? "Unstar" : "Star"}
-                                    </button>
-                                    <button
-                                      onClick={() => {
-                                        setEditingFolderId(folder.id)
-                                        setIsCreatingFolder(false)
-                                        setNewFolderName(folder.name)
-                                        setNewFolderDescription(folder.description || "")
-                                        setNewFolderType(folder.type)
-                                        setActiveDropdownId(null)
-                                      }}
-                                      className="w-full text-left px-3 py-1.5 hover:bg-gray-700 flex items-center text-sm"
-                                    >
-                                      <Edit className="w-3 h-3 mr-2" />
-                                      Edit
-                                    </button>
-                                    <button
-                                      onClick={() => {
-                                        handleDeleteFolder(folder.id)
-                                        setActiveDropdownId(null)
-                                      }}
-                                      className="w-full text-left px-3 py-1.5 hover:bg-gray-700 text-red-400 flex items-center text-sm"
-                                    >
-                                      <Trash className="w-3 h-3 mr-2" />
-                                      Delete
-                                    </button>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Folder tags */}
-                          {folderTags[folder.id]?.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-1 ml-5">
-                              {folderTags[folder.id].map((tag) => (
-                                <span
-                                  key={tag}
-                                  className={`px-1.5 py-0.5 rounded-full text-xs ${getTagColorClass(tag)}`}
-                                >
-                                  {tag}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-
-                          {/* Expanded folder items preview */}
-                          {folder.isExpanded && (
-                            <div className="mt-2 pl-5 space-y-1">
-                              {/* Subfolders */}
-                              {subFolders[folder.id]?.length > 0 && (
-                                <div className="mb-2">
-                                  <div className="text-xs font-medium mb-1 flex items-center">
-                                    <FolderTree className="w-3 h-3 mr-1" />
-                                    Subfolders
-                                  </div>
-                                  {subFolders[folder.id].map(subfolder => (
-                                    <div 
-                                      key={subfolder.id}
-                                      className="text-xs py-1 px-2 rounded hover:bg-gray-600 flex items-center justify-between"
-                                    >
-                                      <div className="flex items-center truncate">
-                                        <Folder className="w-3 h-3 mr-1 text-blue-400" />
-                                        <span className="truncate">{subfolder.name}</span>
-                                      </div>
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation()
-                                          handleDeleteSubFolder(folder.id, subfolder.id)
-                                        }}
-                                        className="text-red-400 hover:text-red-300"
-                                      >
-                                        <Trash className="w-2.5 h-2.5" />
-                                      </button>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                              
-                              {/* Items preview */}
-                              {folder.items.length > 0 ? (
-                                <>
-                                  <div className="text-xs font-medium mb-1 flex items-center">
-                                    <FileText className="w-3 h-3 mr-1" />
-                                    Items
-                                  </div>
-                                  {folder.items.slice(0, 3).map((item) => (
-                                    <div
-                                      key={item.id}
-                                      className="text-xs py-1 px-2 rounded hover:bg-gray-600 flex items-center"
-                                      onClick={() => handleSelectFolder(folder)}
-                                    >
-                                      {"options" in item ? (
-                                        <Brain className="w-3 h-3 mr-1 text-purple-400" />
-                                      ) : (
-                                        <FileText className="w-3 h-3 mr-1 text-blue-400" />
-                                      )}
-                                      <span className="truncate">
-                                        {"definition" in item 
-                                          ? (item.term.length > 30 ? item.term.substring(0, 30) + "..." : item.term)
-                                          : (item.question.length > 30 ? item.question.substring(0, 30) + "..." : item.question)
-                                        }
-                                      </span>
-                                    </div>
-                                  ))}
-                                  {folder.items.length > 3 && (
-                                    <div
-                                      className="text-xs text-center py-1 text-gray-400 hover:text-gray-300 cursor-pointer"
-                                      onClick={() => handleSelectFolder(folder)}
-                                    >
-                                      + {folder.items.length - 3} more items
-                                    </div>
-                                  )}
-                                </>
-                              ) : (
-                                <div className="text-xs text-gray-500 py-1">
-                                  No items in this folder
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      ))
-                    )}
-                  </div>
                 </div>
               </div>
+            </div>
 
-              {/* Right Column - Selected Folder Content */}
-              <div className="lg:col-span-3">
-                {selectedFolder ? (
+            {/* Right Column - Selected Folder Content */}
+            <div className="lg:col-span-3">
+              {selectedFolder ? (
+                <>
                   <div
                     className={`${cardClass} rounded-xl p-4 shadow-lg animate-fadeIn relative overflow-hidden ${
                       cardVisible ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
@@ -2526,629 +2561,584 @@ export function Folders() {
                         </button>
                       )}
                     </div>
+                  </div>
 
-                    {/* Create Subfolder Form */}
-                    {isCreatingSubFolder && (
-                      <div className={`mb-6 p-4 rounded-lg ${isIlluminateEnabled ? "bg-gray-200" : "bg-gray-700"}`}>
-                        <div className="flex items-center justify-between mb-4">
-                          <h3 className={`text-lg font-medium ${headingClass}`}>
-                            Create Subfolder
-                          </h3>
+                  {/* Create Subfolder Form */}
+                  {isCreatingSubFolder && (
+                    <div className={`${cardClass} rounded-xl p-4 shadow-lg mt-4`}>
+                      <h3 className={`text-lg font-semibold ${headingClass} mb-3`}>Create Subfolder</h3>
+                      <div className="space-y-3">
+                        <div>
+                          <label className={`block text-sm font-medium mb-1 ${subheadingClass}`}>Name</label>
+                          <input
+                            type="text"
+                            value={newFolderName}
+                            onChange={(e) => setNewFolderName(e.target.value)}
+                            placeholder="Subfolder Name"
+                            className={`w-full p-2 rounded-lg ${inputBg} border border-gray-600`}
+                          />
+                        </div>
+                        <div>
+                          <label className={`block text-sm font-medium mb-1 ${subheadingClass}`}>Description (optional)</label>
+                          <textarea
+                            value={newFolderDescription}
+                            onChange={(e) => setNewFolderDescription(e.target.value)}
+                            placeholder="Description"
+                            className={`w-full p-2 rounded-lg ${inputBg} border border-gray-600`}
+                            rows={2}
+                          />
+                        </div>
+                        <div>
+                          <label className={`block text-sm font-medium mb-1 ${subheadingClass}`}>Type</label>
+                          <select
+                            value={newFolderType}
+                            onChange={(e) => setNewFolderType(e.target.value as "flashcard" | "question" | "mixed")}
+                            className={`w-full p-2 rounded-lg ${inputBg} border border-gray-600`}
+                          >
+                            <option value="flashcard">Flashcards Only</option>
+                            <option value="question">Questions Only</option>
+                            <option value="mixed">Mixed Content</option>
+                          </select>
                         </div>
 
-                        <div className="space-y-2">
-                          <div>
+                        {/* Tags for subfolder */}
+                        <div>
+                          <label className={`block text-sm font-medium mb-1 ${subheadingClass}`}>Tags</label>
+                          <div className="flex items-center space-x-1 mb-2">
                             <input
                               type="text"
-                              value={newFolderName}
-                              onChange={(e) => setNewFolderName(e.target.value)}
-                              placeholder="Subfolder Name"
-                              className={`w-full p-2 rounded-lg ${inputBg} border border-gray-600 text-sm`}
+                              value={newFlashcardTag}
+                              onChange={(e) => setNewFlashcardTag(e.target.value)}
+                              placeholder="Add tags..."
+                              className={`flex-1 p-2 rounded-lg ${inputBg} border border-gray-600`}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" && newFlashcardTag.trim()) {
+                                  setFlashcardTags([...flashcardTags, newFlashcardTag.trim()])
+                                  setNewFlashcardTag("")
+                                  e.preventDefault()
+                                }
+                              }}
                             />
-                          </div>
-                          <div>
-                            <textarea
-                              value={newFolderDescription}
-                              onChange={(e) => setNewFolderDescription(e.target.value)}
-                              placeholder="Description (optional)"
-                              className={`w-full p-2 rounded-lg ${inputBg} border border-gray-600 text-sm`}
-                              rows={2}
-                            />
-                          </div>
-                          <div>
-                            <select
-                              value={newFolderType}
-                              onChange={(e) => setNewFolderType(e.target.value as "flashcard" | "question" | "mixed")}
-                              className={`w-full p-2 rounded-lg ${inputBg} border border-gray-600 text-sm`}
+                            <button
+                              onClick={() => {
+                                if (newFlashcardTag.trim()) {
+                                  setFlashcardTags([...flashcardTags, newFlashcardTag.trim()])
+                                  setNewFlashcardTag("")
+                                }
+                              }}
+                              className={`p-2 rounded-lg ${buttonPrimary}`}
                             >
-                              <option value="flashcard">Flashcards Only</option>
-                              <option value="question">Questions Only</option>
-                              <option value="mixed">Mixed Content</option>
-                            </select>
+                              <Plus className="w-4 h-4" />
+                            </button>
                           </div>
 
-                          {/* Tags for subfolder */}
-                          <div>
-                            <div className="flex items-center space-x-1 mb-1">
-                              <input
-                                type="text"
-                                value={newFlashcardTag}
-                                onChange={(e) => setNewFlashcardTag(e.target.value)}
-                                placeholder="Add tags..."
-                                className={`flex-1 p-1.5 rounded-lg ${inputBg} border border-gray-600 text-sm`}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter" && newFlashcardTag.trim()) {
-                                    setFlashcardTags([...flashcardTags, newFlashcardTag.trim()])
-                                    setNewFlashcardTag("")
-                                    e.preventDefault()
-                                  }
-                                }}
-                              />
-                              <button
-                                onClick={() => {
-                                  if (newFlashcardTag.trim()) {
-                                    setFlashcardTags([...flashcardTags, newFlashcardTag.trim()])
-                                    setNewFlashcardTag("")
-                                  }
-                                }}
-                                className={`p-1.5 rounded-lg ${buttonPrimary} text-sm`}
+                          <div className="flex flex-wrap gap-1 mb-2">
+                            {flashcardTags.map((tag, index) => (
+                              <div
+                                key={index}
+                                className={`px-2 py-0.5 rounded-full text-xs flex items-center space-x-1 ${getTagColorClass(tag)}`}
                               >
-                                <Plus className="w-4 h-4" />
-                              </button>
-                            </div>
-
-                            <div className="flex flex-wrap gap-1">
-                              {flashcardTags.map((tag, index) => (
-                                <div
-                                  key={index}
-                                  className={`px-2 py-0.5 rounded-full text-xs flex items-center space-x-1 ${getTagColorClass(
-                                    tag,
-                                  )}`}
+                                <span>{tag}</span>
+                                <button
+                                  onClick={() => setFlashcardTags(flashcardTags.filter((_, i) => i !== index))}
+                                  className="hover:text-red-500"
                                 >
-                                  <span>{tag}</span>
-                                  <button
-                                    onClick={() => setFlashcardTags(flashcardTags.filter((_, i) => i !== index))}
-                                    className="hover:text-red-500"
-                                  >
-                                    <X className="w-3 h-3" />
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-
-                          <div className="flex justify-end space-x-2 pt-1">
-                            <button
-                              onClick={() => setIsCreatingSubFolder(false)}
-                              className={`px-3 py-1.5 rounded-lg text-xs ${buttonSecondary}`}
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              onClick={handleCreateSubFolder}
-                              className={`px-3 py-1.5 rounded-lg text-xs ${buttonPrimary}`}
-                            >
-                              Create
-                            </button>
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ))}
                           </div>
                         </div>
-                      </div>
-                    )}
 
-                    {/* Add Item Form */}
-                    {isAddingItem && (
-                      <div className={`mb-6 p-4 rounded-lg ${isIlluminateEnabled ? "bg-gray-200" : "bg-gray-700"}`}>
-                        <div className="flex items-center justify-between mb-4">
-                          <h3 className={`text-lg font-medium ${headingClass}`}>
-                            Add New {newItemType === "flashcard" ? "Flashcard" : "Question"}
-                          </h3>
-                          {selectedFolder.type === "mixed" && (
-                            <div className="flex items-center space-x-2">
+                        <div className="flex justify-end space-x-2 pt-2">
+                          <button
+                            onClick={() => setIsCreatingSubFolder(false)}
+                            className={`px-3 py-1.5 rounded-lg ${buttonSecondary}`}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={handleCreateSubFolder}
+                            className={`px-3 py-1.5 rounded-lg ${buttonPrimary}`}
+                          >
+                            Create Subfolder
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Add Item Form */}
+                  {isAddingItem && (
+                    <div className={`${cardClass} rounded-xl p-4 shadow-lg mt-4`}>
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className={`text-lg font-semibold ${headingClass}`}>
+                          {editingItem ? "Edit Item" : "Add New Item"}
+                        </h3>
+                        <div className="flex space-x-2">
+                          {!editingItem && selectedFolder.type === "mixed" && (
+                            <>
                               <button
-                                onClick={() => {
-                                  setNewItemType("flashcard")
-                                  // Reset question form state when switching to flashcard
-                                  setQuestionText("")
-                                  setQuestionExplanation("")
-                                  setQuestionOptions(["", "", "", ""])
-                                  setQuestionCorrectAnswer(0)
-                                }}
+                                onClick={() => setNewItemType("flashcard")}
                                 className={`px-3 py-1.5 rounded-lg text-sm ${
-                                  newItemType === "flashcard"
-                                    ? buttonPrimary
-                                    : isIlluminateEnabled
-                                      ? "bg-gray-300"
-                                      : "bg-gray-600"
+                                  newItemType === "flashcard" ? buttonPrimary : buttonSecondary
                                 }`}
                               >
                                 Flashcard
                               </button>
                               <button
-                                onClick={() => {
-                                  setNewItemType("question")
-                                  // Reset flashcard form state when switching to question
-                                  setFlashcardTerm("")
-                                  setFlashcardDefinition("")
-                                  setFlashcardTopic("")
-                                }}
+                                onClick={() => setNewItemType("question")}
                                 className={`px-3 py-1.5 rounded-lg text-sm ${
-                                  newItemType === "question"
-                                    ? buttonPrimary
-                                    : isIlluminateEnabled
-                                      ? "bg-gray-300"
-                                      : "bg-gray-600"
+                                  newItemType === "question" ? buttonPrimary : buttonSecondary
                                 }`}
                               >
                                 Question
                               </button>
-                            </div>
+                            </>
                           )}
                         </div>
-
-                        {newItemType === "flashcard" ? (
-                          <div className="space-y-4">
-                            <div>
-                              <label className={`block text-sm font-medium mb-1 ${subheadingClass}`}>Term</label>
-                              <textarea
-                                value={flashcardTerm}
-                                onChange={(e) => setFlashcardTerm(e.target.value)}
-                                className={`w-full p-2 rounded-lg ${inputBg} border border-gray-600`}
-                                rows={2}
-                                placeholder="Enter the term"
-                              />
-                            </div>
-                            <div>
-                              <label className={`block text-sm font-medium mb-1 ${subheadingClass}`}>Definition</label>
-                              <textarea
-                                value={flashcardDefinition}
-                                onChange={(e) => setFlashcardDefinition(e.target.value)}
-                                className={`w-full p-2 rounded-lg ${inputBg} border border-gray-600`}
-                                rows={3}
-                                placeholder="Enter the definition"
-                              />
-                            </div>
-                            <div>
-                              <label className={`block text-sm font-medium mb-1 ${subheadingClass}`}>Topic (optional)</label>
-                              <input
-                                type="text"
-                                value={flashcardTopic}
-                                onChange={(e) => setFlashcardTopic(e.target.value)}
-                                className={`w-full p-2 rounded-lg ${inputBg} border border-gray-600`}
-                                placeholder="E.g., Math, Science, History"
-                              />
-                            </div>
-                            <div className="flex justify-end space-x-2 pt-2">
-                              <button
-                                onClick={() => setIsAddingItem(false)}
-                                className={`px-4 py-2 rounded-lg ${buttonSecondary}`}
-                              >
-                                Cancel
-                              </button>
-                              <button
-                                onClick={handleAddFlashcard}
-                                className={`px-4 py-2 rounded-lg ${buttonPrimary}`}
-                              >
-                                Save Flashcard
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="space-y-4">
-                            <div>
-                              <label className={`block text-sm font-medium mb-1 ${subheadingClass}`}>Question</label>
-                              <textarea
-                                value={questionText}
-                                onChange={(e) => setQuestionText(e.target.value)}
-                                className={`w-full p-2 rounded-lg ${inputBg} border border-gray-600`}
-                                rows={3}
-                                placeholder="Enter your question"
-                              />
-                            </div>
-                            <div>
-                              <label className={`block text-sm font-medium mb-1 ${subheadingClass}`}>Options</label>
-                              <div className="space-y-2">
-                                {questionOptions.map((option, index) => (
-                                  <div key={index} className="flex items-center space-x-2">
-                                    <input
-                                      type="radio"
-                                      name="correct-answer"
-                                      checked={questionCorrectAnswer === index}
-                                      onChange={() => setQuestionCorrectAnswer(index)}
-                                      className="w-4 h-4"
-                                    />
-                                    <input
-                                      type="text"
-                                      value={option}
-                                      onChange={(e) => {
-                                        const newOptions = [...questionOptions]
-                                        newOptions[index] = e.target.value
-                                        setQuestionOptions(newOptions)
-                                      }}
-                                      className={`flex-1 p-2 rounded-lg ${inputBg} border border-gray-600`}
-                                      placeholder={`Option ${index + 1}`}
-                                    />
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                            <div>
-                              <label className={`block text-sm font-medium mb-1 ${subheadingClass}`}>Explanation</label>
-                              <textarea
-                                value={questionExplanation}
-                                onChange={(e) => setQuestionExplanation(e.target.value)}
-                                className={`w-full p-2 rounded-lg ${inputBg} border border-gray-600`}
-                                rows={2}
-                                placeholder="Explain why the correct answer is right"
-                              />
-                            </div>
-                            <div className="flex justify-end space-x-2 pt-2">
-                              <button
-                                onClick={() => setIsAddingItem(false)}
-                                className={`px-4 py-2 rounded-lg ${buttonSecondary}`}
-                              >
-                                Cancel
-                              </button>
-                              <button
-                                onClick={handleAddQuestion}
-                                className={`px-4 py-2 rounded-lg ${buttonPrimary}`}
-                              >
-                                Save Question
-                              </button>
-                            </div>
-                          </div>
-                        )}
                       </div>
-                    )}
 
-                    {/* Edit Item Form */}
-                    {editingItem && (
-                      <div className={`mb-6 p-4 rounded-lg ${isIlluminateEnabled ? "bg-gray-200" : "bg-gray-700"}`}>
-                        <div className="flex items-center justify-between mb-4">
-                          <h3 className={`text-lg font-medium ${headingClass}`}>
-                            Edit {editingItem.type === "flashcard" ? "Flashcard" : "Question"}
-                          </h3>
-                        </div>
-
-                        {editingItem.type === "flashcard" ? (
-                          <div className="space-y-4">
-                            <div>
-                              <label className={`block text-sm font-medium mb-1 ${subheadingClass}`}>Term</label>
-                              <textarea
-                                value={flashcardTerm}
-                                onChange={(e) => setFlashcardTerm(e.target.value)}
-                                className={`w-full p-2 rounded-lg ${inputBg} border border-gray-600`}
-                                rows={2}
-                                placeholder="Enter the term"
-                              />
-                            </div>
-                            <div>
-                              <label className={`block text-sm font-medium mb-1 ${subheadingClass}`}>Definition</label>
-                              <textarea
-                                value={flashcardDefinition}
-                                onChange={(e) => setFlashcardDefinition(e.target.value)}
-                                className={`w-full p-2 rounded-lg ${inputBg} border border-gray-600`}
-                                rows={3}
-                                placeholder="Enter the definition"
-                              />
-                            </div>
-                            <div>
-                              <label className={`block text-sm font-medium mb-1 ${subheadingClass}`}>Topic (optional)</label>
-                              <input
-                                type="text"
-                                value={flashcardTopic}
-                                onChange={(e) => setFlashcardTopic(e.target.value)}
-                                className={`w-full p-2 rounded-lg ${inputBg} border border-gray-600`}
-                                placeholder="E.g., Math, Science, History"
-                              />
-                            </div>
-                            <div className="flex justify-end space-x-2 pt-2">
-                              <button
-                                onClick={() => setEditingItem(null)}
-                                className={`px-4 py-2 rounded-lg ${buttonSecondary}`}
-                              >
-                                Cancel
-                              </button>
-                              <button
-                                onClick={handleUpdateFlashcard}
-                                className={`px-4 py-2 rounded-lg ${buttonPrimary}`}
-                              >
-                                Update Flashcard
-                              </button>
-                            </div>
+                      {/* Flashcard Form */}
+                      {(newItemType === "flashcard" || (editingItem && editingItem.type === "flashcard")) && (
+                        <div className="space-y-3">
+                          <div>
+                            <label className={`block text-sm font-medium mb-1 ${subheadingClass}`}>Term</label>
+                            <input
+                              type="text"
+                              value={flashcardTerm}
+                              onChange={(e) => setFlashcardTerm(e.target.value)}
+                              placeholder="Enter term"
+                              className={`w-full p-2 rounded-lg ${inputBg} border border-gray-600`}
+                            />
                           </div>
-                        ) : (
-                          <div className="space-y-4">
-                            <div>
-                              <label className={`block text-sm font-medium mb-1 ${subheadingClass}`}>Question</label>
-                              <textarea
-                                value={questionText}
-                                onChange={(e) => setQuestionText(e.target.value)}
-                                className={`w-full p-2 rounded-lg ${inputBg} border border-gray-600`}
-                                rows={3}
-                                placeholder="Enter your question"
-                              />
-                            </div>
-                            <div>
-                              <label className={`block text-sm font-medium mb-1 ${subheadingClass}`}>Options</label>
-                              <div className="space-y-2">
-                                {questionOptions.map((option, index) => (
-                                  <div key={index} className="flex items-center space-x-2">
-                                    <input
-                                      type="radio"
-                                      name="edit-correct-answer"
-                                      checked={questionCorrectAnswer === index}
-                                      onChange={() => setQuestionCorrectAnswer(index)}
-                                      className="w-4 h-4"
-                                    />
-                                    <input
-                                      type="text"
-                                      value={option}
-                                      onChange={(e) => {
-                                        const newOptions = [...questionOptions]
-                                        newOptions[index] = e.target.value
-                                        setQuestionOptions(newOptions)
-                                      }}
-                                      className={`flex-1 p-2 rounded-lg ${inputBg} border border-gray-600`}
-                                      placeholder={`Option ${index + 1}`}
-                                    />
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                            <div>
-                              <label className={`block text-sm font-medium mb-1 ${subheadingClass}`}>Explanation</label>
-                              <textarea
-                                value={questionExplanation}
-                                onChange={(e) => setQuestionExplanation(e.target.value)}
-                                className={`w-full p-2 rounded-lg ${inputBg} border border-gray-600`}
-                                rows={2}
-                                placeholder="Explain why the correct answer is right"
-                              />
-                            </div>
-                            <div className="flex justify-end space-x-2 pt-2">
-                              <button
-                                onClick={() => setEditingItem(null)}
-                                className={`px-4 py-2 rounded-lg ${buttonSecondary}`}
-                              >
-                                Cancel
-                              </button>
-                              <button
-                                onClick={handleUpdateQuestion}
-                                className={`px-4 py-2 rounded-lg ${buttonPrimary}`}
-                              >
-                                Update Question
-                              </button>
-                            </div>
+                          <div>
+                            <label className={`block text-sm font-medium mb-1 ${subheadingClass}`}>Definition</label>
+                            <textarea
+                              value={flashcardDefinition}
+                              onChange={(e) => setFlashcardDefinition(e.target.value)}
+                              placeholder="Enter definition"
+                              className={`w-full p-2 rounded-lg ${inputBg} border border-gray-600`}
+                              rows={3}
+                            />
                           </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Subfolders Section */}
-                    {subFolders[selectedFolder.id]?.length > 0 && (
-                      <div className="mb-6">
-                        <h3 className={`text-lg font-medium ${headingClass} mb-3 flex items-center`}>
-                          <FolderTree className="w-5 h-5 mr-2" />
-                          Subfolders
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                          {subFolders[selectedFolder.id].map(subfolder => (
-                            <div 
-                              key={subfolder.id}
-                              className={`p-3 rounded-lg ${isIlluminateEnabled ? "bg-gray-200" : "bg-gray-700/50"} hover:bg-opacity-90 transition-all`}
+                          <div>
+                            <label className={`block text-sm font-medium mb-1 ${subheadingClass}`}>Topic (optional)</label>
+                            <input
+                              type="text"
+                              value={flashcardTopic}
+                              onChange={(e) => setFlashcardTopic(e.target.value)}
+                              placeholder="Enter topic"
+                              className={`w-full p-2 rounded-lg ${inputBg} border border-gray-600`}
+                            />
+                          </div>
+                          <div className="flex justify-end space-x-2 pt-2">
+                            <button
+                              onClick={() => {
+                                setIsAddingItem(false)
+                                setEditingItem(null)
+                              }}
+                              className={`px-3 py-1.5 rounded-lg ${buttonSecondary}`}
                             >
-                              <div className="flex items-center justify-between mb-2">
-                                <div className="flex items-center">
-                                  <Folder className="w-4 h-4 mr-2 text-blue-400" />
-                                  <h4 className={`font-medium ${headingClass}`}>{subfolder.name}</h4>
-                                </div>
-                                <button
-                                  onClick={() => handleDeleteSubFolder(selectedFolder.id, subfolder.id)}
-                                  className="p-1 rounded-full hover:bg-gray-600 text-red-400"
-                                >
-                                  <Trash className="w-4 h-4" />
-                                </button>
+                              Cancel
+                            </button>
+                            <button
+                              onClick={editingItem ? handleUpdateFlashcard : handleAddFlashcard}
+                              className={`px-3 py-1.5 rounded-lg ${buttonPrimary}`}
+                            >
+                              {editingItem ? "Update" : "Add"} Flashcard
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Question Form */}
+                      {(newItemType === "question" || (editingItem && editingItem.type === "question")) && (
+                        <div className="space-y-3">
+                          <div>
+                            <label className={`block text-sm font-medium mb-1 ${subheadingClass}`}>Question</label>
+                            <textarea
+                              value={questionText}
+                              onChange={(e) => setQuestionText(e.target.value)}
+                              placeholder="Enter question"
+                              className={`w-full p-2 rounded-lg ${inputBg} border border-gray-600`}
+                              rows={2}
+                            />
+                          </div>
+                          <div>
+                            <label className={`block text-sm font-medium mb-1 ${subheadingClass}`}>Options</label>
+                            {questionOptions.map((option, index) => (
+                              <div key={index} className="flex items-center space-x-2 mb-2">
+                                <input
+                                  type="radio"
+                                  id={`option-${index}`}
+                                  name="correctAnswer"
+                                  checked={questionCorrectAnswer === index}
+                                  onChange={() => setQuestionCorrectAnswer(index)}
+                                  className="w-4 h-4 text-blue-600"
+                                />
+                                <input
+                                  type="text"
+                                  value={option}
+                                  onChange={(e) => {
+                                    const newOptions = [...questionOptions]
+                                    newOptions[index] = e.target.value
+                                    setQuestionOptions(newOptions)
+                                  }}
+                                  placeholder={`Option ${index + 1}`}
+                                  className={`flex-1 p-2 rounded-lg ${inputBg} border border-gray-600`}
+                                />
+                                {index > 1 && (
+                                  <button
+                                    onClick={() => {
+                                      const newOptions = questionOptions.filter((_, i) => i !== index)
+                                      setQuestionOptions(newOptions)
+                                      if (questionCorrectAnswer === index) {
+                                        setQuestionCorrectAnswer(0)
+                                      } else if (questionCorrectAnswer > index) {
+                                        setQuestionCorrectAnswer(questionCorrectAnswer - 1)
+                                      }
+                                    }}
+                                    className="p-1 text-red-500 hover:text-red-400"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                )}
                               </div>
-                              {subfolder.description && (
-                                <p className={`text-sm ${subheadingClass} mb-2`}>{subfolder.description}</p>
-                              )}
-                              <div className="flex items-center justify-between">
-                                <span className={`text-xs px-1.5 py-0.5 rounded-full ${folderTypeColors[subfolder.type]} bg-opacity-20`}>
-                                  {subfolder.type === "flashcard" ? "Flashcards" : subfolder.type === "question" ? "Questions" : "Mixed"}
-                                </span>
-                                <span className="text-xs text-gray-400">{subfolder.itemCount || 0} items</span>
-                              </div>
-                            </div>
-                          ))}
+                            ))}
+                            {questionOptions.length < 6 && (
+                              <button
+                                onClick={() => setQuestionOptions([...questionOptions, ""])}
+                                className={`text-sm ${illuminateTextBlue} hover:underline flex items-center`}
+                              >
+                                <Plus className="w-3 h-3 mr-1" />
+                                Add Option
+                              </button>
+                            )}
+                          </div>
+                          <div>
+                            <label className={`block text-sm font-medium mb-1 ${subheadingClass}`}>Explanation (optional)</label>
+                            <textarea
+                              value={questionExplanation}
+                              onChange={(e) => setQuestionExplanation(e.target.value)}
+                              placeholder="Enter explanation"
+                              className={`w-full p-2 rounded-lg ${inputBg} border border-gray-600`}
+                              rows={2}
+                            />
+                          </div>
+                          <div className="flex justify-end space-x-2 pt-2">
+                            <button
+                              onClick={() => {
+                                setIsAddingItem(false)
+                                setEditingItem(null)
+                              }}
+                              className={`px-3 py-1.5 rounded-lg ${buttonSecondary}`}
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={editingItem ? handleUpdateQuestion : handleAddQuestion}
+                              className={`px-3 py-1.5 rounded-lg ${buttonPrimary}`}
+                            >
+                              {editingItem ? "Update" : "Add"} Question
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Import Modal */}
+                  {showImportModal && (
+                    <div className={`${cardClass} rounded-xl p-4 shadow-lg mt-4`}>
+                      <h3 className={`text-lg font-semibold ${headingClass} mb-3`}>Import Flashcards</h3>
+                      <div className="space-y-3">
+                        <div>
+                          <label className={`block text-sm font-medium mb-1 ${subheadingClass}`}>Separator</label>
+                          <select
+                            value={importSeparator}
+                            onChange={(e) => setImportSeparator(e.target.value)}
+                            className={`w-full p-2 rounded-lg ${inputBg} border border-gray-600`}
+                          >
+                            <option value="\t">Tab</option>
+                            <option value=",">Comma</option>
+                            <option value=";">Semicolon</option>
+                            <option value="|">Pipe</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className={`block text-sm font-medium mb-1 ${subheadingClass}`}>Content</label>
+                          <textarea
+                            value={importText}
+                            onChange={(e) => setImportText(e.target.value)}
+                            placeholder={`Term${importSeparator}Definition${importSeparator}Topic (optional)\nTerm${importSeparator}Definition${importSeparator}Topic (optional)`}
+                            className={`w-full p-2 rounded-lg ${inputBg} border border-gray-600`}
+                            rows={6}
+                          />
+                        </div>
+                        <div className="flex justify-end space-x-2 pt-2">
+                          <button
+                            onClick={() => setShowImportModal(false)}
+                            className={`px-3 py-1.5 rounded-lg ${buttonSecondary}`}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={handleImport}
+                            className={`px-3 py-1.5 rounded-lg ${buttonPrimary}`}
+                          >
+                            Import
+                          </button>
                         </div>
                       </div>
-                    )}
+                    </div>
+                  )}
 
-                    {/* Folder Items */}
-                    <div>
-                      <h3 className={`text-lg font-medium ${headingClass} mb-3 flex items-center`}>
-                        <FileText className="w-5 h-5 mr-2" />
-                        Items
-                      </h3>
-                      
+                  {/* Folder Items */}
+                  {!isCreatingSubFolder && !isAddingItem && !showImportModal && (
+                    <div className={`${cardClass} rounded-xl p-4 shadow-lg mt-4`}>
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className={`text-lg font-semibold ${headingClass}`}>Items</h3>
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => setViewMode("grid")}
+                            className={`p-1.5 rounded-lg transition-colors ${
+                              viewMode === "grid" ? buttonPrimary : buttonSecondary
+                            }`}
+                            title="Grid View"
+                          >
+                            <LayoutGrid className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={() => setViewMode("list")}
+                            className={`p-1.5 rounded-lg transition-colors ${
+                              viewMode === "list" ? buttonPrimary : buttonSecondary
+                            }`}
+                            title="List View"
+                          >
+                            <List className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+
                       {selectedFolder.items.length === 0 ? (
-                        <div className="text-center py-12">
-                          <p className={`${subheadingClass} mb-4`}>This folder is empty</p>
+                        <div className="text-center py-8">
+                          <p className={`${subheadingClass} mb-4`}>No items in this folder yet</p>
                           <button
                             onClick={() => {
                               setIsAddingItem(true)
                               setNewItemType(selectedFolder.type === "question" ? "question" : "flashcard")
-                              // Reset form states
-                              setQuestionOptions(["", "", "", ""])
-                              setQuestionCorrectAnswer(0)
-                              setFlashcardTerm("")
-                              setFlashcardDefinition("")
-                              setFlashcardTopic("")
                             }}
-                            className={`px-4 py-2 rounded-lg ${buttonPrimary} inline-flex items-center`}
+                            className={`px-3 py-1.5 rounded-lg ${buttonPrimary} inline-flex items-center`}
                           >
                             <Plus className="w-4 h-4 mr-2" />
-                            Add your first {selectedFolder.type === "question" ? "question" : "flashcard"}
+                            Add your first item
                           </button>
                         </div>
-                      ) : (
-                        <div className={viewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 gap-4" : "space-y-4"}>
+                      ) : viewMode === "grid" ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                           {selectedFolder.items.map((item) => (
                             <div
                               key={item.id}
-                              className={`p-4 rounded-lg ${
-                                isIlluminateEnabled
-                                  ? "bg-gray-200"
-                                  : "bg-gray-700/50"
-                              } hover:bg-opacity-90 transition-all`}
+                              className={`p-3 rounded-lg ${isIlluminateEnabled ? "bg-gray-200" : "bg-gray-700/50"} relative group`}
                             >
                               {"definition" in item ? (
                                 // Flashcard
-                                <div>
-                                  <div className="flex items-center justify-between mb-2">
-                                    <div className="flex items-center">
-                                      <FileText className="w-4 h-4 mr-2 text-blue-400" />
-                                      <h3 className={`font-medium ${headingClass}`}>Flashcard</h3>
-                                    </div>
-                                    <div className="flex items-center space-x-2">
-                                      <button
-                                        onClick={() => toggleShowAnswer(item.id)}
-                                        className="p-1 rounded-full hover:bg-gray-600"
-                                        title={showAnswers[item.id] ? "Hide Definition" : "Show Definition"}
-                                      >
-                                        {showAnswers[item.id] ? (
-                                          <EyeOff className="w-4 h-4" />
-                                        ) : (
-                                          <Eye className="w-4 h-4" />
-                                        )}
-                                      </button>
+                                <>
+                                  <div className="flex items-start justify-between">
+                                    <h4 className={`font-medium ${headingClass} mb-1`}>{item.term}</h4>
+                                    <div className="flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                       <button
                                         onClick={() => handleEditItem(item)}
-                                        className="p-1 rounded-full hover:bg-gray-600 text-blue-400"
+                                        className="p-1 text-gray-400 hover:text-gray-300"
                                       >
-                                        <Edit className="w-4 h-4" />
+                                        <Edit className="w-3 h-3" />
                                       </button>
                                       <button
                                         onClick={() => handleDeleteItem(item.id)}
-                                        className="p-1 rounded-full hover:bg-gray-600 text-red-400"
+                                        className="p-1 text-red-500 hover:text-red-400"
                                       >
-                                        <Trash className="w-4 h-4" />
+                                        <Trash className="w-3 h-3" />
                                       </button>
                                     </div>
                                   </div>
-                                  <div className="mb-2">
-                                    <p className={`font-medium ${headingClass}`}>Term:</p>
-                                    <p className={defaultTextColor}>{item.term}</p>
-                                  </div>
-                                  {(showAnswers[item.id]) && (
-                                    <div className="mb-2">
-                                      <p className={`font-medium ${headingClass}`}>Definition:</p>
-                                      <p className={defaultTextColor}>{item.definition}</p>
-                                    </div>
+                                  <button
+                                    onClick={() => toggleShowAnswer(item.id)}
+                                    className={`text-xs ${illuminateTextBlue} hover:underline mb-1`}
+                                  >
+                                    {showAnswers[item.id] ? "Hide Definition" : "Show Definition"}
+                                  </button>
+                                  {showAnswers[item.id] && (
+                                    <p className={`${defaultTextColor} text-sm mt-2`}>{item.definition}</p>
                                   )}
                                   {item.topic && (
-                                    <div className="flex items-center">
+                                    <div className="mt-2">
                                       <span
-                                        className={`text-xs px-2 py-0.5 rounded-full ${
-                                          isIlluminateEnabled ? "bg-blue-100 text-blue-700" : "bg-blue-900/30 text-blue-300"
-                                        }`}
+                                        className={`text-xs px-1.5 py-0.5 rounded-full ${getTagColorClass(item.topic)}`}
                                       >
                                         {item.topic}
                                       </span>
                                     </div>
                                   )}
-                                  <div className="mt-2 text-xs text-gray-400 flex items-center">
-                                    <Clock className="w-3 h-3 mr-1" />
-                                    Created: {item.createdAt.toLocaleDateString()}
-                                    {item.lastReviewed && (
-                                      <>
-                                        <span className="mx-2">•</span>
-                                        <Calendar className="w-3 h-3 mr-1" />
-                                        Last reviewed: {item.lastReviewed.toLocaleDateString()}
-                                      </>
+                                </>
+                              ) : (
+                                // Question
+                                <>
+                                  <div className="flex items-start justify-between">
+                                    <h4 className={`font-medium ${headingClass} mb-1`}>{item.question}</h4>
+                                    <div className="flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <button
+                                        onClick={() => handleEditItem(item)}
+                                        className="p-1 text-gray-400 hover:text-gray-300"
+                                      >
+                                        <Edit className="w-3 h-3" />
+                                      </button>
+                                      <button
+                                        onClick={() => handleDeleteItem(item.id)}
+                                        className="p-1 text-red-500 hover:text-red-400"
+                                      >
+                                        <Trash className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                  <button
+                                    onClick={() => toggleShowAnswer(item.id)}
+                                    className={`text-xs ${illuminateTextBlue} hover:underline mb-1`}
+                                  >
+                                    {showAnswers[item.id] ? "Hide Options" : "Show Options"}
+                                  </button>
+                                  {showAnswers[item.id] && (
+                                    <div className="mt-2 space-y-1">
+                                      {item.options.map((option, index) => (
+                                        <div
+                                          key={index}
+                                          className={`p-1.5 rounded-lg text-xs ${
+                                            index === item.correctAnswer
+                                              ? isIlluminateEnabled
+                                                ? "bg-green-200 text-green-800"
+                                                : "bg-green-900/30 text-green-400"
+                                              : isIlluminateEnabled
+                                                ? "bg-gray-300"
+                                                : "bg-gray-600"
+                                          }`}
+                                        >
+                                          {index === item.correctAnswer && (
+                                            <CheckCircle className="w-3 h-3 inline-block mr-1 text-green-500" />
+                                          )}
+                                          {option}
+                                        </div>
+                                      ))}
+                                      {item.explanation && (
+                                        <div className="mt-1 p-1.5 rounded-lg bg-gray-600/30 text-xs">
+                                          <span className="font-medium">Explanation:</span> {item.explanation}
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {selectedFolder.items.map((item) => (
+                            <div
+                              key={item.id}
+                              className={`p-3 rounded-lg ${isIlluminateEnabled ? "bg-gray-200" : "bg-gray-700/50"} relative group`}
+                            >
+                              {"definition" in item ? (
+                                // Flashcard
+                                <div className="flex items-start justify-between">
+                                  <div className="flex-1">
+                                    <div className="flex items-center">
+                                      <h4 className={`font-medium ${headingClass}`}>{item.term}</h4>
+                                      {item.topic && (
+                                        <span
+                                          className={`ml-2 text-xs px-1.5 py-0.5 rounded-full ${getTagColorClass(item.topic)}`}
+                                        >
+                                          {item.topic}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <button
+                                      onClick={() => toggleShowAnswer(item.id)}
+                                      className={`text-xs ${illuminateTextBlue} hover:underline mt-1`}
+                                    >
+                                      {showAnswers[item.id] ? "Hide Definition" : "Show Definition"}
+                                    </button>
+                                    {showAnswers[item.id] && (
+                                      <p className={`${defaultTextColor} text-sm mt-2`}>{item.definition}</p>
                                     )}
+                                  </div>
+                                  <div className="flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button
+                                      onClick={() => handleEditItem(item)}
+                                      className="p-1 text-gray-400 hover:text-gray-300"
+                                    >
+                                      <Edit className="w-3 h-3" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteItem(item.id)}
+                                      className="p-1 text-red-500 hover:text-red-400"
+                                    >
+                                      <Trash className="w-3 h-3" />
+                                    </button>
                                   </div>
                                 </div>
                               ) : (
                                 // Question
-                                <div>
-                                  <div className="flex items-center justify-between mb-2">
-                                    <div className="flex items-center">
-                                      <Brain className="w-4 h-4 mr-2 text-purple-400" />
-                                      <h3 className={`font-medium ${headingClass}`}>Quiz Question</h3>
-                                    </div>
-                                    <div className="flex items-center space-x-2">
-                                      <button
-                                        onClick={() => toggleShowAnswer(item.id)}
-                                        className="p-1 rounded-full hover:bg-gray-600"
-                                        title={showAnswers[item.id] ? "Hide Answer" : "Show Answer"}
-                                      >
-                                        {showAnswers[item.id] ? (
-                                          <EyeOff className="w-4 h-4" />
-                                        ) : (
-                                          <Eye className="w-4 h-4" />
+                                <div className="flex items-start justify-between">
+                                  <div className="flex-1">
+                                    <h4 className={`font-medium ${headingClass}`}>{item.question}</h4>
+                                    <button
+                                      onClick={() => toggleShowAnswer(item.id)}
+                                      className={`text-xs ${illuminateTextBlue} hover:underline mt-1`}
+                                    >
+                                      {showAnswers[item.id] ? "Hide Options" : "Show Options"}
+                                    </button>
+                                    {showAnswers[item.id] && (
+                                      <div className="mt-2 space-y-1">
+                                        {item.options.map((option, index) => (
+                                          <div
+                                            key={index}
+                                            className={`p-1.5 rounded-lg text-xs ${
+                                              index === item.correctAnswer
+                                                ? isIlluminateEnabled
+                                                  ? "bg-green-200 text-green-800"
+                                                  : "bg-green-900/30 text-green-400"
+                                                : isIlluminateEnabled
+                                                  ? "bg-gray-300"
+                                                  : "bg-gray-600"
+                                            }`}
+                                          >
+                                            {index === item.correctAnswer && (
+                                              <CheckCircle className="w-3 h-3 inline-block mr-1 text-green-500" />
+                                            )}
+                                            {option}
+                                          </div>
+                                        ))}
+                                        {item.explanation && (
+                                          <div className="mt-1 p-1.5 rounded-lg bg-gray-600/30 text-xs">
+                                            <span className="font-medium">Explanation:</span> {item.explanation}
+                                          </div>
                                         )}
-                                      </button>
-                                      <button
-                                        onClick={() => handleEditItem(item)}
-                                        className="p-1 rounded-full hover:bg-gray-600 text-blue-400"
-                                      >
-                                        <Edit className="w-4 h-4" />
-                                      </button>
-                                      <button
-                                        onClick={() => handleDeleteItem(item.id)}
-                                        className="p-1 rounded-full hover:bg-gray-600 text-red-400"
-                                      >
-                                        <Trash className="w-4 h-4" />
-                                      </button>
-                                    </div>
-                                  </div>
-                                  <div className="mb-3">
-                                    <p className={`font-medium ${headingClass}`}>Question:</p>
-                                    <p className={defaultTextColor}>{item.question}</p>
-                                  </div>
-                                  {showAnswers[item.id] && (
-                                    <>
-                                      <div className="mb-3">
-                                        <p className={`font-medium ${headingClass}`}>Options:</p>
-                                        <div className="space-y-1 ml-2">
-                                          {item.options.map((option, index) => (
-                                            <div
-                                              key={index}
-                                              className={`flex items-center p-2 rounded-lg ${
-                                                index === item.correctAnswer
-                                                  ? isIlluminateEnabled ? "bg-green-100 text-green-700" : "bg-green-900/30 text-green-300"
-                                                  : isIlluminateEnabled ? "bg-gray-300" : "bg-gray-600"
-                                              }`}
-                                            >
-                                              {index === item.correctAnswer ? (
-                                                <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
-                                              ) : (
-                                                <div className="w-4 h-4 mr-2 rounded-full border border-gray-400 flex-shrink-0" />
-                                              )}
-                                              <span>{option}</span>
-                                            </div>
-                                          ))}
-                                        </div>
                                       </div>
-                                      {item.explanation && (
-                                        <div className="mb-2">
-                                          <p className={`font-medium ${headingClass}`}>Explanation:</p>
-                                          <p className={defaultTextColor}>{item.explanation}</p>
-                                        </div>
-                                      )}
-                                    </>
-                                  )}
-                                  <div className="mt-2 text-xs text-gray-400 flex items-center">
-                                    <Clock className="w-3 h-3 mr-1" />
-                                    Created: {item.createdAt.toLocaleDateString()}
-                                    {item.lastReviewed && (
-                                      <>
-                                        <span className="mx-2">•</span>
-                                        <Calendar className="w-3 h-3 mr-1" />
-                                        Last reviewed: {item.lastReviewed.toLocaleDateString()}
-                                      </>
                                     )}
+                                  </div>
+                                  <div className="flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button
+                                      onClick={() => handleEditItem(item)}
+                                      className="p-1 text-gray-400 hover:text-gray-300"
+                                    >
+                                      <Edit className="w-3 h-3" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteItem(item.id)}
+                                      className="p-1 text-red-500 hover:text-red-400"
+                                    >
+                                      <Trash className="w-3 h-3" />
+                                    </button>
                                   </div>
                                 </div>
                               )}
@@ -3157,171 +3147,146 @@ export function Folders() {
                         </div>
                       )}
                     </div>
-
-                  </div>
-                ) : (
-                  <div
-                    className={`${cardClass} rounded-xl p-6 flex flex-col items-center justify-center min-h-[400px] shadow-lg animate-fadeIn relative overflow-hidden ${
-                      cardVisible ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
-                    }`}
+                  )}
+                </>
+              ) : (
+                <div className={`${cardClass} rounded-xl p-8 shadow-lg text-center animate-fadeIn`}>
+                  <Folder className="w-16 h-16 mx-auto mb-4 text-gray-500" />
+                  <h2 className={`text-xl font-semibold ${headingClass} mb-2`}>No Folder Selected</h2>
+                  <p className={`${subheadingClass} mb-6`}>
+                    Select a folder from the list or create a new one to get started.
+                  </p>
+                  <button
+                    onClick={() => {
+                      setIsCreatingFolder(true)
+                      setEditingFolderId(null)
+                      setNewFolderName("")
+                      setNewFolderDescription("")
+                      setNewFolderType("mixed")
+                      setFlashcardTags([])
+                    }}
+                    className={`px-4 py-2 rounded-lg ${buttonPrimary} inline-flex items-center`}
                   >
-                    <Sparkles className="w-12 h-12 text-blue-400 mb-4" />
-                    <h2 className={`text-xl font-semibold ${headingClass} mb-2 text-center`}>
-                      No Folder Selected
-                    </h2>
-                    <p className={`${subheadingClass} text-center max-w-md mb-6`}>
-                      Create folders to organize your flashcards, quiz questions, and other learning materials. Select a folder from the list to view its contents, or create one. 
-                    </p>
-                    <button
-                      onClick={() => setIsCreatingFolder(true)}
-                      className={`px-4 py-2 rounded-lg ${buttonPrimary} inline-flex items-center`}
-                    >
-                      <FolderPlus className="w-5 h-5 mr-2" />
-                      Create a folder
-                    </button>
-                  </div>
-                )}
-
-                {/* Organization Tips Card */}
-                {!selectedFolder && (
-                  <div
-                    className={`${cardClass} rounded-xl p-4 sm:p-6 mt-6 shadow-lg animate-fadeIn relative overflow-hidden ${
-                      cardVisible ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-4">
-                      <h2 className={`text-xl font-semibold ${illuminateTextBlue} flex items-center`}>
-                        <MessageCircle className="w-5 h-5 mr-2" />
-                        Study Tips
-                      </h2>
-                    </div>
-                    <div className="space-y-3">
-                      <div className={`p-3 rounded-lg ${isIlluminateEnabled ? "bg-blue-100" : "bg-blue-900/20"}`}>
-                        <div className="flex items-start">
-                          <BookOpen className={`w-5 h-5 mr-2 mt-0.5 ${isIlluminateEnabled ? 'text-blue-600' : 'text-blue-400'}`} />
-                          <div>
-                            <p className={`font-medium ${isIlluminateEnabled ? 'text-blue-700' : 'text-blue-300'}`}>
-                              Flashcards Mode
-                            </p>
-                            <p className={defaultTextColor}>
-                              Review your terms and definitions with interactive flashcards that you can flip through.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                      <div className={`p-3 rounded-lg ${isIlluminateEnabled ? 'bg-green-100' : 'bg-green-900/20'}`}>
-                        <div className="flex items-start">
-                          <Lightbulb className={`w-5 h-5 mr-2 mt-0.5 ${isIlluminateEnabled ? 'text-green-600' : 'text-green-400'}`} />
-                          <div>
-                            <p className={`font-medium ${isIlluminateEnabled ? 'text-green-700' : 'text-green-300'}`}>
-                              Learn Mode
-                            </p>
-                            <p className={defaultTextColor}>
-                              Adaptive learning that focuses on terms you find difficult until you master them.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                      <div className={`p-3 rounded-lg ${isIlluminateEnabled ? 'bg-purple-100' : 'bg-purple-900/20'}`}>
-                        <div className="flex items-start">
-                          <Target className={`w-5 h-5 mr-2 mt-0.5 ${isIlluminateEnabled ? 'text-purple-600' : 'text-purple-400'}`} />
-                          <div>
-                            <p className={`font-medium ${isIlluminateEnabled ? 'text-purple-700' : 'text-purple-300'}`}>
-                              Test & Match Modes
-                            </p>
-                            <p className={defaultTextColor}>
-                              Challenge yourself with written tests or play matching games to reinforce your knowledge.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      </main>
-
-{/* AI Integration - Add this section */}
-{selectedFolder && (
-  <AIFolders
-    selectedFolder={selectedFolder}
-    userName={userName}
-    isIlluminateEnabled={isIlluminateEnabled}
-    isBlackoutEnabled={isBlackoutEnabled}
-    onFolderUpdated={() => {
-      // Refresh folder items
-      if (user && selectedFolder) {
-        getFolderItems(user.uid, selectedFolder.id).then(items => {
-          setSelectedFolder({ ...selectedFolder, items });
-          
-          // Update folder in folders array
-          setFolders(prevFolders =>
-            prevFolders.map(folder =>
-              folder.id === selectedFolder.id ? { ...folder, items, itemCount: items.length } : folder
-            )
-          );
-        });
-      }
-    }}
-  />
-)}
-
-      {/* Import Modal */}
-      {showImportModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className={`${cardClass} rounded-xl p-6 max-w-lg w-full shadow-xl animate-fadeIn`}>
-            <h2 className={`text-xl font-semibold ${headingClass} mb-4`}>Import Flashcards</h2>
-            <p className={`${subheadingClass} mb-4 text-sm`}>
-              Enter your flashcards in the format: Term{importSeparator}Definition{importSeparator}Topic (optional)
-              <br />
-              One flashcard per line.
-            </p>
-
-            <div className="mb-4">
-              <label className={`block text-sm font-medium mb-1 ${subheadingClass}`}>Separator</label>
-              <select
-                value={importSeparator}
-                onChange={(e) => setImportSeparator(e.target.value)}
-                className={`w-full p-2 rounded-lg ${inputBg} border border-gray-600 text-sm`}
-              >
-                <option value="\t">Tab</option>
-                <option value=",">Comma (,)</option>
-                <option value=";">Semicolon (;)</option>
-                <option value="|">Pipe (|)</option>
-              </select>
-            </div>
-
-            <div className="mb-4">
-              <label className={`block text-sm font-medium mb-1 ${subheadingClass}`}>Flashcards</label>
-              <textarea
-                value={importText}
-                onChange={(e) => setImportText(e.target.value)}
-                className={`w-full p-2 rounded-lg ${inputBg} border border-gray-600 text-sm`}
-                rows={10}
-                placeholder={`Term${importSeparator}Definition${importSeparator}Topic\nMitochondria${importSeparator}Powerhouse of the cell${importSeparator}Biology`}
-              />
-            </div>
-
-            <div className="flex justify-end space-x-2">
-              <button
-                onClick={() => setShowImportModal(false)}
-                className={`px-4 py-2 rounded-lg ${buttonSecondary}`}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleImport}
-                className={`px-4 py-2 rounded-lg ${buttonPrimary}`}
-              >
-                Import
-              </button>
+                    <FolderPlus className="w-4 h-4 mr-2" />
+                    Create New Folder
+                  </button>
+                </div>
+              )}
             </div>
           </div>
+        )}
+      </div>
+    </main>
+
+    {/* AI Chat Panel - Fixed to the right side */}
+    {isAIChatOpen && (
+      <div className="fixed right-0 top-0 h-full w-96 z-50 shadow-xl">
+        <div className={`${cardClass} h-full flex flex-col`}>
+          {/* Chat Header */}
+          <div className={`p-4 border-b ${isIlluminateEnabled ? "border-gray-200" : "border-gray-700"} flex items-center justify-between`}>
+            <div className="flex items-center">
+              <Bot className="w-5 h-5 mr-2 text-blue-500" />
+              <h3 className={`font-semibold ${headingClass}`}>AI Study Assistant</h3>
+            </div>
+            <button
+              onClick={() => setIsAIChatOpen(false)}
+              className="p-1 rounded-full hover:bg-gray-700"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Chat Messages */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4" style={{ maxHeight: "calc(100vh - 180px)" }}>
+            {chatHistory.length === 0 ? (
+              <div className="text-center py-8">
+                <Sparkles className="w-12 h-12 mx-auto mb-3 text-blue-500 opacity-50" />
+                <p className={`${subheadingClass} mb-4`}>
+                  Ask me anything about your study materials or how I can help you learn better.
+                </p>
+                <div className="space-y-2">
+                  {studyTipSuggestions.map((tip, index) => (
+                    <button
+                      key={index}
+                      onClick={() => setChatMessage(tip)}
+                      className={`w-full p-2 rounded-lg text-sm text-left ${buttonSecondary} hover:bg-opacity-80`}
+                    >
+                      {tip}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <>
+                {chatHistory.map((message, index) => (
+                  <div
+                    key={index}
+                    className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
+                  >
+                    <div
+                      className={`max-w-[80%] rounded-lg p-3 ${
+                        message.role === "user" ? userBubble : assistantBubble
+                      }`}
+                    >
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm, remarkMath]}
+                        rehypePlugins={[rehypeKatex]}
+                        className="text-sm prose prose-sm max-w-none"
+                      >
+                        {message.content}
+                      </ReactMarkdown>
+                    </div>
+                  </div>
+                ))}
+                {streamingAssistantContent && (
+                  <div className="flex justify-start">
+                    <div className={`max-w-[80%] rounded-lg p-3 ${assistantBubble}`}>
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm, remarkMath]}
+                        rehypePlugins={[rehypeKatex]}
+                        className="text-sm prose prose-sm max-w-none"
+                      >
+                        {streamingAssistantContent}
+                      </ReactMarkdown>
+                    </div>
+                  </div>
+                )}
+                <div ref={chatEndRef} />
+              </>
+            )}
+          </div>
+
+          {/* Chat Input */}
+          <div className={`p-4 border-t ${isIlluminateEnabled ? "border-gray-200" : "border-gray-700"}`}>
+            <form onSubmit={handleChatSubmit} className="flex items-center space-x-2">
+              <input
+                type="text"
+                value={chatMessage}
+                onChange={(e) => setChatMessage(e.target.value)}
+                placeholder="Ask a question..."
+                className={`flex-1 p-2 rounded-lg ${inputBg} border ${
+                  isIlluminateEnabled ? "border-gray-300" : "border-gray-600"
+                }`}
+                disabled={isChatLoading}
+              />
+              <button
+                type="submit"
+                className={`p-2 rounded-lg ${buttonPrimary} ${
+                  isChatLoading || !chatMessage.trim() ? "opacity-50 cursor-not-allowed" : ""
+                }`}
+                disabled={isChatLoading || !chatMessage.trim()}
+              >
+                {isChatLoading ? (
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Send className="w-5 h-5" />
+                )}
+              </button>
+            </form>
+          </div>
         </div>
-      )}
-    </div>
+      </div>
+    )}
+  </div>
   )
 }

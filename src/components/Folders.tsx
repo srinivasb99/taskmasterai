@@ -2444,7 +2444,7 @@ return (
                 <div className="flex items-center justify-between mb-4">
                   <h2 className={`text-lg font-semibold ${headingClass} flex items-center`}>
                     <Folder className="w-5 h-5 mr-2" />
-                    Folders
+                    Your Folders
                   </h2>
                   <div className="flex space-x-1">
                     <button
@@ -2619,7 +2619,7 @@ return (
                 )}
 
                 {/* Folders List */}
-                <div className="space-y-2 max-h-[calc(100vh-300px)] overflow-y-auto pr-1">
+                <div className="space-y-2 max-h-[calc(100vh-200px)] overflow-y-auto pr-1">
                   {sortedFolders.length === 0 ? (
                     <div className="text-center py-6">
                       <p className={`${subheadingClass} mb-2 text-sm`}>No folders found</p>

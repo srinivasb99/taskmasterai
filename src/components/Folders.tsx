@@ -2433,26 +2433,27 @@ return (
           </div>
         )}
 
-        {/* Main Content */}
+ {/* Main Content */}
         {!activeStudyMode && (
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
             {/* Left Column - Folders List */}
             <div className="lg:col-span-1">
-      <div
-        className={`
-          ${cardClass}
-          rounded-xl
-          p-4
-          shadow-lg
-          animate-fadeIn
-          relative
-          overflow-hidden
-          ${cardVisible ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"}
-          h-[700px]          
-          overflow-y-auto     
-        `}
-      >
-                <div className="flex items-center justify-between mb-4">
+              <div
+                className={`
+                  ${cardClass}
+                  rounded-xl
+                  p-4
+                  shadow-lg
+                  animate-fadeIn
+                  relative
+                  ${cardVisible ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"}
+                  max-h-[calc(100vh-2rem)]
+                  overflow-y-auto
+                  flex
+                  flex-col
+                `}
+              >
+                <div className="flex items-center justify-between mb-4 sticky top-0 bg-inherit z-10 pb-2">
                   <h2 className={`text-lg font-semibold ${headingClass} flex items-center`}>
                     <FoldersIcon className="w-5 h-5 mr-2" />
                     Your Folders
@@ -2484,7 +2485,7 @@ return (
                       {showTagsDropdown && (
                         <div
                           ref={tagsDropdownRef}
-                          className={`absolute left-0 mt-1 w-48 ${cardClass} rounded-lg shadow-lg p-2 z-10`}
+                          className={`absolute right-0 mt-1 w-48 ${cardClass} rounded-lg shadow-lg p-2 z-20`}
                         >
                           <h3 className={`${headingClass} text-sm font-medium mb-2`}>Filter by Tags</h3>
                           <div className="flex flex-wrap gap-1 mb-2">

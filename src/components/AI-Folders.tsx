@@ -1,3 +1,5 @@
+"use client"
+
 import type React from "react"
 import { useState, useRef, useEffect } from "react"
 import { Send, Bot, Brain, MessageSquare, Sparkles, X, Lightbulb, FileText, Folder } from "lucide-react"
@@ -451,7 +453,7 @@ Follow these instructions strictly.
             className="px-3 py-1 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors flex items-center"
           >
             <MessageSquare className="w-4 h-4 mr-1" />
-            Chat
+            Open Chat Panel
           </button>
         </div>
         <p className={isIlluminateEnabled ? "text-blue-700" : "text-blue-300"}>
@@ -529,7 +531,7 @@ Follow these instructions strictly.
             </div>
 
             {/* Chat Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div className="flex-1 overflow-y-auto p-4 space-y-4" style={{ maxHeight: "calc(100vh - 180px)" }}>
               {/* Welcome message */}
               {chatHistory.length === 0 && (
                 <div className="flex justify-start">

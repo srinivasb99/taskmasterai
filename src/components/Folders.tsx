@@ -12,7 +12,6 @@ import { Sidebar } from "./Sidebar"
 import { auth } from "../lib/firebase"
 import { AIFolders } from "./AI-Folders";
 import { geminiApiKey } from "../lib/dashboard-firebase"
-import { type FolderWithItems, addFlashcard, addQuestion } from "../lib/folders-firebase"
 import {
   FolderData,
   FolderWithItems,

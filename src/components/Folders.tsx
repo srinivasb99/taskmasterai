@@ -6,7 +6,7 @@ import {
   Sparkles, MessageCircle, Play, BookOpen, Tag, Download, Upload, Copy, Printer, Share2, 
   Settings, Filter, SortAsc, Bookmark, Layers, LayoutGrid, List, Zap, Award, Repeat, Shuffle, 
   ArrowLeft, ArrowRight, Eye, EyeOff, RefreshCw, Lightbulb, Flame, Target, PenTool, Gamepad2, 
-  FolderTree, BarChart, Send, Folders
+  FolderTree, BarChart, Send 
 } from 'lucide-react';
 import { Sidebar } from "./Sidebar"
 import { auth } from "../lib/firebase"
@@ -2443,7 +2443,7 @@ return (
               >
                 <div className="flex items-center justify-between mb-4">
                   <h2 className={`text-lg font-semibold ${headingClass} flex items-center`}>
-                    <Folders className="w-5 h-5 mr-2" />
+                    <Folder className="w-5 h-5 mr-2" />
                     Your Folders
                   </h2>
                   <div className="flex space-x-1">

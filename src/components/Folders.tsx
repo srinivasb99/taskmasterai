@@ -3712,11 +3712,11 @@ return (
               <div ref={chatEndRef} />
             </div>
 
-       {/* Study tip suggestions - Just moved slightly up */}
+        {/* Study tip suggestions - Removed max-height constraint */}
         {!isChatLoading && selectedFolder && (
           <div className="px-4 py-2 border-t border-gray-700 mb-4">
             <p className={`text-xs mb-2 ${subTextColor}`}>Suggestions:</p>
-            <div className="flex flex-wrap gap-2 max-h-20 overflow-y-auto">
+            <div className="flex flex-wrap gap-2">
               {studyTipSuggestions.map((tip, index) => (
                 <button
                   key={index}

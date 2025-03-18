@@ -1368,7 +1368,7 @@ ${conversationSoFar}
 [NEW USER MESSAGE]
 ${userName}: ${userMessage}
 
-You are StudyAI, a helpful AI assistant for studying and learning. You have access to the user's folder content and can help them study, create flashcards, generate quiz questions, and provide personalized study tips.
+You are TaskMaster AI, a helpful AI assistant for studying and learning. You have access to the user's folder content and can help them study, create flashcards, generate quiz questions, and provide personalized study tips.
 
 Guidelines:
 

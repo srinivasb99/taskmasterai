@@ -8,6 +8,7 @@ import {
   ArrowLeft, ArrowRight, Eye, EyeOff, RefreshCw, Lightbulb, Flame, Target, PenTool, Gamepad2, 
   FolderTree, BarChart, Send, 
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Sidebar } from "./Sidebar"
 import { auth } from "../lib/firebase"
 import { AIFolders } from "./AI-Folders";
@@ -1890,21 +1891,35 @@ return (
         </div>
 
 
+   <div className="min-h-screen bg-gray-100 text-gray-900">
+      <div className="max-w-2xl mx-auto p-4">
         {/* AI Study Assistant Button */}
-        <div className={`mb-6 rounded-lg ${isIlluminateEnabled ? "bg-blue-50" : "bg-blue-900/20"} border ${
-          isIlluminateEnabled ? "border-blue-200" : "border-blue-800"
-        }`}>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+          className={`mb-6 rounded-2xl ${isIlluminateEnabled ? "bg-blue-50" : "bg-blue-900/20"} border ${
+            isIlluminateEnabled ? "border-blue-200" : "border-blue-800"
+          }`}
+        >
           <div className="p-4">
             <div className="flex items-center justify-between">
-              <div className="flex items-center">
+              <motion.div 
+                className="flex items-center"
+                initial={{ x: -20 }}
+                animate={{ x: 0 }}
+                transition={{ duration: 0.4, ease: "easeOut" }}
+              >
                 <Bot className={`w-5 h-5 mr-2 ${isIlluminateEnabled ? "text-blue-600" : "text-blue-500"}`} />
                 <h2 className={`text-lg font-semibold ${isIlluminateEnabled ? "text-blue-700" : "text-blue-400"}`}>
                   AI Study Assistant
                 </h2>
-              </div>
-              <button
+              </motion.div>
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
                 onClick={() => setIsAIChatOpen(!isAIChatOpen)}
-                className={`px-3 py-1.5 rounded-lg text-sm flex items-center space-x-1 ${
+                className={`px-3 py-1.5 rounded-xl text-sm flex items-center space-x-1 ${
                   isIlluminateEnabled 
                     ? "bg-blue-600 text-white hover:bg-blue-700" 
                     : "bg-blue-600 text-white hover:bg-blue-700"
@@ -1912,31 +1927,46 @@ return (
               >
                 <MessageSquare className="w-4 h-4 mr-1" />
                 <span>{isAIChatOpen ? "Close Chat Panel" : "Open Chat Panel"}</span>
-              </button>
+              </motion.button>
             </div>
-            <p className={`text-sm mt-2 ${isIlluminateEnabled ? "text-blue-700" : "text-blue-300"}`}>
+            <motion.p 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.2 }}
+              className={`text-sm mt-2 ${isIlluminateEnabled ? "text-blue-700" : "text-blue-300"}`}
+            >
               Get help with studying, creating flashcards, or understanding difficult concepts.
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
+            </motion.p>
+            <motion.div 
+              className="mt-3 flex flex-wrap gap-1.5"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.3 }}
+            >
               {studyTipSuggestions.map((tip, index) => (
-                <button
+                <motion.button
                   key={index}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1 * index }}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
                   onClick={() => {
                     setChatMessage(tip);
                     setIsAIChatOpen(true);
                   }}
-                  className={`px-3 py-1.5 rounded-lg text-sm flex items-center ${
+                  className={`px-2 py-1 rounded-xl text-xs flex items-center ${
                     isIlluminateEnabled
                       ? "bg-white/50 text-blue-700 hover:bg-white/80 border border-blue-200"
                       : "bg-blue-600/20 text-blue-400 hover:bg-blue-600/30"
                   } transition-colors`}
                 >
                   {tip}
-                </button>
+                </motion.button>
               ))}
-            </div>
+            </motion.div>
           </div>
-        </div>
+        </motion.div>
 
         {/* Flashcards Mode */}
         {activeStudyMode === "flashcards" && selectedFolder && studyItems.length > 0 && (

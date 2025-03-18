@@ -1267,14 +1267,11 @@ export function Folders() {
 
     // Study tips suggestions – now defined to avoid ReferenceError
   const studyTipSuggestions = [
-    "Generate study tips for this folder",
     "Create flashcards about this topic",
     "Make a quiz from this content",
     "Explain this topic in simpler terms",
     "How should I study this material?",
-    "Create a summary of this content",
     "What are the key points to remember?",
-    "Generate practice questions",
   ]
 
   // Reset chat when folder changes

@@ -1889,71 +1889,38 @@ return (
           </div>
         </div>
 
-     <div className="min-h-screen bg-gray-900 text-white">
-      <div className="max-w-2xl mx-auto p-4">
-        {/* Study Assistant Button */}
-        <div
-          className={`mb-6 p-4 rounded-lg ${isIlluminateEnabled ? "bg-blue-50" : "bg-blue-900/20"} border ${
-            isIlluminateEnabled ? "border-blue-200" : "border-blue-800"
-          }`}
-        >
+
+        {/* AI Study Assistant Button - Moved to top */}
+        <div className={`${cardClass} rounded-xl p-4 shadow-md backdrop-blur-sm`}>
           <div className="flex items-center justify-between">
-            <h3 className={`text-lg font-medium flex items-center ${isIlluminateEnabled ? "text-blue-700" : "text-blue-400"}`}>
-              <Sparkles className="w-5 h-5 mr-2" />
-              AI Study Assistant
-            </h3>
+            <div className="flex items-center">
+              <Bot className="w-5 h-5 mr-2 text-blue-500" />
+              <h2 className={`text-lg font-semibold ${headingClass}`}>AI Study Assistant</h2>
+            </div>
             <button
-              onClick={() => setIsAIChatOpen(true)}
-              className="px-3 py-1 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors flex items-center"
+              onClick={() => setIsAIChatOpen(!isAIChatOpen)}
+              className={`${buttonPrimary} px-3 py-1.5 rounded-lg text-sm flex items-center space-x-1`}
             >
-              <MessageSquare className="w-4 h-4 mr-1" />
-              Open Chat Panel
+              <MessageSquare className="w-4 h-4" />
+              <span>{isAIChatOpen ? "Close Chat Panel" : "Open Chat Panel"}</span>
             </button>
           </div>
-          <p className={isIlluminateEnabled ? "text-blue-700" : "text-blue-300"}>
-            Get personalized study tips, create flashcards, and generate quizzes with AI assistance.
+          <p className={`${subheadingClass} text-sm mt-2`}>
+            Get help with studying, creating flashcards, or understanding difficult concepts.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              onClick={() => {
-                setIsAIChatOpen(true);
-                setChatMessage("Generate study tips for this folder");
-              }}
-              className="px-2 py-1 bg-blue-600/20 text-blue-400 rounded-lg text-sm hover:bg-blue-600/30 transition-colors flex items-center"
-            >
-              <Lightbulb className="w-4 h-4 mr-1" />
-              Study Tips
-            </button>
-            <button
-              onClick={() => {
-                setIsAIChatOpen(true);
-                setChatMessage("Create flashcards about this topic");
-              }}
-              className="px-2 py-1 bg-blue-600/20 text-blue-400 rounded-lg text-sm hover:bg-blue-600/30 transition-colors flex items-center"
-            >
-              <FileText className="w-4 h-4 mr-1" />
-              Create Flashcards
-            </button>
-            <button
-              onClick={() => {
-                setIsAIChatOpen(true);
-                setChatMessage("Make a quiz from this content");
-              }}
-              className="px-2 py-1 bg-blue-600/20 text-blue-400 rounded-lg text-sm hover:bg-blue-600/30 transition-colors flex items-center"
-            >
-              <Brain className="w-4 h-4 mr-1" />
-              Generate Quiz
-            </button>
-            <button
-              onClick={() => {
-                setIsAIChatOpen(true);
-                setChatMessage("Summarize the content in this folder");
-              }}
-              className="px-2 py-1 bg-blue-600/20 text-blue-400 rounded-lg text-sm hover:bg-blue-600/30 transition-colors flex items-center"
-            >
-              <Folder className="w-4 h-4 mr-1" />
-              Summarize Folder
-            </button>
+            {studyTipSuggestions.map((tip, index) => (
+              <button
+                key={index}
+                onClick={() => {
+                  setChatMessage(tip);
+                  setIsAIChatOpen(true);
+                }}
+                className={`px-2 py-1 rounded-lg text-xs ${buttonSecondary} hover:bg-opacity-80 backdrop-blur-sm`}
+              >
+                {tip}
+              </button>
+            ))}
           </div>
         </div>
 

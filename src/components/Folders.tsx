@@ -1597,12 +1597,6 @@ Follow these instructions strictly.
     mixed: isIlluminateEnabled ? "text-green-600" : "text-green-400",
   }
 
-  // Enhanced styling classes
-  const cardClassAI = "bg-blue-900/20 border border-blue-800/50";
-  const headingClassAI = "text-blue-400";
-  const subheadingClassAI = "text-blue-300/90";
-  const buttonPrimaryAI = "bg-blue-600 text-white hover:bg-blue-700 transition-colors";
-  const buttonSecondaryAI = "bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 transition-colors";
 
   // Tag colors - generate a consistent color based on tag name
   const getTagColor = (tag: string) => {
@@ -1896,37 +1890,51 @@ return (
         </div>
 
 
-        {/* AI Study Assistant Button - Moved to top */}
-        <div className={`${cardClassAI} rounded-xl p-4 shadow-md backdrop-blur-sm`}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <Bot className="w-5 h-5 mr-2 text-blue-500" />
-              <h2 className={`text-lg font-semibold ${headingClassAI}`}>AI Study Assistant</h2>
-            </div>
-            <button
-              onClick={() => setIsAIChatOpen(!isAIChatOpen)}
-              className={`${buttonPrimaryAI} px-3 py-1.5 rounded-lg text-sm flex items-center space-x-1`}
-            >
-              <MessageSquare className="w-4 h-4" />
-              <span>{isAIChatOpen ? "Close Chat Panel" : "Open Chat Panel"}</span>
-            </button>
-          </div>
-          <p className={`${subheadingClassAI} text-sm mt-2`}>
-            Get help with studying, creating flashcards, or understanding difficult concepts.
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {studyTipSuggestions.map((tip, index) => (
+        {/* AI Study Assistant Button */}
+        <div className={`mb-6 rounded-lg ${isIlluminateEnabled ? "bg-blue-50" : "bg-blue-900/20"} border ${
+          isIlluminateEnabled ? "border-blue-200" : "border-blue-800"
+        }`}>
+          <div className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <Bot className={`w-5 h-5 mr-2 ${isIlluminateEnabled ? "text-blue-600" : "text-blue-500"}`} />
+                <h2 className={`text-lg font-semibold ${isIlluminateEnabled ? "text-blue-700" : "text-blue-400"}`}>
+                  AI Study Assistant
+                </h2>
+              </div>
               <button
-                key={index}
-                onClick={() => {
-                  setChatMessage(tip);
-                  setIsAIChatOpen(true);
-                }}
-                className={`px-2 py-1 rounded-lg text-xs ${buttonSecondaryAI} hover:bg-opacity-80 backdrop-blur-sm`}
+                onClick={() => setIsAIChatOpen(!isAIChatOpen)}
+                className={`px-3 py-1.5 rounded-lg text-sm flex items-center space-x-1 ${
+                  isIlluminateEnabled 
+                    ? "bg-blue-600 text-white hover:bg-blue-700" 
+                    : "bg-blue-600 text-white hover:bg-blue-700"
+                } transition-colors`}
               >
-                {tip}
+                <MessageSquare className="w-4 h-4 mr-1" />
+                <span>{isAIChatOpen ? "Close Chat Panel" : "Open Chat Panel"}</span>
               </button>
-            ))}
+            </div>
+            <p className={`text-sm mt-2 ${isIlluminateEnabled ? "text-blue-700" : "text-blue-300"}`}>
+              Get help with studying, creating flashcards, or understanding difficult concepts.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {studyTipSuggestions.map((tip, index) => (
+                <button
+                  key={index}
+                  onClick={() => {
+                    setChatMessage(tip);
+                    setIsAIChatOpen(true);
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-sm flex items-center ${
+                    isIlluminateEnabled
+                      ? "bg-white/50 text-blue-700 hover:bg-white/80 border border-blue-200"
+                      : "bg-blue-600/20 text-blue-400 hover:bg-blue-600/30"
+                  } transition-colors`}
+                >
+                  {tip}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 

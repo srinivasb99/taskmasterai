@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react"
 import { useNavigate } from "react-router-dom"
 import { 
@@ -3711,24 +3712,24 @@ return (
               <div ref={chatEndRef} />
             </div>
 
-            {/* Study tip suggestions */}
-            {!isChatLoading && selectedFolder && (
-              <div className="px-4 py-2 border-t border-gray-700">
-                <p className={`text-xs mb-2 ${subTextColor}`}>Suggestions:</p>
-                <div className="flex flex-wrap gap-2 max-h-20 overflow-y-auto">
-                  {studyTipSuggestions.map((tip, index) => (
-                    <button
-                      key={index}
-                      onClick={() => setChatMessage(tip)}
-                      className="px-2 py-1 bg-blue-600/20 text-blue-400 rounded-lg text-xs hover:bg-blue-600/30 transition-colors flex items-center"
-                    >
-                      <Lightbulb className="w-3 h-3 mr-1" />
-                      {tip}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
+       {/* Study tip suggestions - Moved higher up */}
+        {!isChatLoading && selectedFolder && (
+          <div className="bg-gray-800/50 rounded-lg p-4 mb-6">
+            <p className={`text-sm mb-3 ${subTextColor}`}>Quick Actions:</p>
+            <div className="flex flex-wrap gap-2">
+              {studyTipSuggestions.map((tip, index) => (
+                <button
+                  key={index}
+                  onClick={() => setChatMessage(tip)}
+                  className="px-3 py-2 bg-blue-600/20 text-blue-400 rounded-lg text-sm hover:bg-blue-600/30 transition-colors flex items-center"
+                >
+                  <Lightbulb className="w-4 h-4 mr-2" />
+                  {tip}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
             {/* Chat Input */}
             <form onSubmit={handleChatSubmit} className="p-4 border-t border-gray-700">

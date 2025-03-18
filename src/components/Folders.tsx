@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react"
 import { useNavigate } from "react-router-dom"
 import { 
@@ -1598,6 +1597,13 @@ Follow these instructions strictly.
     mixed: isIlluminateEnabled ? "text-green-600" : "text-green-400",
   }
 
+  // Enhanced styling classes
+  const cardClassAI = "bg-blue-900/20 border border-blue-800/50";
+  const headingClassAI = "text-blue-400";
+  const subheadingClassAI = "text-blue-300/90";
+  const buttonPrimaryAI = "bg-blue-600 text-white hover:bg-blue-700 transition-colors";
+  const buttonSecondaryAI = "bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 transition-colors";
+
   // Tag colors - generate a consistent color based on tag name
   const getTagColor = (tag: string) => {
     const colors = [
@@ -1891,21 +1897,21 @@ return (
 
 
         {/* AI Study Assistant Button - Moved to top */}
-        <div className={`${cardClass} rounded-xl p-4 shadow-md backdrop-blur-sm`}>
+        <div className={`${cardClassAI} rounded-xl p-4 shadow-md backdrop-blur-sm`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center">
               <Bot className="w-5 h-5 mr-2 text-blue-500" />
-              <h2 className={`text-lg font-semibold ${headingClass}`}>AI Study Assistant</h2>
+              <h2 className={`text-lg font-semibold ${headingClassAI}`}>AI Study Assistant</h2>
             </div>
             <button
               onClick={() => setIsAIChatOpen(!isAIChatOpen)}
-              className={`${buttonPrimary} px-3 py-1.5 rounded-lg text-sm flex items-center space-x-1`}
+              className={`${buttonPrimaryAI} px-3 py-1.5 rounded-lg text-sm flex items-center space-x-1`}
             >
               <MessageSquare className="w-4 h-4" />
               <span>{isAIChatOpen ? "Close Chat Panel" : "Open Chat Panel"}</span>
             </button>
           </div>
-          <p className={`${subheadingClass} text-sm mt-2`}>
+          <p className={`${subheadingClassAI} text-sm mt-2`}>
             Get help with studying, creating flashcards, or understanding difficult concepts.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
@@ -1916,7 +1922,7 @@ return (
                   setChatMessage(tip);
                   setIsAIChatOpen(true);
                 }}
-                className={`px-2 py-1 rounded-lg text-xs ${buttonSecondary} hover:bg-opacity-80 backdrop-blur-sm`}
+                className={`px-2 py-1 rounded-lg text-xs ${buttonSecondaryAI} hover:bg-opacity-80 backdrop-blur-sm`}
               >
                 {tip}
               </button>

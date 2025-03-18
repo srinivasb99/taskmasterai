@@ -334,7 +334,15 @@ export function Folders() {
       console.error("Error fetching tags:", error)
     }
   }
-
+  
+ // Toggle showing answer for a specific item
+  const toggleShowAnswer = (itemId: string) => {
+    setShowAnswers(prev => ({
+      ...prev,
+      [itemId]: !prev[itemId]
+    }))
+  }
+  
   // Fetch tags for a specific folder
   const fetchFolderTags = async (userId: string, folderId: string) => {
     try {

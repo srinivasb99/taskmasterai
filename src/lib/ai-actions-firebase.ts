@@ -19,12 +19,17 @@ function parseDueDate(dateString: string): Date {
  * @param uid The user’s unique ID.
  * @param data An object with at least { task: string, dueDate?: string }.
  */
+// Modified version of createUserTask in ai-actions-firebase.ts
 export async function createUserTask(uid: string, data: any) {
+  // Generate a unique ID for the task that will be used for lookups
+  const taskId = `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  
   await addDoc(collection(db, 'tasks'), {
     task: data.task || 'Untitled Task',
     userId: uid,
     dueDate: data.dueDate ? parseDueDate(data.dueDate) : null,
     createdAt: serverTimestamp(),
+    taskId: taskId // Store this unique ID with the task
   });
 }
 
@@ -34,11 +39,15 @@ export async function createUserTask(uid: string, data: any) {
  * @param data An object with at least { goal: string, dueDate?: string }.
  */
 export async function createUserGoal(uid: string, data: any) {
+
+    const goalId = `goal_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
   await addDoc(collection(db, 'goals'), {
     goal: data.goal || 'Untitled Goal',
     userId: uid,
     dueDate: data.dueDate ? parseDueDate(data.dueDate) : null,
     createdAt: serverTimestamp(),
+    goalId: goalId
   });
 }
 
@@ -48,11 +57,15 @@ export async function createUserGoal(uid: string, data: any) {
  * @param data An object with at least { plan: string, dueDate?: string }.
  */
 export async function createUserPlan(uid: string, data: any) {
+
+    const planId = `plan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
   await addDoc(collection(db, 'plans'), {
     plan: data.plan || 'Untitled Plan',
     userId: uid,
     dueDate: data.dueDate ? parseDueDate(data.dueDate) : null,
     createdAt: serverTimestamp(),
+    planId: planId
   });
 }
 
@@ -62,11 +75,14 @@ export async function createUserPlan(uid: string, data: any) {
  * @param data An object with at least { project: string, dueDate?: string }.
  */
 export async function createUserProject(uid: string, data: any) {
+    const projectId = `project_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
   await addDoc(collection(db, 'projects'), {
     project: data.project || 'Untitled Project',
     userId: uid,
     dueDate: data.dueDate ? parseDueDate(data.dueDate) : null,
     createdAt: serverTimestamp(),
+    projectId: projectId
   });
 }
 

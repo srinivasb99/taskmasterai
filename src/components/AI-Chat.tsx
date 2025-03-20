@@ -1,49 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import {
-  Send,
-  Timer as TimerIcon,
-  Bot,
-  Brain,
-  AlertTriangle,
-  MoreHorizontal,
-  Plus,
-  PlusCircle,
-  MessageSquare,
-  Edit2,
-  Share,
-  Trash2,
-  CheckCircle,
-  Goal,
-  Calendar,
-  Folder,
-  BarChart2,
-  Clock,
-  Bell,
-  TrendingUp,
-  Lightbulb,
-  Target,
-  FileText,
-  Notebook,
-  Wand,
-  ListChecks,
-  SortAsc,
-  Search,
-  Timer,
-  ClipboardList,
-  Sun,
-  Layers,
-  AlignLeft,
-  UserCheck,
-  Hourglass,
-  Settings,
-  Columns,
-  PieChart,
-  Users,
-  CalendarCheck,
-  Eye
-} from 'lucide-react';
+import { Send, TimerIcon, Bot, Brain, AlertTriangle, MoreHorizontal, Plus, PlusCircle, MessageSquare, Edit2, Share, Trash2, CheckCircle, Goal, Calendar, Folder, BarChart2, Clock, Bell, TrendingUp, Lightbulb, Target, FileText, Notebook, Wand, ListChecks, SortAsc, Search, Timer, ClipboardList, Sun, Layers, AlignLeft, UserCheck, Hourglass, Settings, Columns, PieChart, Users, CalendarCheck, Eye } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import remarkGfm from 'remark-gfm';
@@ -64,6 +22,7 @@ import {
   onChatConversationsSnapshot,
   updateChatConversationName,
   deleteChatConversation,
+  findItemByName
 } from '../lib/ai-chat-firebase';
 
 // Context and DeepInsight functions
@@ -747,6 +706,9 @@ Return ONLY the title, with no extra commentary.
           const parsed = JSON.parse(block);
           // Process AI action blocks for creation, update, or deletion.
           if (parsed.action && parsed.payload) {
+            // Add user ID to all payloads for finding items by name
+            parsed.payload.userId = user.uid;
+            
             // Create actions
             if (parsed.action === 'createTask') {
               await createUserTask(user.uid, parsed.payload);
@@ -757,25 +719,112 @@ Return ONLY the title, with no extra commentary.
             } else if (parsed.action === 'createProject') {
               await createUserProject(user.uid, parsed.payload);
             }
-            // Update actions (requires a document ID)
-            else if (parsed.action === 'updateTask' && parsed.payload.id) {
-              await updateUserTask(parsed.payload.id, parsed.payload);
-            } else if (parsed.action === 'updateGoal' && parsed.payload.id) {
-              await updateUserGoal(parsed.payload.id, parsed.payload);
-            } else if (parsed.action === 'updatePlan' && parsed.payload.id) {
-              await updateUserPlan(parsed.payload.id, parsed.payload);
-            } else if (parsed.action === 'updateProject' && parsed.payload.id) {
-              await updateUserProject(parsed.payload.id, parsed.payload);
+            // Update actions
+            else if (parsed.action === 'updateTask') {
+              if (parsed.payload.id) {
+                // If ID is provided, update directly
+                await updateUserTask(parsed.payload.id, parsed.payload);
+              } else if (parsed.payload.task) {
+                // Otherwise find by name
+                const taskId = await findItemByName('tasks', user.uid, parsed.payload.task, 'task');
+                if (taskId) {
+                  // If found, update with the ID
+                  await updateUserTask(taskId, {
+                    ...parsed.payload,
+                    id: taskId
+                  });
+                } else {
+                  console.error('Task not found:', parsed.payload.task);
+                }
+              }
+            } else if (parsed.action === 'updateGoal') {
+              if (parsed.payload.id) {
+                await updateUserGoal(parsed.payload.id, parsed.payload);
+              } else if (parsed.payload.goal) {
+                const goalId = await findItemByName('goals', user.uid, parsed.payload.goal, 'goal');
+                if (goalId) {
+                  await updateUserGoal(goalId, {
+                    ...parsed.payload,
+                    id: goalId
+                  });
+                } else {
+                  console.error('Goal not found:', parsed.payload.goal);
+                }
+              }
+            } else if (parsed.action === 'updatePlan') {
+              if (parsed.payload.id) {
+                await updateUserPlan(parsed.payload.id, parsed.payload);
+              } else if (parsed.payload.plan) {
+                const planId = await findItemByName('plans', user.uid, parsed.payload.plan, 'plan');
+                if (planId) {
+                  await updateUserPlan(planId, {
+                    ...parsed.payload,
+                    id: planId
+                  });
+                } else {
+                  console.error('Plan not found:', parsed.payload.plan);
+                }
+              }
+            } else if (parsed.action === 'updateProject') {
+              if (parsed.payload.id) {
+                await updateUserProject(parsed.payload.id, parsed.payload);
+              } else if (parsed.payload.project) {
+                const projectId = await findItemByName('projects', user.uid, parsed.payload.project, 'project');
+                if (projectId) {
+                  await updateUserProject(projectId, {
+                    ...parsed.payload,
+                    id: projectId
+                  });
+                } else {
+                  console.error('Project not found:', parsed.payload.project);
+                }
+              }
             }
-            // Delete actions (requires a document ID)
-            else if (parsed.action === 'deleteTask' && parsed.payload.id) {
-              await deleteUserTask(parsed.payload.id);
-            } else if (parsed.action === 'deleteGoal' && parsed.payload.id) {
-              await deleteUserGoal(parsed.payload.id);
-            } else if (parsed.action === 'deletePlan' && parsed.payload.id) {
-              await deleteUserPlan(parsed.payload.id);
-            } else if (parsed.action === 'deleteProject' && parsed.payload.id) {
-              await deleteUserProject(parsed.payload.id);
+            // Delete actions
+            else if (parsed.action === 'deleteTask') {
+              if (parsed.payload.id) {
+                await deleteUserTask(parsed.payload.id);
+              } else if (parsed.payload.task) {
+                const taskId = await findItemByName('tasks', user.uid, parsed.payload.task, 'task');
+                if (taskId) {
+                  await deleteUserTask(taskId);
+                } else {
+                  console.error('Task not found for deletion:', parsed.payload.task);
+                }
+              }
+            } else if (parsed.action === 'deleteGoal') {
+              if (parsed.payload.id) {
+                await deleteUserGoal(parsed.payload.id);
+              } else if (parsed.payload.goal) {
+                const goalId = await findItemByName('goals', user.uid, parsed.payload.goal, 'goal');
+                if (goalId) {
+                  await deleteUserGoal(goalId);
+                } else {
+                  console.error('Goal not found for deletion:', parsed.payload.goal);
+                }
+              }
+            } else if (parsed.action === 'deletePlan') {
+              if (parsed.payload.id) {
+                await deleteUserPlan(parsed.payload.id);
+              } else if (parsed.payload.plan) {
+                const planId = await findItemByName('plans', user.uid, parsed.payload.plan, 'plan');
+                if (planId) {
+                  await deleteUserPlan(planId);
+                } else {
+                  console.error('Plan not found for deletion:', parsed.payload.plan);
+                }
+              }
+            } else if (parsed.action === 'deleteProject') {
+              if (parsed.payload.id) {
+                await deleteUserProject(parsed.payload.id);
+              } else if (parsed.payload.project) {
+                const projectId = await findItemByName('projects', user.uid, parsed.payload.project, 'project');
+                if (projectId) {
+                  await deleteUserProject(projectId);
+                } else {
+                  console.error('Project not found for deletion:', parsed.payload.project);
+                }
+              }
             }
           }
           // If this is educational content.

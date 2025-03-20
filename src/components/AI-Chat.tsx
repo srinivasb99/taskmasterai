@@ -571,15 +571,16 @@ Guidelines:
 3. Data Modifications (JSON):
    - When ${userName} provides a command to create, update, or delete an item (e.g., "add a task to buy a dog by tomorrow", "update the task for meeting", "delete the goal about exercise", etc.), you must respond by first stating the action you will do and then create a JSON block that specifies the action and its payload.
    - The JSON block must be wrapped in triple backticks with the "json" language identifier and returned as the only content for that modification.
-   - For example, to update a task:
+   - Use this structure, to update a task:
    \`\`\`json
-   {
-     "action": "updateTask",
-     "payload": {
-       "task": "Updated Task",
-       "dueDate": "2025-03-03"
-     }
-   }
+{
+  "action": "updateTask",
+  "payload": {
+    "task": "Original Task Name",
+    "newTask": "Updated Task Name",
+    "dueDate": "2025-03-03"
+  }
+}
    \`\`\`
    - For deletion:
    \`\`\`json

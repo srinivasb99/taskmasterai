@@ -12,10 +12,24 @@ import {
   onSnapshot,
   query,
   where,
-  orderBy
+  orderBy,
+  getDocs // Added this import
 } from "firebase/firestore";
 import { createDeepInsightAction, updateDeepInsightActionStatus, voteOnDeepInsightAction } from './ai-context-firebase';
-import { createUserTask, createUserGoal, createUserPlan, createUserProject } from './ai-actions-firebase';
+import { 
+  createUserTask, 
+  createUserGoal, 
+  createUserPlan, 
+  createUserProject,
+  updateUserTask,
+  updateUserGoal,
+  updateUserPlan,
+  updateUserProject,
+  deleteUserTask,
+  deleteUserGoal,
+  deleteUserPlan,
+  deleteUserProject
+} from './ai-actions-firebase';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -33,17 +47,17 @@ export interface ChatMessage {
  */
 export async function findItemByName(collectionName: string, userId: string, itemName: string, fieldName: string) {
   try {
-    const itemsRef = collection(db, collectionName)
-    const q = query(itemsRef, where(fieldName, "==", itemName), where("userId", "==", userId))
-    const querySnapshot = await getDocs(q)
+    const itemsRef = collection(db, collectionName);
+    const q = query(itemsRef, where(fieldName, "==", itemName), where("userId", "==", userId));
+    const querySnapshot = await getDocs(q);
 
     if (!querySnapshot.empty) {
-      return querySnapshot.docs[0].id
+      return querySnapshot.docs[0].id;
     }
-    return null
+    return null;
   } catch (error) {
-    console.error(`Error finding ${collectionName} by name:`, error)
-    return null
+    console.error(`Error finding ${collectionName} by name:`, error);
+    return null;
   }
 }
 
@@ -145,8 +159,14 @@ export const processAiActions = async (userId: string, actions: any[]) => {
   for (const action of actions) {
     if (!action.action || !action.payload) continue;
 
+    // Add userId to all payloads for name-based operations
+    if (action.payload) {
+      action.payload.userId = userId;
+    }
+
     try {
       switch (action.action) {
+        // Create operations
         case 'createTask':
           await createUserTask(userId, action.payload);
           break;
@@ -159,6 +179,121 @@ export const processAiActions = async (userId: string, actions: any[]) => {
         case 'createProject':
           await createUserProject(userId, action.payload);
           break;
+
+        // Update operations
+        case 'updateTask':
+          if (action.payload.id) {
+            // If ID is provided, update directly
+            await updateUserTask(action.payload.id, action.payload);
+          } else if (action.payload.task) {
+            // Otherwise find by name
+            const taskId = await findItemByName('tasks', userId, action.payload.task, 'task');
+            if (taskId) {
+              await updateUserTask(taskId, {
+                ...action.payload,
+                id: taskId
+              });
+            } else {
+              console.error('Task not found for update:', action.payload.task);
+            }
+          }
+          break;
+        case 'updateGoal':
+          if (action.payload.id) {
+            await updateUserGoal(action.payload.id, action.payload);
+          } else if (action.payload.goal) {
+            const goalId = await findItemByName('goals', userId, action.payload.goal, 'goal');
+            if (goalId) {
+              await updateUserGoal(goalId, {
+                ...action.payload,
+                id: goalId
+              });
+            } else {
+              console.error('Goal not found for update:', action.payload.goal);
+            }
+          }
+          break;
+        case 'updatePlan':
+          if (action.payload.id) {
+            await updateUserPlan(action.payload.id, action.payload);
+          } else if (action.payload.plan) {
+            const planId = await findItemByName('plans', userId, action.payload.plan, 'plan');
+            if (planId) {
+              await updateUserPlan(planId, {
+                ...action.payload,
+                id: planId
+              });
+            } else {
+              console.error('Plan not found for update:', action.payload.plan);
+            }
+          }
+          break;
+        case 'updateProject':
+          if (action.payload.id) {
+            await updateUserProject(action.payload.id, action.payload);
+          } else if (action.payload.project) {
+            const projectId = await findItemByName('projects', userId, action.payload.project, 'project');
+            if (projectId) {
+              await updateUserProject(projectId, {
+                ...action.payload,
+                id: projectId
+              });
+            } else {
+              console.error('Project not found for update:', action.payload.project);
+            }
+          }
+          break;
+
+        // Delete operations
+        case 'deleteTask':
+          if (action.payload.id) {
+            await deleteUserTask(action.payload.id);
+          } else if (action.payload.task) {
+            const taskId = await findItemByName('tasks', userId, action.payload.task, 'task');
+            if (taskId) {
+              await deleteUserTask(taskId);
+            } else {
+              console.error('Task not found for deletion:', action.payload.task);
+            }
+          }
+          break;
+        case 'deleteGoal':
+          if (action.payload.id) {
+            await deleteUserGoal(action.payload.id);
+          } else if (action.payload.goal) {
+            const goalId = await findItemByName('goals', userId, action.payload.goal, 'goal');
+            if (goalId) {
+              await deleteUserGoal(goalId);
+            } else {
+              console.error('Goal not found for deletion:', action.payload.goal);
+            }
+          }
+          break;
+        case 'deletePlan':
+          if (action.payload.id) {
+            await deleteUserPlan(action.payload.id);
+          } else if (action.payload.plan) {
+            const planId = await findItemByName('plans', userId, action.payload.plan, 'plan');
+            if (planId) {
+              await deleteUserPlan(planId);
+            } else {
+              console.error('Plan not found for deletion:', action.payload.plan);
+            }
+          }
+          break;
+        case 'deleteProject':
+          if (action.payload.id) {
+            await deleteUserProject(action.payload.id);
+          } else if (action.payload.project) {
+            const projectId = await findItemByName('projects', userId, action.payload.project, 'project');
+            if (projectId) {
+              await deleteUserProject(projectId);
+            } else {
+              console.error('Project not found for deletion:', action.payload.project);
+            }
+          }
+          break;
+
         case 'deepInsight':
           await createDeepInsightAction(userId, {
             type: action.payload.type,

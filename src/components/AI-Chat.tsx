@@ -617,7 +617,6 @@ Guidelines:
    {
      "action": "updateTask",
      "payload": {
-       "id": "documentId",
        "task": "Updated Task",
        "dueDate": "2025-03-03"
      }
@@ -628,7 +627,17 @@ Guidelines:
    {
      "action": "deleteTask",
      "payload": {
-       "id": "documentId"
+       "task": "Study Digital Marketing"
+     }
+   }
+   \`\`\`
+   - For creating:
+      \`\`\`json
+   {
+     "action": "createTask",
+     "payload": {
+       "task": "Study Digital Marketing",
+       "dueDate": "2025-03-03"
      }
    }
    \`\`\`

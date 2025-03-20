@@ -151,16 +151,21 @@ export function onCustomTimersSnapshot(
    5. TASKS / GOALS / PROJECTS / PLANS (CRUD + LISTENERS)
    ------------------------------------------------------------------ */
 
+// Modified version of createTask in dashboard-firebase.ts
 export async function createTask(
   userId: string,
   taskText: string,
   dueDate?: Date | null
 ) {
+  // Generate a unique ID for the task
+  const taskId = `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  
   await addDoc(collection(db, 'tasks'), {
     task: taskText,
     userId,
     dueDate: dueDate || null,
     createdAt: serverTimestamp(),
+    taskId: taskId // Store this unique ID with the task
   });
 }
 
@@ -169,11 +174,14 @@ export async function createGoal(
   goalText: string,
   dueDate?: Date | null
 ) {
+
+   const goalId = `goal_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   await addDoc(collection(db, 'goals'), {
     goal: goalText,
     userId,
     dueDate: dueDate || null,
     createdAt: serverTimestamp(),
+    goalId: goalId
   });
 }
 
@@ -182,11 +190,14 @@ export async function createProject(
   projectText: string,
   dueDate?: Date | null
 ) {
+
+   const projectId = `project_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   await addDoc(collection(db, 'projects'), {
     project: projectText,
     userId,
     dueDate: dueDate || null,
     createdAt: serverTimestamp(),
+    projectId: projectId
   });
 }
 
@@ -195,11 +206,14 @@ export async function createPlan(
   planText: string,
   dueDate?: Date | null
 ) {
+
+   const planId = `plan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   await addDoc(collection(db, 'plans'), {
     plan: planText,
     userId,
     dueDate: dueDate || null,
     createdAt: serverTimestamp(),
+   planId: planId
   });
 }
 

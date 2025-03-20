@@ -74,12 +74,20 @@ import {
   type UserContext,
 } from '../lib/ai-context-firebase';
 
-// Firestore item CRUD helpers
+// Firestore item CRUD helpers (now including update and delete functionality)
 import {
   createUserTask,
   createUserGoal,
   createUserPlan,
   createUserProject,
+  updateUserTask,
+  updateUserGoal,
+  updateUserPlan,
+  updateUserProject,
+  deleteUserTask,
+  deleteUserGoal,
+  deleteUserPlan,
+  deleteUserProject,
 } from '../lib/ai-actions-firebase';
 
 import { Sidebar } from './Sidebar';
@@ -361,7 +369,7 @@ export function AIChat() {
   }, [user]);
 
 
-    // Context listener
+  // Context listener
   useEffect(() => {
     if (!user) return;
     const unsubscribe = onUserContextChange(user.uid, (context) => {
@@ -404,7 +412,6 @@ export function AIChat() {
     if (!user) return;
     await saveUserContext(user.uid, context);
   };
-
 
   // ----- Style Handlers -----
   const handleStyleSelect = (style: string, prompt: string) => {
@@ -514,7 +521,7 @@ export function AIChat() {
       styleInstruction = `\n\n${activePrompt}\n`;
     }
 
-   let contextSection = '';
+    let contextSection = '';
     if (userContext) {
       contextSection = `
 User Context:
@@ -603,19 +610,29 @@ Guidelines:
      \`\`\`
 
 3. Data Modifications (JSON):
-   - When ${userName} provides a command to create or update an item (e.g., "add a task to buy a dog by tomorrow", "create a goal to exercise daily", etc.), you must respond by first stating the action you will do and then create a JSON block that specifies the action and its payload.
+   - When ${userName} provides a command to create, update, or delete an item (e.g., "add a task to buy a dog by tomorrow", "update the task for meeting", "delete the goal about exercise", etc.), you must respond by first stating the action you will do and then create a JSON block that specifies the action and its payload.
    - The JSON block must be wrapped in triple backticks with the "json" language identifier and returned as the only content for that modification.
-   - For example:
+   - For example, to update a task:
    \`\`\`json
    {
-     "action": "createTask",
+     "action": "updateTask",
      "payload": {
-       "task": "Study Digital Marketing",
+       "id": "documentId",
+       "task": "Updated Task",
        "dueDate": "2025-03-03"
      }
    }
    \`\`\`
-   - You may return multiple JSON blocks if multiple items are to be created or updated.
+   - For deletion:
+   \`\`\`json
+   {
+     "action": "deleteTask",
+     "payload": {
+       "id": "documentId"
+     }
+   }
+   \`\`\`
+   - You may return multiple JSON blocks if multiple items are to be created, updated, or deleted.
    - Do not include any additional text with the JSON block; it should be the sole output for that command.
 
 4. Response Structure:
@@ -719,8 +736,9 @@ Return ONLY the title, with no extra commentary.
       for (const block of jsonBlocks) {
         try {
           const parsed = JSON.parse(block);
-          // If this is an AI action block.
+          // Process AI action blocks for creation, update, or deletion.
           if (parsed.action && parsed.payload) {
+            // Create actions
             if (parsed.action === 'createTask') {
               await createUserTask(user.uid, parsed.payload);
             } else if (parsed.action === 'createGoal') {
@@ -729,6 +747,26 @@ Return ONLY the title, with no extra commentary.
               await createUserPlan(user.uid, parsed.payload);
             } else if (parsed.action === 'createProject') {
               await createUserProject(user.uid, parsed.payload);
+            }
+            // Update actions (requires a document ID)
+            else if (parsed.action === 'updateTask' && parsed.payload.id) {
+              await updateUserTask(parsed.payload.id, parsed.payload);
+            } else if (parsed.action === 'updateGoal' && parsed.payload.id) {
+              await updateUserGoal(parsed.payload.id, parsed.payload);
+            } else if (parsed.action === 'updatePlan' && parsed.payload.id) {
+              await updateUserPlan(parsed.payload.id, parsed.payload);
+            } else if (parsed.action === 'updateProject' && parsed.payload.id) {
+              await updateUserProject(parsed.payload.id, parsed.payload);
+            }
+            // Delete actions (requires a document ID)
+            else if (parsed.action === 'deleteTask' && parsed.payload.id) {
+              await deleteUserTask(parsed.payload.id);
+            } else if (parsed.action === 'deleteGoal' && parsed.payload.id) {
+              await deleteUserGoal(parsed.payload.id);
+            } else if (parsed.action === 'deletePlan' && parsed.payload.id) {
+              await deleteUserPlan(parsed.payload.id);
+            } else if (parsed.action === 'deleteProject' && parsed.payload.id) {
+              await deleteUserProject(parsed.payload.id);
             }
           }
           // If this is educational content.

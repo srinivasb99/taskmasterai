@@ -23,6 +23,29 @@ export interface ChatMessage {
   createdAt?: any;
 }
 
+/**
+ * Find an item by name in a specific collection
+ * @param collectionName The name of the collection to search in
+ * @param userId The user's ID
+ * @param itemName The name of the item to find
+ * @param fieldName The field name to match against (e.g., 'task', 'goal')
+ * @returns The document ID if found, null otherwise
+ */
+export async function findItemByName(collectionName: string, userId: string, itemName: string, fieldName: string) {
+  try {
+    const itemsRef = collection(db, collectionName)
+    const q = query(itemsRef, where(fieldName, "==", itemName), where("userId", "==", userId))
+    const querySnapshot = await getDocs(q)
+
+    if (!querySnapshot.empty) {
+      return querySnapshot.docs[0].id
+    }
+    return null
+  } catch (error) {
+    console.error(`Error finding ${collectionName} by name:`, error)
+    return null
+  }
+}
 
 // Create a new chat conversation for the user
 export async function createChatConversation(userId: string, chatName: string): Promise<string> {

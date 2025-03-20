@@ -47,13 +47,43 @@ export interface ChatMessage {
  */
 export async function findItemByName(collectionName: string, userId: string, itemName: string, fieldName: string) {
   try {
+    console.log(`Searching for ${fieldName}: "${itemName}" in ${collectionName} for user ${userId}`);
+    
+    // First try: look for the item by its unique ID field
+    const idFieldName = fieldName + 'Id'; // e.g., "taskId", "goalId"
     const itemsRef = collection(db, collectionName);
-    const q = query(itemsRef, where(fieldName, "==", itemName), where("userId", "==", userId));
-    const querySnapshot = await getDocs(q);
-
-    if (!querySnapshot.empty) {
-      return querySnapshot.docs[0].id;
+    
+    // Try to find by unique ID first (if the itemName looks like an ID)
+    if (itemName.startsWith(`${fieldName}_`)) {
+      const idQuery = query(
+        itemsRef, 
+        where(idFieldName, "==", itemName), 
+        where("userId", "==", userId)
+      );
+      
+      let querySnapshot = await getDocs(idQuery);
+      if (!querySnapshot.empty) {
+        const docId = querySnapshot.docs[0].id;
+        console.log(`Found by ${idFieldName}: ${docId}`);
+        return docId;
+      }
     }
+    
+    // If not found by ID, try by name
+    const nameQuery = query(
+      itemsRef, 
+      where(fieldName, "==", itemName), 
+      where("userId", "==", userId)
+    );
+    
+    let querySnapshot = await getDocs(nameQuery);
+    if (!querySnapshot.empty) {
+      const docId = querySnapshot.docs[0].id;
+      console.log(`Found by name: ${docId}`);
+      return docId;
+    }
+    
+    console.log(`No matching ${fieldName} found with name: "${itemName}"`);
     return null;
   } catch (error) {
     console.error(`Error finding ${collectionName} by name:`, error);

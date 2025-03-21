@@ -1808,6 +1808,5 @@ return (
       </div>
     </main>
   </div>
-);
-
+)
 

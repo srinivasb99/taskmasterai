@@ -1087,7 +1087,6 @@ Keep it brief, actionable, impersonal, and readable.
           {/* Calendar Card */}
           <div className={`${theme.card} rounded-md border ${theme.border} p-2 min-w-[100px] w-full max-w-full md:max-w-[450px] h-[70px] flex-shrink-0 lg:flex-shrink shadow-sm`}>
             <div className="grid grid-cols-9 gap-1 h-full flex-shrink-0 lg:flex-shrink shadow-sm">
-            <div className="grid grid-cols-9 gap-1 h-full">
               <button
                 onClick={() => {
                   const prevWeek = new Date(currentWeek[0]);

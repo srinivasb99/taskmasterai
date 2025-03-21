@@ -1,17 +1,38 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useBlackoutMode } from '../hooks/useBlackoutMode';
-import { useIlluminateMode } from '../hooks/useIlluminateMode';
-import { PlusCircle, Edit, Trash, Sparkles, CheckCircle, MessageCircle, RotateCcw, Square, X, TimerIcon, Send, ChevronLeft, ChevronRight, Moon, Sun, Star, Wind, Droplets, Zap, Calendar, Clock, MoreHorizontal, ArrowUpRight, Bookmark, BookOpen, Lightbulb, Flame, Award, TrendingUp, Rocket, Target, Layers, Clipboard, AlertCircle, ThumbsUp, ThumbsDown, BrainCircuit, ArrowRight, Flag, Bell, Filter, Tag, BarChart, PieChart } from 'lucide-react';
-import { Sidebar } from './Sidebar';
-import { Timer } from './Timer';
-import { FlashcardsQuestions } from './FlashcardsQuestions';
-import { getTimeBasedGreeting, getRandomQuote } from '../lib/greetings';
-import ReactMarkdown from 'react-markdown';
-import remarkMath from 'remark-math';
-import remarkGfm from 'remark-gfm';
-import rehypeKatex from 'rehype-katex';
-import 'katex/dist/katex.min.css';
+"use client"
+
+import type React from "react"
+import { useEffect, useState, useRef } from "react"
+import { useNavigate } from "react-router-dom"
+import {
+  PlusIcon,
+  Pencil,
+  Trash2,
+  Sparkles,
+  Check,
+  MessageSquare,
+  X,
+  Send,
+  ChevronLeft,
+  ChevronRight,
+  Calendar,
+  Clock,
+  Lightbulb,
+  TrendingUp,
+  Rocket,
+  Target,
+  Layers,
+  ClipboardList,
+  AlertCircle,
+  BarChart,
+  PieChart,
+} from "lucide-react"
+import { Sidebar } from "./Sidebar"
+import { getTimeBasedGreeting, getRandomQuote } from "../lib/greetings"
+import ReactMarkdown from "react-markdown"
+import remarkMath from "remark-math"
+import remarkGfm from "remark-gfm"
+import rehypeKatex from "rehype-katex"
+import "katex/dist/katex.min.css"
 import {
   onFirebaseAuthStateChanged,
   onCollectionSnapshot,
@@ -20,75 +41,69 @@ import {
   createProject,
   updateDashboardLastSeen,
   createPlan,
-  addCustomTimer,
-  onCustomTimersSnapshot,
   updateItem,
   deleteItem,
   markItemComplete,
-  updateCustomTimer,
-  deleteCustomTimer,
-  weatherApiKey,
-  hfApiKey,
   geminiApiKey,
-} from '../lib/dashboard-firebase';
-import { auth } from '../lib/firebase'
-import { User, onAuthStateChanged } from 'firebase/auth'
-import { updateUserProfile, signOutUser, deleteUserAccount, AuthError, getCurrentUser } from '../lib/settings-firebase';
-import { SmartInsight } from './SmartInsight';
-import { PriorityBadge } from './PriorityBadge';
-import { TaskAnalytics } from './TaskAnalytics';
+} from "../lib/dashboard-firebase"
+import { db } from "../lib/firebase"
+import type { User } from "firebase/auth"
+import { getCurrentUser } from "../lib/settings-firebase"
+import { PriorityBadge } from "./PriorityBadge"
+import { TaskAnalytics } from "./TaskAnalytics"
+import { getDoc, doc } from "firebase/firestore"
 
 // ---------------------
 // Helper functions for Gemini integration
 // ---------------------
-const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`;
+const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`
 
 const fetchWithTimeout = async (url: string, options: RequestInit, timeout = 30000) => {
-  const controller = new AbortController();
-  const { signal } = controller;
-  const timeoutId = setTimeout(() => controller.abort(), timeout);
+  const controller = new AbortController()
+  const { signal } = controller
+  const timeoutId = setTimeout(() => controller.abort(), timeout)
   try {
-    const response = await fetch(url, { ...options, signal });
-    clearTimeout(timeoutId);
-    return response;
+    const response = await fetch(url, { ...options, signal })
+    clearTimeout(timeoutId)
+    return response
   } catch (error) {
-    clearTimeout(timeoutId);
-    throw error;
+    clearTimeout(timeoutId)
+    throw error
   }
-};
+}
 
 const streamResponse = async (
   url: string,
   options: RequestInit,
   onStreamUpdate: (textChunk: string) => void,
-  timeout = 30000
+  timeout = 30000,
 ) => {
-  const response = await fetchWithTimeout(url, options, timeout);
+  const response = await fetchWithTimeout(url, options, timeout)
   if (!response.body) {
-    const text = await response.text();
-    onStreamUpdate(text);
-    return text;
+    const text = await response.text()
+    onStreamUpdate(text)
+    return text
   }
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder("utf-8");
-  let done = false;
-  let accumulatedText = "";
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder("utf-8")
+  let done = false
+  let accumulatedText = ""
   while (!done) {
-    const { value, done: doneReading } = await reader.read();
-    done = doneReading;
+    const { value, done: doneReading } = await reader.read()
+    done = doneReading
     if (value) {
-      const chunk = decoder.decode(value, { stream: !done });
-      accumulatedText += chunk;
-      onStreamUpdate(accumulatedText);
+      const chunk = decoder.decode(value, { stream: !done })
+      accumulatedText += chunk
+      onStreamUpdate(accumulatedText)
     }
   }
-  return accumulatedText;
-};
+  return accumulatedText
+}
 
 const extractCandidateText = (text: string): string => {
-  let candidateText = text;
+  let candidateText = text
   try {
-    const jsonResponse = JSON.parse(text);
+    const jsonResponse = JSON.parse(text)
     if (
       jsonResponse &&
       jsonResponse.candidates &&
@@ -97,61 +112,50 @@ const extractCandidateText = (text: string): string => {
       jsonResponse.candidates[0].content.parts &&
       jsonResponse.candidates[0].content.parts[0]
     ) {
-      candidateText = jsonResponse.candidates[0].content.parts[0].text;
+      candidateText = jsonResponse.candidates[0].content.parts[0].text
     }
   } catch (err) {
-    console.error("Error parsing Gemini response:", err);
+    console.error("Error parsing Gemini response:", err)
   }
-  return candidateText;
-};
+  return candidateText
+}
 
 // ---------------------
 // Helper functions
 // ---------------------
 const getWeekDates = (date: Date): Date[] => {
-  const sunday = new Date(date);
-  sunday.setDate(date.getDate() - date.getDay());
-  
-  const weekDates: Date[] = [];
+  const sunday = new Date(date)
+  sunday.setDate(date.getDate() - date.getDay())
+
+  const weekDates: Date[] = []
   for (let i = 0; i < 7; i++) {
-    const day = new Date(sunday);
-    day.setDate(sunday.getDate() + i);
-    weekDates.push(day);
+    const day = new Date(sunday)
+    day.setDate(sunday.getDate() + i)
+    weekDates.push(day)
   }
-  return weekDates;
-};
+  return weekDates
+}
 
 const formatDateForComparison = (date: Date): string => {
-  return date.toISOString().split('T')[0];
-};
+  return date.toISOString().split("T")[0]
+}
 
 // Calculate priority based on due date and other factors
-const calculatePriority = (item: any): 'high' | 'medium' | 'low' => {
-  if (!item.data.dueDate) return 'low';
-  
-  const dueDate = item.data.dueDate.toDate ? item.data.dueDate.toDate() : new Date(item.data.dueDate);
-  const now = new Date();
-  const diffTime = dueDate.getTime() - now.getTime();
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  
-  // Check if item has a priority field already
-  if (item.data.priority) return item.data.priority;
-  
-  // Calculate based on due date
-  if (diffDays <= 1) return 'high';
-  if (diffDays <= 3) return 'medium';
-  return 'low';
-};
+const calculatePriority = (item: any): "high" | "medium" | "low" => {
+  if (!item.data.dueDate) return "low"
 
-// Interface for Smart Insights
-interface SmartInsight {
-  id: string;
-  text: string;
-  type: 'suggestion' | 'warning' | 'achievement';
-  accepted?: boolean;
-  rejected?: boolean;
-  relatedItemId?: string;
-  createdAt: Date;
+  const dueDate = item.data.dueDate.toDate ? item.data.dueDate.toDate() : new Date(item.data.dueDate)
+  const now = new Date()
+  const diffTime = dueDate.getTime() - now.getTime()
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+
+  // Check if item has a priority field already
+  if (item.data.priority) return item.data.priority
+
+  // Calculate based on due date
+  if (diffDays <= 1) return "high"
+  if (diffDays <= 3) return "medium"
+  return "low"
 }
 
 export function Dashboard() {
@@ -182,15 +186,16 @@ export function Dashboard() {
     return stored ? JSON.parse(stored) : false;
   });
 
-   // Illuminate (light mode) state
+  // Illuminate (light mode) state
   const [isIlluminateEnabled, setIsIlluminateEnabled] = useState(() => {
     const stored = localStorage.getItem('isIlluminateEnabled');
-    return stored ? JSON.parse(stored) : false;
+    return stored ? JSON.parse(stored) : true; // Default to light mode for professional look
   });
+
   // Sidebar Illuminate option state
   const [isSidebarIlluminateEnabled, setIsSidebarIlluminateEnabled] = useState(() => {
     const stored = localStorage.getItem('isSidebarIlluminateEnabled');
-    return stored ? JSON.parse(stored) : false;
+    return stored ? JSON.parse(stored) : true; // Default to light mode for professional look
   });
 
   // Update localStorage whenever the state changes
@@ -209,7 +214,7 @@ export function Dashboard() {
     localStorage.setItem('isSidebarBlackoutEnabled', JSON.stringify(isSidebarBlackoutEnabled));
   }, [isSidebarBlackoutEnabled]);
 
-   // Update localStorage and document.body for Illuminate mode
+  // Update localStorage and document.body for Illuminate mode
   useEffect(() => {
     localStorage.setItem('isIlluminateEnabled', JSON.stringify(isIlluminateEnabled));
     if (isIlluminateEnabled) {
@@ -239,18 +244,11 @@ export function Dashboard() {
   const handleToggleSidebar = () => {
     setIsSidebarCollapsed((prev) => !prev);
   };
-  
+
   const [currentWeek, setCurrentWeek] = useState<Date[]>(getWeekDates(new Date()));
   const today = new Date();
 
   // ---------------------
-  // Types for timer messages
-  interface TimerMessage {
-    type: 'timer';
-    duration: number;
-    id: string;
-  }
-
   // Types for flashcard and question messages
   interface FlashcardData {
     id: string;
@@ -280,7 +278,6 @@ export function Dashboard() {
   interface ChatMessage {
     role: 'user' | 'assistant';
     content: string;
-    timer?: TimerMessage;
     flashcard?: FlashcardMessage;
     question?: QuestionMessage;
   }
@@ -293,42 +290,11 @@ export function Dashboard() {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([
     {
       role: 'assistant',
-      content: "👋 Hi I'm TaskMaster, How can I help you today? Need help with your items? Simply ask me!"
+      content: "Hi, I'm TaskMaster. How can I help you today? Need help with your items? Simply ask me."
     }
   ]);
   const [isChatLoading, setIsChatLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
-
-  // Timer handling functions
-  const handleTimerComplete = (timerId: string) => {
-    setChatHistory(prev => [
-      ...prev,
-      {
-        role: 'assistant',
-        content: "⏰ Time's up! Your timer has finished."
-      }
-    ]);
-  };
-
-  const parseTimerRequest = (message: string): number | null => {
-    const timeRegex = /(\d+)\s*(minutes?|mins?|hours?|hrs?|seconds?|secs?)/i;
-    const match = message.match(timeRegex);
-    
-    if (!match) return null;
-    
-    const amount = parseInt(match[1]);
-    const unit = match[2].toLowerCase();
-    
-    if (unit.startsWith('hour') || unit.startsWith('hr')) {
-      return amount * 3600;
-    } else if (unit.startsWith('min')) {
-      return amount * 60;
-    } else if (unit.startsWith('sec')) {
-      return amount;
-    }
-    
-    return null;
-  };
 
   // Whenever chatHistory changes, scroll to the bottom of the chat
   useEffect(() => {
@@ -341,7 +307,8 @@ export function Dashboard() {
   const formatItemsForChat = () => {
     const lines: string[] = [];
 
-    lines.push(`${userName}'s items:\n`);
+    lines.push(`${userName}'s items:
+`);
 
     tasks.forEach((t) => {
       const due = t.data.dueDate?.toDate?.();
@@ -388,8 +355,6 @@ export function Dashboard() {
     e.preventDefault();
     if (!chatMessage.trim()) return;
 
-    // Check for timer request
-    const timerDuration = parseTimerRequest(chatMessage);
     const userMsg: ChatMessage = { 
       role: 'user',
       content: chatMessage
@@ -397,24 +362,6 @@ export function Dashboard() {
     
     setChatHistory(prev => [...prev, userMsg]);
     setChatMessage('');
-
-    // If it's a timer request, add timer immediately
-    if (timerDuration) {
-      const timerId = Math.random().toString(36).substr(2, 9);
-      setChatHistory(prev => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: `Starting a timer for ${timerDuration} seconds.`,
-          timer: {
-            type: 'timer',
-            duration: timerDuration,
-            id: timerId
-          }
-        }
-      ]);
-      return;
-    }
 
     // Regular chat processing
     const conversation = chatHistory
@@ -456,68 +403,68 @@ You are TaskMaster, a friendly and versatile AI productivity assistant. Engage i
 Guidelines:
 
 1. General Conversation:
-   - Respond in a friendly, natural tone matching ${userName}'s style.
-   - Do not include any internal instructions, meta commentary, or explanations of your process.
-   - Do not include phrases such as "Here's my response to continue the conversation:"
-     or similar wording that introduces your reply.
-   - Do not include or reference code blocks for languages like Python, Bash, or any other
-     unless explicitly requested by ${userName}.
-   - Only reference ${userName}'s items if ${userName} explicitly asks about them.
-   - When discussing tasks, goals, projects, or plans, consider their priority levels and due dates.
-   - Provide specific advice based on item priorities and completion status.
+ - Respond in a friendly, natural tone matching ${userName}'s style.
+ - Do not include any internal instructions, meta commentary, or explanations of your process.
+ - Do not include phrases such as "Here's my response to continue the conversation:"
+   or similar wording that introduces your reply.
+ - Do not include or reference code blocks for languages like Python, Bash, or any other
+   unless explicitly requested by ${userName}.
+ - Only reference ${userName}'s items if ${userName} explicitly asks about them.
+ - When discussing tasks, goals, projects, or plans, consider their priority levels and due dates.
+ - Provide specific advice based on item priorities and completion status.
 
 2. Educational Content (JSON):
-   - If ${userName} explicitly requests educational content (flashcards or quiz questions), provide exactly one JSON object.
-   - Wrap the JSON object in a single code block using triple backticks and the "json" language identifier.
-   - Use one of the following formats:
+ - If ${userName} explicitly requests educational content (flashcards or quiz questions), provide exactly one JSON object.
+ - Wrap the JSON object in a single code block using triple backticks and the "json" language identifier.
+ - Use one of the following formats:
 
-     For flashcards:
-     {
-       "type": "flashcard",
-       "data": [
-         {
-           "id": "unique-id-1",
-           "question": "Question 1",
-           "answer": "Answer 1",
-           "topic": "Subject area"
-         },
-         {
-           "id": "unique-id-2",
-           "question": "Question 2",
-           "answer": "Answer 2",
-           "topic": "Subject area"
-         }
-       ]
-     }
+   For flashcards:
+   {
+     "type": "flashcard",
+     "data": [
+       {
+         "id": "unique-id-1",
+         "question": "Question 1",
+         "answer": "Answer 1",
+         "topic": "Subject area"
+       },
+       {
+         "id": "unique-id-2",
+         "question": "Question 2",
+         "answer": "Answer 2",
+         "topic": "Subject area"
+       }
+     ]
+   }
 
-     For quiz questions:
-     {
-       "type": "question",
-       "data": [
-         {
-           "id": "unique-id-1",
-           "question": "Question 1",
-           "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
-           "correctAnswer": 0,
-           "explanation": "Explanation 1"
-         },
-         {
-           "id": "unique-id-2",
-           "question": "Question 2",
-           "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
-           "correctAnswer": 1,
-           "explanation": "Explanation 2"
-         }
-       ]
-     }
+   For quiz questions:
+   {
+     "type": "question",
+     "data": [
+       {
+         "id": "unique-id-1",
+         "question": "Question 1",
+         "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
+         "correctAnswer": 0,
+         "explanation": "Explanation 1"
+       },
+       {
+         "id": "unique-id-2",
+         "question": "Question 2",
+         "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
+         "correctAnswer": 1,
+         "explanation": "Explanation 2"
+       }
+     ]
+   }
 
-   - Do not include any JSON unless ${userName} explicitly requests it.
-   - The JSON must be valid, complete, and include multiple items in its "data" array.
+ - Do not include any JSON unless ${userName} explicitly requests it.
+ - The JSON must be valid, complete, and include multiple items in its "data" array.
 
 3. Response Structure:
-   - Provide a direct response to ${userName} without any extraneous openings or meta-text.
-   - Do not mix JSON with regular text. JSON is only for requested educational content.
-   - Always address ${userName} in a friendly, helpful tone.
+ - Provide a direct response to ${userName} without any extraneous openings or meta-text.
+ - Do not mix JSON with regular text. JSON is only for requested educational content.
+ - Always address ${userName} in a friendly, helpful tone.
 
 Follow these instructions strictly.
 `;
@@ -604,30 +551,11 @@ Follow these instructions strictly.
   const [goals, setGoals] = useState<Array<{ id: string; data: any }>>([]);
   const [projects, setProjects] = useState<Array<{ id: string; data: any }>>([]);
   const [plans, setPlans] = useState<Array<{ id: string; data: any }>>([]);
-  const [customTimers, setCustomTimers] = useState<Array<{ id: string; data: any }>>([]);
-  
-  // New state for smart insights
-  const [smartInsights, setSmartInsights] = useState<SmartInsight[]>([]);
-  const [showInsightsPanel, setShowInsightsPanel] = useState(false);
 
   const handleMarkComplete = async (itemId: string) => {
     if (!user) return;
     try {
       await markItemComplete(activeTab, itemId);
-      
-      // Generate a completion insight
-      const item = currentItems.find(item => item.id === itemId);
-      if (item) {
-        const itemName = item.data[titleField] || 'Untitled';
-        const newInsight: SmartInsight = {
-          id: Math.random().toString(36).substr(2, 9),
-          text: `Great job completing "${itemName}"! Would you like to create a follow-up task?`,
-          type: 'achievement',
-          relatedItemId: itemId,
-          createdAt: new Date()
-        };
-        setSmartInsights(prev => [newInsight, ...prev]);
-      }
     } catch (error) {
       console.error("Error marking item as complete:", error);
     }
@@ -641,11 +569,6 @@ Follow these instructions strictly.
       console.error("Error updating priority:", error);
     }
   };
-
-  // ---------------------
-  // 3. WEATHER STATE
-  // ---------------------
-  const [weatherData, setWeatherData] = useState<any>(null);
 
   // ---------------------
   // 4. GREETING UPDATE
@@ -672,67 +595,12 @@ Follow these instructions strictly.
   const [editingDate, setEditingDate] = useState("");
   const [editingPriority, setEditingPriority] = useState<'high' | 'medium' | 'low'>('medium');
   const [cardVisible, setCardVisible] = useState(false);
-  const [editingTimerId, setEditingTimerId] = useState<string | null>(null);
-  const [editingTimerName, setEditingTimerName] = useState("");
-  const [editingTimerMinutes, setEditingTimerMinutes] = useState("");
   const [showAnalytics, setShowAnalytics] = useState(false);
 
   // Effect for card animation on mount
   useEffect(() => {
     setCardVisible(true);
   }, []);
-
-  // ---------------------
-  // 6. MAIN POMODORO TIMER (LOCAL)
-  // ---------------------
-  const [pomodoroTimeLeft, setPomodoroTimeLeft] = useState(25 * 60);
-  const [pomodoroRunning, setPomodoroRunning] = useState(false);
-  const pomodoroRef = useRef<NodeJS.Timer | null>(null);
-  const pomodoroAudioRef = useRef<HTMLAudioElement | null>(null);
-
-  const handlePomodoroStart = () => {
-    if (pomodoroRunning) return;
-    setPomodoroRunning(true);
-    pomodoroRef.current = setInterval(() => {
-      setPomodoroTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(pomodoroRef.current as NodeJS.Timer);
-          setPomodoroRunning(false);
-          // Play the alarm sound (if not already playing)
-          if (!pomodoroAudioRef.current) {
-            const alarmAudio = new Audio('https://firebasestorage.googleapis.com/v0/b/deepworkai-c3419.appspot.com/o/ios-17-ringtone-tilt-gg8jzmiv_pUhS32fz.mp3?alt=media&token=a0a522e0-8a49-408a-9dfe-17e41d3bc801');
-            alarmAudio.loop = true;
-            alarmAudio.play();
-            pomodoroAudioRef.current = alarmAudio;
-          }
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  };
-
-  const handlePomodoroPause = () => {
-    setPomodoroRunning(false);
-    if (pomodoroRef.current) clearInterval(pomodoroRef.current);
-  };
-
-  const handlePomodoroReset = () => {
-    setPomodoroRunning(false);
-    if (pomodoroRef.current) clearInterval(pomodoroRef.current);
-    setPomodoroTimeLeft(25 * 60);
-    if (pomodoroAudioRef.current) {
-      pomodoroAudioRef.current.pause();
-      pomodoroAudioRef.current.currentTime = 0;
-      pomodoroAudioRef.current = null;
-    }
-  };
-
-  const formatPomodoroTime = (timeInSeconds: number) => {
-    const mins = Math.floor(timeInSeconds / 60);
-    const secs = timeInSeconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
 
   // ---------------------
   // 7. AUTH LISTENER
@@ -774,46 +642,12 @@ Follow these instructions strictly.
     const unsubGoals = onCollectionSnapshot('goals', user.uid, (items) => setGoals(items));
     const unsubProjects = onCollectionSnapshot('projects', user.uid, (items) => setProjects(items));
     const unsubPlans = onCollectionSnapshot('plans', user.uid, (items) => setPlans(items));
-    const unsubTimers = onCustomTimersSnapshot(user.uid, (timers) => {
-      setCustomTimers(timers);
-    });
     return () => {
       unsubTasks();
       unsubGoals();
       unsubProjects();
       unsubPlans();
-      unsubTimers();
     };
-  }, [user]);
-
-  // ---------------------
-  // 9. WEATHER FETCH (using 3-day forecast)
-  // ---------------------
-  useEffect(() => {
-    if (!user) {
-      setWeatherData(null);
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude } = position.coords;
-        try {
-          const response = await fetch(
-            `https://api.weatherapi.com/v1/forecast.json?key=${weatherApiKey}&q=${latitude},${longitude}&days=3`
-          );
-          if (!response.ok) throw new Error("Weather fetch failed");
-          const data = await response.json();
-          setWeatherData(data);
-        } catch (error) {
-          console.error("Failed to fetch weather:", error);
-          setWeatherData(null);
-        }
-      },
-      (error) => {
-        console.error("Geolocation error:", error);
-        setWeatherData(null);
-      }
-    );
   }, [user]);
 
   // ---------------------
@@ -823,79 +657,6 @@ Follow these instructions strictly.
   const [overviewLoading, setOverviewLoading] = useState(false);
   const [lastGeneratedData, setLastGeneratedData] = useState<string>("");
   const [lastResponse, setLastResponse] = useState<string>("");
-
-  // Generate AI insights based on tasks, goals, projects, and plans
-  useEffect(() => {
-    if (!user || tasks.length === 0) return;
-    
-    // Check for overdue items
-    const now = new Date();
-    const overdueItems = [...tasks, ...goals, ...projects, ...plans].filter(item => {
-      if (!item.data.dueDate || item.data.completed) return false;
-      const dueDate = item.data.dueDate.toDate ? item.data.dueDate.toDate() : new Date(item.data.dueDate);
-      return dueDate < now;
-    });
-    
-    // Generate insights for overdue items
-    overdueItems.forEach(item => {
-      const itemType = item.data.task ? 'task' : item.data.goal ? 'goal' : item.data.project ? 'project' : 'plan';
-      const itemName = item.data[itemType] || 'Untitled';
-      
-      // Check if we already have an insight for this item
-      const existingInsight = smartInsights.find(insight => 
-        insight.relatedItemId === item.id && 
-        insight.type === 'warning' &&
-        !insight.accepted && 
-        !insight.rejected
-      );
-      
-      if (!existingInsight) {
-        const newInsight: SmartInsight = {
-          id: Math.random().toString(36).substr(2, 9),
-          text: `"${itemName}" is overdue. Would you like to reschedule or mark as complete?`,
-          type: 'warning',
-          relatedItemId: item.id,
-          createdAt: new Date()
-        };
-        setSmartInsights(prev => [newInsight, ...prev]);
-      }
-    });
-    
-    // Check for upcoming deadlines
-    const upcomingItems = [...tasks, ...goals, ...projects, ...plans].filter(item => {
-      if (!item.data.dueDate || item.data.completed) return false;
-      const dueDate = item.data.dueDate.toDate ? item.data.dueDate.toDate() : new Date(item.data.dueDate);
-      const diffTime = dueDate.getTime() - now.getTime();
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      return diffDays <= 2 && diffDays > 0;
-    });
-    
-    // Generate insights for upcoming deadlines
-    upcomingItems.forEach(item => {
-      const itemType = item.data.task ? 'task' : item.data.goal ? 'goal' : item.data.project ? 'project' : 'plan';
-      const itemName = item.data[itemType] || 'Untitled';
-      
-      // Check if we already have an insight for this item
-      const existingInsight = smartInsights.find(insight => 
-        insight.relatedItemId === item.id && 
-        insight.type === 'suggestion' &&
-        !insight.accepted && 
-        !insight.rejected
-      );
-      
-      if (!existingInsight) {
-        const newInsight: SmartInsight = {
-          id: Math.random().toString(36).substr(2, 9),
-          text: `"${itemName}" is due soon. Would you like to set a reminder?`,
-          type: 'suggestion',
-          relatedItemId: item.id,
-          createdAt: new Date()
-        };
-        setSmartInsights(prev => [newInsight, ...prev]);
-      }
-    });
-    
-  }, [user, tasks, goals, projects, plans]);
 
   useEffect(() => {
     if (!user) return;
@@ -921,8 +682,8 @@ Follow these instructions strictly.
       // If there are no items, show the empty state message
       if (!allItems.length) {
         setSmartOverview(`
-          <div class="text-gray-400 font-large">
-            Add some items to get started with your Smart Overview!
+          <div class="text-neutral-500 font-medium">
+            Add some items to get started with your Smart Overview.
           </div>
         `);
         return;
@@ -952,11 +713,11 @@ Follow these guidelines exactly:
 2. Summarize the focus of the items briefly (1 sentence, no labels like "items" or "to-do list")
 3. Include EXACTLY 3 actionable priorities based ONLY on the data provided
 4. For each priority:
-   - Reference specific tasks from the data naturally
-   - Format due dates as "Month Day" (e.g., "March 7th") if present
-   - Consider priority levels (high, medium, low) when suggesting what to focus on
-   - Suggest ONE clear, actionable next step
-   - Blend seamlessly into the paragraph
+ - Reference specific tasks from the data naturally
+ - Format due dates as "Month Day" (e.g., "March 7th") if present
+ - Consider priority levels (high, medium, low) when suggesting what to focus on
+ - Suggest ONE clear, actionable next step
+ - Blend seamlessly into the paragraph
 5. Focus on practical execution, not description
 
 FORBIDDEN IN YOUR FINAL RESPONSE:
@@ -1021,7 +782,7 @@ Keep it brief, actionable, impersonal, and readable.
             .replace(/\b(TASKS?|GOALS?|PROJECTS?|PLANS?)\b:/gi, '')
             .replace(/\n\s*\n/g, '\n');
 
-          let lines = cleanedText
+          const lines = cleanedText
             .split('\n')
             .map(line => line.trim())
             .filter(line => line.length > 0 && !/^[^a-zA-Z0-9]+$/.test(line));
@@ -1086,14 +847,15 @@ Keep it brief, actionable, impersonal, and readable.
           .split('\n')
           .filter(line => line.length > 0);
 
+        // Use more subtle styling for the professional look
         const formattedHtml = cleanTextLines
           .map((line, index) => {
             if (index === 0) {
-              return `<div class="${headlineColor} text-lg font-medium mb-4">${line}</div>`;
+              return `<div class="text-neutral-800 text-base font-medium mb-3">${line}</div>`;
             } else if (line.match(/^\d+\./)) {
-              return `<div class="${bulletTextColor} mb-3 pl-4 border-l-2 ${bulletBorderColor}">${line}</div>`;
+              return `<div class="text-neutral-700 mb-2 pl-3 border-l border-neutral-300">${line}</div>`;
             } else {
-              return `<div class="${defaultTextColor} mb-3">${line}</div>`;
+              return `<div class="text-neutral-600 mb-2">${line}</div>`;
             }
           })
           .join('');
@@ -1103,7 +865,7 @@ Keep it brief, actionable, impersonal, and readable.
       } catch (error) {
         console.error("Overview generation error:", error);
         setSmartOverview(`
-          <div class="text-red-400">Error generating overview. Please try again.</div>
+          <div class="text-neutral-500">Error generating overview. Please try again.</div>
         `);
       } finally {
         setOverviewLoading(false);
@@ -1146,16 +908,6 @@ Keep it brief, actionable, impersonal, and readable.
       }
       setNewItemText("");
       setNewItemDate("");
-      
-      // Generate a new item insight
-      const newInsight: SmartInsight = {
-        id: Math.random().toString(36).substr(2, 9),
-        text: `New ${activeTab.slice(0, -1)} created! Would you like to break it down into smaller steps?`,
-        type: 'suggestion',
-        createdAt: new Date()
-      };
-      setSmartInsights(prev => [newInsight, ...prev]);
-      
     } catch (error) {
       console.error("Error creating item:", error);
     }
@@ -1163,7 +915,7 @@ Keep it brief, actionable, impersonal, and readable.
 
   let currentItems: Array<{ id: string; data: any }> = [];
   let titleField = "";
-  let collectionName = activeTab;
+  const collectionName = activeTab;
   if (activeTab === "tasks") {
     currentItems = tasks;
     titleField = "task";
@@ -1234,155 +986,6 @@ Keep it brief, actionable, impersonal, and readable.
   };
 
   // ---------------------
-  // 12. CUSTOM TIMERS
-  // ---------------------
-  const [runningTimers, setRunningTimers] = useState<{
-    [id: string]: {
-      isRunning: boolean;
-      timeLeft: number;
-      intervalRef: NodeJS.Timer | null;
-      audio?: HTMLAudioElement | null;
-    };
-  }>({});
-
-  const handleAddCustomTimer = async () => {
-    if (!user) return;
-    try {
-      await addCustomTimer("My Custom Timer", 25 * 60, user.uid);
-    } catch (error) {
-      console.error("Error adding custom timer:", error);
-    }
-  };
-
-  useEffect(() => {
-    setRunningTimers((prev) => {
-      const nextState = { ...prev };
-      customTimers.forEach((timer) => {
-        if (!nextState[timer.id]) {
-          nextState[timer.id] = {
-            isRunning: false,
-            timeLeft: timer.data.time,
-            intervalRef: null,
-          };
-        }
-      });
-      Object.keys(nextState).forEach((id) => {
-        if (!customTimers.some((t) => t.id === id)) {
-          delete nextState[id];
-        }
-      });
-      return nextState;
-    });
-  }, [customTimers]);
-
-  const formatCustomTime = (timeInSeconds: number) => {
-    const hours = Math.floor(timeInSeconds / 3600);
-    const remainder = timeInSeconds % 3600;
-    const mins = Math.floor(remainder / 60);
-    const secs = remainder % 60;
-    return `${hours.toString().padStart(2, "0")}:${mins
-      .toString()
-      .padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
-  };
-
-  const startCustomTimer = (timerId: string) => {
-    setRunningTimers((prev) => {
-      const timerState = { ...prev[timerId] };
-      if (timerState.isRunning) return prev;
-      timerState.isRunning = true;
-      const intervalId = setInterval(() => {
-        setRunningTimers((old) => {
-          const copy = { ...old };
-          const tState = { ...copy[timerId] };
-          if (tState.timeLeft <= 1) {
-            clearInterval(tState.intervalRef as NodeJS.Timer);
-            tState.isRunning = false;
-            tState.timeLeft = 0;
-            // Only play the alarm if it's not already playing
-            if (!tState.audio) {
-              const alarmAudio = new Audio('https://firebasestorage.googleapis.com/v0/b/deepworkai-c3419.appspot.com/o/ios-17-ringtone-tilt-gg8jzmiv_pUhS32fz.mp3?alt=media&token=a0a522e0-8a49-408a-9dfe-17e41d3bc801');
-              alarmAudio.loop = true;
-              alarmAudio.play();
-              tState.audio = alarmAudio;
-            }
-          } else {
-            tState.timeLeft -= 1;
-          }
-          copy[timerId] = tState;
-          return copy;
-        });
-      }, 1000);
-      timerState.intervalRef = intervalId as unknown as NodeJS.Timer;
-      return { ...prev, [timerId]: timerState };
-    });
-  };
-
-  const pauseCustomTimer = (timerId: string) => {
-    setRunningTimers((prev) => {
-      const timerState = { ...prev[timerId] };
-      if (timerState.intervalRef) clearInterval(timerState.intervalRef);
-      timerState.isRunning = false;
-      timerState.intervalRef = null;
-      // Optionally pause the alarm if it's playing (if you wish to pause after finishing)
-      if (timerState.audio) {
-        timerState.audio.pause();
-      }
-      return { ...prev, [timerId]: timerState };
-    });
-  };
-
-  const resetCustomTimer = (timerId: string, defaultTime?: number) => {
-    setRunningTimers((prev) => {
-      const timerState = { ...prev[timerId] };
-      if (timerState.intervalRef) clearInterval(timerState.intervalRef);
-      timerState.isRunning = false;
-      timerState.timeLeft =
-        defaultTime ?? (customTimers.find((t) => t.id === timerId)?.data.time || 25 * 60);
-      timerState.intervalRef = null;
-      // Stop and reset the alarm sound if it's playing
-      if (timerState.audio) {
-        timerState.audio.pause();
-        timerState.audio.currentTime = 0;
-        timerState.audio = null;
-      }
-      return { ...prev, [timerId]: timerState };
-    });
-  };
-
-  const handleEditTimerClick = (timerId: string, currentName: string, currentTime: number) => {
-    setEditingTimerId(timerId);
-    setEditingTimerName(currentName);
-    setEditingTimerMinutes(String(Math.floor(currentTime / 60)));
-  };
-
-  const handleEditTimerSave = async (timerId: string) => {
-    if (!editingTimerName.trim()) return;
-    
-    const minutes = parseInt(editingTimerMinutes, 10);
-    if (isNaN(minutes) || minutes <= 0) return;
-
-    try {
-      await updateCustomTimer(timerId, editingTimerName, minutes * 60);
-      resetCustomTimer(timerId, minutes * 60);
-      setEditingTimerId(null);
-      setEditingTimerName("");
-      setEditingTimerMinutes("");
-    } catch (error) {
-      console.error("Error updating timer:", error);
-    }
-  };
-
-  const handleDeleteTimer = async (timerId: string) => {
-    const confirmDel = window.confirm("Are you sure you want to delete this timer?");
-    if (!confirmDel) return;
-    try {
-      await deleteCustomTimer(timerId);
-    } catch (error) {
-      console.error("Error deleting custom timer:", error);
-    }
-  };
-
-  // ---------------------
   // 13. PROGRESS BARS
   // ---------------------
   const totalTasks = tasks.length;
@@ -1401,83 +1004,61 @@ Keep it brief, actionable, impersonal, and readable.
   const completedPlans = plans.filter((pl) => pl.data.completed).length;
   const plansProgress = totalPlans > 0 ? (completedPlans / totalPlans) * 100 : 0;
 
-  // Smart Insights handlers
-  const handleAcceptInsight = (insightId: string) => {
-    setSmartInsights(prev => 
-      prev.map(insight => 
-        insight.id === insightId 
-          ? { ...insight, accepted: true, rejected: false } 
-          : insight
-      )
-    );
-    
-    // Find the insight
-    const insight = smartInsights.find(i => i.id === insightId);
-    if (insight && insight.relatedItemId) {
-      // If it's a warning about an overdue item, open the edit dialog
-      if (insight.type === 'warning') {
-        const item = [...tasks, ...goals, ...projects, ...plans].find(i => i.id === insight.relatedItemId);
-        if (item) {
-          const itemType = item.data.task ? 'task' : item.data.goal ? 'goal' : item.data.project ? 'project' : 'plan';
-          const itemName = item.data[itemType] || 'Untitled';
-          handleEditClick(item.id, itemName, item.data.dueDate);
-        }
-      }
+  // Define theme colors - using more neutral, Notion-like colors
+  const themeColors = {
+    // Light mode colors (default)
+    light: {
+      background: 'bg-white',
+      card: 'bg-white',
+      text: {
+        primary: 'text-neutral-900',
+        secondary: 'text-neutral-600',
+        muted: 'text-neutral-500',
+      },
+      border: 'border-neutral-200',
+      accent: {
+        primary: 'bg-neutral-900 text-white',
+        secondary: 'bg-neutral-100 text-neutral-800',
+        success: 'bg-emerald-50 text-emerald-700',
+        warning: 'bg-amber-50 text-amber-700',
+        danger: 'bg-red-50 text-red-700',
+      },
+      hover: {
+        primary: 'hover:bg-neutral-800',
+        secondary: 'hover:bg-neutral-200',
+      },
+      input: 'bg-white border-neutral-300 focus:border-neutral-500 focus:ring-neutral-500',
+    },
+    // Dark mode colors
+    dark: {
+      background: 'bg-neutral-900',
+      card: 'bg-neutral-800',
+      text: {
+        primary: 'text-neutral-100',
+        secondary: 'text-neutral-300',
+        muted: 'text-neutral-400',
+      },
+      border: 'border-neutral-700',
+      accent: {
+        primary: 'bg-neutral-100 text-neutral-900',
+        secondary: 'bg-neutral-700 text-neutral-200',
+        success: 'bg-emerald-900/20 text-emerald-300',
+        warning: 'bg-amber-900/20 text-amber-300',
+        danger: 'bg-red-900/20 text-red-300',
+      },
+      hover: {
+        primary: 'hover:bg-neutral-200',
+        secondary: 'hover:bg-neutral-600',
+      },
+      input: 'bg-neutral-700 border-neutral-600 focus:border-neutral-500 focus:ring-neutral-500',
     }
   };
 
-  const handleRejectInsight = (insightId: string) => {
-    setSmartInsights(prev => 
-      prev.map(insight => 
-        insight.id === insightId 
-          ? { ...insight, accepted: false, rejected: true } 
-          : insight
-      )
-    );
-  };
-
-  // Define conditional color classes based on the isIlluminateEnabled flag
-  const headlineColor = isIlluminateEnabled ? "text-green-700" : "text-green-400"
-  const bulletTextColor = isIlluminateEnabled ? "text-blue-700" : "text-blue-300"
-  const bulletBorderColor = isIlluminateEnabled ? "border-blue-700" : "border-blue-500"
-  const defaultTextColor = isIlluminateEnabled ? "text-gray-700" : "text-gray-300"
-  const illuminateHighlightToday = "bg-blue-200 text-blue-800 font-bold"
-  const illuminateHighlightDeadline = "bg-red-200 hover:bg-red-300"
-  const illuminateHoverGray = "hover:bg-gray-200"
-  const illuminateTextBlue = "text-blue-700"
-  const illuminateTextPurple = "text-purple-700"
-  const illuminateTextGreen = "text-green-700"
-  const illuminateTextPink = "text-pink-700"
-  const illuminateTextYellow = "text-yellow-700"
-
-  // Define breakpoint for mobile/desktop switch - using md (768px) instead of sm (640px)
-  // This makes mobile mode activate on bigger devices and split screens
-  const mobileBreakpoint = "lg" // ADDED: Variable to control all breakpoints consistently
-
-  // Original dynamic classes
-  const containerClass = isIlluminateEnabled
-    ? "bg-white text-gray-900"
-    : isBlackoutEnabled
-      ? "bg-gray-950 text-white"
-      : "bg-gray-900 text-white"
-
-  const cardClass = isIlluminateEnabled ? "bg-gray-100 text-gray-900" : "bg-gray-800 text-gray-300"
-
-  const headingClass = isIlluminateEnabled ? "text-gray-900" : "text-white"
-  // Darken subheading a bit so it's easier to see on white
-  const subheadingClass = isIlluminateEnabled ? "text-gray-700" : "text-gray-400"
-
-  // Lighten input background but keep enough contrast
-  const inputBg = isIlluminateEnabled ? "bg-gray-200" : "bg-gray-700"
-
-  const bgColor = isIlluminateEnabled
-    ? "bg-white text-gray-900"
-    : isBlackoutEnabled
-      ? "bg-gray-950 text-white"
-      : "bg-gray-900 text-white"
+  // Get current theme based on mode
+  const theme = isIlluminateEnabled ? themeColors.light : themeColors.dark;
 
   return (
-    <div className={`${containerClass} min-h-screen w-full overflow-x-hidden`}>
+    <div className={`${theme.background} min-h-screen w-full`}>
       {/* Pass collapse state & toggle handler to Sidebar */}
       <Sidebar
         userName={userName}
@@ -1490,38 +1071,22 @@ Keep it brief, actionable, impersonal, and readable.
       <main
         className={`transition-all duration-300 ease-in-out min-h-screen
           ${isSidebarCollapsed ? 'ml-16 md:ml-16' : 'ml-0 md:ml-64'} 
-          p-4 md:p-6 lg:p-8 overflow-x-hidden`} 
+          p-4 md:p-8 ${theme.text.primary}`} 
       >
-        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-4">
-          <header className="dashboard-header w-full lg:w-auto"> 
-            <h1
-              className={`text-2xl md:text-3xl font-bold mb-1 ${headingClass} break-words`} 
-            >
-              {React.cloneElement(greeting.icon, {
-                className: 'w-5 h-5 md:w-6 md:h-6 inline-block align-middle mr-2 -translate-y-0.5 ' + 
-                (greeting.icon.props.className ?? ''),
-              })}
-              {greeting.greeting},{' '}
-            <span className="font-bold">
-              {userName ? userName.split(' ')[0] : 'Loading...'}
-            </span>
+        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-6">
+          <header className="w-full lg:w-auto"> 
+            <h1 className="text-2xl font-medium mb-1 flex items-center">
+              <span className="mr-2">{greeting.greeting},</span>
+              <span className="font-semibold">{userName ? userName.split(' ')[0] : 'Loading...'}</span>
             </h1>
-            <p className={`italic text-sm md:text-base ${subheadingClass}`}>
-              "{quote.text}" -{' '}
-              <span
-                className={
-                  isIlluminateEnabled ? illuminateTextPurple : 'text-purple-400'
-                }
-              >
-                {quote.author}
-              </span>
+            <p className={`text-sm italic ${theme.text.secondary}`}>
+              "{quote.text}" - <span className="text-neutral-500 dark:text-neutral-400">{quote.author}</span>
             </p>
           </header>
 
           {/* Calendar Card */}
-          <div
-            className={`${cardClass} rounded-lg p-2 min-w-[100px] w-full max-w-full md:max-w-[450px] h-[70px] flex-shrink-0 lg:flex-shrink shadow-sm`} 
-          >
+          <div className={`${theme.card} rounded-md border ${theme.border} p-2 min-w-[100px] w-full max-w-full md:max-w-[450px] h-[70px] flex-shrink-0 lg:flex-shrink shadow-sm`}>
+            <div className="grid grid-cols-9 gap-1 h-full flex-shrink-0 lg:flex-shrink shadow-sm">
             <div className="grid grid-cols-9 gap-1 h-full">
               <button
                 onClick={() => {
@@ -1529,7 +1094,7 @@ Keep it brief, actionable, impersonal, and readable.
                   prevWeek.setDate(prevWeek.getDate() - 7);
                   setCurrentWeek(getWeekDates(prevWeek));
                 }}
-                className="w-6 sm:w-8 h-full flex items-center justify-center text-gray-400 hover:text-white transition-colors hover:bg-gray-700/30 rounded-lg"
+                className={`w-6 h-full flex items-center justify-center ${theme.text.muted} hover:${theme.text.secondary} transition-colors rounded-md`}
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
@@ -1537,11 +1102,11 @@ Keep it brief, actionable, impersonal, and readable.
               <div className="col-span-7">
                 <div className="grid grid-cols-7 gap-1 h-full">
                   <div className="col-span-7 grid grid-cols-7 gap-1">
-                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(
+                    {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(
                       (day) => (
                         <div
                           key={day}
-                          className={`text-center text-[8px] md:text-[10px] font-medium ${subheadingClass}`}
+                          className={`text-center text-[10px] font-medium ${theme.text.muted}`}
                         >
                           {day}
                         </div>
@@ -1550,83 +1115,35 @@ Keep it brief, actionable, impersonal, and readable.
                   </div>
 
                   {currentWeek.map((date, index) => {
-                    // Merge items with a 'type' label
-                    const tasksWithType = tasks.map((t) => ({
-                      ...t,
-                      type: 'Task',
-                    }));
-                    const goalsWithType = goals.map((g) => ({
-                      ...g,
-                      type: 'Goal',
-                    }));
-                    const projectsWithType = projects.map((p) => ({
-                      ...p,
-                      type: 'Project',
-                    }));
-                    const plansWithType = plans.map((p) => ({
-                      ...p,
-                      type: 'Plan',
-                    }));
-
-                    const allItems = [
-                      ...tasksWithType,
-                      ...goalsWithType,
-                      ...projectsWithType,
-                      ...plansWithType,
-                    ];
-
-                    const hasDeadline =
-                      allItems?.some((item) => {
-                        if (!item?.data?.dueDate) return false;
-
-                        let itemDate;
-                        try {
-                          itemDate =
-                            typeof item.data.dueDate.toDate === 'function'
-                              ? item.data.dueDate.toDate()
-                              : new Date(item.data.dueDate);
-                          itemDate.setHours(0, 0, 0, 0);
-                          const compareDate = new Date(date);
-                          compareDate.setHours(0, 0, 0, 0);
-                          return itemDate.getTime() === compareDate.getTime();
-                        } catch (e) {
-                          console.error('Error parsing date:', e);
-                          return false;
-                        }
-                      }) || false;
-
-                    const isToday =
-                      formatDateForComparison(date) ===
-                      formatDateForComparison(today);
-
-                    // Use conditional classes for better readability in Illuminate
-                    const todayClass = isIlluminateEnabled
-                      ? illuminateHighlightToday
-                      : 'bg-blue-500/20 text-blue-300 font-bold';
-
-                    const deadlineClass = isIlluminateEnabled
-                      ? illuminateHighlightDeadline
-                      : 'bg-red-500/10 hover:bg-red-500/20';
-
-                    const defaultHover = isIlluminateEnabled
-                      ? illuminateHoverGray
-                      : 'hover:bg-gray-700/50';
+                    const isToday = formatDateForComparison(date) === formatDateForComparison(today);
+                    
+                    // Check if any items have deadlines on this date
+                    const hasDeadline = [...tasks, ...goals, ...projects, ...plans].some(item => {
+                      if (!item?.data?.dueDate) return false;
+                      try {
+                        const itemDate = item.data.dueDate.toDate ? item.data.dueDate.toDate() : new Date(item.data.dueDate);
+                        itemDate.setHours(0, 0, 0, 0);
+                        const compareDate = new Date(date);
+                        compareDate.setHours(0, 0, 0, 0);
+                        return itemDate.getTime() === compareDate.getTime();
+                      } catch (e) {
+                        return false;
+                      }
+                    });
 
                     return (
                       <div
                         key={index}
-                        className={`relative w-full h-6 text-center rounded-lg transition-all duration-200 cursor-pointer flex items-center justify-center
-                          ${
-                            isToday
-                              ? todayClass
-                              : subheadingClass + ' ' + defaultHover
-                          }
-                          ${hasDeadline ? deadlineClass : ''}
+                        className={`relative w-full h-6 text-center rounded-md transition-all duration-200 cursor-pointer flex items-center justify-center
+                          ${isToday 
+                            ? 'bg-neutral-100 text-neutral-800 font-medium dark:bg-neutral-700 dark:text-neutral-200' 
+                            : `${theme.text.secondary} hover:bg-neutral-100 dark:hover:bg-neutral-800`}
+                          ${hasDeadline ? 'ring-1 ring-neutral-400' : ''}
                         `}
                       >
                         <span className="text-xs">{date.getDate()}</span>
                         {hasDeadline && (
-                          <div className="absolute bottom-0.5 left-1/2 transform -translate-x-1/2 w-1 h-1 rounded-full bg-red-400"></div>
+                          <div className="absolute bottom-0.5 left-1/2 transform -translate-x-1/2 w-1 h-1 rounded-full bg-neutral-500"></div>
                         )}
                       </div>
                     );
@@ -1640,7 +1157,7 @@ Keep it brief, actionable, impersonal, and readable.
                   nextWeek.setDate(nextWeek.getDate() + 7);
                   setCurrentWeek(getWeekDates(nextWeek));
                 }}
-                className="w-8 h-full flex items-center justify-center text-gray-400 hover:text-white transition-colors hover:bg-gray-700/30 rounded-lg"
+                className={`w-6 h-full flex items-center justify-center ${theme.text.muted} hover:${theme.text.secondary} transition-colors rounded-md`}
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
@@ -1648,156 +1165,40 @@ Keep it brief, actionable, impersonal, and readable.
           </div>
         </div>
 
-        {/* Smart Insights Panel */}
-        {smartInsights.filter(insight => !insight.accepted && !insight.rejected).length > 0 && (
-          <div 
-            className={`${cardClass} rounded-lg p-4 mb-4 shadow-sm relative overflow-hidden`}
-          >
-            <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-purple-500/5 pointer-events-none"></div>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className={`text-lg font-semibold flex items-center ${isIlluminateEnabled ? illuminateTextBlue : 'text-blue-300'}`}>
-                <BrainCircuit className="w-5 h-5 mr-2" />
-                AI Insights
-                <span className="ml-2 text-xs bg-gradient-to-r from-pink-500 to-purple-500 text-white px-2 py-0.5 rounded-full">
-                  {smartInsights.filter(insight => !insight.accepted && !insight.rejected).length}
-                </span>
-              </h2>
-              <button 
-                onClick={() => setShowInsightsPanel(!showInsightsPanel)}
-                className={`p-1.5 rounded-full transition-colors ${
-                  isIlluminateEnabled 
-                    ? 'hover:bg-gray-200 text-gray-700' 
-                    : 'hover:bg-gray-700 text-gray-300'
-                }`}
+        <div className={`${theme.card} rounded-md border ${theme.border} p-6 relative min-h-[150px] shadow-sm transition-all duration-300 ${
+          cardVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
+        }`}>
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+            <h2 className="text-lg font-medium flex items-center text-neutral-800 dark:text-neutral-200">
+              <Sparkles className="w-5 h-5 mr-2 text-neutral-500" />
+              Overview
+              <button
+                onClick={() => setIsChatModalOpen(true)}
+                className={`ml-2 p-1.5 rounded-md transition-colors ${theme.text.secondary} hover:${theme.text.primary} hover:bg-neutral-100 dark:hover:bg-neutral-800`}
+                title="Chat with TaskMaster"
               >
-                {showInsightsPanel ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
+                <MessageSquare className="w-4 h-4" />
               </button>
-            </div>
-            
-            <div className={`space-y-3 transition-all duration-300 ${showInsightsPanel ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0 overflow-hidden'}`}>
-              {smartInsights
-                .filter(insight => !insight.accepted && !insight.rejected)
-                .map((insight, index) => (
-                  <div 
-                    key={insight.id}
-                    className={`p-3 rounded-lg flex items-center justify-between gap-3 ${
-                      insight.type === 'warning' 
-                        ? isIlluminateEnabled ? 'bg-red-100' : 'bg-red-900/20' 
-                        : insight.type === 'suggestion'
-                          ? isIlluminateEnabled ? 'bg-blue-100' : 'bg-blue-900/20'
-                          : isIlluminateEnabled ? 'bg-green-100' : 'bg-green-900/20'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      {insight.type === 'warning' && <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />}
-                      {insight.type === 'suggestion' && <Lightbulb className="w-5 h-5 text-blue-500 flex-shrink-0" />}
-                      {insight.type === 'achievement' && <Award className="w-5 h-5 text-green-500 flex-shrink-0" />}
-                      <p className="text-sm">{insight.text}</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <button 
-                        onClick={() => handleAcceptInsight(insight.id)}
-                        className="p-1.5 rounded-full bg-green-500 text-white hover:bg-green-600 transition-colors"
-                        title="Accept"
-                      >
-                        <ThumbsUp className="w-4 h-4" />
-                      </button>
-                      <button 
-                        onClick={() => handleRejectInsight(insight.id)}
-                        className="p-1.5 rounded-full bg-red-500 text-white hover:bg-red-600 transition-colors"
-                        title="Reject"
-                      >
-                        <ThumbsDown className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-            </div>
-            
-            {!showInsightsPanel && (
-              <div className="flex flex-wrap gap-2">
-                {smartInsights
-                  .filter(insight => !insight.accepted && !insight.rejected)
-                  .slice(0, 3)
-                  .map((insight) => (
-                    <div 
-                      key={insight.id}
-                      className={`px-3 py-1.5 rounded-full text-xs flex items-center gap-1 ${
-                        insight.type === 'warning' 
-                          ? isIlluminateEnabled ? 'bg-red-100 text-red-700' : 'bg-red-900/20 text-red-400' 
-                          : insight.type === 'suggestion'
-                            ? isIlluminateEnabled ? 'bg-blue-100 text-blue-700' : 'bg-blue-900/20 text-blue-400'
-                            : isIlluminateEnabled ? 'bg-green-100 text-green-700' : 'bg-green-900/20 text-green-400'
-                      }`}
-                    >
-                      {insight.type === 'warning' && <AlertCircle className="w-3 h-3 flex-shrink-0" />}
-                      {insight.type === 'suggestion' && <Lightbulb className="w-3 h-3 flex-shrink-0" />}
-                      {insight.type === 'achievement' && <Award className="w-3 h-3 flex-shrink-0" />}
-                      <span className="truncate max-w-[200px]">{insight.text}</span>
-                    </div>
-                  ))}
-                {smartInsights.filter(insight => !insight.accepted && !insight.rejected).length > 3 && (
-                  <button 
-                    onClick={() => setShowInsightsPanel(true)}
-                    className={`px-3 py-1.5 rounded-full text-xs ${
-                      isIlluminateEnabled ? 'bg-gray-200 text-gray-700' : 'bg-gray-700 text-gray-300'
-                    } hover:opacity-80 transition-opacity`}
-                  >
-                    +{smartInsights.filter(insight => !insight.accepted && !insight.rejected).length - 3} more
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        <div
-          className={`${cardClass} rounded-lg p-4 relative min-h-[180px] transition-all duration-300 shadow-sm ${
-            cardVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
-          }`}
-        >
-          <div className="flex flex-wrap items-center gap-2 mb-3">
-            <h2
-              className={`text-lg font-semibold mr-2 flex items-center ${
-                isIlluminateEnabled ? illuminateTextBlue : 'text-blue-300'
-              }`}
-            >
-              <Sparkles
-                className="w-5 h-5 mr-2 text-yellow-400"
-                style={{ color: isIlluminateEnabled ? '#D97706' : '' }}
-              />
-              Smart Overview
             </h2>
-            <button
-              onClick={() => setIsChatModalOpen(true)}
-              className={`p-1.5 ${
-                isIlluminateEnabled
-                  ? 'text-blue-700 hover:text-blue-800 hover:bg-blue-200'
-                  : 'text-blue-300 hover:text-blue-400 hover:bg-blue-500/10'
-              } rounded-full transition-colors duration-200`}
-              title="Chat with TaskMaster"
-            >
-              <MessageCircle className="w-5 h-5" />
-            </button>
-            <span className="text-xs bg-gradient-to-r from-pink-500 to-purple-500 text-white px-2 py-0.5 rounded-full font-medium">
-              BETA
+            <span className="text-xs bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300 px-2 py-0.5 rounded-full font-medium">
+              AI-POWERED
             </span>
           </div>
 
           {overviewLoading ? (
             <div className="space-y-3">
-              <div className="h-4 rounded-full w-3/4 animate-pulse bg-gray-700"></div>
-              <div className="h-4 rounded-full w-2/3 animate-pulse bg-gray-700 delay-75"></div>
-              <div className="h-4 rounded-full w-4/5 animate-pulse bg-gray-700 delay-150"></div>
+              <div className="h-4 rounded-full w-3/4 animate-pulse bg-neutral-200 dark:bg-neutral-700"></div>
+              <div className="h-4 rounded-full w-2/3 animate-pulse bg-neutral-200 dark:bg-neutral-700 delay-75"></div>
+              <div className="h-4 rounded-full w-4/5 animate-pulse bg-neutral-200 dark:bg-neutral-700 delay-150"></div>
             </div>
           ) : (
             <>
               <div
-                className="text-sm prose prose-invert"
+                className="text-sm prose prose-neutral dark:prose-invert max-w-none"
                 dangerouslySetInnerHTML={{ __html: smartOverview }}
               />
-              <div className="mt-3 text-left text-xs text-gray-400">
-                TaskMaster can make mistakes. Verify details.
+              <div className="mt-3 text-left text-xs text-neutral-500 dark:text-neutral-400">
+                AI-generated content may contain inaccuracies.
               </div>
             </>
           )}
@@ -1806,67 +1207,35 @@ Keep it brief, actionable, impersonal, and readable.
         {/* Chat History Modal */}
         {isChatModalOpen && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div
-              className={`${
-                isIlluminateEnabled ? 'bg-white text-gray-900' : 'bg-gray-800'
-              } rounded-lg w-full max-w-2xl max-h-[80vh] flex flex-col shadow-xl`}
-            >
-              <div
-                className={`p-3 border-b ${
-                  isIlluminateEnabled
-                    ? 'border-gray-200'
-                    : 'border-gray-700 text-gray-100'
-                } flex justify-between items-center`}
-              >
-                <h3
-                  className={`text-base font-semibold flex items-center flex-wrap ${
-                    isIlluminateEnabled ? 'text-blue-700' : 'text-blue-300'
-                  }`}
-                >
-                  <MessageCircle className="w-5 h-5 mr-2" />
+            <div className={`${theme.card} rounded-md border ${theme.border} w-full max-w-2xl max-h-[80vh] flex flex-col shadow-md`}>
+              <div className={`p-3 border-b ${theme.border} flex justify-between items-center`}>
+                <h3 className="text-base font-medium flex items-center flex-wrap text-neutral-800 dark:text-neutral-200">
+                  <MessageSquare className="w-5 h-5 mr-2" />
                   Chat with TaskMaster
-                  <span className="ml-2 text-xs bg-gradient-to-r from-pink-500 to-purple-500 text-gray-300 px-2 py-0.5 rounded-full">
-                    BETA
-                  </span>
-                  <span className="ml-2 text-xs bg-blue text-gray-300 px-2 py-0.5 rounded-full">
-                    Chat history is not saved.
+                  <span className="ml-2 text-xs bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300 px-2 py-0.5 rounded-full">
+                    AI-POWERED
                   </span>
                 </h3>
                 <button
                   onClick={() => setIsChatModalOpen(false)}
-                  className={`${
-                    isIlluminateEnabled
-                      ? 'text-gray-600 hover:text-gray-900'
-                      : 'text-gray-400 hover:text-gray-200'
-                  } transition-colors`}
+                  className={`${theme.text.secondary} hover:${theme.text.primary} transition-colors`}
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
-              <div
-                className={`flex-1 overflow-y-auto p-4 space-y-4 ${
-                  isIlluminateEnabled ? 'bg-white' : ''
-                }`}
-                ref={chatEndRef}
-              >
+              <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={chatEndRef}>
                 {chatHistory.map((message, index) => (
                   <div
                     key={index}
-                    className={`flex ${
-                      message.role === 'user' ? 'justify-end' : 'justify-start'
-                    }`}
+                    className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                   >
                     <div
-                      className={`max-w-[80%] rounded-lg px-4 py-2 ${
+                      className={`max-w-[80%] rounded-md px-4 py-2 ${
                         message.role === 'user'
-                          ? isIlluminateEnabled
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-blue-600 text-white'
-                          : isIlluminateEnabled
-                          ? 'bg-gray-200 text-gray-900'
-                          : 'bg-gray-700 text-gray-200'
-                      } shadow-md`}
+                          ? 'bg-neutral-800 text-white dark:bg-neutral-700'
+                          : `${theme.card} border ${theme.border}`
+                      } shadow-sm`}
                     >
                       <ReactMarkdown
                         remarkPlugins={[remarkMath, remarkGfm]}
@@ -1882,11 +1251,11 @@ Keep it brief, actionable, impersonal, and readable.
                           li: ({ children }) => <li className="mb-1">{children}</li>,
                           code: ({ inline, children }) =>
                             inline ? (
-                              <code className="bg-gray-800 px-1 rounded">
+                              <code className="bg-neutral-100 dark:bg-neutral-800 px-1 rounded">
                                 {children}
                               </code>
                             ) : (
-                              <pre className="bg-gray-800 p-2 rounded-lg overflow-x-auto">
+                              <pre className="bg-neutral-100 dark:bg-neutral-800 p-2 rounded-md overflow-x-auto">
                                 <code>{children}</code>
                               </pre>
                             ),
@@ -1894,79 +1263,35 @@ Keep it brief, actionable, impersonal, and readable.
                       >
                         {message.content}
                       </ReactMarkdown>
-                      {message.timer && (
-                        <div className="mt-2">
-                          <div
-                            className={`flex items-center space-x-2 ${
-                              isIlluminateEnabled
-                                ? 'bg-gray-300'
-                                : 'bg-gray-900'
-                            } rounded-lg px-4 py-2`}
-                          >
-                            <TimerIcon
-                              className={`w-5 h-5 ${
-                                isIlluminateEnabled ? 'text-blue-600' : 'text-blue-400'
-                              }`}
-                            />
-                            <Timer
-                              key={message.timer.id}
-                              initialDuration={message.timer.duration}
-                              onComplete={() => handleTimerComplete(message.timer.id)}
-                            />
-                          </div>
-                        </div>
-                      )}
-                      {message.flashcard && (
-                        <div className="mt-2">
-                          <FlashcardsQuestions
-                            type="flashcard"
-                            data={message.flashcard.data}
-                            onComplete={() => {}}
-                          />
-                        </div>
-                      )}
-                      {message.question && (
-                        <div className="mt-2">
-                          <FlashcardsQuestions
-                            type="question"
-                            data={message.question.data}
-                            onComplete={() => {}}
-                          />
-                        </div>
-                      )}
                     </div>
                   </div>
                 ))}
                 {isChatLoading && (
                   <div className="flex justify-start">
-                    <div
-                      className={`${
-                        isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700'
-                      } text-gray-200 rounded-lg px-4 py-2 max-w-[80%]`}
-                    >
+                    <div className={`${theme.card} border ${theme.border} rounded-md px-4 py-2 max-w-[80%]`}>
                       <div className="flex space-x-2">
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100"></div>
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200"></div>
+                        <div className="w-2 h-2 bg-neutral-400 rounded-full animate-bounce"></div>
+                        <div className="w-2 h-2 bg-neutral-400 rounded-full animate-bounce delay-100"></div>
+                        <div className="w-2 h-2 bg-neutral-400 rounded-full animate-bounce delay-200"></div>
                       </div>
                     </div>
                   </div>
                 )}
               </div>
 
-              <form onSubmit={handleChatSubmit} className="p-3 border-t border-gray-700">
+              <form onSubmit={handleChatSubmit} className={`p-3 border-t ${theme.border}`}>
                 <div className="flex gap-2">
                   <input
                     type="text"
                     value={chatMessage}
                     onChange={(e) => setChatMessage(e.target.value)}
-                    placeholder="Ask TaskMaster about your items or set a timer..."
-                    className={`flex-1 ${inputBg} text-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-300 shadow-inner`}
+                    placeholder="Ask TaskMaster about your items..."
+                    className={`flex-1 rounded-md px-3 py-2 ${theme.input} text-sm`}
                   />
                   <button
                     type="submit"
                     disabled={isChatLoading}
-                    className="bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className={`${theme.accent.primary} px-3 py-2 rounded-md ${theme.hover.primary} transition-colors disabled:opacity-50 disabled:cursor-not-allowed`}
                   >
                     <Send className="w-5 h-5" />
                   </button>
@@ -1976,35 +1301,22 @@ Keep it brief, actionable, impersonal, and readable.
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
-          <div className="flex flex-col gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+          <div className="flex flex-col gap-6">
             {/* Productivity Card with Analytics Toggle */}
-            <div
-              className={`${cardClass} rounded-lg p-4 shadow-sm relative overflow-hidden`}
-            >
-              <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-blue-500/5 pointer-events-none"></div>
-              <div className="flex justify-between items-center mb-3">
-                <h2
-                  className={`text-lg font-semibold ${
-                    isIlluminateEnabled ? illuminateTextPurple : 'text-purple-400'
-                  } flex items-center`}
-                >
+            <div className={`${theme.card} rounded-md border ${theme.border} p-6 shadow-sm`}>
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg font-medium flex items-center text-neutral-800 dark:text-neutral-200">
                   <TrendingUp className="w-5 h-5 mr-2" />
-                  Your Productivity
+                  Productivity
                 </h2>
-                <div className="flex gap-2">
-                  <button 
-                    onClick={() => setShowAnalytics(!showAnalytics)}
-                    className={`p-1.5 rounded-full transition-colors ${
-                      isIlluminateEnabled 
-                        ? 'hover:bg-gray-200 text-gray-700' 
-                        : 'hover:bg-gray-700 text-gray-300'
-                    } flex items-center gap-1 text-xs`}
-                  >
-                    {showAnalytics ? <BarChart className="w-4 h-4" /> : <PieChart className="w-4 h-4" />}
-                    <span>{showAnalytics ? 'Basic View' : 'Analytics'}</span>
-                  </button>
-                </div>
+                <button 
+                  onClick={() => setShowAnalytics(!showAnalytics)}
+                  className={`p-1.5 rounded-md transition-colors ${theme.text.secondary} hover:${theme.text.primary} hover:bg-neutral-100 dark:hover:bg-neutral-800 flex items-center gap-1 text-xs`}
+                >
+                  {showAnalytics ? <BarChart className="w-4 h-4" /> : <PieChart className="w-4 h-4" />}
+                  <span>{showAnalytics ? 'Basic View' : 'Analytics'}</span>
+                </button>
               </div>
               
               {showAnalytics ? (
@@ -2018,27 +1330,21 @@ Keep it brief, actionable, impersonal, and readable.
                   />
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {totalTasks > 0 && (
                     <div className="mb-3">
                       <div className="flex justify-between mb-1">
-                        <p className="flex items-center">
-                          <Clipboard className="w-4 h-4 mr-2" />
+                        <p className="flex items-center text-sm">
+                          <ClipboardList className="w-4 h-4 mr-2" />
                           Tasks
                         </p>
-                        <p
-                          className={
-                            isIlluminateEnabled
-                              ? illuminateTextGreen
-                              : 'text-green-400'
-                          }
-                        >
+                        <p className="text-sm text-neutral-600 dark:text-neutral-400">
                           {completedTasks}/{totalTasks}
                         </p>
                       </div>
-                      <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+                      <div className="w-full h-2 bg-neutral-100 dark:bg-neutral-700 rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-gradient-to-r from-green-400 to-green-600 rounded-full transition-all duration-1000 ease-out"
+                          className="h-full bg-neutral-800 dark:bg-neutral-400 rounded-full transition-all duration-1000 ease-out"
                           style={{ width: `${tasksProgress}%` }}
                         />
                       </div>
@@ -2048,23 +1354,17 @@ Keep it brief, actionable, impersonal, and readable.
                   {totalGoals > 0 && (
                     <div className="mb-3">
                       <div className="flex justify-between mb-1">
-                        <p className="flex items-center">
+                        <p className="flex items-center text-sm">
                           <Target className="w-4 h-4 mr-2" />
                           Goals
                         </p>
-                        <p
-                          className={
-                            isIlluminateEnabled
-                              ? illuminateTextPink
-                              : 'text-pink-400'
-                          }
-                        >
+                        <p className="text-sm text-neutral-600 dark:text-neutral-400">
                           {completedGoals}/{totalGoals}
                         </p>
                       </div>
-                      <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+                      <div className="w-full h-2 bg-neutral-100 dark:bg-neutral-700 rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-gradient-to-r from-pink-400 to-pink-600 rounded-full transition-all duration-1000 ease-out"
+                          className="h-full bg-neutral-800 dark:bg-neutral-400 rounded-full transition-all duration-1000 ease-out"
                           style={{ width: `${goalsProgress}%` }}
                         />
                       </div>
@@ -2074,23 +1374,17 @@ Keep it brief, actionable, impersonal, and readable.
                   {totalProjects > 0 && (
                     <div className="mb-3">
                       <div className="flex justify-between mb-1">
-                        <p className="flex items-center">
+                        <p className="flex items-center text-sm">
                           <Layers className="w-4 h-4 mr-2" />
                           Projects
                         </p>
-                        <p
-                          className={
-                            isIlluminateEnabled
-                              ? illuminateTextBlue
-                              : 'text-blue-400'
-                          }
-                        >
+                        <p className="text-sm text-neutral-600 dark:text-neutral-400">
                           {completedProjects}/{totalProjects}
                         </p>
                       </div>
-                      <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+                      <div className="w-full h-2 bg-neutral-100 dark:bg-neutral-700 rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-gradient-to-r from-blue-400 to-blue-600 rounded-full transition-all duration-1000 ease-out"
+                          className="h-full bg-neutral-800 dark:bg-neutral-400 rounded-full transition-all duration-1000 ease-out"
                           style={{ width: `${projectsProgress}%` }}
                         />
                       </div>
@@ -2100,23 +1394,17 @@ Keep it brief, actionable, impersonal, and readable.
                   {totalPlans > 0 && (
                     <div className="mb-3">
                       <div className="flex justify-between mb-1">
-                        <p className="flex items-center">
+                        <p className="flex items-center text-sm">
                           <Rocket className="w-4 h-4 mr-2" />
                           Plans
                         </p>
-                        <p
-                          className={
-                            isIlluminateEnabled
-                              ? illuminateTextYellow
-                              : 'text-yellow-400'
-                          }
-                        >
+                        <p className="text-sm text-neutral-600 dark:text-neutral-400">
                           {completedPlans}/{totalPlans}
                         </p>
                       </div>
-                      <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+                      <div className="w-full h-2 bg-neutral-100 dark:bg-neutral-700 rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-gradient-to-r from-yellow-400 to-yellow-600 rounded-full transition-all duration-1000 ease-out"
+                          className="h-full bg-neutral-800 dark:bg-neutral-400 rounded-full transition-all duration-1000 ease-out"
                           style={{ width: `${plansProgress}%` }}
                         />
                       </div>
@@ -2127,10 +1415,10 @@ Keep it brief, actionable, impersonal, and readable.
                     totalGoals === 0 &&
                     totalProjects === 0 &&
                     totalPlans === 0 && (
-                      <p className="text-gray-400 flex items-center">
-                        <Lightbulb className="w-4 h-4 mr-2 text-yellow-400" />
+                      <p className={`${theme.text.muted} flex items-center text-sm`}>
+                        <Lightbulb className="w-4 h-4 mr-2 text-neutral-500" />
                         No items to track yet. Start by creating some tasks,
-                        goals, projects, or plans!
+                        goals, projects, or plans.
                       </p>
                     )}
                 </div>
@@ -2138,14 +1426,8 @@ Keep it brief, actionable, impersonal, and readable.
             </div>
 
             {/* Upcoming Deadlines Card */}
-            <div
-              className={`${cardClass} rounded-lg p-4 shadow-sm`}
-            >
-              <h2
-                className={`text-lg font-semibold mb-3 ${
-                  isIlluminateEnabled ? illuminateTextBlue : 'text-blue-400'
-                } flex items-center`}
-              >
+            <div className={`${theme.card} rounded-md border ${theme.border} p-6 shadow-sm`}>
+              <h2 className="text-lg font-medium mb-4 text-neutral-800 dark:text-neutral-200 flex items-center">
                 <Calendar className="w-5 h-5 mr-2" />
                 Upcoming Deadlines
               </h2>
@@ -2187,16 +1469,16 @@ Keep it brief, actionable, impersonal, and readable.
 
                 if (!upcomingDeadlines.length) {
                   return (
-                    <p className="text-gray-400 flex items-center">
-                      <AlertCircle className="w-4 h-4 mr-2 text-blue-400" />
+                    <p className={`${theme.text.muted} flex items-center text-sm`}>
+                      <AlertCircle className="w-4 h-4 mr-2 text-neutral-500" />
                       No upcoming deadlines
                     </p>
                   );
                 }
 
                 return (
-                  <ul className="space-y-2">
-                    {upcomingDeadlines.map((item, index) => {
+                  <ul className="space-y-3">
+                    {upcomingDeadlines.map((item) => {
                       const { id, type, data } = item;
                       const dueDateObj = data.dueDate.toDate
                         ? data.dueDate.toDate()
@@ -2216,67 +1498,44 @@ Keep it brief, actionable, impersonal, and readable.
                       dueDate.setHours(0, 0, 0, 0);
                       const daysRemaining = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
                       
-                      // Determine urgency color
-                      let urgencyColor = '';
-                      if (daysRemaining <= 1) {
-                        urgencyColor = isIlluminateEnabled ? 'border-l-red-600' : 'border-l-red-500';
-                      } else if (daysRemaining <= 3) {
-                        urgencyColor = isIlluminateEnabled ? 'border-l-orange-600' : 'border-l-orange-500';
-                      } else if (daysRemaining <= 7) {
-                        urgencyColor = isIlluminateEnabled ? 'border-l-yellow-600' : 'border-l-yellow-500';
-                      } else {
-                        urgencyColor = isIlluminateEnabled ? 'border-l-green-600' : 'border-l-green-500';
-                      }
-
                       // Get priority
                       const priority = data.priority || calculatePriority(item);
+                      
+                      // Determine border color based on days remaining
+                      let borderColor = '';
+                      if (daysRemaining <= 1) {
+                        borderColor = 'border-l-neutral-500 dark:border-l-neutral-400';
+                      } else if (daysRemaining <= 3) {
+                        borderColor = 'border-l-neutral-500 dark:border-l-neutral-400';
+                      } else {
+                        borderColor = 'border-l-neutral-500 dark:border-l-neutral-400';
+                      }
 
                       return (
                         <li
                           key={id}
-                          className={`${
-                            isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700/50'
-                          } p-3 rounded-lg border-l-4 ${urgencyColor}`}
+                          className={`${theme.card} p-3 rounded-md border ${theme.border} border-l-4 ${borderColor}`}
                         >
                           <div className="flex items-center justify-between">
-                            <div className="text-sm font-medium">
-                              <span
-                                className={`font-bold ${
-                                  isIlluminateEnabled ? 'text-gray-800' : ''
-                                }`}
-                              >
-                                {type}:
-                              </span>{' '}
+                            <div className="text-sm">
+                              <span className="font-medium mr-1">{type}:</span>
                               {itemName}
                               <PriorityBadge priority={priority} isIlluminateEnabled={isIlluminateEnabled} />
                             </div>
-                            <div
-                              className={`text-xs ml-4 ${
-                                isIlluminateEnabled
-                                  ? 'text-gray-600'
-                                  : 'text-gray-300'
-                              } flex items-center`}
-                            >
+                            <div className={`text-xs ${theme.text.secondary} flex items-center`}>
                               <Clock className="w-3 h-3 mr-1" />
-                              Due:{' '}
-                              <span
-                                className={`font-semibold ml-1 ${
-                                  isIlluminateEnabled ? 'text-gray-800' : ''
-                                }`}
-                              >
-                                {dueDateStr}
-                              </span>
+                              <span className="font-medium">{dueDateStr}</span>
                               <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
                                 daysRemaining <= 1 
-                                  ? 'bg-red-500/20 text-red-400' 
+                                  ? 'bg-neutral-100 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200' 
                                   : daysRemaining <= 3 
-                                    ? 'bg-orange-500/20 text-orange-400'
-                                    : 'bg-green-500/20 text-green-400'
+                                    ? 'bg-neutral-100 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200'
+                                    : 'bg-neutral-100 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200'
                               }`}>
                                 {daysRemaining === 0 
-                                  ? 'Today!' 
+                                  ? 'Today' 
                                   : daysRemaining === 1 
-                                    ? 'Tomorrow!' 
+                                    ? 'Tomorrow' 
                                     : `${daysRemaining} days`}
                               </span>
                             </div>
@@ -2288,40 +1547,40 @@ Keep it brief, actionable, impersonal, and readable.
                 );
               })()}
             </div>
-
-      {/* Tabs & List */}
-      <div
-        className={`${cardClass} rounded-lg p-4 shadow-sm`}
-      >
-        {/* Tabs List - Fixed with proper container */}
-        <div className="flex overflow-x-auto no-scrollbar mb-4">
-          <div className="flex space-x-2 w-full">
-            {["tasks", "goals", "projects", "plans"].map((tab) => (
-              <button
-                key={tab}
-                className={`px-3 py-1.5 rounded-full transition-all duration-300 text-sm flex items-center whitespace-nowrap ${
-                  activeTab === tab
-                    ? "bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-md"
-                    : isIlluminateEnabled
-                      ? "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                      : "bg-gray-700 text-gray-200 hover:bg-gray-600"
-                }`}
-                onClick={() => handleTabChange(tab as "tasks" | "goals" | "projects" | "plans")}
-              >
-                {tab === "tasks" && <Clipboard className="w-4 h-4 mr-1" />}
-                {tab === "goals" && <Target className="w-4 h-4 mr-1" />}
-                {tab === "projects" && <Layers className="w-4 h-4 mr-1" />}
-                {tab === "plans" && <Rocket className="w-4 h-4 mr-1" />}
-                {tab.charAt(0).toUpperCase() + tab.slice(1)}
-              </button>
-            ))}
           </div>
-        </div>
 
+          {/* RIGHT COLUMN */}
+          <div className="flex flex-col gap-6">
+            {/* Tabs & List */}
+            <div className={`${theme.card} rounded-md border ${theme.border} p-6 shadow-sm`}>
+              {/* Tabs List */}
+              <div className="flex overflow-x-auto no-scrollbar mb-4">
+                <div className="flex space-x-2 w-full">
+                  {["tasks", "goals", "projects", "plans"].map((tab) => (
+                    <button
+                      key={tab}
+                      className={`px-3 py-1.5 rounded-md transition-all duration-200 text-sm flex items-center whitespace-nowrap ${
+                        activeTab === tab
+                          ? theme.accent.primary
+                          : `${theme.accent.secondary}`
+                      }`}
+                      onClick={() => handleTabChange(tab as "tasks" | "goals" | "projects" | "plans")}
+                    >
+                      {tab === "tasks" && <ClipboardList className="w-4 h-4 mr-1" />}
+                      {tab === "goals" && <Target className="w-4 h-4 mr-1" />}
+                      {tab === "projects" && <Layers className="w-4 h-4 mr-1" />}
+                      {tab === "plans" && <Rocket className="w-4 h-4 mr-1" />}
+                      {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* New Item Form */}
               <div className="flex flex-col md:flex-row gap-2 mb-4">
                 <input
                   type="text"
-                  className={`flex-grow ${inputBg} border border-gray-700 rounded-lg p-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 shadow-inner`} 
+                  className={`flex-grow rounded-md px-3 py-2 ${theme.input} text-sm`}
                   placeholder={`Enter new ${activeTab}...`}
                   value={newItemText}
                   onChange={(e) => setNewItemText(e.target.value)}
@@ -2329,35 +1588,36 @@ Keep it brief, actionable, impersonal, and readable.
                 <div className="flex gap-2">
                   <input
                     type="date"
-                    className={`${inputBg} border border-gray-700 rounded-lg p-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 w-full md:w-auto shadow-inner`} 
+                    className={`rounded-md px-3 py-2 ${theme.input} text-sm w-full md:w-auto`}
                     value={newItemDate}
                     onChange={(e) => setNewItemDate(e.target.value)}
                   />
                   <select
-                    className={`${inputBg} border border-gray-700 rounded-lg p-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 shadow-inner`}
+                    className={`rounded-md px-3 py-2 ${theme.input} text-sm`}
                     value={newItemPriority}
                     onChange={(e) => setNewItemPriority(e.target.value as 'high' | 'medium' | 'low')}
                   >
-                    <option value="high">High Priority</option>
-                    <option value="medium">Medium Priority</option>
-                    <option value="low">Low Priority</option>
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
                   </select>
-            <button
-              className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white p-2 rounded-lg flex items-center justify-center hover:shadow-md transition-all duration-300 min-w-[40px] min-h-[40px]"
-              onClick={handleCreate}
-            >
-              <PlusCircle className="w-5 h-5" />
-            </button>
+                  <button
+                    className={`${theme.accent.primary} px-3 py-2 rounded-md ${theme.hover.primary} transition-colors`}
+                    onClick={handleCreate}
+                  >
+                    <PlusIcon className="w-5 h-5" />
+                  </button>
                 </div>
               </div>
 
+              {/* Items List */}
               <ul className="space-y-2">
                 {currentItems.length === 0 ? (
-                  <li className="text-gray-400 text-center py-6">
+                  <li className={`${theme.text.muted} text-center py-6 text-sm`}>
                     No {activeTab} yet...
                   </li>
                 ) : (
-                  currentItems.map((item, index) => {
+                  currentItems.map((item) => {
                     const itemId = item.id;
                     const textValue = item.data[titleField] || 'Untitled';
                     const isCompleted = item.data.completed || false;
@@ -2376,31 +1636,22 @@ Keep it brief, actionable, impersonal, and readable.
                     return (
                       <li
                         key={item.id}
-                        className={`p-3 rounded-lg flex flex-col md:flex-row md:items-center md:justify-between gap-2
+                        className={`p-3 rounded-md border ${theme.border} flex flex-col md:flex-row md:items-center md:justify-between gap-2
                           ${
                             isCompleted
-                              ? isIlluminateEnabled
-                                ? 'bg-green-100 opacity-75'
-                                : 'bg-green-900/30 opacity-75'
+                              ? 'bg-neutral-50 dark:bg-neutral-800/50'
                               : overdue
-                              ? isIlluminateEnabled
-                                ? 'bg-red-100'
-                                : 'bg-red-900/50'
-                              : isIlluminateEnabled
-                              ? 'bg-gray-200'
-                              : 'bg-gray-700/50'
+                              ? 'bg-neutral-50 dark:bg-neutral-800/50'
+                              : theme.card
                           }
-                          shadow-sm
                         `}
                       >
                         {!isEditing ? (
                           <div className="flex items-center gap-2 flex-wrap">
                             <span
-                              className={`font-bold text-base ${
+                              className={`font-medium text-sm ${
                                 isCompleted
-                                  ? 'line-through text-gray-400'
-                                  : isIlluminateEnabled
-                                  ? 'text-gray-900'
+                                  ? 'line-through text-neutral-500 dark:text-neutral-400'
                                   : ''
                               }`}
                             >
@@ -2409,11 +1660,7 @@ Keep it brief, actionable, impersonal, and readable.
                             <PriorityBadge priority={priority} isIlluminateEnabled={isIlluminateEnabled} />
                             {dueDateStr && (
                               <span
-                                className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                                  isIlluminateEnabled
-                                    ? 'bg-gray-300 text-gray-800'
-                                    : 'bg-gray-600'
-                                } flex items-center`}
+                                className={`text-xs px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200 flex items-center`}
                               >
                                 <Calendar className="w-3 h-3 mr-1" />
                                 {dueDateStr}
@@ -2421,13 +1668,9 @@ Keep it brief, actionable, impersonal, and readable.
                             )}
                             {isCompleted && (
                               <span
-                                className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                                  isIlluminateEnabled
-                                    ? 'bg-green-300 text-green-800'
-                                    : 'bg-green-600'
-                                } flex items-center`}
+                                className="text-xs px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200 flex items-center"
                               >
-                                <CheckCircle className="w-3 h-3 mr-1" />
+                                <Check className="w-3 h-3 mr-1" />
                                 Completed
                               </span>
                             )}
@@ -2435,24 +1678,24 @@ Keep it brief, actionable, impersonal, and readable.
                         ) : (
                           <div className="flex flex-col sm:flex-row gap-2 w-full">
                             <input
-                              className={`flex-grow ${inputBg} border border-gray-600 rounded-lg p-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 shadow-inner`}
+                              className={`flex-grow rounded-md px-3 py-2 ${theme.input} text-sm`}
                               value={editingText}
                               onChange={(e) => setEditingText(e.target.value)}
                             />
                             <input
                               type="date"
-                              className={`flex-grow ${inputBg} border border-gray-600 rounded-lg p-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 shadow-inner`}
+                              className={`rounded-md px-3 py-2 ${theme.input} text-sm`}
                               value={editingDate}
                               onChange={(e) => setEditingDate(e.target.value)}
                             />
                             <select
-                              className={`${inputBg} border border-gray-600 rounded-lg p-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 shadow-inner`}
+                              className={`rounded-md px-3 py-2 ${theme.input} text-sm`}
                               value={editingPriority}
                               onChange={(e) => setEditingPriority(e.target.value as 'high' | 'medium' | 'low')}
                             >
-                              <option value="high">High Priority</option>
-                              <option value="medium">Medium Priority</option>
-                              <option value="low">Low Priority</option>
+                              <option value="high">High</option>
+                              <option value="medium">Medium</option>
+                              <option value="low">Low</option>
                             </select>
                           </div>
                         )}
@@ -2461,37 +1704,37 @@ Keep it brief, actionable, impersonal, and readable.
                             <>
                               {!isCompleted && (
                                 <button
-                                  className="bg-gradient-to-r from-green-400 to-green-600 px-2 py-1 rounded-lg text-white flex items-center"
+                                  className="bg-neutral-800 text-white dark:bg-neutral-700 px-2 py-1 rounded-md hover:bg-neutral-700 dark:hover:bg-neutral-600 transition-colors"
                                   onClick={() => handleMarkComplete(itemId)}
                                 >
-                                  <CheckCircle className="w-4 h-4" />
+                                  <Check className="w-4 h-4" />
                                 </button>
                               )}
                               <button
-                                className="bg-gradient-to-r from-blue-400 to-blue-600 px-2 py-1 rounded-lg text-white flex items-center"
+                                className="bg-neutral-800 text-white dark:bg-neutral-700 px-2 py-1 rounded-md hover:bg-neutral-700 dark:hover:bg-neutral-600 transition-colors"
                                 onClick={() =>
                                   handleEditClick(itemId, textValue, item.data.dueDate)
                                 }
                               >
-                                <Edit className="w-4 h-4" />
+                                <Pencil className="w-4 h-4" />
                               </button>
                               <button
-                                className="bg-gradient-to-r from-red-400 to-red-600 px-2 py-1 rounded-lg text-white flex items-center"
+                                className="bg-neutral-800 text-white dark:bg-neutral-700 px-2 py-1 rounded-md hover:bg-neutral-700 dark:hover:bg-neutral-600 transition-colors"
                                 onClick={() => handleDelete(itemId)}
                               >
-                                <Trash className="w-4 h-4" />
+                                <Trash2 className="w-4 h-4" />
                               </button>
                             </>
                           ) : (
                             <>
                               <button
-                                className="bg-gradient-to-r from-green-400 to-green-600 px-3 py-1 rounded-lg text-white text-sm"
+                                className="bg-neutral-800 text-white dark:bg-neutral-700 px-3 py-1 rounded-md hover:bg-neutral-700 dark:hover:bg-neutral-600 transition-colors text-sm"
                                 onClick={() => handleEditSave(itemId)}
                               >
                                 Save
                               </button>
                               <button
-                                className="bg-gradient-to-r from-gray-400 to-gray-600 px-3 py-1 rounded-lg text-white text-sm"
+                                className="bg-neutral-800 text-white dark:bg-neutral-700 px-3 py-1 rounded-md hover:bg-neutral-700 dark:hover:bg-neutral-600 transition-colors text-sm"
                                 onClick={() => {
                                   setEditingItemId(null);
                                   setEditingText('');
@@ -2499,378 +1742,6 @@ Keep it brief, actionable, impersonal, and readable.
                                 }}
                               >
                                 Cancel
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </li>
-                    );
-                  })
-                )}
-              </ul>
-            </div>
-          </div>
-
-          {/* RIGHT COLUMN */}
-          <div className="flex flex-col gap-4">
-            {/* ADVANCED WEATHER CARD */}
-            <div className={`${cardClass} rounded-lg p-4 shadow-sm`}>
-              <h2 className={`text-lg font-semibold mb-3 ${headingClass} flex items-center`}>
-                <Sun className="w-5 h-5 mr-2" />
-                Weather & Forecast
-              </h2>
-              {weatherData ? (
-                <>
-                  {/* Current weather */}
-                  <div className="space-y-2 mb-4">
-                    <p
-                      className={`text-xl font-bold bg-clip-text text-transparent ${
-                        isIlluminateEnabled
-                          ? 'bg-gradient-to-r from-blue-600 to-purple-800'
-                          : 'bg-gradient-to-r from-blue-400 to-purple-600'
-                      }`}
-                    >
-                      {weatherData.location.name}
-                    </p>
-
-                    <p className={`flex items-center gap-2 text-base ${subheadingClass}`}>
-                      <img
-                        src={weatherData.current.condition.icon || "/placeholder.svg"}
-                        alt={weatherData.current.condition.text}
-                        className="w-8 h-8"
-                      />
-                      {weatherData.current.condition.text} - {weatherData.current.temp_f}°F
-                      <span className={`ml-2 text-sm ${subheadingClass}`}>
-                        Feels like {weatherData.current.feelslike_f}°F
-                      </span>
-                    </p>
-                    <div className="flex flex-wrap gap-2 text-xs">
-                      <div className="flex items-center">
-                        <Wind className="w-4 h-4 mr-1 text-blue-400" />
-                        <strong>Wind:</strong>
-                        <span className="ml-1">
-                          {Math.round(weatherData.current.wind_mph)} mph
-                        </span>
-                      </div>
-                      <div className="flex items-center">
-                        <Droplets className="w-4 h-4 mr-1 text-blue-400" />
-                        <strong>Humidity:</strong>
-                        <span className="ml-1">{weatherData.current.humidity}%</span>
-                      </div>
-                      <div className="flex items-center">
-                        <Zap className="w-4 h-4 mr-1 text-yellow-400" />
-                        <strong>UV Index:</strong>
-                        <span className="ml-1">{weatherData.current.uv}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Forecast */}
-                  {weatherData.forecast && weatherData.forecast.forecastday && (
-                    <div className="space-y-3">
-                      <h3
-                        className={`text-base font-semibold ${
-                          isIlluminateEnabled ? 'text-blue-700' : 'text-blue-400'
-                        } flex items-center`}
-                      >
-                        <Calendar className="w-4 h-4 mr-2" />
-                        Forecast
-                      </h3>
-                      {(() => {
-                        const now = new Date();
-                        now.setHours(0, 0, 0, 0);
-                        const validDays = weatherData.forecast.forecastday.filter(
-                          (day: any) => {
-                            const d = new Date(day.date);
-                            d.setHours(0, 0, 0, 0);
-                            return d >= now;
-                          }
-                        );
-                        const finalDays = validDays.slice(0, 3);
-                        const dayLabels = ['Today', 'Tomorrow', 'Day After Tomorrow'];
-                        return finalDays.map((day: any, idx: number) => {
-                          const dateObj = new Date(day.date);
-                          const monthDay = dateObj.toLocaleDateString(undefined, {
-                            month: 'short',
-                            day: 'numeric',
-                          });
-                          const label = `${dayLabels[idx]} (${monthDay})`;
-                          const maxF = Math.round(day.day.maxtemp_f);
-                          const minF = Math.round(day.day.mintemp_f);
-                          const icon = day.day.condition.icon;
-                          const barWidth = maxF > 0 ? (maxF / 120) * 100 : 0;
-                          // Lighter background in illuminate mode
-                          const forecastBg = isIlluminateEnabled
-                            ? 'bg-gray-300/50'
-                            : 'bg-gray-700/50';
-
-                          return (
-                            <div
-                              key={day.date}
-                              className={`flex items-center gap-3 ${forecastBg} p-2 rounded-lg relative overflow-hidden`}
-                            >
-                              <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 to-purple-600/10 pointer-events-none" />
-                              <img
-                                src={icon || "/placeholder.svg"}
-                                alt={day.day.condition.text}
-                                className="w-10 h-10 z-10"
-                              />
-                              <div className="z-10 flex-grow">
-                                <p
-                                  className={`text-sm font-medium ${
-                                    isIlluminateEnabled ? 'text-gray-800' : 'text-gray-200'
-                                  }`}
-                                >
-                                  {label}
-                                </p>
-                                <div className="flex items-center gap-3 mt-1">
-                                  <p
-                                    className={`text-xs ${
-                                      isIlluminateEnabled ? 'text-red-700' : 'text-red-300'
-                                    } flex items-center`}
-                                  >
-                                    <Flame className="w-3 h-3 mr-1" />
-                                    High: {maxF}°F
-                                  </p>
-                                  <p
-                                    className={`text-xs ${
-                                      isIlluminateEnabled ? 'text-blue-700' : 'text-blue-300'
-                                    } flex items-center`}
-                                  >
-                                    <Moon className="w-3 h-3 mr-1" />
-                                    Low: {minF}°F
-                                  </p>
-                                </div>
-                                <div
-                                  className={`mt-1 w-full h-2 ${
-                                    isIlluminateEnabled ? 'bg-gray-300' : 'bg-gray-600'
-                                  } rounded-full overflow-hidden`}
-                                >
-                                  <div
-                                    className="h-full bg-gradient-to-r from-yellow-300 to-red-500 rounded-full transition-all duration-700 ease-out"
-                                    style={{ width: `${barWidth}%` }}
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        });
-                      })()}
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div className="animate-pulse space-y-3">
-                  <div
-                    className={`h-6 rounded-full w-1/2 ${
-                      isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700'
-                    }`}
-                  ></div>
-                  <div
-                    className={`h-4 rounded-full w-3/4 ${
-                      isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700'
-                    }`}
-                  ></div>
-                  <div
-                    className={`h-4 rounded-full w-1/3 ${
-                      isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700'
-                    }`}
-                  ></div>
-                </div>
-              )}
-            </div>
-
-            {/* MAIN POMODORO TIMER */}
-            <div className={`${cardClass} rounded-lg p-4 shadow-sm`}>
-              <div className="flex items-center justify-between mb-3">
-                <h2 className={`text-lg font-semibold ${headingClass} flex items-center`}>
-                  <Clock className="w-5 h-5 mr-2" />
-                  Pomodoro Timer
-                </h2>
-                <button
-                  className="bg-gradient-to-r from-purple-400 to-purple-600 text-white px-3 py-1 rounded-lg font-medium flex items-center gap-1 text-sm"
-                  onClick={handleAddCustomTimer}
-                >
-                  <PlusCircle className="w-4 h-4" /> New Timer
-                </button>
-              </div>
-              <div
-                className={`text-4xl font-bold mb-4 text-center bg-clip-text text-transparent ${
-                  isIlluminateEnabled
-                    ? 'bg-gradient-to-r from-blue-600 to-purple-800'
-                    : 'bg-gradient-to-r from-blue-400 to-purple-600'
-                } ${pomodoroRunning ? 'animate-pulse' : ''}`}
-              >
-                {formatPomodoroTime(pomodoroTimeLeft)}
-              </div>
-              <div className="flex justify-center flex-wrap gap-2">
-                <button
-                  className="bg-gradient-to-r from-green-400 to-green-600 px-4 py-2 rounded-lg font-medium hover:shadow-md transition-all duration-300 text-sm"
-                  onClick={handlePomodoroStart}
-                >
-                  Start
-                </button>
-                <button
-                  className="bg-gradient-to-r from-yellow-400 to-yellow-600 px-4 py-2 rounded-lg font-medium hover:shadow-md transition-all duration-300 text-sm"
-                  onClick={handlePomodoroPause}
-                >
-                  Pause
-                </button>
-                <button
-                  className="bg-gradient-to-r from-red-400 to-red-600 px-4 py-2 rounded-lg font-medium hover:shadow-md transition-all duration-300 text-sm"
-                  onClick={handlePomodoroReset}
-                >
-                  Reset
-                </button>
-              </div>
-              {!customTimers.length && (
-                <p className="text-sm text-gray-400 mt-4 text-center">
-                  🍎 No custom timers yet. Click the "New Timer" button to create one! 🍎
-                </p>
-              )}
-            </div>
-
-            {/* CUSTOM TIMERS LIST */}
-            <div className={`${cardClass} rounded-lg p-4 shadow-sm`}>
-              <h2 className={`text-lg font-semibold mb-3 ${headingClass} flex items-center`}>
-                <TimerIcon className="w-5 h-5 mr-2" />
-                Custom Timers
-              </h2>
-              {customTimers.length === 0 ? (
-                <p className="text-gray-400 text-center py-6">No custom timers yet...</p>
-              ) : (
-                <ul className="space-y-3">
-                  {customTimers.map((timer, index) => {
-                    const timerId = timer.id;
-                    const runningState = runningTimers[timerId];
-                    const timeLeft = runningState ? runningState.timeLeft : timer.data.time;
-                    const isRunning = runningState ? runningState.isRunning : false;
-                    const isEditing = editingTimerId === timerId;
-
-                    let itemBgClass = '';
-                    if (!isEditing) {
-                      if (timer.data.completed) {
-                        // Completed
-                        itemBgClass = isIlluminateEnabled
-                          ? 'bg-green-200/30 opacity-75'
-                          : 'bg-green-900/30 opacity-75';
-                      } else if (
-                        timer.data.dueDate &&
-                        new Date(timer.data.dueDate) < new Date()
-                      ) {
-                        // Overdue
-                        itemBgClass = isIlluminateEnabled
-                          ? 'bg-red-200/50'
-                          : 'bg-red-900/50';
-                      } else {
-                        // Default
-                        itemBgClass = isIlluminateEnabled
-                          ? 'bg-gray-200/50'
-                          : 'bg-gray-700/50';
-                      }
-                    }
-
-                    return (
-                      <li
-                        key={timerId}
-                        className={`p-3 rounded-lg shadow-sm ${itemBgClass}`}
-                      >
-                        <div className="flex flex-col md:flex-row items-center justify-between gap-3"> 
-                          <div className="flex flex-col items-center md:items-start w-full md:w-auto"> 
-                            {isEditing ? (
-                              <div className="flex flex-col gap-2 w-full">
-                                <input
-                                  type="text"
-                                  className={`flex-grow ${inputBg} border border-gray-600 rounded-lg p-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 shadow-inner`}
-                                  value={editingTimerName}
-                                  onChange={(e) => setEditingTimerName(e.target.value)}
-                                  placeholder="Timer name"
-                                />
-                                <input
-                                  type="number"
-                                  className={`flex-grow ${inputBg} border border-gray-600 rounded-lg p-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 shadow-inner`}
-                                  value={editingTimerMinutes}
-                                  onChange={(e) => setEditingTimerMinutes(e.target.value)}
-                                  placeholder="Minutes"
-                                  min="1"
-                                />
-                                <div className="flex gap-2 mt-2">
-                                  <button
-                                    className="bg-gradient-to-r from-green-400 to-green-600 px-3 py-1 rounded-lg text-white text-sm"
-                                    onClick={() => handleEditTimerSave(timerId)}
-                                  >
-                                    Save
-                                  </button>
-                                  <button
-                                    className="bg-gradient-to-r from-gray-400 to-gray-600 px-3 py-1 rounded-lg text-white text-sm"
-                                    onClick={() => setEditingTimerId(null)}
-                                  >
-                                    Cancel
-                                  </button>
-                                </div>
-                              </div>
-                            ) : (
-                              <>
-                                <div className="flex items-center gap-2 mb-1 flex-wrap justify-center md:justify-start">
-                                  <span className="font-bold text-base text-center md:text-left">
-                                    {timer.data.name}
-                                  </span>
-                                  <div className="flex gap-1">
-                                    <button
-                                      className="bg-gradient-to-r from-blue-400 to-blue-600 p-1 rounded-lg text-white"
-                                      onClick={() =>
-                                        handleEditTimerClick(
-                                          timerId,
-                                          timer.data.name,
-                                          timer.data.time
-                                        )
-                                      }
-                                    >
-                                      <Edit className="w-3 h-3" />
-                                    </button>
-                                    <button
-                                      className="bg-gradient-to-r from-red-400 to-red-600 p-1 rounded-lg text-white"
-                                      onClick={() => handleDeleteTimer(timerId)}
-                                    >
-                                      <Trash className="w-3 h-3" />
-                                    </button>
-                                  </div>
-                                </div>
-                                <span
-                                  className={`text-2xl font-semibold bg-clip-text text-transparent ${
-                                    isIlluminateEnabled
-                                      ? 'bg-gradient-to-r from-blue-600 to-purple-800'
-                                      : 'bg-gradient-to-r from-blue-400 to-purple-600'
-                                  } ${isRunning ? 'animate-pulse' : ''}`}
-                                >
-                                  {formatCustomTime(timeLeft)}
-                                </span>
-                              </>
-                            )}
-                          </div>
-                          {!isEditing && (
-                            <div className="flex gap-2">
-                              {!isRunning && (
-                                <button
-                                  className="bg-gradient-to-r from-green-400 to-green-600 px-3 py-1 rounded-lg font-medium text-xs"
-                                  onClick={() => startCustomTimer(timerId)}
-                                >
-                                  Start
-                                </button>
-                              )}
-                              {isRunning && (
-                                <button
-                                  className="bg-gradient-to-r from-yellow-400 to-yellow-600 px-3 py-1 rounded-lg font-medium text-xs"
-                                  onClick={() => pauseCustomTimer(timerId)}
-                                >
-                                  Pause
-                                </button>
-                              )}
-                              <button
-                                className="bg-gradient-to-r from-gray-400 to-gray-600 px-3 py-1 rounded-lg font-medium text-xs"
-                                onClick={() => resetCustomTimer(timerId)}
-                              >
-                                Reset
                               </button>
                             </div>
                           )}

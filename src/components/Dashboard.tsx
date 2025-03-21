@@ -1743,18 +1743,18 @@ Keep it brief, actionable, impersonal, and readable.
                               >
                                 Cancel
                               </button>
-                            </div>
+                            </>
                           )}
                         </div>
                       </li>
                     );
                   })}
-               </ul>
-              )}
+                </ul>
+              </div>
             </div>
           </div>
-        </div>
-      </main>
-    </div>
-  );
-} 
+        </main>
+      </div>
+    );
+  }
+

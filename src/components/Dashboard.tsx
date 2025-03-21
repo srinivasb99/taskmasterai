@@ -1057,70 +1057,77 @@ Keep it brief, actionable, impersonal, and readable.
   // Get current theme based on mode
   const theme = isIlluminateEnabled ? themeColors.light : themeColors.dark;
 
-  return (
-    <div className={`${theme.background} min-h-screen w-full`}>
-      {/* Pass collapse state & toggle handler to Sidebar */}
-      <Sidebar
-        userName={userName}
-        isCollapsed={isSidebarCollapsed}
-        onToggle={handleToggleSidebar}
-        isBlackoutEnabled={isBlackoutEnabled && isSidebarBlackoutEnabled}
-        isIlluminateEnabled={isIlluminateEnabled && isSidebarIlluminateEnabled}
-      />
+return (
+  <div className={`${theme.background} min-h-screen w-full`}>
+    <Sidebar
+      userName={userName}
+      isCollapsed={isSidebarCollapsed}
+      onToggle={handleToggleSidebar}
+      isBlackoutEnabled={isBlackoutEnabled && isSidebarBlackoutEnabled}
+      isIlluminateEnabled={isIlluminateEnabled && isSidebarIlluminateEnabled}
+    />
 
-      <main
-        className={`transition-all duration-300 ease-in-out min-h-screen
-          ${isSidebarCollapsed ? 'ml-16 md:ml-16' : 'ml-0 md:ml-64'} 
-          p-4 md:p-8 ${theme.text.primary}`} 
-      >
-        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-6">
-          <header className="w-full lg:w-auto"> 
-            <h1 className="text-2xl font-medium mb-1 flex items-center">
-              <span className="mr-2">{greeting.greeting},</span>
-              <span className="font-semibold">{userName ? userName.split(' ')[0] : 'Loading...'}</span>
-            </h1>
-            <p className={`text-sm italic ${theme.text.secondary}`}>
-              "{quote.text}" - <span className="text-neutral-500 dark:text-neutral-400">{quote.author}</span>
-            </p>
-          </header>
+    <main
+      className={`transition-all duration-300 ease-in-out min-h-screen
+        ${isSidebarCollapsed ? 'ml-16 md:ml-16' : 'ml-0 md:ml-64'} 
+        p-4 md:p-8 ${theme.text.primary}`}
+    >
+      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-6">
+        <header className="w-full lg:w-auto">
+          <h1 className="text-2xl font-medium mb-1 flex items-center">
+            <span className="mr-2">{greeting.greeting},</span>
+            <span className="font-semibold">
+              {userName ? userName.split(' ')[0] : 'Loading...'}
+            </span>
+          </h1>
+          <p className={`text-sm italic ${theme.text.secondary}`}>
+            "{quote.text}" -{' '}
+            <span className="text-neutral-500 dark:text-neutral-400">
+              {quote.author}
+            </span>
+          </p>
+        </header>
 
-          {/* Calendar Card */}
-          <div className={`${theme.card} rounded-md border ${theme.border} p-2 min-w-[100px] w-full max-w-full md:max-w-[450px] h-[70px] flex-shrink-0 lg:flex-shrink shadow-sm`}>
-            <div className="grid grid-cols-9 gap-1 h-full flex-shrink-0 lg:flex-shrink shadow-sm">
-              <button
-                onClick={() => {
-                  const prevWeek = new Date(currentWeek[0]);
-                  prevWeek.setDate(prevWeek.getDate() - 7);
-                  setCurrentWeek(getWeekDates(prevWeek));
-                }}
-                className={`w-6 h-full flex items-center justify-center ${theme.text.muted} hover:${theme.text.secondary} transition-colors rounded-md`}
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
+        <div
+          className={`${theme.card} rounded-md border ${theme.border} p-2 min-w-[100px] w-full max-w-full md:max-w-[450px] h-[70px] flex-shrink-0 lg:flex-shrink shadow-sm`}
+        >
+          <div className="grid grid-cols-9 gap-1 h-full">
+            <button
+              onClick={() => {
+                const prevWeek = new Date(currentWeek[0]);
+                prevWeek.setDate(prevWeek.getDate() - 7);
+                setCurrentWeek(getWeekDates(prevWeek));
+              }}
+              className={`w-6 h-full flex items-center justify-center ${theme.text.muted} hover:${theme.text.secondary} transition-colors rounded-md`}
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
 
-              <div className="col-span-7">
-                <div className="grid grid-cols-7 gap-1 h-full">
-                  <div className="col-span-7 grid grid-cols-7 gap-1">
-                    {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(
-                      (day) => (
-                        <div
-                          key={day}
-                          className={`text-center text-[10px] font-medium ${theme.text.muted}`}
-                        >
-                          {day}
-                        </div>
-                      )
-                    )}
-                  </div>
+            <div className="col-span-7">
+              <div className="grid grid-cols-7 gap-1 h-full">
+                <div className="col-span-7 grid grid-cols-7 gap-1">
+                  {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day) => (
+                    <div
+                      key={day}
+                      className={`text-center text-[10px] font-medium ${theme.text.muted}`}
+                    >
+                      {day}
+                    </div>
+                  ))}
+                </div>
 
-                  {currentWeek.map((date, index) => {
-                    const isToday = formatDateForComparison(date) === formatDateForComparison(today);
-                    
-                    // Check if any items have deadlines on this date
-                    const hasDeadline = [...tasks, ...goals, ...projects, ...plans].some(item => {
+                {currentWeek.map((date, index) => {
+                  const isToday =
+                    formatDateForComparison(date) ===
+                    formatDateForComparison(today);
+
+                  const hasDeadline = [...tasks, ...goals, ...projects, ...plans].some(
+                    (item) => {
                       if (!item?.data?.dueDate) return false;
                       try {
-                        const itemDate = item.data.dueDate.toDate ? item.data.dueDate.toDate() : new Date(item.data.dueDate);
+                        const itemDate = item.data.dueDate.toDate
+                          ? item.data.dueDate.toDate()
+                          : new Date(item.data.dueDate);
                         itemDate.setHours(0, 0, 0, 0);
                         const compareDate = new Date(date);
                         compareDate.setHours(0, 0, 0, 0);
@@ -1128,632 +1135,679 @@ Keep it brief, actionable, impersonal, and readable.
                       } catch (e) {
                         return false;
                       }
-                    });
+                    }
+                  );
 
-                    return (
-                      <div
-                        key={index}
-                        className={`relative w-full h-6 text-center rounded-md transition-all duration-200 cursor-pointer flex items-center justify-center
-                          ${isToday 
-                            ? 'bg-neutral-100 text-neutral-800 font-medium dark:bg-neutral-700 dark:text-neutral-200' 
-                            : `${theme.text.secondary} hover:bg-neutral-100 dark:hover:bg-neutral-800`}
-                          ${hasDeadline ? 'ring-1 ring-neutral-400' : ''}
-                        `}
-                      >
-                        <span className="text-xs">{date.getDate()}</span>
-                        {hasDeadline && (
-                          <div className="absolute bottom-0.5 left-1/2 transform -translate-x-1/2 w-1 h-1 rounded-full bg-neutral-500"></div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <button
-                onClick={() => {
-                  const nextWeek = new Date(currentWeek[0]);
-                  nextWeek.setDate(nextWeek.getDate() + 7);
-                  setCurrentWeek(getWeekDates(nextWeek));
-                }}
-                className={`w-6 h-full flex items-center justify-center ${theme.text.muted} hover:${theme.text.secondary} transition-colors rounded-md`}
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div className={`${theme.card} rounded-md border ${theme.border} p-6 relative min-h-[150px] shadow-sm transition-all duration-300 ${
-          cardVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
-        }`}>
-          <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-            <h2 className="text-lg font-medium flex items-center text-neutral-800 dark:text-neutral-200">
-              <Sparkles className="w-5 h-5 mr-2 text-neutral-500" />
-              Overview
-              <button
-                onClick={() => setIsChatModalOpen(true)}
-                className={`ml-2 p-1.5 rounded-md transition-colors ${theme.text.secondary} hover:${theme.text.primary} hover:bg-neutral-100 dark:hover:bg-neutral-800`}
-                title="Chat with TaskMaster"
-              >
-                <MessageSquare className="w-4 h-4" />
-              </button>
-            </h2>
-            <span className="text-xs bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300 px-2 py-0.5 rounded-full font-medium">
-              AI-POWERED
-            </span>
-          </div>
-
-          {overviewLoading ? (
-            <div className="space-y-3">
-              <div className="h-4 rounded-full w-3/4 animate-pulse bg-neutral-200 dark:bg-neutral-700"></div>
-              <div className="h-4 rounded-full w-2/3 animate-pulse bg-neutral-200 dark:bg-neutral-700 delay-75"></div>
-              <div className="h-4 rounded-full w-4/5 animate-pulse bg-neutral-200 dark:bg-neutral-700 delay-150"></div>
-            </div>
-          ) : (
-            <>
-              <div
-                className="text-sm prose prose-neutral dark:prose-invert max-w-none"
-                dangerouslySetInnerHTML={{ __html: smartOverview }}
-              />
-              <div className="mt-3 text-left text-xs text-neutral-500 dark:text-neutral-400">
-                AI-generated content may contain inaccuracies.
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* Chat History Modal */}
-        {isChatModalOpen && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className={`${theme.card} rounded-md border ${theme.border} w-full max-w-2xl max-h-[80vh] flex flex-col shadow-md`}>
-              <div className={`p-3 border-b ${theme.border} flex justify-between items-center`}>
-                <h3 className="text-base font-medium flex items-center flex-wrap text-neutral-800 dark:text-neutral-200">
-                  <MessageSquare className="w-5 h-5 mr-2" />
-                  Chat with TaskMaster
-                  <span className="ml-2 text-xs bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300 px-2 py-0.5 rounded-full">
-                    AI-POWERED
-                  </span>
-                </h3>
-                <button
-                  onClick={() => setIsChatModalOpen(false)}
-                  className={`${theme.text.secondary} hover:${theme.text.primary} transition-colors`}
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={chatEndRef}>
-                {chatHistory.map((message, index) => (
-                  <div
-                    key={index}
-                    className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                  >
+                  return (
                     <div
-                      className={`max-w-[80%] rounded-md px-4 py-2 ${
-                        message.role === 'user'
-                          ? 'bg-neutral-800 text-white dark:bg-neutral-700'
-                          : `${theme.card} border ${theme.border}`
-                      } shadow-sm`}
+                      key={index}
+                      className={`relative w-full h-6 text-center rounded-md transition-all duration-200 cursor-pointer flex items-center justify-center
+                        ${
+                          isToday
+                            ? 'bg-neutral-100 text-neutral-800 font-medium dark:bg-neutral-700 dark:text-neutral-200'
+                            : `${theme.text.secondary} hover:bg-neutral-100 dark:hover:bg-neutral-800`
+                        }
+                        ${hasDeadline ? 'ring-1 ring-neutral-400' : ''}`}
                     >
-                      <ReactMarkdown
-                        remarkPlugins={[remarkMath, remarkGfm]}
-                        rehypePlugins={[rehypeKatex]}
-                        components={{
-                          p: ({ children }) => <p className="mb-2">{children}</p>,
-                          ul: ({ children }) => (
-                            <ul className="list-disc ml-4 mb-2">{children}</ul>
-                          ),
-                          ol: ({ children }) => (
-                            <ol className="list-decimal ml-4 mb-2">{children}</ol>
-                          ),
-                          li: ({ children }) => <li className="mb-1">{children}</li>,
-                          code: ({ inline, children }) =>
-                            inline ? (
-                              <code className="bg-neutral-100 dark:bg-neutral-800 px-1 rounded">
-                                {children}
-                              </code>
-                            ) : (
-                              <pre className="bg-neutral-100 dark:bg-neutral-800 p-2 rounded-md overflow-x-auto">
-                                <code>{children}</code>
-                              </pre>
-                            ),
-                        }}
-                      >
-                        {message.content}
-                      </ReactMarkdown>
+                      <span className="text-xs">{date.getDate()}</span>
+                      {hasDeadline && (
+                        <div className="absolute bottom-0.5 left-1/2 transform -translate-x-1/2 w-1 h-1 rounded-full bg-neutral-500" />
+                      )}
                     </div>
-                  </div>
-                ))}
-                {isChatLoading && (
-                  <div className="flex justify-start">
-                    <div className={`${theme.card} border ${theme.border} rounded-md px-4 py-2 max-w-[80%]`}>
-                      <div className="flex space-x-2">
-                        <div className="w-2 h-2 bg-neutral-400 rounded-full animate-bounce"></div>
-                        <div className="w-2 h-2 bg-neutral-400 rounded-full animate-bounce delay-100"></div>
-                        <div className="w-2 h-2 bg-neutral-400 rounded-full animate-bounce delay-200"></div>
-                      </div>
-                    </div>
-                  </div>
-                )}
+                  );
+                })}
               </div>
-
-              <form onSubmit={handleChatSubmit} className={`p-3 border-t ${theme.border}`}>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={chatMessage}
-                    onChange={(e) => setChatMessage(e.target.value)}
-                    placeholder="Ask TaskMaster about your items..."
-                    className={`flex-1 rounded-md px-3 py-2 ${theme.input} text-sm`}
-                  />
-                  <button
-                    type="submit"
-                    disabled={isChatLoading}
-                    className={`${theme.accent.primary} px-3 py-2 rounded-md ${theme.hover.primary} transition-colors disabled:opacity-50 disabled:cursor-not-allowed`}
-                  >
-                    <Send className="w-5 h-5" />
-                  </button>
-                </div>
-              </form>
             </div>
+
+            <button
+              onClick={() => {
+                const nextWeek = new Date(currentWeek[0]);
+                nextWeek.setDate(nextWeek.getDate() + 7);
+                setCurrentWeek(getWeekDates(nextWeek));
+              }}
+              className={`w-6 h-full flex items-center justify-center ${theme.text.muted} hover:${theme.text.secondary} transition-colors rounded-md`}
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
           </div>
+        </div>
+      </div>
+
+      <div
+        className={`${theme.card} rounded-md border ${theme.border} p-6 relative min-h-[150px] shadow-sm transition-all duration-300 ${
+          cardVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
+        }`}
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+          <h2 className="text-lg font-medium flex items-center text-neutral-800 dark:text-neutral-200">
+            <Sparkles className="w-5 h-5 mr-2 text-neutral-500" />
+            Overview
+            <button
+              onClick={() => setIsChatModalOpen(true)}
+              className={`ml-2 p-1.5 rounded-md transition-colors ${theme.text.secondary} hover:${theme.text.primary} hover:bg-neutral-100 dark:hover:bg-neutral-800`}
+              title="Chat with TaskMaster"
+            >
+              <MessageSquare className="w-4 h-4" />
+            </button>
+          </h2>
+          <span className="text-xs bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300 px-2 py-0.5 rounded-full font-medium">
+            AI-POWERED
+          </span>
+        </div>
+
+        {overviewLoading ? (
+          <div className="space-y-3">
+            <div className="h-4 rounded-full w-3/4 animate-pulse bg-neutral-200 dark:bg-neutral-700" />
+            <div className="h-4 rounded-full w-2/3 animate-pulse bg-neutral-200 dark:bg-neutral-700 delay-75" />
+            <div className="h-4 rounded-full w-4/5 animate-pulse bg-neutral-200 dark:bg-neutral-700 delay-150" />
+          </div>
+        ) : (
+          <>
+            <div
+              className="text-sm prose prose-neutral dark:prose-invert max-w-none"
+              dangerouslySetInnerHTML={{ __html: smartOverview }}
+            />
+            <div className="mt-3 text-left text-xs text-neutral-500 dark:text-neutral-400">
+              AI-generated content may contain inaccuracies.
+            </div>
+          </>
         )}
+      </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-          <div className="flex flex-col gap-6">
-            {/* Productivity Card with Analytics Toggle */}
-            <div className={`${theme.card} rounded-md border ${theme.border} p-6 shadow-sm`}>
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-medium flex items-center text-neutral-800 dark:text-neutral-200">
-                  <TrendingUp className="w-5 h-5 mr-2" />
-                  Productivity
-                </h2>
-                <button 
-                  onClick={() => setShowAnalytics(!showAnalytics)}
-                  className={`p-1.5 rounded-md transition-colors ${theme.text.secondary} hover:${theme.text.primary} hover:bg-neutral-100 dark:hover:bg-neutral-800 flex items-center gap-1 text-xs`}
+      {isChatModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div
+            className={`${theme.card} rounded-md border ${theme.border} w-full max-w-2xl max-h-[80vh] flex flex-col shadow-md`}
+          >
+            <div
+              className={`p-3 border-b ${theme.border} flex justify-between items-center`}
+            >
+              <h3 className="text-base font-medium flex items-center flex-wrap text-neutral-800 dark:text-neutral-200">
+                <MessageSquare className="w-5 h-5 mr-2" />
+                Chat with TaskMaster
+                <span className="ml-2 text-xs bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300 px-2 py-0.5 rounded-full">
+                  AI-POWERED
+                </span>
+              </h3>
+              <button
+                onClick={() => setIsChatModalOpen(false)}
+                className={`${theme.text.secondary} hover:${theme.text.primary} transition-colors`}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div
+              className="flex-1 overflow-y-auto p-4 space-y-4"
+              ref={chatEndRef}
+            >
+              {chatHistory.map((message, index) => (
+                <div
+                  key={index}
+                  className={`flex ${
+                    message.role === 'user' ? 'justify-end' : 'justify-start'
+                  }`}
                 >
-                  {showAnalytics ? <BarChart className="w-4 h-4" /> : <PieChart className="w-4 h-4" />}
-                  <span>{showAnalytics ? 'Basic View' : 'Analytics'}</span>
-                </button>
-              </div>
-              
-              {showAnalytics ? (
-                <div>
-                  <TaskAnalytics 
-                    tasks={tasks}
-                    goals={goals}
-                    projects={projects}
-                    plans={plans}
-                    isIlluminateEnabled={isIlluminateEnabled}
-                  />
+                  <div
+                    className={`max-w-[80%] rounded-md px-4 py-2 ${
+                      message.role === 'user'
+                        ? 'bg-neutral-800 text-white dark:bg-neutral-700'
+                        : `${theme.card} border ${theme.border}`
+                    } shadow-sm`}
+                  >
+                    <ReactMarkdown
+                      remarkPlugins={[remarkMath, remarkGfm]}
+                      rehypePlugins={[rehypeKatex]}
+                      components={{
+                        p: ({ children }) => <p className="mb-2">{children}</p>,
+                        ul: ({ children }) => (
+                          <ul className="list-disc ml-4 mb-2">{children}</ul>
+                        ),
+                        ol: ({ children }) => (
+                          <ol className="list-decimal ml-4 mb-2">{children}</ol>
+                        ),
+                        li: ({ children }) => (
+                          <li className="mb-1">{children}</li>
+                        ),
+                        code: ({ inline, children }) =>
+                          inline ? (
+                            <code className="bg-neutral-100 dark:bg-neutral-800 px-1 rounded">
+                              {children}
+                            </code>
+                          ) : (
+                            <pre className="bg-neutral-100 dark:bg-neutral-800 p-2 rounded-md overflow-x-auto">
+                              <code>{children}</code>
+                            </pre>
+                          ),
+                      }}
+                    >
+                      {message.content}
+                    </ReactMarkdown>
+                  </div>
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  {totalTasks > 0 && (
-                    <div className="mb-3">
-                      <div className="flex justify-between mb-1">
-                        <p className="flex items-center text-sm">
-                          <ClipboardList className="w-4 h-4 mr-2" />
-                          Tasks
-                        </p>
-                        <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                          {completedTasks}/{totalTasks}
-                        </p>
-                      </div>
-                      <div className="w-full h-2 bg-neutral-100 dark:bg-neutral-700 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-neutral-800 dark:bg-neutral-400 rounded-full transition-all duration-1000 ease-out"
-                          style={{ width: `${tasksProgress}%` }}
-                        />
-                      </div>
+              ))}
+              {isChatLoading && (
+                <div className="flex justify-start">
+                  <div
+                    className={`${theme.card} border ${theme.border} rounded-md px-4 py-2 max-w-[80%]`}
+                  >
+                    <div className="flex space-x-2">
+                      <div className="w-2 h-2 bg-neutral-400 rounded-full animate-bounce" />
+                      <div className="w-2 h-2 bg-neutral-400 rounded-full animate-bounce delay-100" />
+                      <div className="w-2 h-2 bg-neutral-400 rounded-full animate-bounce delay-200" />
                     </div>
-                  )}
-
-                  {totalGoals > 0 && (
-                    <div className="mb-3">
-                      <div className="flex justify-between mb-1">
-                        <p className="flex items-center text-sm">
-                          <Target className="w-4 h-4 mr-2" />
-                          Goals
-                        </p>
-                        <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                          {completedGoals}/{totalGoals}
-                        </p>
-                      </div>
-                      <div className="w-full h-2 bg-neutral-100 dark:bg-neutral-700 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-neutral-800 dark:bg-neutral-400 rounded-full transition-all duration-1000 ease-out"
-                          style={{ width: `${goalsProgress}%` }}
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {totalProjects > 0 && (
-                    <div className="mb-3">
-                      <div className="flex justify-between mb-1">
-                        <p className="flex items-center text-sm">
-                          <Layers className="w-4 h-4 mr-2" />
-                          Projects
-                        </p>
-                        <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                          {completedProjects}/{totalProjects}
-                        </p>
-                      </div>
-                      <div className="w-full h-2 bg-neutral-100 dark:bg-neutral-700 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-neutral-800 dark:bg-neutral-400 rounded-full transition-all duration-1000 ease-out"
-                          style={{ width: `${projectsProgress}%` }}
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {totalPlans > 0 && (
-                    <div className="mb-3">
-                      <div className="flex justify-between mb-1">
-                        <p className="flex items-center text-sm">
-                          <Rocket className="w-4 h-4 mr-2" />
-                          Plans
-                        </p>
-                        <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                          {completedPlans}/{totalPlans}
-                        </p>
-                      </div>
-                      <div className="w-full h-2 bg-neutral-100 dark:bg-neutral-700 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-neutral-800 dark:bg-neutral-400 rounded-full transition-all duration-1000 ease-out"
-                          style={{ width: `${plansProgress}%` }}
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {totalTasks === 0 &&
-                    totalGoals === 0 &&
-                    totalProjects === 0 &&
-                    totalPlans === 0 && (
-                      <p className={`${theme.text.muted} flex items-center text-sm`}>
-                        <Lightbulb className="w-4 h-4 mr-2 text-neutral-500" />
-                        No items to track yet. Start by creating some tasks,
-                        goals, projects, or plans.
-                      </p>
-                    )}
+                  </div>
                 </div>
               )}
             </div>
 
-            {/* Upcoming Deadlines Card */}
-            <div className={`${theme.card} rounded-md border ${theme.border} p-6 shadow-sm`}>
-              <h2 className="text-lg font-medium mb-4 text-neutral-800 dark:text-neutral-200 flex items-center">
-                <Calendar className="w-5 h-5 mr-2" />
-                Upcoming Deadlines
-              </h2>
-              {(() => {
-                const tasksWithType = tasks.map((t) => ({ ...t, type: 'Task' }));
-                const goalsWithType = goals.map((g) => ({ ...g, type: 'Goal' }));
-                const projectsWithType = projects.map((p) => ({
-                  ...p,
-                  type: 'Project',
-                }));
-                const plansWithType = plans.map((p) => ({ ...p, type: 'Plan' }));
-                const allItems = [
-                  ...tasksWithType,
-                  ...goalsWithType,
-                  ...projectsWithType,
-                  ...plansWithType,
-                ];
-
-                const now = new Date();
-                const upcomingDeadlines = allItems
-                  .filter((item) => {
-                    const { dueDate, completed } = item.data;
-                    if (!dueDate) return false;
-                    const dueDateObj = dueDate.toDate
-                      ? dueDate.toDate()
-                      : new Date(dueDate);
-                    return dueDateObj > now && !completed;
-                  })
-                  .sort((a, b) => {
-                    const aDate = a.data.dueDate.toDate
-                      ? a.data.dueDate.toDate()
-                      : new Date(a.data.dueDate);
-                    const bDate = b.data.dueDate.toDate
-                      ? b.data.dueDate.toDate()
-                      : new Date(a.data.dueDate);
-                    return aDate - bDate;
-                  })
-                  .slice(0, 5);
-
-                if (!upcomingDeadlines.length) {
-                  return (
-                    <p className={`${theme.text.muted} flex items-center text-sm`}>
-                      <AlertCircle className="w-4 h-4 mr-2 text-neutral-500" />
-                      No upcoming deadlines
-                    </p>
-                  );
-                }
-
-                return (
-                  <ul className="space-y-3">
-                    {upcomingDeadlines.map((item) => {
-                      const { id, type, data } = item;
-                      const dueDateObj = data.dueDate.toDate
-                        ? data.dueDate.toDate()
-                        : new Date(data.dueDate);
-                      const dueDateStr = dueDateObj.toLocaleDateString();
-                      const itemName =
-                        data.task ||
-                        data.goal ||
-                        data.project ||
-                        data.plan ||
-                        'Untitled';
-
-                      // Calculate days remaining
-                      const today = new Date();
-                      today.setHours(0, 0, 0, 0);
-                      const dueDate = new Date(dueDateObj);
-                      dueDate.setHours(0, 0, 0, 0);
-                      const daysRemaining = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-                      
-                      // Get priority
-                      const priority = data.priority || calculatePriority(item);
-                      
-                      // Determine border color based on days remaining
-                      let borderColor = '';
-                      if (daysRemaining <= 1) {
-                        borderColor = 'border-l-neutral-500 dark:border-l-neutral-400';
-                      } else if (daysRemaining <= 3) {
-                        borderColor = 'border-l-neutral-500 dark:border-l-neutral-400';
-                      } else {
-                        borderColor = 'border-l-neutral-500 dark:border-l-neutral-400';
-                      }
-
-                      return (
-                        <li
-                          key={id}
-                          className={`${theme.card} p-3 rounded-md border ${theme.border} border-l-4 ${borderColor}`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="text-sm">
-                              <span className="font-medium mr-1">{type}:</span>
-                              {itemName}
-                              <PriorityBadge priority={priority} isIlluminateEnabled={isIlluminateEnabled} />
-                            </div>
-                            <div className={`text-xs ${theme.text.secondary} flex items-center`}>
-                              <Clock className="w-3 h-3 mr-1" />
-                              <span className="font-medium">{dueDateStr}</span>
-                              <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
-                                daysRemaining <= 1 
-                                  ? 'bg-neutral-100 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200' 
-                                  : daysRemaining <= 3 
-                                    ? 'bg-neutral-100 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200'
-                                    : 'bg-neutral-100 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200'
-                              }`}>
-                                {daysRemaining === 0 
-                                  ? 'Today' 
-                                  : daysRemaining === 1 
-                                    ? 'Tomorrow' 
-                                    : `${daysRemaining} days`}
-                              </span>
-                            </div>
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                );
-              })()}
-            </div>
-          </div>
-
-          {/* RIGHT COLUMN */}
-          <div className="flex flex-col gap-6">
-            {/* Tabs & List */}
-            <div className={`${theme.card} rounded-md border ${theme.border} p-6 shadow-sm`}>
-              {/* Tabs List */}
-              <div className="flex overflow-x-auto no-scrollbar mb-4">
-                <div className="flex space-x-2 w-full">
-                  {["tasks", "goals", "projects", "plans"].map((tab) => (
-                    <button
-                      key={tab}
-                      className={`px-3 py-1.5 rounded-md transition-all duration-200 text-sm flex items-center whitespace-nowrap ${
-                        activeTab === tab
-                          ? theme.accent.primary
-                          : `${theme.accent.secondary}`
-                      }`}
-                      onClick={() => handleTabChange(tab as "tasks" | "goals" | "projects" | "plans")}
-                    >
-                      {tab === "tasks" && <ClipboardList className="w-4 h-4 mr-1" />}
-                      {tab === "goals" && <Target className="w-4 h-4 mr-1" />}
-                      {tab === "projects" && <Layers className="w-4 h-4 mr-1" />}
-                      {tab === "plans" && <Rocket className="w-4 h-4 mr-1" />}
-                      {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* New Item Form */}
-              <div className="flex flex-col md:flex-row gap-2 mb-4">
+            <form
+              onSubmit={handleChatSubmit}
+              className={`p-3 border-t ${theme.border}`}
+            >
+              <div className="flex gap-2">
                 <input
                   type="text"
-                  className={`flex-grow rounded-md px-3 py-2 ${theme.input} text-sm`}
-                  placeholder={`Enter new ${activeTab}...`}
-                  value={newItemText}
-                  onChange={(e) => setNewItemText(e.target.value)}
+                  value={chatMessage}
+                  onChange={(e) => setChatMessage(e.target.value)}
+                  placeholder="Ask TaskMaster about your items..."
+                  className={`flex-1 rounded-md px-3 py-2 ${theme.input} text-sm`}
                 />
-                <div className="flex gap-2">
-                  <input
-                    type="date"
-                    className={`rounded-md px-3 py-2 ${theme.input} text-sm w-full md:w-auto`}
-                    value={newItemDate}
-                    onChange={(e) => setNewItemDate(e.target.value)}
-                  />
-                  <select
-                    className={`rounded-md px-3 py-2 ${theme.input} text-sm`}
-                    value={newItemPriority}
-                    onChange={(e) => setNewItemPriority(e.target.value as 'high' | 'medium' | 'low')}
-                  >
-                    <option value="high">High</option>
-                    <option value="medium">Medium</option>
-                    <option value="low">Low</option>
-                  </select>
-                  <button
-                    className={`${theme.accent.primary} px-3 py-2 rounded-md ${theme.hover.primary} transition-colors`}
-                    onClick={handleCreate}
-                  >
-                    <PlusIcon className="w-5 h-5" />
-                  </button>
-                </div>
+                <button
+                  type="submit"
+                  disabled={isChatLoading}
+                  className={`${theme.accent.primary} px-3 py-2 rounded-md ${theme.hover.primary} transition-colors disabled:opacity-50 disabled:cursor-not-allowed`}
+                >
+                  <Send className="w-5 h-5" />
+                </button>
               </div>
+            </form>
+          </div>
+        </div>
+      )}
 
-              {/* Items List */}
-              <ul className="space-y-2">
-                {currentItems.length === 0 ? (
-                  <li className={`${theme.text.muted} text-center py-6 text-sm`}>
-                    No {activeTab} yet...
-                  </li>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+        <div className="flex flex-col gap-6">
+          <div
+            className={`${theme.card} rounded-md border ${theme.border} p-6 shadow-sm`}
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-medium flex items-center text-neutral-800 dark:text-neutral-200">
+                <TrendingUp className="w-5 h-5 mr-2" />
+                Productivity
+              </h2>
+              <button
+                onClick={() => setShowAnalytics(!showAnalytics)}
+                className={`p-1.5 rounded-md transition-colors ${theme.text.secondary} hover:${theme.text.primary} hover:bg-neutral-100 dark:hover:bg-neutral-800 flex items-center gap-1 text-xs`}
+              >
+                {showAnalytics ? (
+                  <BarChart className="w-4 h-4" />
                 ) : (
-                  currentItems.map((item) => {
-                    const itemId = item.id;
-                    const textValue = item.data[titleField] || 'Untitled';
-                    const isCompleted = item.data.completed || false;
-                    let overdue = false;
-                    let dueDateStr = '';
-                    if (item.data.dueDate) {
-                      const dueDateObj = item.data.dueDate.toDate
-                        ? item.data.dueDate.toDate()
-                        : new Date(item.data.dueDate);
-                      dueDateStr = dueDateObj.toLocaleDateString();
-                      overdue = dueDateObj < new Date();
-                    }
-                    const isEditing = editingItemId === itemId;
-                    const priority = item.data.priority || calculatePriority(item);
+                  <PieChart className="w-4 h-4" />
+                )}
+                <span>{showAnalytics ? 'Basic View' : 'Analytics'}</span>
+              </button>
+            </div>
+
+            {showAnalytics ? (
+              <div>
+                <TaskAnalytics
+                  tasks={tasks}
+                  goals={goals}
+                  projects={projects}
+                  plans={plans}
+                  isIlluminateEnabled={isIlluminateEnabled}
+                />
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {totalTasks > 0 && (
+                  <div className="mb-3">
+                    <div className="flex justify-between mb-1">
+                      <p className="flex items-center text-sm">
+                        <ClipboardList className="w-4 h-4 mr-2" />
+                        Tasks
+                      </p>
+                      <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                        {completedTasks}/{totalTasks}
+                      </p>
+                    </div>
+                    <div className="w-full h-2 bg-neutral-100 dark:bg-neutral-700 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-neutral-800 dark:bg-neutral-400 rounded-full transition-all duration-1000 ease-out"
+                        style={{ width: `${tasksProgress}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {totalGoals > 0 && (
+                  <div className="mb-3">
+                    <div className="flex justify-between mb-1">
+                      <p className="flex items-center text-sm">
+                        <Target className="w-4 h-4 mr-2" />
+                        Goals
+                      </p>
+                      <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                        {completedGoals}/{totalGoals}
+                      </p>
+                    </div>
+                    <div className="w-full h-2 bg-neutral-100 dark:bg-neutral-700 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-neutral-800 dark:bg-neutral-400 rounded-full transition-all duration-1000 ease-out"
+                        style={{ width: `${goalsProgress}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {totalProjects > 0 && (
+                  <div className="mb-3">
+                    <div className="flex justify-between mb-1">
+                      <p className="flex items-center text-sm">
+                        <Layers className="w-4 h-4 mr-2" />
+                        Projects
+                      </p>
+                      <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                        {completedProjects}/{totalProjects}
+                      </p>
+                    </div>
+                    <div className="w-full h-2 bg-neutral-100 dark:bg-neutral-700 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-neutral-800 dark:bg-neutral-400 rounded-full transition-all duration-1000 ease-out"
+                        style={{ width: `${projectsProgress}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {totalPlans > 0 && (
+                  <div className="mb-3">
+                    <div className="flex justify-between mb-1">
+                      <p className="flex items-center text-sm">
+                        <Rocket className="w-4 h-4 mr-2" />
+                        Plans
+                      </p>
+                      <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                        {completedPlans}/{totalPlans}
+                      </p>
+                    </div>
+                    <div className="w-full h-2 bg-neutral-100 dark:bg-neutral-700 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-neutral-800 dark:bg-neutral-400 rounded-full transition-all duration-1000 ease-out"
+                        style={{ width: `${plansProgress}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {totalTasks === 0 &&
+                  totalGoals === 0 &&
+                  totalProjects === 0 &&
+                  totalPlans === 0 && (
+                    <p className={`${theme.text.muted} flex items-center text-sm`}>
+                      <Lightbulb className="w-4 h-4 mr-2 text-neutral-500" />
+                      No items to track yet. Start by creating some tasks, goals,
+                      projects, or plans.
+                    </p>
+                  )}
+              </div>
+            )}
+          </div>
+
+          <div
+            className={`${theme.card} rounded-md border ${theme.border} p-6 shadow-sm`}
+          >
+            <h2 className="text-lg font-medium mb-4 text-neutral-800 dark:text-neutral-200 flex items-center">
+              <Calendar className="w-5 h-5 mr-2" />
+              Upcoming Deadlines
+            </h2>
+            {(() => {
+              const tasksWithType = tasks.map((t) => ({ ...t, type: 'Task' }));
+              const goalsWithType = goals.map((g) => ({ ...g, type: 'Goal' }));
+              const projectsWithType = projects.map((p) => ({
+                ...p,
+                type: 'Project',
+              }));
+              const plansWithType = plans.map((p) => ({ ...p, type: 'Plan' }));
+              const allItems = [
+                ...tasksWithType,
+                ...goalsWithType,
+                ...projectsWithType,
+                ...plansWithType,
+              ];
+
+              const now = new Date();
+              const upcomingDeadlines = allItems
+                .filter((item) => {
+                  const { dueDate, completed } = item.data;
+                  if (!dueDate) return false;
+                  const dueDateObj = dueDate.toDate
+                    ? dueDate.toDate()
+                    : new Date(dueDate);
+                  return dueDateObj > now && !completed;
+                })
+                .sort((a, b) => {
+                  const aDate = a.data.dueDate.toDate
+                    ? a.data.dueDate.toDate()
+                    : new Date(a.data.dueDate);
+                  const bDate = b.data.dueDate.toDate
+                    ? b.data.dueDate.toDate()
+                    : new Date(b.data.dueDate);
+                  return aDate - bDate;
+                })
+                .slice(0, 5);
+
+              if (!upcomingDeadlines.length) {
+                return (
+                  <p className={`${theme.text.muted} flex items-center text-sm`}>
+                    <AlertCircle className="w-4 h-4 mr-2 text-neutral-500" />
+                    No upcoming deadlines
+                  </p>
+                );
+              }
+
+              return (
+                <ul className="space-y-3">
+                  {upcomingDeadlines.map((item) => {
+                    const { id, type, data } = item;
+                    const dueDateObj = data.dueDate.toDate
+                      ? data.dueDate.toDate()
+                      : new Date(data.dueDate);
+                    const dueDateStr = dueDateObj.toLocaleDateString();
+                    const itemName =
+                      data.task ||
+                      data.goal ||
+                      data.project ||
+                      data.plan ||
+                      'Untitled';
+
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const dueDate = new Date(dueDateObj);
+                    dueDate.setHours(0, 0, 0, 0);
+                    const daysRemaining = Math.ceil(
+                      (dueDate.getTime() - today.getTime()) /
+                        (1000 * 60 * 60 * 24)
+                    );
+
+                    const priority = data.priority || calculatePriority(item);
+
+                    const borderColor =
+                      daysRemaining <= 1
+                        ? 'border-l-neutral-500 dark:border-l-neutral-400'
+                        : daysRemaining <= 3
+                        ? 'border-l-neutral-500 dark:border-l-neutral-400'
+                        : 'border-l-neutral-500 dark:border-l-neutral-400';
 
                     return (
                       <li
-                        key={item.id}
-                        className={`p-3 rounded-md border ${theme.border} flex flex-col md:flex-row md:items-center md:justify-between gap-2
-                          ${
-                            isCompleted
-                              ? 'bg-neutral-50 dark:bg-neutral-800/50'
-                              : overdue
-                              ? 'bg-neutral-50 dark:bg-neutral-800/50'
-                              : theme.card
-                          }
-                        `}
+                        key={id}
+                        className={`${theme.card} p-3 rounded-md border ${theme.border} border-l-4 ${borderColor}`}
                       >
-                        {!isEditing ? (
-                          <div className="flex items-center gap-2 flex-wrap">
+                        <div className="flex items-center justify-between">
+                          <div className="text-sm">
+                            <span className="font-medium mr-1">{type}:</span>
+                            {itemName}
+                            <PriorityBadge
+                              priority={priority}
+                              isIlluminateEnabled={isIlluminateEnabled}
+                            />
+                          </div>
+                          <div
+                            className={`text-xs ${theme.text.secondary} flex items-center`}
+                          >
+                            <Clock className="w-3 h-3 mr-1" />
+                            <span className="font-medium">{dueDateStr}</span>
                             <span
-                              className={`font-medium text-sm ${
-                                isCompleted
-                                  ? 'line-through text-neutral-500 dark:text-neutral-400'
-                                  : ''
+                              className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
+                                daysRemaining <= 1
+                                  ? 'bg-neutral-100 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200'
+                                  : daysRemaining <= 3
+                                  ? 'bg-neutral-100 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200'
+                                  : 'bg-neutral-100 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200'
                               }`}
                             >
-                              {textValue}
+                              {daysRemaining === 0
+                                ? 'Today'
+                                : daysRemaining === 1
+                                ? 'Tomorrow'
+                                : `${daysRemaining} days`}
                             </span>
-                            <PriorityBadge priority={priority} isIlluminateEnabled={isIlluminateEnabled} />
-                            {dueDateStr && (
-                              <span
-                                className={`text-xs px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200 flex items-center`}
-                              >
-                                <Calendar className="w-3 h-3 mr-1" />
-                                {dueDateStr}
-                              </span>
-                            )}
-                            {isCompleted && (
-                              <span
-                                className="text-xs px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200 flex items-center"
-                              >
-                                <Check className="w-3 h-3 mr-1" />
-                                Completed
-                              </span>
-                            )}
                           </div>
-                        ) : (
-                          <div className="flex flex-col sm:flex-row gap-2 w-full">
-                            <input
-                              className={`flex-grow rounded-md px-3 py-2 ${theme.input} text-sm`}
-                              value={editingText}
-                              onChange={(e) => setEditingText(e.target.value)}
-                            />
-                            <input
-                              type="date"
-                              className={`rounded-md px-3 py-2 ${theme.input} text-sm`}
-                              value={editingDate}
-                              onChange={(e) => setEditingDate(e.target.value)}
-                            />
-                            <select
-                              className={`rounded-md px-3 py-2 ${theme.input} text-sm`}
-                              value={editingPriority}
-                              onChange={(e) => setEditingPriority(e.target.value as 'high' | 'medium' | 'low')}
-                            >
-                              <option value="high">High</option>
-                              <option value="medium">Medium</option>
-                              <option value="low">Low</option>
-                            </select>
-                          </div>
-                        )}
-                        <div className="flex gap-2 mt-2 md:mt-0">
-                          {!isEditing ? (
-                            <>
-                              {!isCompleted && (
-                                <button
-                                  className="bg-neutral-800 text-white dark:bg-neutral-700 px-2 py-1 rounded-md hover:bg-neutral-700 dark:hover:bg-neutral-600 transition-colors"
-                                  onClick={() => handleMarkComplete(itemId)}
-                                >
-                                  <Check className="w-4 h-4" />
-                                </button>
-                              )}
-                              <button
-                                className="bg-neutral-800 text-white dark:bg-neutral-700 px-2 py-1 rounded-md hover:bg-neutral-700 dark:hover:bg-neutral-600 transition-colors"
-                                onClick={() =>
-                                  handleEditClick(itemId, textValue, item.data.dueDate)
-                                }
-                              >
-                                <Pencil className="w-4 h-4" />
-                              </button>
-                              <button
-                                className="bg-neutral-800 text-white dark:bg-neutral-700 px-2 py-1 rounded-md hover:bg-neutral-700 dark:hover:bg-neutral-600 transition-colors"
-                                onClick={() => handleDelete(itemId)}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </>
-                          ) : (
-                            <>
-                              <button
-                                className="bg-neutral-800 text-white dark:bg-neutral-700 px-3 py-1 rounded-md hover:bg-neutral-700 dark:hover:bg-neutral-600 transition-colors text-sm"
-                                onClick={() => handleEditSave(itemId)}
-                              >
-                                Save
-                              </button>
-                              <button
-                                className="bg-neutral-800 text-white dark:bg-neutral-700 px-3 py-1 rounded-md hover:bg-neutral-700 dark:hover:bg-neutral-600 transition-colors text-sm"
-                                onClick={() => {
-                                  setEditingItemId(null);
-                                  setEditingText('');
-                                  setEditingDate('');
-                                }}
-                              >
-                                Cancel
-                              </button>
-                            </>
-                          )}
                         </div>
                       </li>
                     );
                   })}
                 </ul>
+              );
+            })()}
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-6">
+          <div
+            className={`${theme.card} rounded-md border ${theme.border} p-6 shadow-sm`}
+          >
+            <div className="flex overflow-x-auto no-scrollbar mb-4">
+              <div className="flex space-x-2 w-full">
+                {['tasks', 'goals', 'projects', 'plans'].map((tab) => (
+                  <button
+                    key={tab}
+                    className={`px-3 py-1.5 rounded-md transition-all duration-200 text-sm flex items-center whitespace-nowrap ${
+                      activeTab === tab
+                        ? theme.accent.primary
+                        : theme.accent.secondary
+                    }`}
+                    onClick={() =>
+                      handleTabChange(
+                        tab as 'tasks' | 'goals' | 'projects' | 'plans'
+                      )
+                    }
+                  >
+                    {tab === 'tasks' && (
+                      <ClipboardList className="w-4 h-4 mr-1" />
+                    )}
+                    {tab === 'goals' && <Target className="w-4 h-4 mr-1" />}
+                    {tab === 'projects' && <Layers className="w-4 h-4 mr-1" />}
+                    {tab === 'plans' && <Rocket className="w-4 h-4 mr-1" />}
+                    {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                  </button>
+                ))}
               </div>
             </div>
+
+            <div className="flex flex-col md:flex-row gap-2 mb-4">
+              <input
+                type="text"
+                className={`flex-grow rounded-md px-3 py-2 ${theme.input} text-sm`}
+                placeholder={`Enter new ${activeTab}...`}
+                value={newItemText}
+                onChange={(e) => setNewItemText(e.target.value)}
+              />
+              <div className="flex gap-2">
+                <input
+                  type="date"
+                  className={`rounded-md px-3 py-2 ${theme.input} text-sm w-full md:w-auto`}
+                  value={newItemDate}
+                  onChange={(e) => setNewItemDate(e.target.value)}
+                />
+                <select
+                  className={`rounded-md px-3 py-2 ${theme.input} text-sm`}
+                  value={newItemPriority}
+                  onChange={(e) =>
+                    setNewItemPriority(e.target.value as 'high' | 'medium' | 'low')
+                  }
+                >
+                  <option value="high">High</option>
+                  <option value="medium">Medium</option>
+                  <option value="low">Low</option>
+                </select>
+                <button
+                  className={`${theme.accent.primary} px-3 py-2 rounded-md ${theme.hover.primary} transition-colors`}
+                  onClick={handleCreate}
+                >
+                  <PlusIcon className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            <ul className="space-y-2">
+              {currentItems.length === 0 ? (
+                <li className={`${theme.text.muted} text-center py-6 text-sm`}>
+                  No {activeTab} yet...
+                </li>
+              ) : (
+                currentItems.map((item) => {
+                  const itemId = item.id;
+                  const textValue = item.data[titleField] || 'Untitled';
+                  const isCompleted = item.data.completed || false;
+                  let overdue = false;
+                  let dueDateStr = '';
+                  if (item.data.dueDate) {
+                    const dueDateObj = item.data.dueDate.toDate
+                      ? item.data.dueDate.toDate()
+                      : new Date(item.data.dueDate);
+                    dueDateStr = dueDateObj.toLocaleDateString();
+                    overdue = dueDateObj < new Date();
+                  }
+                  const isEditing = editingItemId === itemId;
+                  const priority = item.data.priority || calculatePriority(item);
+
+                  return (
+                    <li
+                      key={item.id}
+                      className={`p-3 rounded-md border ${
+                        theme.border
+                      } flex flex-col md:flex-row md:items-center md:justify-between gap-2
+                        ${
+                          isCompleted
+                            ? 'bg-neutral-50 dark:bg-neutral-800/50'
+                            : overdue
+                            ? 'bg-neutral-50 dark:bg-neutral-800/50'
+                            : theme.card
+                        }`}
+                    >
+                      {!isEditing ? (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span
+                            className={`font-medium text-sm ${
+                              isCompleted
+                                ? 'line-through text-neutral-500 dark:text-neutral-400'
+                                : ''
+                            }`}
+                          >
+                            {textValue}
+                          </span>
+                          <PriorityBadge
+                            priority={priority}
+                            isIlluminateEnabled={isIlluminateEnabled}
+                          />
+                          {dueDateStr && (
+                            <span
+                              className={`text-xs px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200 flex items-center`}
+                            >
+                              <Calendar className="w-3 h-3 mr-1" />
+                              {dueDateStr}
+                            </span>
+                          )}
+                          {isCompleted && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200 flex items-center">
+                              <Check className="w-3 h-3 mr-1" />
+                              Completed
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="flex flex-col sm:flex-row gap-2 w-full">
+                          <input
+                            className={`flex-grow rounded-md px-3 py-2 ${theme.input} text-sm`}
+                            value={editingText}
+                            onChange={(e) => setEditingText(e.target.value)}
+                          />
+                          <input
+                            type="date"
+                            className={`rounded-md px-3 py-2 ${theme.input} text-sm`}
+                
+                            value={editingDate}
+                            onChange={(e) => setEditingDate(e.target.value)}
+                          />
+                          <select
+                            className={`rounded-md px-3 py-2 ${theme.input} text-sm`}
+                            value={editingPriority}
+                            onChange={(e) =>
+                              setEditingPriority(
+                                e.target.value as 'high' | 'medium' | 'low'
+                              )
+                            }
+                          >
+                            <option value="high">High</option>
+                            <option value="medium">Medium</option>
+                            <option value="low">Low</option>
+                          </select>
+                        </div>
+                      )}
+                      <div className="flex gap-2 mt-2 md:mt-0">
+                        {!isEditing ? (
+                          <>
+                            {!isCompleted && (
+                              <button
+                                className="bg-neutral-800 text-white dark:bg-neutral-700 px-2 py-1 rounded-md hover:bg-neutral-700 dark:hover:bg-neutral-600 transition-colors"
+                                onClick={() => handleMarkComplete(itemId)}
+                              >
+                                <Check className="w-4 h-4" />
+                              </button>
+                            )}
+                            <button
+                              className="bg-neutral-800 text-white dark:bg-neutral-700 px-2 py-1 rounded-md hover:bg-neutral-700 dark:hover:bg-neutral-600 transition-colors"
+                              onClick={() =>
+                                handleEditClick(
+                                  itemId,
+                                  textValue,
+                                  item.data.dueDate
+                                )
+                              }
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                            <button
+                              className="bg-neutral-800 text-white dark:bg-neutral-700 px-2 py-1 rounded-md hover:bg-neutral-700 dark:hover:bg-neutral-600 transition-colors"
+                              onClick={() => handleDelete(itemId)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              className="bg-neutral-800 text-white dark:bg-neutral-700 px-3 py-1 rounded-md hover:bg-neutral-700 dark:hover:bg-neutral-600 transition-colors text-sm"
+                              onClick={() => handleEditSave(itemId)}
+                            >
+                              Save
+                            </button>
+                            <button
+                              className="bg-neutral-800 text-white dark:bg-neutral-700 px-3 py-1 rounded-md hover:bg-neutral-700 dark:hover:bg-neutral-600 transition-colors text-sm"
+                              onClick={() => {
+                                setEditingItemId(null);
+                                setEditingText('');
+                                setEditingDate('');
+                              }}
+                            >
+                              Cancel
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })
+              )}
+            </ul>
           </div>
-        </main>
+        </div>
       </div>
-    );
-  }
+    </main>
+  </div>
+);
+
 

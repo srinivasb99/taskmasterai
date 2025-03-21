@@ -1488,26 +1488,25 @@ Keep it brief, actionable, impersonal, and readable.
       />
 
       <main
-        className={`transition-all duration-500 ease-in-out min-h-screen
-          ${isSidebarCollapsed ? 'ml-20 md:ml-20' : 'ml-0 md:ml-64'} 
-          p-3 md:p-4 lg:p-8 overflow-x-hidden`} 
+        className={`transition-all duration-300 ease-in-out min-h-screen
+          ${isSidebarCollapsed ? 'ml-16 md:ml-16' : 'ml-0 md:ml-64'} 
+          p-4 md:p-6 lg:p-8 overflow-x-hidden`} 
       >
-        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 sm:gap-6 mb-4 sm:mb-6">
-          <header className="dashboard-header transform transition-all duration-700 ease-out translate-y-0 opacity-100 pt-4 md:pt-16 lg:pt-0 w-full lg:w-auto animate-fadeIn"> 
+        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-4">
+          <header className="dashboard-header w-full lg:w-auto"> 
             <h1
-              className={`text-xl md:text-2xl lg:text-4xl font-bold mb-2 ${headingClass} break-words animate-slideInDown`} 
+              className={`text-2xl md:text-3xl font-bold mb-1 ${headingClass} break-words`} 
             >
               {React.cloneElement(greeting.icon, {
-                className:
-                  'w-4 h-4 md:w-5 md:h-5 lg:w-6 lg:h-6 inline-block align-middle mr-2 -translate-y-0.5 animate-pulse ' + 
-                  (greeting.icon.props.className ?? ''),
+                className: 'w-5 h-5 md:w-6 md:h-6 inline-block align-middle mr-2 -translate-y-0.5 ' + 
+                (greeting.icon.props.className ?? ''),
               })}
               {greeting.greeting},{' '}
             <span className="font-bold">
               {userName ? userName.split(' ')[0] : 'Loading...'}
             </span>
             </h1>
-            <p className={`italic text-sm md:text-base lg:text-lg ${subheadingClass} animate-slideInUp`}>
+            <p className={`italic text-sm md:text-base ${subheadingClass}`}>
               "{quote.text}" -{' '}
               <span
                 className={
@@ -1521,7 +1520,7 @@ Keep it brief, actionable, impersonal, and readable.
 
           {/* Calendar Card */}
           <div
-            className={`${cardClass} rounded-xl p-2 min-w-[100px] w-full max-w-full md:max-w-[550px] h-[80px] transform hover:scale-[1.02] transition-all duration-300 flex-shrink-0 lg:flex-shrink overflow-hidden shadow-lg animate-fadeIn`} 
+            className={`${cardClass} rounded-lg p-2 min-w-[100px] w-full max-w-full md:max-w-[450px] h-[70px] flex-shrink-0 lg:flex-shrink shadow-sm`} 
           >
             <div className="grid grid-cols-9 gap-1 h-full">
               <button
@@ -1652,12 +1651,12 @@ Keep it brief, actionable, impersonal, and readable.
         {/* Smart Insights Panel */}
         {smartInsights.filter(insight => !insight.accepted && !insight.rejected).length > 0 && (
           <div 
-            className={`${cardClass} rounded-xl p-4 sm:p-6 mb-6 shadow-lg animate-fadeIn relative overflow-hidden`}
+            className={`${cardClass} rounded-lg p-4 mb-4 shadow-sm relative overflow-hidden`}
           >
-            <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10 pointer-events-none"></div>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className={`text-lg sm:text-xl font-semibold flex items-center ${isIlluminateEnabled ? illuminateTextBlue : 'text-blue-300'}`}>
-                <BrainCircuit className="w-5 h-5 mr-2 animate-pulse" />
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-purple-500/5 pointer-events-none"></div>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className={`text-lg font-semibold flex items-center ${isIlluminateEnabled ? illuminateTextBlue : 'text-blue-300'}`}>
+                <BrainCircuit className="w-5 h-5 mr-2" />
                 AI Insights
                 <span className="ml-2 text-xs bg-gradient-to-r from-pink-500 to-purple-500 text-white px-2 py-0.5 rounded-full">
                   {smartInsights.filter(insight => !insight.accepted && !insight.rejected).length}
@@ -1681,14 +1680,13 @@ Keep it brief, actionable, impersonal, and readable.
                 .map((insight, index) => (
                   <div 
                     key={insight.id}
-                    className={`p-3 rounded-lg flex items-center justify-between gap-3 animate-slideInRight ${
+                    className={`p-3 rounded-lg flex items-center justify-between gap-3 ${
                       insight.type === 'warning' 
                         ? isIlluminateEnabled ? 'bg-red-100' : 'bg-red-900/20' 
                         : insight.type === 'suggestion'
                           ? isIlluminateEnabled ? 'bg-blue-100' : 'bg-blue-900/20'
                           : isIlluminateEnabled ? 'bg-green-100' : 'bg-green-900/20'
                     }`}
-                    style={{ animationDelay: `${index * 100}ms` }}
                   >
                     <div className="flex items-center gap-2">
                       {insight.type === 'warning' && <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />}
@@ -1724,7 +1722,7 @@ Keep it brief, actionable, impersonal, and readable.
                   .map((insight) => (
                     <div 
                       key={insight.id}
-                      className={`px-3 py-1.5 rounded-full text-xs flex items-center gap-1 animate-fadeIn ${
+                      className={`px-3 py-1.5 rounded-full text-xs flex items-center gap-1 ${
                         insight.type === 'warning' 
                           ? isIlluminateEnabled ? 'bg-red-100 text-red-700' : 'bg-red-900/20 text-red-400' 
                           : insight.type === 'suggestion'
@@ -1754,34 +1752,34 @@ Keep it brief, actionable, impersonal, and readable.
         )}
 
         <div
-          className={`${cardClass} rounded-xl p-4 sm:p-6 relative min-h-[200px] transform hover:shadow-lg hover:shadow-purple-500/20 transition-all duration-500 ease-out ${
+          className={`${cardClass} rounded-lg p-4 relative min-h-[180px] transition-all duration-300 shadow-sm ${
             cardVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
-          } animate-fadeIn`}
+          }`}
         >
-          <div className="flex flex-wrap items-center gap-2 mb-4">
+          <div className="flex flex-wrap items-center gap-2 mb-3">
             <h2
-              className={`text-lg sm:text-xl font-semibold mr-2 flex items-center ${
+              className={`text-lg font-semibold mr-2 flex items-center ${
                 isIlluminateEnabled ? illuminateTextBlue : 'text-blue-300'
               }`}
             >
               <Sparkles
-                className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-yellow-400 animate-pulse"
+                className="w-5 h-5 mr-2 text-yellow-400"
                 style={{ color: isIlluminateEnabled ? '#D97706' : '' }}
               />
               Smart Overview
             </h2>
             <button
               onClick={() => setIsChatModalOpen(true)}
-              className={`p-1.5 sm:p-2 ${
+              className={`p-1.5 ${
                 isIlluminateEnabled
                   ? 'text-blue-700 hover:text-blue-800 hover:bg-blue-200'
                   : 'text-blue-300 hover:text-blue-400 hover:bg-blue-500/10'
-              } rounded-full transition-colors duration-200 transform hover:scale-110`}
+              } rounded-full transition-colors duration-200`}
               title="Chat with TaskMaster"
             >
-              <MessageCircle className="w-4 h-4 sm:w-5 sm:h-5" />
+              <MessageCircle className="w-5 h-5" />
             </button>
-            <span className="text-xs bg-gradient-to-r from-pink-500 to-purple-500 text-white px-2 sm:px-3 py-0.5 sm:py-1 rounded-full font-medium animate-pulse">
+            <span className="text-xs bg-gradient-to-r from-pink-500 to-purple-500 text-white px-2 py-0.5 rounded-full font-medium">
               BETA
             </span>
           </div>
@@ -1795,10 +1793,10 @@ Keep it brief, actionable, impersonal, and readable.
           ) : (
             <>
               <div
-                className="text-sm prose prose-invert animate-fadeIn"
+                className="text-sm prose prose-invert"
                 dangerouslySetInnerHTML={{ __html: smartOverview }}
               />
-              <div className="mt-4 text-left text-xs text-gray-400">
+              <div className="mt-3 text-left text-xs text-gray-400">
                 TaskMaster can make mistakes. Verify details.
               </div>
             </>
@@ -1807,30 +1805,30 @@ Keep it brief, actionable, impersonal, and readable.
 
         {/* Chat History Modal */}
         {isChatModalOpen && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-0 animate-fadeIn">
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div
               className={`${
                 isIlluminateEnabled ? 'bg-white text-gray-900' : 'bg-gray-800'
-              } rounded-xl w-full max-w-2xl mx-2 sm:mx-4 max-h-[80vh] flex flex-col shadow-2xl animate-slideInUp`}
+              } rounded-lg w-full max-w-2xl max-h-[80vh] flex flex-col shadow-xl`}
             >
               <div
-                className={`p-3 sm:p-4 border-b ${
+                className={`p-3 border-b ${
                   isIlluminateEnabled
                     ? 'border-gray-200'
                     : 'border-gray-700 text-gray-100'
                 } flex justify-between items-center`}
               >
                 <h3
-                  className={`text-base sm:text-lg font-semibold flex items-center flex-wrap ${
+                  className={`text-base font-semibold flex items-center flex-wrap ${
                     isIlluminateEnabled ? 'text-blue-700' : 'text-blue-300'
                   }`}
                 >
-                  <MessageCircle className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
+                  <MessageCircle className="w-5 h-5 mr-2" />
                   Chat with TaskMaster
                   <span className="ml-2 text-xs bg-gradient-to-r from-pink-500 to-purple-500 text-gray-300 px-2 py-0.5 rounded-full">
                     BETA
                   </span>
-                  <span className="ml-0 mt-1 sm:ml-2 sm:mt-0 text-xs bg-blue text-gray-300 px-2 py-0.5 rounded-full">
+                  <span className="ml-2 text-xs bg-blue text-gray-300 px-2 py-0.5 rounded-full">
                     Chat history is not saved.
                   </span>
                 </h3>
@@ -1840,7 +1838,7 @@ Keep it brief, actionable, impersonal, and readable.
                     isIlluminateEnabled
                       ? 'text-gray-600 hover:text-gray-900'
                       : 'text-gray-400 hover:text-gray-200'
-                  } transition-colors transform hover:scale-110`}
+                  } transition-colors`}
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -1857,8 +1855,7 @@ Keep it brief, actionable, impersonal, and readable.
                     key={index}
                     className={`flex ${
                       message.role === 'user' ? 'justify-end' : 'justify-start'
-                    } animate-fadeIn`}
-                    style={{ animationDelay: `${index * 100}ms` }}
+                    }`}
                   >
                     <div
                       className={`max-w-[80%] rounded-lg px-4 py-2 ${
@@ -1869,7 +1866,7 @@ Keep it brief, actionable, impersonal, and readable.
                           : isIlluminateEnabled
                           ? 'bg-gray-200 text-gray-900'
                           : 'bg-gray-700 text-gray-200'
-                      } shadow-md transform transition-all duration-300 hover:scale-[1.02]`}
+                      } shadow-md`}
                     >
                       <ReactMarkdown
                         remarkPlugins={[remarkMath, remarkGfm]}
@@ -1957,19 +1954,19 @@ Keep it brief, actionable, impersonal, and readable.
                 )}
               </div>
 
-              <form onSubmit={handleChatSubmit} className="p-4 border-t border-gray-700">
+              <form onSubmit={handleChatSubmit} className="p-3 border-t border-gray-700">
                 <div className="flex gap-2">
                   <input
                     type="text"
                     value={chatMessage}
                     onChange={(e) => setChatMessage(e.target.value)}
                     placeholder="Ask TaskMaster about your items or set a timer..."
-                    className={`flex-1 ${inputBg} text-gray-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-300 shadow-inner`}
+                    className={`flex-1 ${inputBg} text-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-300 shadow-inner`}
                   />
                   <button
                     type="submit"
                     disabled={isChatLoading}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105 shadow-md"
+                    className="bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Send className="w-5 h-5" />
                   </button>
@@ -1979,16 +1976,16 @@ Keep it brief, actionable, impersonal, and readable.
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-          <div className="flex flex-col gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+          <div className="flex flex-col gap-4">
             {/* Productivity Card with Analytics Toggle */}
             <div
-              className={`${cardClass} rounded-xl p-6 transform hover:scale-[1.02] transition-all duration-300 shadow-lg animate-fadeIn relative overflow-hidden`}
+              className={`${cardClass} rounded-lg p-4 shadow-sm relative overflow-hidden`}
             >
               <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-blue-500/5 pointer-events-none"></div>
-              <div className="flex justify-between items-center mb-4">
+              <div className="flex justify-between items-center mb-3">
                 <h2
-                  className={`text-xl font-semibold ${
+                  className={`text-lg font-semibold ${
                     isIlluminateEnabled ? illuminateTextPurple : 'text-purple-400'
                   } flex items-center`}
                 >
@@ -2011,7 +2008,7 @@ Keep it brief, actionable, impersonal, and readable.
               </div>
               
               {showAnalytics ? (
-                <div className="animate-fadeIn">
+                <div>
                   <TaskAnalytics 
                     tasks={tasks}
                     goals={goals}
@@ -2021,10 +2018,10 @@ Keep it brief, actionable, impersonal, and readable.
                   />
                 </div>
               ) : (
-                <div className="space-y-4 animate-fadeIn">
+                <div className="space-y-3">
                   {totalTasks > 0 && (
-                    <div className="mb-4">
-                      <div className="flex justify-between mb-2">
+                    <div className="mb-3">
+                      <div className="flex justify-between mb-1">
                         <p className="flex items-center">
                           <Clipboard className="w-4 h-4 mr-2" />
                           Tasks
@@ -2049,8 +2046,8 @@ Keep it brief, actionable, impersonal, and readable.
                   )}
 
                   {totalGoals > 0 && (
-                    <div className="mb-4">
-                      <div className="flex justify-between mb-2">
+                    <div className="mb-3">
+                      <div className="flex justify-between mb-1">
                         <p className="flex items-center">
                           <Target className="w-4 h-4 mr-2" />
                           Goals
@@ -2075,8 +2072,8 @@ Keep it brief, actionable, impersonal, and readable.
                   )}
 
                   {totalProjects > 0 && (
-                    <div className="mb-4">
-                      <div className="flex justify-between mb-2">
+                    <div className="mb-3">
+                      <div className="flex justify-between mb-1">
                         <p className="flex items-center">
                           <Layers className="w-4 h-4 mr-2" />
                           Projects
@@ -2101,8 +2098,8 @@ Keep it brief, actionable, impersonal, and readable.
                   )}
 
                   {totalPlans > 0 && (
-                    <div className="mb-4">
-                      <div className="flex justify-between mb-2">
+                    <div className="mb-3">
+                      <div className="flex justify-between mb-1">
                         <p className="flex items-center">
                           <Rocket className="w-4 h-4 mr-2" />
                           Plans
@@ -2142,10 +2139,10 @@ Keep it brief, actionable, impersonal, and readable.
 
             {/* Upcoming Deadlines Card */}
             <div
-              className={`${cardClass} rounded-xl p-6 transform hover:scale-[1.02] transition-all duration-300 shadow-lg animate-fadeIn`}
+              className={`${cardClass} rounded-lg p-4 shadow-sm`}
             >
               <h2
-                className={`text-xl font-semibold mb-4 ${
+                className={`text-lg font-semibold mb-3 ${
                   isIlluminateEnabled ? illuminateTextBlue : 'text-blue-400'
                 } flex items-center`}
               >
@@ -2198,7 +2195,7 @@ Keep it brief, actionable, impersonal, and readable.
                 }
 
                 return (
-                  <ul className="space-y-3">
+                  <ul className="space-y-2">
                     {upcomingDeadlines.map((item, index) => {
                       const { id, type, data } = item;
                       const dueDateObj = data.dueDate.toDate
@@ -2239,8 +2236,7 @@ Keep it brief, actionable, impersonal, and readable.
                           key={id}
                           className={`${
                             isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700/50'
-                          } p-4 rounded-lg backdrop-blur-sm transition-all hover:scale-[1.02] hover:shadow-lg border-l-4 ${urgencyColor} animate-slideInRight`}
-                          style={{ animationDelay: `${index * 100}ms` }}
+                          } p-3 rounded-lg border-l-4 ${urgencyColor}`}
                         >
                           <div className="flex items-center justify-between">
                             <div className="text-sm font-medium">
@@ -2295,17 +2291,17 @@ Keep it brief, actionable, impersonal, and readable.
 
       {/* Tabs & List */}
       <div
-        className={`${cardClass} rounded-xl p-6 transform hover:scale-[1.02] transition-all duration-300 shadow-lg animate-fadeIn`}
+        className={`${cardClass} rounded-lg p-4 shadow-sm`}
       >
         {/* Tabs List - Fixed with proper container */}
-        <div className="flex overflow-x-auto no-scrollbar mb-6">
+        <div className="flex overflow-x-auto no-scrollbar mb-4">
           <div className="flex space-x-2 w-full">
             {["tasks", "goals", "projects", "plans"].map((tab) => (
               <button
                 key={tab}
-                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-full transition-all duration-300 transform hover:scale-105 text-sm sm:text-base flex items-center whitespace-nowrap ${
+                className={`px-3 py-1.5 rounded-full transition-all duration-300 text-sm flex items-center whitespace-nowrap ${
                   activeTab === tab
-                    ? "bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-lg"
+                    ? "bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-md"
                     : isIlluminateEnabled
                       ? "bg-gray-200 text-gray-700 hover:bg-gray-300"
                       : "bg-gray-700 text-gray-200 hover:bg-gray-600"
@@ -2322,10 +2318,10 @@ Keep it brief, actionable, impersonal, and readable.
           </div>
         </div>
 
-              <div className="flex flex-col md:flex-row gap-2 mb-6">
+              <div className="flex flex-col md:flex-row gap-2 mb-4">
                 <input
                   type="text"
-                  className={`flex-grow ${inputBg} border border-gray-700 rounded-full p-2 md:p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 shadow-inner`} 
+                  className={`flex-grow ${inputBg} border border-gray-700 rounded-lg p-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 shadow-inner`} 
                   placeholder={`Enter new ${activeTab}...`}
                   value={newItemText}
                   onChange={(e) => setNewItemText(e.target.value)}
@@ -2333,12 +2329,12 @@ Keep it brief, actionable, impersonal, and readable.
                 <div className="flex gap-2">
                   <input
                     type="date"
-                    className={`${inputBg} border border-gray-700 rounded-full p-2 md:p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 w-full md:w-auto shadow-inner`} 
+                    className={`${inputBg} border border-gray-700 rounded-lg p-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 w-full md:w-auto shadow-inner`} 
                     value={newItemDate}
                     onChange={(e) => setNewItemDate(e.target.value)}
                   />
                   <select
-                    className={`${inputBg} border border-gray-700 rounded-full p-2 md:p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 shadow-inner`}
+                    className={`${inputBg} border border-gray-700 rounded-lg p-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 shadow-inner`}
                     value={newItemPriority}
                     onChange={(e) => setNewItemPriority(e.target.value as 'high' | 'medium' | 'low')}
                   >
@@ -2347,7 +2343,7 @@ Keep it brief, actionable, impersonal, and readable.
                     <option value="low">Low Priority</option>
                   </select>
             <button
-              className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white p-3 rounded-full flex items-center justify-center hover:shadow-lg hover:shadow-purple-500/20 transition-all duration-300 transform hover:scale-105 min-w-[48px] min-h-[48px]"
+              className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white p-2 rounded-lg flex items-center justify-center hover:shadow-md transition-all duration-300 min-w-[40px] min-h-[40px]"
               onClick={handleCreate}
             >
               <PlusCircle className="w-5 h-5" />
@@ -2355,9 +2351,9 @@ Keep it brief, actionable, impersonal, and readable.
                 </div>
               </div>
 
-              <ul className="space-y-3">
+              <ul className="space-y-2">
                 {currentItems.length === 0 ? (
-                  <li className="text-gray-400 text-center py-8 animate-pulse">
+                  <li className="text-gray-400 text-center py-6">
                     No {activeTab} yet...
                   </li>
                 ) : (
@@ -2380,7 +2376,7 @@ Keep it brief, actionable, impersonal, and readable.
                     return (
                       <li
                         key={item.id}
-                        className={`p-3 md:p-4 rounded-lg flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-3 
+                        className={`p-3 rounded-lg flex flex-col md:flex-row md:items-center md:justify-between gap-2
                           ${
                             isCompleted
                               ? isIlluminateEnabled
@@ -2394,16 +2390,13 @@ Keep it brief, actionable, impersonal, and readable.
                               ? 'bg-gray-200'
                               : 'bg-gray-700/50'
                           }
-                          backdrop-blur-sm transform transition-all duration-300 hover:scale-[1.02] hover:shadow-lg animate-slideInUp
+                          shadow-sm
                         `}
-                        style={{
-                          animationDelay: `${index * 100}ms`,
-                        }}
                       >
                         {!isEditing ? (
-                          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span
-                              className={`font-bold text-base sm:text-lg ${
+                              className={`font-bold text-base ${
                                 isCompleted
                                   ? 'line-through text-gray-400'
                                   : isIlluminateEnabled
@@ -2416,7 +2409,7 @@ Keep it brief, actionable, impersonal, and readable.
                             <PriorityBadge priority={priority} isIlluminateEnabled={isIlluminateEnabled} />
                             {dueDateStr && (
                               <span
-                                className={`text-xs sm:text-sm font-medium px-2 sm:px-3 py-0.5 sm:py-1 rounded-full ${
+                                className={`text-xs font-medium px-2 py-0.5 rounded-full ${
                                   isIlluminateEnabled
                                     ? 'bg-gray-300 text-gray-800'
                                     : 'bg-gray-600'
@@ -2428,7 +2421,7 @@ Keep it brief, actionable, impersonal, and readable.
                             )}
                             {isCompleted && (
                               <span
-                                className={`text-xs sm:text-sm font-medium px-2 sm:px-3 py-0.5 sm:py-1 rounded-full ${
+                                className={`text-xs font-medium px-2 py-0.5 rounded-full ${
                                   isIlluminateEnabled
                                     ? 'bg-green-300 text-green-800'
                                     : 'bg-green-600'
@@ -2440,20 +2433,20 @@ Keep it brief, actionable, impersonal, and readable.
                             )}
                           </div>
                         ) : (
-                          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full">
+                          <div className="flex flex-col sm:flex-row gap-2 w-full">
                             <input
-                              className={`flex-grow ${inputBg} border border-gray-600 rounded-full p-2 sm:p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 shadow-inner`}
+                              className={`flex-grow ${inputBg} border border-gray-600 rounded-lg p-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 shadow-inner`}
                               value={editingText}
                               onChange={(e) => setEditingText(e.target.value)}
                             />
                             <input
                               type="date"
-                              className={`flex-grow ${inputBg} border border-gray-600 rounded-full p-2 sm:p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 shadow-inner`}
+                              className={`flex-grow ${inputBg} border border-gray-600 rounded-lg p-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 shadow-inner`}
                               value={editingDate}
                               onChange={(e) => setEditingDate(e.target.value)}
                             />
                             <select
-                              className={`${inputBg} border border-gray-600 rounded-full p-2 sm:p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 shadow-inner`}
+                              className={`${inputBg} border border-gray-600 rounded-lg p-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 shadow-inner`}
                               value={editingPriority}
                               onChange={(e) => setEditingPriority(e.target.value as 'high' | 'medium' | 'low')}
                             >
@@ -2463,42 +2456,42 @@ Keep it brief, actionable, impersonal, and readable.
                             </select>
                           </div>
                         )}
-                        <div className="flex gap-2 mt-2 sm:mt-0">
+                        <div className="flex gap-2 mt-2 md:mt-0">
                           {!isEditing ? (
                             <>
                               {!isCompleted && (
                                 <button
-                                  className="bg-gradient-to-r from-green-400 to-green-600 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-white flex items-center gap-2 hover:shadow-lg hover:shadow-green-500/20 transition-all duration-300 transform hover:scale-105"
+                                  className="bg-gradient-to-r from-green-400 to-green-600 px-2 py-1 rounded-lg text-white flex items-center"
                                   onClick={() => handleMarkComplete(itemId)}
                                 >
-                                  <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4" />
+                                  <CheckCircle className="w-4 h-4" />
                                 </button>
                               )}
                               <button
-                                className="bg-gradient-to-r from-blue-400 to-blue-600 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-white flex items-center gap-2 hover:shadow-lg hover:shadow-blue-500/20 transition-all duration-300 transform hover:scale-105"
+                                className="bg-gradient-to-r from-blue-400 to-blue-600 px-2 py-1 rounded-lg text-white flex items-center"
                                 onClick={() =>
                                   handleEditClick(itemId, textValue, item.data.dueDate)
                                 }
                               >
-                                <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
+                                <Edit className="w-4 h-4" />
                               </button>
                               <button
-                                className="bg-gradient-to-r from-red-400 to-red-600 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-white flex items-center gap-2 hover:shadow-lg hover:shadow-red-500/20 transition-all duration-300 transform hover:scale-105"
+                                className="bg-gradient-to-r from-red-400 to-red-600 px-2 py-1 rounded-lg text-white flex items-center"
                                 onClick={() => handleDelete(itemId)}
                               >
-                                <Trash className="w-3 h-3 sm:w-4 sm:h-4" />
+                                <Trash className="w-4 h-4" />
                               </button>
                             </>
                           ) : (
                             <>
                               <button
-                                className="bg-gradient-to-r from-green-400 to-green-600 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-white hover:shadow-lg hover:shadow-green-500/20 transition-all duration-300 transform hover:scale-105 text-sm sm:text-base"
+                                className="bg-gradient-to-r from-green-400 to-green-600 px-3 py-1 rounded-lg text-white text-sm"
                                 onClick={() => handleEditSave(itemId)}
                               >
                                 Save
                               </button>
                               <button
-                                className="bg-gradient-to-r from-gray-400 to-gray-600 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-white hover:shadow-lg hover:shadow-gray-500/20 transition-all duration-300 transform hover:scale-105 text-sm sm:text-base"
+                                className="bg-gradient-to-r from-gray-400 to-gray-600 px-3 py-1 rounded-lg text-white text-sm"
                                 onClick={() => {
                                   setEditingItemId(null);
                                   setEditingText('');
@@ -2519,19 +2512,19 @@ Keep it brief, actionable, impersonal, and readable.
           </div>
 
           {/* RIGHT COLUMN */}
-          <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-4">
             {/* ADVANCED WEATHER CARD */}
-            <div className={`${cardClass} rounded-xl p-4 sm:p-6 transform hover:scale-[1.02] transition-all duration-300 shadow-lg animate-fadeIn`}>
-              <h2 className={`text-lg sm:text-xl font-semibold mb-4 ${headingClass} flex items-center`}>
-                <Sun className="w-5 h-5 mr-2 animate-spin-slow" />
+            <div className={`${cardClass} rounded-lg p-4 shadow-sm`}>
+              <h2 className={`text-lg font-semibold mb-3 ${headingClass} flex items-center`}>
+                <Sun className="w-5 h-5 mr-2" />
                 Weather & Forecast
               </h2>
               {weatherData ? (
                 <>
                   {/* Current weather */}
-                  <div className="space-y-2 sm:space-y-3 mb-4 sm:mb-6">
+                  <div className="space-y-2 mb-4">
                     <p
-                      className={`text-xl sm:text-2xl font-bold bg-clip-text text-transparent ${
+                      className={`text-xl font-bold bg-clip-text text-transparent ${
                         isIlluminateEnabled
                           ? 'bg-gradient-to-r from-blue-600 to-purple-800'
                           : 'bg-gradient-to-r from-blue-400 to-purple-600'
@@ -2540,43 +2533,43 @@ Keep it brief, actionable, impersonal, and readable.
                       {weatherData.location.name}
                     </p>
 
-                    <p className={`flex items-center gap-2 text-base sm:text-lg ${subheadingClass}`}>
+                    <p className={`flex items-center gap-2 text-base ${subheadingClass}`}>
                       <img
                         src={weatherData.current.condition.icon || "/placeholder.svg"}
                         alt={weatherData.current.condition.text}
-                        className="w-8 h-8 sm:w-10 sm:h-10 animate-pulse"
+                        className="w-8 h-8"
                       />
                       {weatherData.current.condition.text} - {weatherData.current.temp_f}°F
-                      <span className={`ml-2 text-sm sm:text-base ${subheadingClass}`}>
+                      <span className={`ml-2 text-sm ${subheadingClass}`}>
                         Feels like {weatherData.current.feelslike_f}°F
                       </span>
                     </p>
-                    <div className="flex flex-wrap gap-2 sm:gap-4 text-xs sm:text-sm">
+                    <div className="flex flex-wrap gap-2 text-xs">
                       <div className="flex items-center">
                         <Wind className="w-4 h-4 mr-1 text-blue-400" />
                         <strong>Wind:</strong>
-                        <span className="ml-1 sm:ml-2">
+                        <span className="ml-1">
                           {Math.round(weatherData.current.wind_mph)} mph
                         </span>
                       </div>
                       <div className="flex items-center">
                         <Droplets className="w-4 h-4 mr-1 text-blue-400" />
                         <strong>Humidity:</strong>
-                        <span className="ml-1 sm:ml-2">{weatherData.current.humidity}%</span>
+                        <span className="ml-1">{weatherData.current.humidity}%</span>
                       </div>
                       <div className="flex items-center">
                         <Zap className="w-4 h-4 mr-1 text-yellow-400" />
                         <strong>UV Index:</strong>
-                        <span className="ml-1 sm:ml-2">{weatherData.current.uv}</span>
+                        <span className="ml-1">{weatherData.current.uv}</span>
                       </div>
                     </div>
                   </div>
 
                   {/* Forecast */}
                   {weatherData.forecast && weatherData.forecast.forecastday && (
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                       <h3
-                        className={`text-lg font-semibold ${
+                        className={`text-base font-semibold ${
                           isIlluminateEnabled ? 'text-blue-700' : 'text-blue-400'
                         } flex items-center`}
                       >
@@ -2614,10 +2607,9 @@ Keep it brief, actionable, impersonal, and readable.
                           return (
                             <div
                               key={day.date}
-                              className={`flex items-center gap-4 ${forecastBg} p-3 rounded-lg relative overflow-hidden transform transition-all duration-300 hover:scale-[1.02] animate-slideInRight`}
-                              style={{ animationDelay: `${idx * 150}ms` }}
+                              className={`flex items-center gap-3 ${forecastBg} p-2 rounded-lg relative overflow-hidden`}
                             >
-                              <div className="absolute inset-0 bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 opacity-10 pointer-events-none" />
+                              <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 to-purple-600/10 pointer-events-none" />
                               <img
                                 src={icon || "/placeholder.svg"}
                                 alt={day.day.condition.text}
@@ -2633,7 +2625,7 @@ Keep it brief, actionable, impersonal, and readable.
                                 </p>
                                 <div className="flex items-center gap-3 mt-1">
                                   <p
-                                    className={`text-sm ${
+                                    className={`text-xs ${
                                       isIlluminateEnabled ? 'text-red-700' : 'text-red-300'
                                     } flex items-center`}
                                   >
@@ -2641,7 +2633,7 @@ Keep it brief, actionable, impersonal, and readable.
                                     High: {maxF}°F
                                   </p>
                                   <p
-                                    className={`text-sm ${
+                                    className={`text-xs ${
                                       isIlluminateEnabled ? 'text-blue-700' : 'text-blue-300'
                                     } flex items-center`}
                                   >
@@ -2650,7 +2642,7 @@ Keep it brief, actionable, impersonal, and readable.
                                   </p>
                                 </div>
                                 <div
-                                  className={`mt-2 w-full h-2 ${
+                                  className={`mt-1 w-full h-2 ${
                                     isIlluminateEnabled ? 'bg-gray-300' : 'bg-gray-600'
                                   } rounded-full overflow-hidden`}
                                 >
@@ -2668,14 +2660,14 @@ Keep it brief, actionable, impersonal, and readable.
                   )}
                 </>
               ) : (
-                <div className="animate-pulse space-y-4">
+                <div className="animate-pulse space-y-3">
                   <div
-                    className={`h-8 rounded-full w-1/2 ${
+                    className={`h-6 rounded-full w-1/2 ${
                       isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700'
                     }`}
                   ></div>
                   <div
-                    className={`h-6 rounded-full w-3/4 ${
+                    className={`h-4 rounded-full w-3/4 ${
                       isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700'
                     }`}
                   ></div>
@@ -2689,21 +2681,21 @@ Keep it brief, actionable, impersonal, and readable.
             </div>
 
             {/* MAIN POMODORO TIMER */}
-            <div className={`${cardClass} rounded-xl p-4 sm:p-6 transform hover:scale-[1.02] transition-all duration-300 shadow-lg animate-fadeIn`}>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className={`text-lg sm:text-xl font-semibold ${headingClass} flex items-center`}>
+            <div className={`${cardClass} rounded-lg p-4 shadow-sm`}>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className={`text-lg font-semibold ${headingClass} flex items-center`}>
                   <Clock className="w-5 h-5 mr-2" />
                   Pomodoro Timer
                 </h2>
                 <button
-                  className="bg-gradient-to-r from-purple-400 to-purple-600 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-full font-bold flex items-center gap-1 sm:gap-2 hover:shadow-lg hover:shadow-purple-500/20 transition-all duration-300 transform hover:scale-105 text-xs sm:text-sm"
+                  className="bg-gradient-to-r from-purple-400 to-purple-600 text-white px-3 py-1 rounded-lg font-medium flex items-center gap-1 text-sm"
                   onClick={handleAddCustomTimer}
                 >
-                  <PlusCircle className="w-3 h-3 sm:w-4 sm:h-4" /> New Timer
+                  <PlusCircle className="w-4 h-4" /> New Timer
                 </button>
               </div>
               <div
-                className={`text-4xl sm:text-6xl font-bold mb-4 sm:mb-6 text-center bg-clip-text text-transparent ${
+                className={`text-4xl font-bold mb-4 text-center bg-clip-text text-transparent ${
                   isIlluminateEnabled
                     ? 'bg-gradient-to-r from-blue-600 to-purple-800'
                     : 'bg-gradient-to-r from-blue-400 to-purple-600'
@@ -2711,43 +2703,43 @@ Keep it brief, actionable, impersonal, and readable.
               >
                 {formatPomodoroTime(pomodoroTimeLeft)}
               </div>
-              <div className="flex justify-center flex-wrap gap-2 sm:space-x-4">
+              <div className="flex justify-center flex-wrap gap-2">
                 <button
-                  className="bg-gradient-to-r from-green-400 to-green-600 px-4 sm:px-6 py-2 sm:py-3 rounded-full font-semibold hover:shadow-lg hover:shadow-green-500/20 transition-all duration-300 transform hover:scale-105 text-sm sm:text-base"
+                  className="bg-gradient-to-r from-green-400 to-green-600 px-4 py-2 rounded-lg font-medium hover:shadow-md transition-all duration-300 text-sm"
                   onClick={handlePomodoroStart}
                 >
                   Start
                 </button>
                 <button
-                  className="bg-gradient-to-r from-yellow-400 to-yellow-600 px-4 sm:px-6 py-2 sm:py-3 rounded-full font-semibold hover:shadow-lg hover:shadow-yellow-500/20 transition-all duration-300 transform hover:scale-105 text-sm sm:text-base"
+                  className="bg-gradient-to-r from-yellow-400 to-yellow-600 px-4 py-2 rounded-lg font-medium hover:shadow-md transition-all duration-300 text-sm"
                   onClick={handlePomodoroPause}
                 >
                   Pause
                 </button>
                 <button
-                  className="bg-gradient-to-r from-red-400 to-red-600 px-4 sm:px-6 py-2 sm:py-3 rounded-full font-semibold hover:shadow-lg hover:shadow-red-500/20 transition-all duration-300 transform hover:scale-105 text-sm sm:text-base"
+                  className="bg-gradient-to-r from-red-400 to-red-600 px-4 py-2 rounded-lg font-medium hover:shadow-md transition-all duration-300 text-sm"
                   onClick={handlePomodoroReset}
                 >
                   Reset
                 </button>
               </div>
               {!customTimers.length && (
-                <p className="text-sm text-gray-400 mt-6 text-center animate-pulse">
+                <p className="text-sm text-gray-400 mt-4 text-center">
                   🍎 No custom timers yet. Click the "New Timer" button to create one! 🍎
                 </p>
               )}
             </div>
 
             {/* CUSTOM TIMERS LIST */}
-            <div className={`${cardClass} rounded-xl p-6 transform hover:scale-[1.02] transition-all duration-300 shadow-lg animate-fadeIn`}>
-              <h2 className={`text-xl font-semibold mb-6 ${headingClass} flex items-center transition-all duration-300 shadow-lg animate-fadeIn`}>
+            <div className={`${cardClass} rounded-lg p-4 shadow-sm`}>
+              <h2 className={`text-lg font-semibold mb-3 ${headingClass} flex items-center`}>
                 <TimerIcon className="w-5 h-5 mr-2" />
                 Custom Timers
               </h2>
               {customTimers.length === 0 ? (
-                <p className="text-gray-400 text-center py-8 animate-pulse">No custom timers yet...</p>
+                <p className="text-gray-400 text-center py-6">No custom timers yet...</p>
               ) : (
-                <ul className="space-y-4">
+                <ul className="space-y-3">
                   {customTimers.map((timer, index) => {
                     const timerId = timer.id;
                     const runningState = runningTimers[timerId];
@@ -2781,23 +2773,22 @@ Keep it brief, actionable, impersonal, and readable.
                     return (
                       <li
                         key={timerId}
-                        className={`p-3 sm:p-4 rounded-lg backdrop-blur-sm transform transition-all duration-300 hover:scale-[1.02] hover:shadow-lg animate-slideInUp ${itemBgClass}`}
-                        style={{ animationDelay: `${index * 100}ms` }}
+                        className={`p-3 rounded-lg shadow-sm ${itemBgClass}`}
                       >
-                        <div className="flex flex-col md:flex-row items-center justify-between gap-3 md:gap-4"> 
+                        <div className="flex flex-col md:flex-row items-center justify-between gap-3"> 
                           <div className="flex flex-col items-center md:items-start w-full md:w-auto"> 
                             {isEditing ? (
                               <div className="flex flex-col gap-2 w-full">
                                 <input
                                   type="text"
-                                  className={`flex-grow ${inputBg} border border-gray-600 rounded-full p-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 shadow-inner`}
+                                  className={`flex-grow ${inputBg} border border-gray-600 rounded-lg p-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 shadow-inner`}
                                   value={editingTimerName}
                                   onChange={(e) => setEditingTimerName(e.target.value)}
                                   placeholder="Timer name"
                                 />
                                 <input
                                   type="number"
-                                  className={`flex-grow ${inputBg} border border-gray-600 rounded-full p-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 shadow-inner`}
+                                  className={`flex-grow ${inputBg} border border-gray-600 rounded-lg p-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 shadow-inner`}
                                   value={editingTimerMinutes}
                                   onChange={(e) => setEditingTimerMinutes(e.target.value)}
                                   placeholder="Minutes"
@@ -2805,13 +2796,13 @@ Keep it brief, actionable, impersonal, and readable.
                                 />
                                 <div className="flex gap-2 mt-2">
                                   <button
-                                    className="bg-gradient-to-r from-green-400 to-green-600 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-white hover:shadow-lg hover:shadow-green-500/20 transition-all duration-300 text-sm"
+                                    className="bg-gradient-to-r from-green-400 to-green-600 px-3 py-1 rounded-lg text-white text-sm"
                                     onClick={() => handleEditTimerSave(timerId)}
                                   >
                                     Save
                                   </button>
                                   <button
-                                    className="bg-gradient-to-r from-gray-400 to-gray-600 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-white hover:shadow-lg hover:shadow-gray-500/20 transition-all duration-300 text-sm"
+                                    className="bg-gradient-to-r from-gray-400 to-gray-600 px-3 py-1 rounded-lg text-white text-sm"
                                     onClick={() => setEditingTimerId(null)}
                                   >
                                     Cancel
@@ -2820,13 +2811,13 @@ Keep it brief, actionable, impersonal, and readable.
                               </div>
                             ) : (
                               <>
-                                <div className="flex items-center gap-2 mb-2 flex-wrap justify-center sm:justify-start">
-                                  <span className="font-bold text-base sm:text-lg text-center sm:text-left">
+                                <div className="flex items-center gap-2 mb-1 flex-wrap justify-center md:justify-start">
+                                  <span className="font-bold text-base text-center md:text-left">
                                     {timer.data.name}
                                   </span>
-                                  <div className="flex gap-1 sm:gap-2">
+                                  <div className="flex gap-1">
                                     <button
-                                      className="bg-gradient-to-r from-blue-400 to-blue-600 p-1.5 sm:p-2 rounded-full text-white hover:shadow-lg hover:shadow-blue-500/20 transition-all duration-300 transform hover:scale-105"
+                                      className="bg-gradient-to-r from-blue-400 to-blue-600 p-1 rounded-lg text-white"
                                       onClick={() =>
                                         handleEditTimerClick(
                                           timerId,
@@ -2835,18 +2826,18 @@ Keep it brief, actionable, impersonal, and readable.
                                         )
                                       }
                                     >
-                                      <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
+                                      <Edit className="w-3 h-3" />
                                     </button>
                                     <button
-                                      className="bg-gradient-to-r from-red-400 to-red-600 p-1.5 sm:p-2 rounded-full text-white hover:shadow-lg hover:shadow-red-500/20 transition-all duration-300 transform hover:scale-105"
+                                      className="bg-gradient-to-r from-red-400 to-red-600 p-1 rounded-lg text-white"
                                       onClick={() => handleDeleteTimer(timerId)}
                                     >
-                                      <Trash className="w-3 h-3 sm:w-4 sm:h-4" />
+                                      <Trash className="w-3 h-3" />
                                     </button>
                                   </div>
                                 </div>
                                 <span
-                                  className={`text-2xl sm:text-3xl font-semibold bg-clip-text text-transparent ${
+                                  className={`text-2xl font-semibold bg-clip-text text-transparent ${
                                     isIlluminateEnabled
                                       ? 'bg-gradient-to-r from-blue-600 to-purple-800'
                                       : 'bg-gradient-to-r from-blue-400 to-purple-600'
@@ -2858,10 +2849,10 @@ Keep it brief, actionable, impersonal, and readable.
                             )}
                           </div>
                           {!isEditing && (
-                            <div className="flex gap-2 mt-2 sm:mt-0">
+                            <div className="flex gap-2">
                               {!isRunning && (
                                 <button
-                                  className="bg-gradient-to-r from-green-400 to-green-600 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full font-semibold hover:shadow-lg hover:shadow-green-500/20 transition-all duration-300 transform hover:scale-105 text-xs sm:text-sm"
+                                  className="bg-gradient-to-r from-green-400 to-green-600 px-3 py-1 rounded-lg font-medium text-xs"
                                   onClick={() => startCustomTimer(timerId)}
                                 >
                                   Start
@@ -2869,14 +2860,14 @@ Keep it brief, actionable, impersonal, and readable.
                               )}
                               {isRunning && (
                                 <button
-                                  className="bg-gradient-to-r from-yellow-400 to-yellow-600 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full font-semibold hover:shadow-lg hover:shadow-yellow-500/20 transition-all duration-300 transform hover:scale-105 text-xs sm:text-sm"
+                                  className="bg-gradient-to-r from-yellow-400 to-yellow-600 px-3 py-1 rounded-lg font-medium text-xs"
                                   onClick={() => pauseCustomTimer(timerId)}
                                 >
                                   Pause
                                 </button>
                               )}
                               <button
-                                className="bg-gradient-to-r from-gray-400 to-gray-600 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full font-semibold hover:shadow-lg hover:shadow-gray-500/20 transition-all duration-300 transform hover:scale-105 text-xs sm:text-sm"
+                                className="bg-gradient-to-r from-gray-400 to-gray-600 px-3 py-1 rounded-lg font-medium text-xs"
                                 onClick={() => resetCustomTimer(timerId)}
                               >
                                 Reset
@@ -2895,4 +2886,4 @@ Keep it brief, actionable, impersonal, and readable.
       </main>
     </div>
   );
-}
+} 

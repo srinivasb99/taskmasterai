@@ -35,7 +35,7 @@ import { auth, db } from '../lib/firebase';
 import { User } from 'firebase/auth';
 import { getDoc, doc } from 'firebase/firestore';
 import { updateUserProfile, signOutUser, deleteUserAccount, AuthError, getCurrentUser } from '../lib/settings-firebase'; // Ensure these functions exist
-import { SmartInsight } from './SmartInsight'; // Assuming this component exists - might be integrated or removed if logic is purely within Dashboard
+import { SmartInsight as SmartInsightComponent } from './SmartInsight'; // Renamed import to avoid conflict with interface
 import { PriorityBadge } from './PriorityBadge'; // Ensure this component exists and accepts priority and isIlluminateEnabled props
 import { TaskAnalytics } from './TaskAnalytics'; // Ensure this component exists and accepts item props and isIlluminateEnabled
 
@@ -43,7 +43,7 @@ import { TaskAnalytics } from './TaskAnalytics'; // Ensure this component exists
 // ---------------------
 // Helper functions for Gemini integration
 // ---------------------
-const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`; // Using 1.5 flash as per common practice, ensure key is valid
+const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}&alt=sse`; // Use 1.5 flash and enable SSE
 
 const fetchWithTimeout = async (url: string, options: RequestInit, timeout = 30000) => {
   const controller = new AbortController();
@@ -68,11 +68,12 @@ const fetchWithTimeout = async (url: string, options: RequestInit, timeout = 300
 const streamResponse = async (
   url: string,
   options: RequestInit,
-  onStreamUpdate: (textChunk: string) => void,
+  onStreamUpdate: (textChunk: string) => void, // Changed to pass raw accumulated text
   timeout = 45000 // Increased timeout slightly for potentially longer streams
 ) => {
     try {
-        const response = await fetchWithTimeout(url, options, timeout); // Use fetchWithTimeout
+        // Fetch WITHOUT timeout for streaming connections, as the connection should stay open
+        const response = await fetch(url, { ...options });
 
         if (!response.ok) {
             // Try to get error message from response body
@@ -89,29 +90,29 @@ const streamResponse = async (
             throw new Error(`API Request Failed (${response.status}): ${response.statusText} ${errorBody || ''}`);
         }
 
-
         if (!response.body) {
+             // This case might still happen if the server doesn't support SSE correctly or sends a non-streamed error
             const text = await response.text();
             onStreamUpdate(text); // Send the full non-streamed text
-            return text;
+            return text; // Return the full text
         }
 
         const reader = response.body.getReader();
         const decoder = new TextDecoder("utf-8");
         let done = false;
-        let accumulatedText = "";
+        let accumulatedRawText = ""; // Accumulate the RAW text from chunks
 
         while (!done) {
             const { value, done: doneReading } = await reader.read();
             done = doneReading;
             if (value) {
-            const chunk = decoder.decode(value, { stream: !done });
-            accumulatedText += chunk;
-            // Debounce or directly call onStreamUpdate
-            onStreamUpdate(accumulatedText); // Pass the accumulated text so far
+                const rawChunk = decoder.decode(value, { stream: !done });
+                accumulatedRawText += rawChunk;
+                // Pass the *accumulated raw text* to the callback
+                onStreamUpdate(accumulatedRawText);
             }
         }
-        return accumulatedText; // Return the final accumulated text
+        return accumulatedRawText; // Return the final accumulated raw text
 
     } catch (error) {
         console.error("Streaming Error:", error);
@@ -121,56 +122,67 @@ const streamResponse = async (
 };
 
 
-const extractCandidateText = (text: string): string => {
-  // Improved extraction to handle potential streaming chunks and errors
-  try {
-    // Attempt to find the last complete JSON object in the stream if multiple are present
-    const jsonObjects = text.match(/{\s*"candidates":[\s\S]*?}/g);
-    let candidateText = text; // Default to the original text
+const extractCandidateText = (rawResponseText: string): string => {
+    // Goal: Find and return only the text content from the *first candidate*.
+    // Avoid returning the raw JSON wrapper or metadata. Handles SSE chunks.
+    try {
+        let extractedText = "";
+        let potentialJson = "";
 
-    if (jsonObjects && jsonObjects.length > 0) {
-        const lastJsonObject = jsonObjects[jsonObjects.length - 1];
-        try {
-            const jsonResponse = JSON.parse(lastJsonObject);
-             if (
-                jsonResponse?.candidates?.[0]?.content?.parts?.[0]?.text
-            ) {
-                candidateText = jsonResponse.candidates[0].content.parts[0].text;
-            } else if (jsonResponse?.error?.message) {
-                 console.error("Gemini API Error in response:", jsonResponse.error.message);
-                 // Return a user-friendly error or the message itself
-                 candidateText = `Error: ${jsonResponse.error.message}`;
-             }
-            // If structure is unexpected but parsing worked, keep candidateText as the original text
-        } catch (innerErr) {
-            // If parsing the *last* object fails, maybe the text *before* it was the message?
-             const textBeforeLastJson = text.substring(0, text.lastIndexOf(lastJsonObject)).trim();
-             if (textBeforeLastJson && !textBeforeLastJson.includes('"candidates"')) {
-                 candidateText = textBeforeLastJson;
-             }
-             // else stick with original text as fallback
-             // console.warn("Error parsing last JSON object in stream:", innerErr);
+        // Split potential SSE chunks (Gemini SSE format: data: {...})
+        const lines = rawResponseText.trim().split('\n');
+        const lastDataLine = lines.filter(line => line.startsWith('data:')).pop();
+
+        if (lastDataLine) {
+             potentialJson = lastDataLine.substring(5).trim(); // Remove 'data:' prefix
+        } else if (rawResponseText.trim().startsWith('{')) {
+            // Might be a non-SSE JSON response (e.g., error or non-streamed)
+            potentialJson = rawResponseText.trim();
         }
-    } else if (text.trim().startsWith('{')) {
-         // Might be a single JSON object not matching the regex (e.g., error format)
-         try {
-            const jsonResponse = JSON.parse(text);
-             if (jsonResponse?.error?.message) {
-                 console.error("Gemini API Error in response:", jsonResponse.error.message);
-                 candidateText = `Error: ${jsonResponse.error.message}`;
-             }
-             // If it parses but isn't the expected candidate structure or error, keep original text
-         } catch (parseErr) {
-             // Incomplete JSON or plain text, ignore parsing error and use original text
-         }
-    }
 
-    // Clean up common unwanted prefixes/suffixes sometimes added by the model
-    return candidateText.replace(/^Assistant:\s*/, '').replace(/^(User|Human):\s*/, '').trim();
-  } catch (err) {
-    console.error("Error extracting candidate text:", err, "Original text:", text);
-    return text; // Fallback to original text on unexpected error
-  }
+        if (potentialJson) {
+            try {
+                const parsedJson = JSON.parse(potentialJson);
+
+                // 1. Check for the target candidate text
+                if (parsedJson.candidates?.[0]?.content?.parts?.[0]?.text) {
+                    extractedText = parsedJson.candidates[0].content.parts[0].text;
+                }
+                // 2. Check for an error message within the JSON
+                else if (parsedJson.error?.message) {
+                    console.error("Gemini API Error in response:", parsedJson.error.message);
+                    return `Error: ${parsedJson.error.message}`; // Return formatted error
+                }
+                // 3. If parsed but no text/error found (e.g., only safety ratings in chunk)
+                // Return empty string for this chunk, wait for next chunk with text.
+                else {
+                    // console.warn("Parsed JSON chunk lacks text/error:", parsedJson);
+                    extractedText = "";
+                }
+
+            } catch (e) {
+                // JSON parsing failed - likely an incomplete chunk.
+                // Return empty string, wait for more data.
+                 // console.warn("Incomplete JSON chunk, waiting...", potentialJson);
+                extractedText = "";
+            }
+        } else {
+            // Doesn't look like SSE or JSON - maybe plain text error or unexpected format?
+            // Return empty for safety unless it's the very final chunk processing.
+            // The caller (`handleChatSubmit`) handles the final decision based on accumulated text.
+             // For streaming updates, safer to return "" if format is unexpected.
+            extractedText = "";
+        }
+
+        // Clean common prefixes (already handled in stream processing, but safe to repeat)
+        return extractedText.replace(/^Assistant:\s*/, '').replace(/^(User|Human):\s*/, '').trim();
+
+    } catch (err) {
+        // Catch unexpected errors during the extraction process itself
+        console.error("Error *during* extraction logic:", err, "Original text:", rawResponseText);
+        // Fallback cautiously: return empty string
+        return "";
+    }
 };
 
 // ---------------------
@@ -324,13 +336,7 @@ export function Dashboard() {
     const checkAuth = async () => {
         const currentUser = getCurrentUser(); // Assumes this returns User | null synchronously
         if (!currentUser) {
-          // Small delay before redirecting, allows Firebase auth state init
-          //setTimeout(() => {
-          //  if (!getCurrentUser()) { // Double check after delay
-          //      navigate('/login');
-          //  }
-          //}, 500);
-          navigate('/login'); // Redirect immediately might be fine if initial check is reliable
+          navigate('/login'); // Redirect immediately
         } else {
            // If user exists, update their lastSeen in Firestore (fire-and-forget)
            updateDashboardLastSeen(currentUser.uid).catch(err => {
@@ -358,6 +364,7 @@ export function Dashboard() {
   interface FlashcardMessage { type: 'flashcard'; data: FlashcardData[]; }
   interface QuestionMessage { type: 'question'; data: QuestionData[]; }
   interface ChatMessage {
+    id?: string; // Added optional ID for message tracking during streaming
     role: 'user' | 'assistant';
     content: string;
     timer?: TimerMessage;
@@ -372,6 +379,7 @@ export function Dashboard() {
   const [chatMessage, setChatMessage] = useState('');
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([
     {
+      id: 'initial-greet',
       role: 'assistant',
       content: "👋 Hi I'm TaskMaster, How can I help you today? Need help with your items? Simply ask me!"
     }
@@ -384,6 +392,7 @@ export function Dashboard() {
     setChatHistory(prev => [
       ...prev,
       {
+        id: `timer-complete-${timerId}`,
         role: 'assistant',
         content: `⏰ Timer (${timerId.substring(0,4)}...) finished!`
       }
@@ -458,6 +467,7 @@ export function Dashboard() {
 
       const timerDuration = parseTimerRequest(currentMessage);
       const userMsg: ChatMessage = {
+        id: `user-${Date.now()}`,
         role: 'user',
         content: currentMessage
       };
@@ -470,6 +480,7 @@ export function Dashboard() {
         setChatHistory(prev => [
           ...prev,
           {
+            id: `timer-start-${timerId}`,
             role: 'assistant',
             content: `Okay, starting a timer for ${Math.round(timerDuration / 60)} minutes.`,
             timer: {
@@ -520,7 +531,7 @@ Guidelines:
 2.  **Tone:** Friendly, encouraging, concise, and action-oriented. Match the user's tone where appropriate.
 3.  **Item Awareness:** Refer to the user's items accurately when relevant. Use information like due dates and priorities to give better advice.
 4.  **Clarity:** Provide clear, unambiguous responses. Avoid jargon unless the user uses it first.
-5.  **Conciseness:** Get straight to the point. Avoid unnecessary filler text. Short paragraphs are preferred.
+5.  **Conciseness:** Get straight to the point. Avoid unnecessary filler text. Short paragraphs are preferred. Use Markdown for basic formatting (like lists or bold text) where it improves readability.
 6.  **Educational Content (JSON):** If the user *explicitly* asks for flashcards or quiz questions on a specific topic, provide *only* a *single* JSON object in the specified format, wrapped in \`\`\`json ... \`\`\`. Do *not* provide JSON otherwise. Do not mix JSON with conversational text in the same response.
 
     Flashcard JSON format:
@@ -548,9 +559,11 @@ Respond directly to the NEW USER MESSAGE based on the CONTEXT and CONVERSATION H
 
 
       // Add placeholder message for streaming UI
-        const assistantMsgId = Date.now().toString(); // Unique ID for the message
+        const assistantMsgId = `assistant-${Date.now()}`; // Unique ID for the message
         const placeholderMsg: ChatMessage = { id: assistantMsgId, role: 'assistant', content: "..." };
         setChatHistory(prev => [...prev, placeholderMsg]);
+
+        let accumulatedStreamedText = ""; // Accumulate text specifically extracted from stream chunks
 
       try {
         const geminiOptions = {
@@ -573,34 +586,51 @@ Respond directly to the NEW USER MESSAGE based on the CONTEXT and CONVERSATION H
           })
         };
 
-        let streamingResponseText = "";
-        let finalResponseText = ""; // Store final text after stream ends
+        let finalRawResponseText = ""; // Store final *raw* text after stream ends
 
-        await streamResponse(geminiEndpoint, geminiOptions, (chunk) => {
-            // Process chunk text using the improved extractor
-            streamingResponseText = extractCandidateText(chunk);
+        await streamResponse(geminiEndpoint, geminiOptions, (rawChunkAccumulated) => {
+            // Extract candidate text from the raw accumulated data using the improved function
+            // This will return only the actual text content or empty string/error message
+            const currentExtractedText = extractCandidateText(rawChunkAccumulated);
 
-            // Update the placeholder message content in the history
-            setChatHistory(prev => prev.map(msg =>
-                msg.id === assistantMsgId
-                    ? { ...msg, content: streamingResponseText || "..." } // Update content, ensure ellipsis if empty
-                    : msg
-            ));
+            // Append *only* the newly extracted text (avoid duplicates from re-parsing)
+            // Basic check to see if the end of the accumulated matches the new extraction
+            if (currentExtractedText && !accumulatedStreamedText.endsWith(currentExtractedText)) {
+                 // A simple heuristic: assume the new text is appended if it doesn't fully overlap.
+                 // This is imperfect for complex edits mid-stream but often works.
+                 // A more robust diffing approach could be used if needed.
+                 // Let's try accumulating directly for now, assuming Gemini appends.
+                 accumulatedStreamedText += currentExtractedText; // Update the text we display
+            }
+             // Re-extract from the full raw chunk each time to get the latest *complete* text state
+            accumulatedStreamedText = extractCandidateText(rawChunkAccumulated);
+
+            // Update the placeholder message content ONLY if new text is extracted
+            if (accumulatedStreamedText) { // Only update if there's actual text content
+                 setChatHistory(prev => prev.map(msg =>
+                     msg.id === assistantMsgId
+                         ? { ...msg, content: accumulatedStreamedText || "..." } // Update content, ensure ellipsis if empty
+                         : msg
+                 ));
+            }
+
+            // Store the latest *raw* text for final processing
+            finalRawResponseText = rawChunkAccumulated;
 
         });
 
-         finalResponseText = streamingResponseText; // Text accumulated from the last chunk update
 
-         // Final processing after stream ends to handle potential JSON
+         // Final processing after stream ends to handle potential JSON blocks
           setChatHistory(prev => {
               return prev.map(msg => {
                   if (msg.id === assistantMsgId) {
-                      let finalAssistantText = finalResponseText;
+                      // Re-run extraction on the final *raw* text to get the definitive content
+                      let finalExtractedAssistantText = extractCandidateText(finalRawResponseText);
                       let parsedJson: any = null;
                       let jsonType: 'flashcard' | 'question' | null = null;
 
-                      // Check for JSON block in the final accumulated text
-                      const finalJsonMatch = finalAssistantText.match(/```json\s*([\s\S]*?)\s*```/);
+                      // Check for ```json block in the final *raw* accumulated text
+                      const finalJsonMatch = finalRawResponseText.match(/```json\s*([\s\S]*?)\s*```/);
 
                       if (finalJsonMatch && finalJsonMatch[1]) {
                           try {
@@ -608,22 +638,48 @@ Respond directly to the NEW USER MESSAGE based on the CONTEXT and CONVERSATION H
                                // Basic validation of JSON structure
                                if ( (parsedJson.type === 'flashcard' || parsedJson.type === 'question') && Array.isArray(parsedJson.data) && parsedJson.data.length > 0) {
                                    // Valid structure
-                                   finalAssistantText = finalAssistantText.replace(finalJsonMatch[0], '').trim(); // Remove JSON block from text
+                                   // The finalExtractedAssistantText should NOT contain the JSON block itself.
+                                   // If it somehow did, clean it just in case (though unlikely with new extractor).
+                                   finalExtractedAssistantText = finalExtractedAssistantText.replace(finalJsonMatch[0], '').trim();
                                    jsonType = parsedJson.type;
                                } else {
-                                   console.warn("Received JSON block, but structure is invalid:", parsedJson);
+                                   console.warn("Received ```json block, but structure is invalid:", parsedJson);
                                    parsedJson = null; // Invalidate if structure is wrong
                                }
                           } catch (e) {
-                              console.error('Failed to parse final JSON content:', e, "JSON String:", finalJsonMatch[1]);
+                              console.error('Failed to parse final ```json content:', e, "JSON String:", finalJsonMatch[1]);
                               parsedJson = null; // Invalidate on parse error
                           }
                       }
 
+                       // If extraction failed but raw text exists, use raw as fallback (but try cleaning)
+                       if (!finalExtractedAssistantText && finalRawResponseText) {
+                            console.warn("Extraction failed on final text, using raw fallback.");
+                            // Attempt basic cleaning on raw text
+                            finalExtractedAssistantText = finalRawResponseText
+                                .replace(/^data:\s*/gm, '') // Remove SSE prefixes
+                                .replace(/```json[\s\S]*?```/g, '') // Remove JSON blocks
+                                .trim();
+                            // If still looks like JSON, maybe it's an error format not caught by extractor
+                            if (finalExtractedAssistantText.startsWith('{')) {
+                                try {
+                                    const parsedFallback = JSON.parse(finalExtractedAssistantText);
+                                    if (parsedFallback?.error?.message) {
+                                        finalExtractedAssistantText = `Error: ${parsedFallback.error.message}`;
+                                    } else {
+                                        finalExtractedAssistantText = "Error: Unexpected response format.";
+                                    }
+                                } catch {
+                                    finalExtractedAssistantText = "Error: Could not process response.";
+                                }
+                            }
+                       }
+
+
                       // Return the final message object
                        return {
                            ...msg,
-                           content: finalAssistantText || "...", // Ensure some content is shown
+                           content: finalExtractedAssistantText || "...", // Ensure some content is shown
                            flashcard: jsonType === 'flashcard' ? parsedJson : undefined,
                            question: jsonType === 'question' ? parsedJson : undefined,
                        };
@@ -649,7 +705,7 @@ Respond directly to the NEW USER MESSAGE based on the CONTEXT and CONVERSATION H
              });
              // If placeholder wasn't found (shouldn't happen), add a new error message
              if (!updated) {
-                 updatedHistory.push({ role: 'assistant', content: errorMsgContent, error: true });
+                 updatedHistory.push({ id: `error-${Date.now()}`, role: 'assistant', content: errorMsgContent, error: true });
              }
              return updatedHistory;
          });
@@ -968,7 +1024,7 @@ Respond directly to the NEW USER MESSAGE based on the CONTEXT and CONVERSATION H
          setWeatherData(null);
          setSmartOverview("");
          setSmartInsights([]);
-         setChatHistory([ { role: 'assistant', content: "👋 Hi I'm TaskMaster, How can I help you today?" } ]);
+         setChatHistory([ { id: 'initial-greet-logout', role: 'assistant', content: "👋 Hi I'm TaskMaster, How can I help you today?" } ]);
          // Reset Pomodoro on logout? Optional.
          // handlePomodoroReset();
       }
@@ -1028,9 +1084,13 @@ Respond directly to the NEW USER MESSAGE based on the CONTEXT and CONVERSATION H
          if (!isMounted) return;
         const { latitude, longitude } = position.coords;
         try {
-          const response = await fetch(
-            `https://api.weatherapi.com/v1/forecast.json?key=${weatherApiKey}&q=${latitude},${longitude}&days=3`
+          // Use fetchWithTimeout for weather API calls as well
+          const response = await fetchWithTimeout(
+            `https://api.weatherapi.com/v1/forecast.json?key=${weatherApiKey}&q=${latitude},${longitude}&days=3`,
+            {}, // Empty options object
+            15000 // 15 second timeout for weather
           );
+
           if (!response.ok) {
               let errorMsg = `Weather fetch failed (${response.status})`;
               try {
@@ -1048,7 +1108,12 @@ Respond directly to the NEW USER MESSAGE based on the CONTEXT and CONVERSATION H
            if (isMounted) {
               console.error("Failed to fetch weather:", error);
               setWeatherData(null);
-              setWeatherError(error.message || "Failed to fetch weather data.");
+              // Display specific error messages
+              if (error.message === 'Request timed out') {
+                 setWeatherError("Weather request timed out.");
+              } else {
+                 setWeatherError(error.message || "Failed to fetch weather data.");
+              }
               setWeatherLoading(false);
            }
         }
@@ -1057,7 +1122,22 @@ Respond directly to the NEW USER MESSAGE based on the CONTEXT and CONVERSATION H
          if (isMounted) {
               console.error("Geolocation error:", error);
               setWeatherData(null);
-              setWeatherError(`Geolocation Error: ${error.message}`);
+              // More specific geolocation errors
+              let geoErrorMsg = "Geolocation Error";
+              switch(error.code) {
+                  case error.PERMISSION_DENIED:
+                      geoErrorMsg = "Geolocation permission denied.";
+                      break;
+                  case error.POSITION_UNAVAILABLE:
+                      geoErrorMsg = "Location information is unavailable.";
+                      break;
+                  case error.TIMEOUT:
+                      geoErrorMsg = "Geolocation request timed out.";
+                      break;
+                  default:
+                      geoErrorMsg = `Geolocation Error: ${error.message}`;
+              }
+              setWeatherError(geoErrorMsg);
               setWeatherLoading(false);
          }
       },
@@ -1078,7 +1158,7 @@ Respond directly to the NEW USER MESSAGE based on the CONTEXT and CONVERSATION H
     const [smartOverview, setSmartOverview] = useState<string>("");
     const [overviewLoading, setOverviewLoading] = useState(false);
     const [lastGeneratedDataSig, setLastGeneratedDataSig] = useState<string>("");
-    const [lastResponse, setLastResponse] = useState<string>("");
+    const [lastResponse, setLastResponse] = useState<string>(""); // Stores the actual text content of the last overview
 
     const overviewTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const [debouncedItemsSigForOverview, setDebouncedItemsSigForOverview] = useState("");
@@ -1103,7 +1183,7 @@ Respond directly to the NEW USER MESSAGE based on the CONTEXT and CONVERSATION H
 
         overviewTimeoutRef.current = setTimeout(() => {
             setDebouncedItemsSigForOverview(currentSig);
-        }, 1500);
+        }, 1500); // 1.5 seconds debounce
 
         return () => {
             if (overviewTimeoutRef.current) {
@@ -1120,7 +1200,8 @@ Respond directly to the NEW USER MESSAGE based on the CONTEXT and CONVERSATION H
             return;
         };
 
-        if (debouncedItemsSigForOverview === lastGeneratedDataSig && !overviewLoading) { // Don't regenerate if signature hasn't changed and not already loading
+        // Only regenerate if the signature has changed or if we are not currently loading
+        if (debouncedItemsSigForOverview === lastGeneratedDataSig && !overviewLoading) {
             return;
         }
 
@@ -1129,7 +1210,7 @@ Respond directly to the NEW USER MESSAGE based on the CONTEXT and CONVERSATION H
             if (overviewLoading) return;
 
             setOverviewLoading(true);
-            setLastGeneratedDataSig(debouncedItemsSigForOverview);
+            setLastGeneratedDataSig(debouncedItemsSigForOverview); // Set signature *before* async call
 
             const formatItem = (item: any, type: string) => {
                  let dueDate: Date | null = null;
@@ -1160,27 +1241,26 @@ Respond directly to the NEW USER MESSAGE based on the CONTEXT and CONVERSATION H
             if (formattedData === "No pending items.") {
                 setSmartOverview(`<div class="text-gray-400 text-xs italic">No pending items to generate overview from.</div>`);
                 setOverviewLoading(false);
+                setLastResponse(""); // Clear last response
                 return;
             }
 
             const firstName = userName.split(" ")[0];
 
              // Refined prompt focusing on brevity and action
-              const prompt = `[INST] <<SYS>>
-You are TaskMaster, an AI assistant embedded in a dashboard. Analyze these pending items for user "${firstName}" and provide a *very concise* (1-2 sentences) Smart Overview focusing on immediate priorities.
+              const prompt = `Analyze these pending items for user "${firstName}" and provide a *very concise* (1-2 sentences, max 80 tokens) Smart Overview focusing on the single most immediate priority or suggestion. Format as plain text. No greetings, no fluff.
 
 ${formattedData}
 
-Guidelines:
-- Identify the most urgent task/item (highest priority or nearest due date).
-- Suggest one single, clear action related to that item.
-- Be extremely brief and direct. No greetings, no fluff.
-- Format as plain text.
+Example: Focus on high-priority 'Submit Report' due today. Next, tackle 'Plan Project Kickoff'.
+Another Example: Check the overdue 'Draft Proposal' task first. Then review upcoming goals.
+Another Example: Looks clear for today. Consider planning your next project step.
 
-Example: "Focus on high-priority 'Submit Report' due today. Next, tackle 'Plan Project Kickoff'."
-<</SYS>> [/INST]`;
+Overview:`; // Simplified prompt structure
 
             try {
+                // Using the non-streaming endpoint for overview
+                const overviewEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`;
                 const geminiOptions = {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -1190,37 +1270,39 @@ Example: "Focus on high-priority 'Submit Report' due today. Next, tackle 'Plan P
                              maxOutputTokens: 80, // Keep it very short
                              temperature: 0.5,
                          },
-                         safetySettings: [
-                             { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-                             { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-                             { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-                             { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-                         ]
+                         safetySettings: [ // Standard safety settings
+                            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+                            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+                            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+                            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+                        ],
                     })
                 };
 
-                // Use simple fetch for overview, no streaming needed
-                 const response = await fetchWithTimeout(geminiEndpoint, geminiOptions, 20000); // 20s timeout is enough
+                 // Use fetchWithTimeout for the overview call
+                 const response = await fetchWithTimeout(overviewEndpoint, geminiOptions, 20000); // 20s timeout
+
                  if (!response.ok) {
-                    const errorText = await response.text();
-                     throw new Error(`Gemini API error (${response.status}): ${errorText}`);
+                    let errorBody = 'API Error';
+                    try { errorBody = await response.text(); } catch {}
+                     throw new Error(`Gemini API error (${response.status}): ${errorBody}`);
                  }
                 const resultJson = await response.json();
-                const rawText = extractCandidateText(JSON.stringify(resultJson)); // Ensure extractor gets the JSON string
 
-                // Minimal cleaning, relying on prompt constraints
-                const cleanText = rawText
-                    .replace(/^(Okay|Alright|Sure|Got it|Hello|Hi)[\s,.:!]*?/i, '')
-                    .replace(/^[Hh]ere('s| is) your [Ss]mart [Oo]verview:?\s*/, '')
-                    .replace(/\*+/g, '') // Remove any lingering markdown bold/italics
-                    .replace(/\n+/g, ' ')
-                    .replace(/\s{2,}/g, ' ')
-                    .trim();
+                // Use the robust extractor, passing the full JSON response *as a string*
+                const rawText = extractCandidateText(JSON.stringify(resultJson));
 
-                if (!cleanText || cleanText.toLowerCase().includes("error") || cleanText.length < 10) {
-                     throw new Error("Received invalid overview response."); // Treat empty or error-like responses as errors
+                // Minimal cleaning needed as extractor handles most issues
+                const cleanText = rawText.trim(); // Extractor already trims
+
+                // Check if the response is valid and different from the last one
+                if (!cleanText || cleanText.toLowerCase().includes("error") || cleanText.length < 5) {
+                     // Treat very short, empty, or error-like responses as errors for overview
+                     console.warn("Received invalid overview response:", cleanText);
+                     throw new Error("Received invalid overview response.");
                  }
 
+                // Only update state if the actual text content has changed
                 if (cleanText !== lastResponse) {
                     setLastResponse(cleanText);
                     setSmartOverview(
@@ -1236,11 +1318,16 @@ Example: "Focus on high-priority 'Submit Report' due today. Next, tackle 'Plan P
                      errorMsg = "Overview limit reached. Try again later.";
                  } else if (error.message.includes('API key not valid')) {
                       errorMsg = "Invalid AI config.";
-                 } else if (error.message.includes('timed out')) {
+                 } else if (error.message.includes('timed out') || error.message === 'Request timed out') {
                      errorMsg = "Overview request timed out.";
+                 } else if (error.message.includes("invalid overview response")) {
+                      errorMsg = "AI failed to generate a valid overview.";
+                 } else if (error.message.includes("API Error")) {
+                      errorMsg = "Overview generation failed (API).";
                  }
                 setSmartOverview(`<div class="text-yellow-500 text-xs italic">${errorMsg}</div>`);
-                 setLastResponse(""); // Clear last response on error
+                 setLastResponse(""); // Clear last response text on error to allow retry
+                 setLastGeneratedDataSig(""); // Also clear signature on error to force retry next time
             } finally {
                 setOverviewLoading(false);
             }
@@ -1248,7 +1335,8 @@ Example: "Focus on high-priority 'Submit Report' due today. Next, tackle 'Plan P
 
         generateOverview();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [user, debouncedItemsSigForOverview, userName, geminiApiKey, isIlluminateEnabled]); // Depend on debounced sig
+    }, [user, debouncedItemsSigForOverview, userName, geminiApiKey, isIlluminateEnabled, lastResponse]); // Added lastResponse dependency
+
 
   // ---------------------
   // 11. CREATE & EDIT & DELETE
@@ -1326,11 +1414,21 @@ Example: "Focus on high-priority 'Submit Report' due today. Next, tackle 'Plan P
         let dateForInput = "";
         if (currentData.dueDate) {
             try {
+                 // Prefer toDate() if it's a Firestore Timestamp
                  const dueDateObj = currentData.dueDate.toDate ? currentData.dueDate.toDate() : new Date(currentData.dueDate);
                  if (!isNaN(dueDateObj.getTime())) { // Check if date is valid
-                     dateForInput = dueDateObj.toISOString().split('T')[0];
+                     // Adjust for timezone offset to display the *intended* local date
+                     const tzOffset = dueDateObj.getTimezoneOffset() * 60000; // offset in milliseconds
+                     const localDate = new Date(dueDateObj.getTime() - tzOffset);
+                     dateForInput = localDate.toISOString().split('T')[0];
+
+                    // Old method (can be off by one day near midnight)
+                    // dateForInput = dueDateObj.toISOString().split('T')[0];
                  }
-             } catch { /* Ignore date conversion errors */ }
+             } catch (e) {
+                 console.warn("Error converting date for editing:", e);
+                 /* Ignore date conversion errors */
+            }
         }
         setEditingDate(dateForInput);
         setEditingPriority(currentData.priority || 'medium');
@@ -1345,6 +1443,7 @@ Example: "Focus on high-priority 'Submit Report' due today. Next, tackle 'Plan P
     let dateValue: Date | null = null;
     if (editingDate) {
        try {
+            // Parse YYYY-MM-DD and store as UTC noon to avoid timezone boundary issues
             const [year, month, day] = editingDate.split('-').map(Number);
             dateValue = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
             if (isNaN(dateValue.getTime())) dateValue = null;
@@ -1429,28 +1528,34 @@ Example: "Focus on high-priority 'Submit Report' due today. Next, tackle 'Plan P
    useEffect(() => {
         setRunningTimers(prev => {
             const nextState: typeof prev = {};
-            const now = Date.now(); // To check for recently deleted timers
+            // const now = Date.now(); // To check for recently deleted timers
 
             customTimers.forEach(timer => {
-                 // If timer exists in previous state, preserve its running status
+                 const sourceTime = timer.data.time;
+                 // If timer exists in previous state, preserve its *running* status and *current* time
                  if (prev[timer.id]) {
-                     // Update timeLeft only if NOT running OR if the source data changed significantly
-                      const sourceTime = timer.data.time;
                       const localState = prev[timer.id];
                       nextState[timer.id] = {
                           ...localState,
-                          // Only update timeLeft from source if timer isn't running
-                          timeLeft: localState.isRunning ? localState.timeLeft : sourceTime,
-                          // Reset finished flag if source time changes and timer wasn't running
-                          finished: (localState.isRunning || localState.timeLeft > 0) ? localState.finished : false,
+                          // Keep local time if running, otherwise sync BUT ONLY if source differs significantly?
+                          // Let's simplify: reset time only if timer is NOT running AND source time changed
+                          timeLeft: localState.isRunning
+                              ? localState.timeLeft
+                              : (sourceTime !== localState.timeLeft && !localState.finished) // check if finished locally?
+                                ? sourceTime // Reset to source time if not running and source changed
+                                : localState.timeLeft, // Keep local time otherwise (e.g., finished locally)
+                          // Reset finished flag only if source time changes AND timer wasn't running?
+                          finished: localState.isRunning
+                               ? localState.finished // Keep finished state if running
+                               : (sourceTime > 0 ? false : localState.finished) // Reset finished if source has time, else keep local state
                       };
                  } else {
                      // Initialize new timers from Firestore data
                      nextState[timer.id] = {
                          isRunning: false,
-                         timeLeft: timer.data.time,
+                         timeLeft: sourceTime,
                          intervalRef: null,
-                         finished: timer.data.time <= 0, // Mark as finished if initial time is 0
+                         finished: sourceTime <= 0, // Mark as finished if initial time is 0
                      };
                  }
             });
@@ -1506,37 +1611,50 @@ Example: "Focus on high-priority 'Submit Report' due today. Next, tackle 'Plan P
         newTimerState.isRunning = true;
         newTimerState.finished = false; // Ensure finished flag is reset
 
+        // Use requestAnimationFrame for potentially smoother updates? No, setInterval is fine.
         const intervalId = setInterval(() => {
             setRunningTimers((currentTimers) => {
+                // Check if timer still exists in the state (could be deleted async)
+                if (!currentTimers[timerId]) {
+                     clearInterval(intervalId);
+                     console.warn(`Interval cleared for deleted/missing timer state: ${timerId}`);
+                     return currentTimers;
+                }
+
+                // Clone the state to avoid direct mutation issues
                 const updatedTimers = { ...currentTimers };
-                const tState = updatedTimers[timerId];
+                const tState = { ...updatedTimers[timerId] }; // Clone the specific timer's state
 
-                 // Safety check: If timer state disappears while interval is running, clear interval
-                 if (!tState) {
-                      clearInterval(intervalId);
-                      console.warn(`Interval cleared for non-existent timer state: ${timerId}`);
+                 // Safety check: If interval is running but state says !isRunning, clear interval
+                 if (!tState.isRunning && tState.intervalRef) {
+                      console.warn(`Clearing stray interval for paused timer: ${timerId}`);
+                      clearInterval(tState.intervalRef);
+                      tState.intervalRef = null;
+                      updatedTimers[timerId] = tState;
+                      return updatedTimers; // Return updated state
+                 }
+
+                 // If timeLeft is already 0 or less, stop interval and update state
+                 if (tState.timeLeft <= 0 && tState.isRunning) {
+                      console.warn(`Correcting running state for timer ${timerId} which reached zero unexpectedly.`);
+                      clearInterval(tState.intervalRef as NodeJS.Timer);
+                      tState.isRunning = false;
+                      tState.finished = true;
+                      tState.intervalRef = null;
+                      tState.timeLeft = 0; // Ensure it's exactly 0
+                      updatedTimers[timerId] = tState;
                       return updatedTimers;
                  }
 
-                 // If timeLeft is already 0 or less, something is wrong, stop interval
-                 if (tState.timeLeft <= 0) {
-                      clearInterval(intervalId);
-                      if (tState.isRunning) { // If it was incorrectly marked as running
-                          tState.isRunning = false;
-                           tState.finished = true;
-                           tState.intervalRef = null;
-                           console.warn(`Corrected running state for timer ${timerId} which reached zero.`);
-                      }
-                      return updatedTimers;
-                 }
-
+                // Normal decrement or finish logic
                 if (tState.timeLeft <= 1) {
-                    clearInterval(tState.intervalRef as NodeJS.Timer); // Use intervalId captured in closure? Or from state? State is safer if reset happens.
+                    clearInterval(tState.intervalRef as NodeJS.Timer);
                     tState.isRunning = false;
                     tState.finished = true;
                     tState.timeLeft = 0;
                     tState.intervalRef = null;
 
+                     // Play sound only if finished state is newly set
                      if (!tState.audio) {
                          try {
                             const alarmAudio = new Audio('https://firebasestorage.googleapis.com/v0/b/deepworkai-c3419.appspot.com/o/ios-17-ringtone-tilt-gg8jzmiv_pUhS32fz.mp3?alt=media&token=a0a522e0-8a49-408a-9dfe-17e41d3bc801');
@@ -1548,8 +1666,8 @@ Example: "Focus on high-priority 'Submit Report' due today. Next, tackle 'Plan P
                 } else {
                     tState.timeLeft -= 1;
                 }
-                updatedTimers[timerId] = tState;
-                return updatedTimers;
+                updatedTimers[timerId] = tState; // Put the updated timer state back
+                return updatedTimers; // Return the full updated state
             });
         }, 1000);
         newTimerState.intervalRef = intervalId;
@@ -1583,7 +1701,12 @@ Example: "Focus on high-priority 'Submit Report' due today. Next, tackle 'Plan P
     const sourceTimerData = customTimers.find((t) => t.id === timerId)?.data;
     if (!sourceTimerData) {
         console.warn(`Cannot reset timer ${timerId}: Source data not found.`);
-        return; // Timer might have been deleted from Firestore
+        // Maybe remove the timer from local state if source is gone?
+        setRunningTimers(prev => {
+            const { [timerId]: _, ...rest } = prev;
+            return rest;
+        });
+        return;
     }
     const defaultTime = sourceTimerData.time;
 
@@ -1591,17 +1714,18 @@ Example: "Focus on high-priority 'Submit Report' due today. Next, tackle 'Plan P
         const timerState = prev[timerId];
         // Even if state doesn't exist locally (e.g., after hot reload), create it from source
         const newState = { ...prev };
-        const newTimerState = timerState ? { ...timerState } : { // Initialize if needed
-             isRunning: false, timeLeft: defaultTime, intervalRef: null, finished: defaultTime <= 0
+        // Use existing state as base if available, otherwise init fully
+        const newTimerState = timerState ? { ...timerState } : {
+             isRunning: false, timeLeft: defaultTime, intervalRef: null, finished: defaultTime <= 0, audio: undefined
         };
 
         // Clear interval if running
         if (newTimerState.intervalRef) {
             clearInterval(newTimerState.intervalRef);
         }
-        // Reset state
+        // Reset state values
         newTimerState.isRunning = false;
-        newTimerState.timeLeft = defaultTime;
+        newTimerState.timeLeft = defaultTime; // Reset to original duration
         newTimerState.intervalRef = null;
         newTimerState.finished = defaultTime <= 0; // Reset finished state based on default time
 
@@ -1609,9 +1733,9 @@ Example: "Focus on high-priority 'Submit Report' due today. Next, tackle 'Plan P
         if (newTimerState.audio) {
             newTimerState.audio.pause();
             newTimerState.audio.currentTime = 0;
-            newTimerState.audio = undefined;
+            newTimerState.audio = undefined; // Use undefined consistently
         }
-        newState[timerId] = newTimerState;
+        newState[timerId] = newTimerState; // Update the state map
         return newState;
     });
   };
@@ -1643,7 +1767,10 @@ Example: "Focus on high-priority 'Submit Report' due today. Next, tackle 'Plan P
     try {
       const newTimeSeconds = minutes * 60;
       await updateCustomTimer(timerId, editingTimerName.trim(), newTimeSeconds); // Assumes this function updates Firestore
-      // Local state will update via the useEffect watching customTimers, which triggers a reset effect internally
+      // Local state will update via the useEffect watching customTimers, triggering sync logic
+      // Reset the timer locally after saving to reflect the new duration immediately if needed
+      // resetCustomTimer(timerId); // Optional: uncomment to force immediate reset display
+
       setEditingTimerId(null); // Close edit mode
 
     } catch (error) {
@@ -1661,7 +1788,10 @@ Example: "Focus on high-priority 'Submit Report' due today. Next, tackle 'Plan P
             const timerState = prev[timerId];
             if (timerState) {
                  if (timerState.intervalRef) clearInterval(timerState.intervalRef);
-                 if (timerState.audio) timerState.audio.pause();
+                 if (timerState.audio) {
+                     timerState.audio.pause();
+                     timerState.audio.currentTime = 0;
+                 }
             }
              // Return previous state without the deleted timer ID
              const { [timerId]: _, ...rest } = prev;
@@ -1712,14 +1842,25 @@ Example: "Focus on high-priority 'Submit Report' due today. Next, tackle 'Plan P
     if (insight.relatedItemId) {
        const item = [...tasks, ...goals, ...projects, ...plans].find(i => i.id === insight.relatedItemId);
        if (item) {
-           if (insight.type === 'warning' && insight.text.includes('overdue')) {
-               // Ensure item data is passed correctly
-                handleEditClick(item.id, item.data);
+           const itemType = item.data.task ? 'tasks' : item.data.goal ? 'goals' : item.data.project ? 'projects' : item.data.plan ? 'plans' : null;
+           if (insight.type === 'warning' && insight.text.includes('overdue') && itemType) {
+               // Ensure item data is passed correctly and switch tab if necessary
+                if(activeTab !== itemType) {
+                    setActiveTab(itemType);
+                }
+                // Small delay to allow tab switch before opening edit
+                setTimeout(() => handleEditClick(item.id, item.data), 50);
            }
            // Add other actions if needed
        }
     }
      // Remove accepted insight after a short delay? Or keep it? For now, keep.
+     // Let's remove non-actionable accepted insights after a delay
+     if (!(insight.type === 'warning' && insight.text.includes('overdue'))) {
+         setTimeout(() => {
+              setSmartInsights(prev => prev.filter(i => i.id !== insightId));
+         }, 3000); // Remove suggestion/achievement after 3s
+     }
   };
 
   const handleRejectInsight = (insightId: string) => {
@@ -1728,7 +1869,7 @@ Example: "Focus on high-priority 'Submit Report' due today. Next, tackle 'Plan P
           i.id === insightId ? { ...i, accepted: false, rejected: true } : i
         )
       );
-     // Remove rejected insight after a short delay?
+     // Remove rejected insight after a short delay
       setTimeout(() => {
           setSmartInsights(prev => prev.filter(i => i.id !== insightId || i.accepted)); // Keep accepted ones
       }, 2000); // Remove after 2 seconds
@@ -1738,17 +1879,18 @@ Example: "Focus on high-priority 'Submit Report' due today. Next, tackle 'Plan P
   // Theme & Style Variables
   // ---------------------
   const headlineColor = isIlluminateEnabled ? "text-green-700" : "text-green-400";
-  //const bulletTextColor = isIlluminateEnabled ? "text-blue-700" : "text-blue-300"; // Removed as unused
-  //const bulletBorderColor = isIlluminateEnabled ? "border-blue-500" : "border-blue-500"; // Removed as unused
-  //const defaultTextColor = isIlluminateEnabled ? "text-gray-700" : "text-gray-300"; // Removed as unused
   const illuminateHighlightToday = isIlluminateEnabled ? "bg-blue-100 text-blue-700 font-semibold" : "bg-blue-500/30 text-blue-200 font-semibold";
   const illuminateHighlightDeadline = isIlluminateEnabled ? "bg-red-100 hover:bg-red-200" : "bg-red-500/20 hover:bg-red-500/30";
-  const illuminateHoverGray = isIlluminateEnabled ? "hover:bg-gray-200" : "hover:bg-gray-700/50";
+  const illuminateHoverGray = isIlluminateEnabled ? "hover:bg-gray-200/60" : "hover:bg-gray-700/50";
   const illuminateTextBlue = isIlluminateEnabled ? "text-blue-700" : "text-blue-400";
   const illuminateTextPurple = isIlluminateEnabled ? "text-purple-700" : "text-purple-400";
   const illuminateTextGreen = isIlluminateEnabled ? "text-green-700" : "text-green-400";
   const illuminateTextPink = isIlluminateEnabled ? "text-pink-700" : "text-pink-400";
   const illuminateTextYellow = isIlluminateEnabled ? "text-yellow-700" : "text-yellow-400";
+  const illuminateBorder = isIlluminateEnabled ? "border-gray-300" : "border-gray-600/80";
+  const illuminateIconColor = isIlluminateEnabled ? "text-gray-500" : "text-gray-400";
+  const illuminateBgHover = isIlluminateEnabled ? "hover:bg-gray-100" : "hover:bg-gray-700";
+
 
   const containerClass = isIlluminateEnabled
     ? "bg-gray-50 text-gray-900" // Slightly off-white bg for light mode
@@ -1764,8 +1906,10 @@ Example: "Focus on high-priority 'Submit Report' due today. Next, tackle 'Plan P
 
   const headingClass = isIlluminateEnabled ? "text-gray-800" : "text-gray-100"; // Slightly lighter text in dark mode
   const subheadingClass = isIlluminateEnabled ? "text-gray-600" : "text-gray-400";
-  const inputBg = isIlluminateEnabled ? "bg-gray-100 hover:bg-gray-200/50" : "bg-gray-700 hover:bg-gray-600/50"; // Input background with subtle hover
-  const iconColor = isIlluminateEnabled ? "text-gray-500" : "text-gray-400"; // Generic icon color
+  const inputBg = isIlluminateEnabled ? "bg-gray-100 hover:bg-gray-200/50 border-gray-300 focus:border-blue-500 focus:ring-blue-500" : "bg-gray-700 hover:bg-gray-600/50 border-gray-600 focus:border-blue-500 focus:ring-blue-500"; // Input background with subtle hover and focus
+  const iconColor = isIlluminateEnabled ? "text-gray-500 hover:text-gray-700" : "text-gray-400 hover:text-gray-200"; // Generic icon color with hover
+
+
 
 
   // Memoize expensive calculations if needed (e.g., filtered lists for display)

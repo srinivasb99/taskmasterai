@@ -1,14 +1,14 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-// No changes to imports needed unless new icons are used
-import { PlusCircle, Edit, Trash, Sparkles, CheckCircle, MessageCircle, RotateCcw, Square, X, TimerIcon, Send, ChevronLeft, ChevronRight, Moon, Sun, Star, Wind, Droplets, Zap, Calendar, Clock, MoreHorizontal, ArrowUpRight, Bookmark, BookOpen, Lightbulb, Flame, Award, TrendingUp, Rocket, Target, Layers, Clipboard, AlertCircle, ThumbsUp, ThumbsDown, BrainCircuit, ArrowRight, Flag, Bell, Filter, Tag, BarChart, PieChart } from 'lucide-react';
+// Ensure all used icons are imported
+import { Play, Pause, PlusCircle, Edit, Trash, Sparkles, CheckCircle, MessageCircle, RotateCcw, Square, X, TimerIcon, Send, ChevronLeft, ChevronRight, Moon, Sun, Star, Wind, Droplets, Zap, Calendar, Clock, MoreHorizontal, ArrowUpRight, Bookmark, BookOpen, Lightbulb, Flame, Award, TrendingUp, Rocket, Target, Layers, Clipboard, AlertCircle, ThumbsUp, ThumbsDown, BrainCircuit, ArrowRight, Flag, Bell, Filter, Tag, BarChart, PieChart } from 'lucide-react';
 import { Sidebar } from './Sidebar';
-import { Timer } from './Timer';
-import { FlashcardsQuestions } from './FlashcardsQuestions';
+import { Timer } from './Timer'; // Ensure this component exists and accepts props like initialDuration, onComplete, compact
+import { FlashcardsQuestions } from './FlashcardsQuestions'; // Ensure this component exists and accepts props like type, data, onComplete, isIlluminateEnabled
 import { getTimeBasedGreeting, getRandomQuote } from '../lib/greetings';
 import ReactMarkdown from 'react-markdown';
+import { ChevronDown } from 'lucide-react';
 import remarkMath from 'remark-math';
-import { Play, Pause } from 'lucide-react';
 import remarkGfm from 'remark-gfm';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
@@ -28,22 +28,22 @@ import {
   updateCustomTimer,
   deleteCustomTimer,
   weatherApiKey,
-  hfApiKey,
+  hfApiKey, // hfApiKey seems unused, but kept import as per instruction
   geminiApiKey,
-} from '../lib/dashboard-firebase';
-import { auth, db } from '../lib/firebase'; // Added db import for getDoc
-import { User, onAuthStateChanged } from 'firebase/auth';
-import { getDoc, doc } from 'firebase/firestore'; // Added imports for getDoc and doc
-import { updateUserProfile, signOutUser, deleteUserAccount, AuthError, getCurrentUser } from '../lib/settings-firebase';
-import { SmartInsight } from './SmartInsight'; // Assuming this component exists
-import { PriorityBadge } from './PriorityBadge'; // Assuming this component exists
-import { TaskAnalytics } from './TaskAnalytics'; // Assuming this component exists
+} from '../lib/dashboard-firebase'; // Ensure this file exports all functions and constants
+import { auth, db } from '../lib/firebase';
+import { User } from 'firebase/auth';
+import { getDoc, doc } from 'firebase/firestore';
+import { updateUserProfile, signOutUser, deleteUserAccount, AuthError, getCurrentUser } from '../lib/settings-firebase'; // Ensure these functions exist
+import { SmartInsight } from './SmartInsight'; // Assuming this component exists - might be integrated or removed if logic is purely within Dashboard
+import { PriorityBadge } from './PriorityBadge'; // Ensure this component exists and accepts priority and isIlluminateEnabled props
+import { TaskAnalytics } from './TaskAnalytics'; // Ensure this component exists and accepts item props and isIlluminateEnabled
 
 
 // ---------------------
-// Helper functions for Gemini integration (NO CHANGES HERE)
+// Helper functions for Gemini integration
 // ---------------------
-const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`;
+const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`; // Using 1.5 flash as per common practice, ensure key is valid
 
 const fetchWithTimeout = async (url: string, options: RequestInit, timeout = 30000) => {
   const controller = new AbortController();
@@ -55,7 +55,13 @@ const fetchWithTimeout = async (url: string, options: RequestInit, timeout = 300
     return response;
   } catch (error) {
     clearTimeout(timeoutId);
-    throw error;
+    // Don't rethrow generic error if it's an AbortError from timeout
+    if ((error as Error).name === 'AbortError') {
+         console.warn('Fetch timed out:', url);
+         // You might want to throw a custom error or return a specific response object
+         throw new Error('Request timed out');
+    }
+    throw error; // Rethrow other errors
   }
 };
 
@@ -63,93 +69,112 @@ const streamResponse = async (
   url: string,
   options: RequestInit,
   onStreamUpdate: (textChunk: string) => void,
-  timeout = 30000
+  timeout = 45000 // Increased timeout slightly for potentially longer streams
 ) => {
-  const response = await fetchWithTimeout(url, options, timeout);
-  if (!response.body) {
-    const text = await response.text();
-    onStreamUpdate(text);
-    return text;
-  }
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder("utf-8");
-  let done = false;
-  let accumulatedText = "";
-  while (!done) {
-    const { value, done: doneReading } = await reader.read();
-    done = doneReading;
-    if (value) {
-      const chunk = decoder.decode(value, { stream: !done });
-      accumulatedText += chunk;
-      onStreamUpdate(accumulatedText);
+    try {
+        const response = await fetchWithTimeout(url, options, timeout); // Use fetchWithTimeout
+
+        if (!response.ok) {
+            // Try to get error message from response body
+            let errorBody = '';
+            try {
+                errorBody = await response.text();
+                const errorJson = JSON.parse(errorBody);
+                if (errorJson?.error?.message) {
+                    throw new Error(`API Error (${response.status}): ${errorJson.error.message}`);
+                }
+            } catch (parseError) {
+                // Ignore parsing error, use raw text if available
+            }
+            throw new Error(`API Request Failed (${response.status}): ${response.statusText} ${errorBody || ''}`);
+        }
+
+
+        if (!response.body) {
+            const text = await response.text();
+            onStreamUpdate(text); // Send the full non-streamed text
+            return text;
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let done = false;
+        let accumulatedText = "";
+
+        while (!done) {
+            const { value, done: doneReading } = await reader.read();
+            done = doneReading;
+            if (value) {
+            const chunk = decoder.decode(value, { stream: !done });
+            accumulatedText += chunk;
+            // Debounce or directly call onStreamUpdate
+            onStreamUpdate(accumulatedText); // Pass the accumulated text so far
+            }
+        }
+        return accumulatedText; // Return the final accumulated text
+
+    } catch (error) {
+        console.error("Streaming Error:", error);
+         // Propagate the error so the caller can handle it (e.g., display message in chat)
+        throw error;
     }
-  }
-  return accumulatedText;
 };
+
 
 const extractCandidateText = (text: string): string => {
-  let candidateText = text;
+  // Improved extraction to handle potential streaming chunks and errors
   try {
-    // Handle potential JSON chunks before the final one
-    let lastValidJsonText = text;
-    if (text.includes('```json')) {
-        // Find the last occurrence of ```json
-        const lastJsonIndex = text.lastIndexOf('```json');
-        // Find the start of the JSON content after that index
-        const jsonStart = text.indexOf('{', lastJsonIndex);
-        if (jsonStart !== -1) {
-            // Find the end of the JSON block
-            const jsonEnd = text.indexOf('```', jsonStart);
-            if (jsonEnd !== -1) {
-                lastValidJsonText = text.substring(jsonStart, jsonEnd).trim();
-            } else {
-                // If closing ``` is missing, try to parse from { onwards
-                 lastValidJsonText = text.substring(jsonStart).trim();
-            }
-        } else {
-             // If { not found after ```json, maybe the text before it is the message?
-             lastValidJsonText = text.substring(0, lastJsonIndex).trim();
-             if (!lastValidJsonText) lastValidJsonText = text; // fallback if text before was empty
+    // Attempt to find the last complete JSON object in the stream if multiple are present
+    const jsonObjects = text.match(/{\s*"candidates":[\s\S]*?}/g);
+    let candidateText = text; // Default to the original text
+
+    if (jsonObjects && jsonObjects.length > 0) {
+        const lastJsonObject = jsonObjects[jsonObjects.length - 1];
+        try {
+            const jsonResponse = JSON.parse(lastJsonObject);
+             if (
+                jsonResponse?.candidates?.[0]?.content?.parts?.[0]?.text
+            ) {
+                candidateText = jsonResponse.candidates[0].content.parts[0].text;
+            } else if (jsonResponse?.error?.message) {
+                 console.error("Gemini API Error in response:", jsonResponse.error.message);
+                 // Return a user-friendly error or the message itself
+                 candidateText = `Error: ${jsonResponse.error.message}`;
+             }
+            // If structure is unexpected but parsing worked, keep candidateText as the original text
+        } catch (innerErr) {
+            // If parsing the *last* object fails, maybe the text *before* it was the message?
+             const textBeforeLastJson = text.substring(0, text.lastIndexOf(lastJsonObject)).trim();
+             if (textBeforeLastJson && !textBeforeLastJson.includes('"candidates"')) {
+                 candidateText = textBeforeLastJson;
+             }
+             // else stick with original text as fallback
+             // console.warn("Error parsing last JSON object in stream:", innerErr);
         }
-    } else {
-        // If no ```json, try to parse the whole text
-        lastValidJsonText = text;
+    } else if (text.trim().startsWith('{')) {
+         // Might be a single JSON object not matching the regex (e.g., error format)
+         try {
+            const jsonResponse = JSON.parse(text);
+             if (jsonResponse?.error?.message) {
+                 console.error("Gemini API Error in response:", jsonResponse.error.message);
+                 candidateText = `Error: ${jsonResponse.error.message}`;
+             }
+             // If it parses but isn't the expected candidate structure or error, keep original text
+         } catch (parseErr) {
+             // Incomplete JSON or plain text, ignore parsing error and use original text
+         }
     }
 
-
-    const potentialJson = JSON.parse(lastValidJsonText);
-    if (
-      potentialJson &&
-      potentialJson.candidates &&
-      potentialJson.candidates[0] &&
-      potentialJson.candidates[0].content &&
-      potentialJson.candidates[0].content.parts &&
-      potentialJson.candidates[0].content.parts[0]
-    ) {
-      candidateText = potentialJson.candidates[0].content.parts[0].text;
-    } else if (potentialJson && potentialJson.error) {
-       // Handle API error response format
-       console.error("Gemini API Error:", potentialJson.error.message);
-       candidateText = `Error: ${potentialJson.error.message}`;
-    }
+    // Clean up common unwanted prefixes/suffixes sometimes added by the model
+    return candidateText.replace(/^Assistant:\s*/, '').replace(/^(User|Human):\s*/, '').trim();
   } catch (err) {
-      // If parsing fails, assume the whole text is the candidate text
-      // unless it looks like an incomplete JSON structure
-      if (!(text.trim().startsWith('{') && !text.trim().endsWith('}'))) {
-          candidateText = text;
-      } else {
-          console.warn("Incomplete JSON received, waiting for more chunks potentially.");
-          // Keep the text as is, might be completed in next chunk
-      }
+    console.error("Error extracting candidate text:", err, "Original text:", text);
+    return text; // Fallback to original text on unexpected error
   }
-   // Clean up common unwanted prefixes/suffixes sometimes added by the model
-   candidateText = candidateText.replace(/^Assistant:\s*/, '').trim();
-  return candidateText;
 };
 
-
 // ---------------------
-// Helper functions (NO CHANGES HERE)
+// Helper functions
 // ---------------------
 const getWeekDates = (date: Date): Date[] => {
   const sunday = new Date(date);
@@ -169,27 +194,45 @@ const formatDateForComparison = (date: Date): string => {
 };
 
 const calculatePriority = (item: any): 'high' | 'medium' | 'low' => {
-  if (item.data.priority) return item.data.priority; // Respect existing priority first
+  if (item.data.priority) return item.data.priority;
 
   if (!item.data.dueDate) return 'low';
 
-  const dueDate = item.data.dueDate.toDate ? item.data.dueDate.toDate() : new Date(item.data.dueDate);
+  // Ensure dueDate is a Date object
+  let dueDate: Date | null = null;
+  if (item.data.dueDate?.toDate) {
+      dueDate = item.data.dueDate.toDate();
+  } else if (item.data.dueDate instanceof Date) {
+      dueDate = item.data.dueDate;
+  } else if (typeof item.data.dueDate === 'string' || typeof item.data.dueDate === 'number') {
+      try {
+          dueDate = new Date(item.data.dueDate);
+           // Check if the conversion resulted in a valid date
+           if (isNaN(dueDate.getTime())) {
+              dueDate = null;
+           }
+      } catch (e) {
+          dueDate = null;
+      }
+  }
+
+  if (!dueDate) return 'low';
+
   const now = new Date();
-  // Set time to 00:00:00 for comparison to avoid time-of-day issues
   dueDate.setHours(0, 0, 0, 0);
   now.setHours(0, 0, 0, 0);
 
   const diffTime = dueDate.getTime() - now.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-
+  if (diffDays < 0) return 'high'; // Overdue is high priority
   if (diffDays <= 1) return 'high'; // Due today or tomorrow
   if (diffDays <= 3) return 'medium'; // Due within 3 days
   return 'low';
 };
 
 
-// Interface for Smart Insights (NO CHANGES HERE)
+// Interface for Smart Insights
 interface SmartInsight {
   id: string;
   text: string;
@@ -202,7 +245,7 @@ interface SmartInsight {
 
 export function Dashboard() {
   // ---------------------
-  // 1. USER & GENERAL STATE (NO CHANGES HERE, except adding new AI sidebar state)
+  // 1. USER & GENERAL STATE
   // ---------------------
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
@@ -226,8 +269,9 @@ export function Dashboard() {
   });
 
   const [isIlluminateEnabled, setIsIlluminateEnabled] = useState(() => {
+    // Default to true (light mode) if nothing is stored
     const stored = localStorage.getItem('isIlluminateEnabled');
-    return stored ? JSON.parse(stored) : false;
+    return stored ? JSON.parse(stored) : true;
   });
 
   const [isSidebarIlluminateEnabled, setIsSidebarIlluminateEnabled] = useState(() => {
@@ -238,19 +282,20 @@ export function Dashboard() {
   // *** NEW State for AI Chat Sidebar ***
   const [isAiSidebarOpen, setIsAiSidebarOpen] = useState(false);
 
-  // Effects for localStorage and theme toggling (NO CHANGES HERE)
+  // Effects for localStorage and theme toggling
   useEffect(() => {
     localStorage.setItem('isSidebarCollapsed', JSON.stringify(isSidebarCollapsed));
   }, [isSidebarCollapsed]);
 
   useEffect(() => {
     localStorage.setItem('isBlackoutEnabled', JSON.stringify(isBlackoutEnabled));
-    document.body.classList.toggle('blackout-mode', isBlackoutEnabled);
-     // Ensure illuminate is removed if blackout is enabled
-    if (isBlackoutEnabled) {
-      document.body.classList.remove('illuminate-mode');
+    // Apply blackout only if illuminate is not enabled
+    if (isBlackoutEnabled && !isIlluminateEnabled) {
+      document.body.classList.add('blackout-mode');
+    } else {
+      document.body.classList.remove('blackout-mode');
     }
-  }, [isBlackoutEnabled]);
+  }, [isBlackoutEnabled, isIlluminateEnabled]); // Depend on both
 
   useEffect(() => {
     localStorage.setItem('isSidebarBlackoutEnabled', JSON.stringify(isSidebarBlackoutEnabled));
@@ -258,18 +303,17 @@ export function Dashboard() {
 
   useEffect(() => {
     localStorage.setItem('isIlluminateEnabled', JSON.stringify(isIlluminateEnabled));
-     // Ensure blackout is removed if illuminate is enabled
     if (isIlluminateEnabled) {
       document.body.classList.add('illuminate-mode');
-      document.body.classList.remove('blackout-mode'); // Ensure blackout is off
+      document.body.classList.remove('blackout-mode'); // Ensure blackout is off if illuminate is on
     } else {
       document.body.classList.remove('illuminate-mode');
-       // Re-apply blackout if it was intended but overridden by illuminate
+      // Re-apply blackout if it's enabled and illuminate is turned off
       if (isBlackoutEnabled) {
-          document.body.classList.add('blackout-mode');
+        document.body.classList.add('blackout-mode');
       }
     }
-  }, [isIlluminateEnabled, isBlackoutEnabled]); // Add isBlackoutEnabled dependency here
+  }, [isIlluminateEnabled, isBlackoutEnabled]); // Depend on both
 
   useEffect(() => {
     localStorage.setItem('isSidebarIlluminateEnabled', JSON.stringify(isSidebarIlluminateEnabled));
@@ -277,13 +321,26 @@ export function Dashboard() {
 
 
   useEffect(() => {
-    const user = getCurrentUser();
-    if (!user) {
-      navigate('/login');
-    } else {
-      updateDashboardLastSeen(user.uid);
-    }
+    const checkAuth = async () => {
+        const currentUser = getCurrentUser(); // Assumes this returns User | null synchronously
+        if (!currentUser) {
+          // Small delay before redirecting, allows Firebase auth state init
+          //setTimeout(() => {
+          //  if (!getCurrentUser()) { // Double check after delay
+          //      navigate('/login');
+          //  }
+          //}, 500);
+          navigate('/login'); // Redirect immediately might be fine if initial check is reliable
+        } else {
+           // If user exists, update their lastSeen in Firestore (fire-and-forget)
+           updateDashboardLastSeen(currentUser.uid).catch(err => {
+              console.warn("Failed to update last seen:", err); // Log error but don't block UI
+           });
+        }
+    };
+    checkAuth();
   }, [navigate]);
+
 
   const handleToggleSidebar = () => {
     setIsSidebarCollapsed((prev) => !prev);
@@ -293,7 +350,7 @@ export function Dashboard() {
   const today = new Date();
 
   // ---------------------
-  // Types for timer/flashcard/question messages (NO CHANGES HERE)
+  // Types for timer/flashcard/question messages
   // ---------------------
   interface TimerMessage { type: 'timer'; duration: number; id: string; }
   interface FlashcardData { id: string; question: string; answer: string; topic: string; }
@@ -306,12 +363,12 @@ export function Dashboard() {
     timer?: TimerMessage;
     flashcard?: FlashcardMessage;
     question?: QuestionMessage;
+    error?: boolean; // Added flag for error messages
   }
 
   // ---------------------
-  // CHAT FUNCTIONALITY (Moved from Modal to Sidebar, logic remains the same)
+  // CHAT FUNCTIONALITY
   // ---------------------
-  // Removed: const [isChatModalOpen, setIsChatModalOpen] = useState(false); // Replaced by isAiSidebarOpen
   const [chatMessage, setChatMessage] = useState('');
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([
     {
@@ -322,13 +379,13 @@ export function Dashboard() {
   const [isChatLoading, setIsChatLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // Timer handling functions (NO CHANGES HERE)
+  // Timer handling functions
   const handleTimerComplete = (timerId: string) => {
     setChatHistory(prev => [
       ...prev,
       {
         role: 'assistant',
-        content: "⏰ Time's up! Your timer has finished."
+        content: `⏰ Timer (${timerId.substring(0,4)}...) finished!`
       }
     ]);
   };
@@ -342,6 +399,8 @@ export function Dashboard() {
     const amount = parseInt(match[1]);
     const unit = match[2].toLowerCase();
 
+    if (isNaN(amount) || amount <= 0) return null; // Ensure positive amount
+
     if (unit.startsWith('hour') || unit.startsWith('hr')) {
       return amount * 3600;
     } else if (unit.startsWith('min')) {
@@ -353,55 +412,66 @@ export function Dashboard() {
     return null;
   };
 
-  // Scroll effect (NO CHANGES HERE)
+  // Scroll effect
   useEffect(() => {
-    if (chatEndRef.current && isAiSidebarOpen) { // Only scroll if sidebar is open
-      chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (chatEndRef.current && isAiSidebarOpen) {
+        // Use requestAnimationFrame for smoother scroll after render
+        requestAnimationFrame(() => {
+            chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        });
     }
-  }, [chatHistory, isAiSidebarOpen]); // Add dependency
+  }, [chatHistory, isAiSidebarOpen]);
 
-  // Format items for chat (NO CHANGES HERE)
+  // Format items for chat
   const formatItemsForChat = () => {
     const lines: string[] = [];
-    lines.push(`${userName}'s items:\n`);
+    lines.push(`Current items for ${userName}:\n`);
     const formatLine = (item: any, type: string) => {
       const name = item.data[type] || 'Untitled';
       const due = item.data.dueDate?.toDate?.();
       const priority = item.data.priority || calculatePriority(item);
       const completed = item.data.completed ? 'Yes' : 'No';
       return `${type.charAt(0).toUpperCase() + type.slice(1)}: ${name}${
-        due ? ` (Due: ${due.toLocaleDateString()})` : ''
+        due ? ` (Due: ${due.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})` : '' // Use shorter date format
       } [Priority: ${priority}] [Completed: ${completed}]`;
     };
-    tasks.forEach((t) => lines.push(formatLine(t, 'task')));
-    goals.forEach((g) => lines.push(formatLine(g, 'goal')));
-    projects.forEach((p) => lines.push(formatLine(p, 'project')));
-    plans.forEach((p) => lines.push(formatLine(p, 'plan')));
+    // Include only non-completed items unless explicitly asked? For now, include all.
+    const activeItems = [...tasks, ...goals, ...projects, ...plans]; //.filter(i => !i.data.completed);
+    if (activeItems.length === 0) return `No active items found for ${userName}.`;
+
+    activeItems.forEach((item) => {
+        if (item.data.task) lines.push(formatLine(item, 'task'));
+        else if (item.data.goal) lines.push(formatLine(item, 'goal'));
+        else if (item.data.project) lines.push(formatLine(item, 'project'));
+        else if (item.data.plan) lines.push(formatLine(item, 'plan'));
+    });
     return lines.join('\n');
   };
 
-  // Handle Chat Submit (NO CHANGES IN CORE LOGIC, just uses existing state)
+  // Handle Chat Submit
     const handleChatSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
       if (!chatMessage.trim() || isChatLoading) return;
 
-      const timerDuration = parseTimerRequest(chatMessage);
+      const currentMessage = chatMessage; // Capture message before clearing
+      setChatMessage(''); // Clear input immediately
+
+      const timerDuration = parseTimerRequest(currentMessage);
       const userMsg: ChatMessage = {
         role: 'user',
-        content: chatMessage
+        content: currentMessage
       };
 
       setChatHistory(prev => [...prev, userMsg]);
-      setChatMessage('');
       setIsChatLoading(true); // Set loading early
 
       if (timerDuration) {
-        const timerId = Math.random().toString(36).substr(2, 9);
+        const timerId = Math.random().toString(36).substring(2, 9);
         setChatHistory(prev => [
           ...prev,
           {
             role: 'assistant',
-            content: `Okay, starting a timer for ${timerDuration} seconds.`,
+            content: `Okay, starting a timer for ${Math.round(timerDuration / 60)} minutes.`,
             timer: {
               type: 'timer',
               duration: timerDuration,
@@ -413,116 +483,74 @@ export function Dashboard() {
         return;
       }
 
-      const conversation = chatHistory
-        .map((m) => `${m.role === 'user' ? userName : 'Assistant'}: ${m.content}`)
-        .join('\n');
+      // Prepare context for LLM
+       const conversationHistory = chatHistory
+         .slice(-6) // Limit history to last ~6 turns to save tokens
+         .map((m) => `${m.role === 'user' ? userName : 'Assistant'}: ${m.content}`)
+         .join('\n');
       const itemsText = formatItemsForChat();
 
       const now = new Date();
       const currentDateTime = {
-        date: now.toLocaleDateString('en-US', {
-          weekday: 'long',
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric'
-        }),
-        time: now.toLocaleTimeString('en-US', {
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: true
-        })
+        date: now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
+        time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
       };
 
-        // *** Use the exact same prompt structure as before ***
-        const prompt = `
+        // Construct the prompt using the defined structure
+         const prompt = `
 [CONTEXT]
 User's Name: ${userName}
 Current Date: ${currentDateTime.date}
 Current Time: ${currentDateTime.time}
 
+User's Current Items:
 ${itemsText}
 
-[CONVERSATION SO FAR]
-${conversation}
+[CONVERSATION HISTORY (Last few turns)]
+${conversationHistory}
 
 [NEW USER MESSAGE]
-${userName}: ${userMsg.content}
+${userName}: ${currentMessage}
 
-You are TaskMaster, a friendly and versatile AI productivity assistant. Engage in casual conversation, provide productivity advice, and discuss ${userName}'s items only when explicitly asked by ${userName}.
+You are TaskMaster, a friendly and highly productive AI assistant integrated into a task management dashboard. Your goal is to assist the user with their tasks, goals, plans, and projects, provide productivity tips, and engage in helpful conversation.
 
 Guidelines:
 
-1. General Conversation:
-   - Respond in a friendly, natural tone matching ${userName}'s style.
-   - Do not include any internal instructions, meta commentary, or explanations of your process.
-   - Do not include phrases such as "Here's my response to continue the conversation:"
-     or similar wording that introduces your reply.
-   - Do not include or reference code blocks for languages like Python, Bash, or any other
-     unless explicitly requested by ${userName}.
-   - Only reference ${userName}'s items if ${userName} explicitly asks about them.
-   - When discussing tasks, goals, projects, or plans, consider their priority levels and due dates.
-   - Provide specific advice based on item priorities and completion status.
+1.  **Primary Focus:** Help the user manage their listed items. Be proactive if the user asks vague questions like "What should I do?". Analyze their items (due dates, priorities) and suggest specific actions.
+2.  **Tone:** Friendly, encouraging, concise, and action-oriented. Match the user's tone where appropriate.
+3.  **Item Awareness:** Refer to the user's items accurately when relevant. Use information like due dates and priorities to give better advice.
+4.  **Clarity:** Provide clear, unambiguous responses. Avoid jargon unless the user uses it first.
+5.  **Conciseness:** Get straight to the point. Avoid unnecessary filler text. Short paragraphs are preferred.
+6.  **Educational Content (JSON):** If the user *explicitly* asks for flashcards or quiz questions on a specific topic, provide *only* a *single* JSON object in the specified format, wrapped in \`\`\`json ... \`\`\`. Do *not* provide JSON otherwise. Do not mix JSON with conversational text in the same response.
 
-2. Educational Content (JSON):
-   - If ${userName} explicitly requests educational content (flashcards or quiz questions), provide exactly one JSON object.
-   - Wrap the JSON object in a single code block using triple backticks and the "json" language identifier.
-   - Use one of the following formats:
+    Flashcard JSON format:
+    \`\`\`json
+    {
+      "type": "flashcard",
+      "data": [ { "id": "...", "question": "...", "answer": "...", "topic": "..." }, ... ]
+    }
+    \`\`\`
 
-     For flashcards:
-     \`\`\`json
-     {
-       "type": "flashcard",
-       "data": [
-         {
-           "id": "unique-id-1",
-           "question": "Question 1",
-           "answer": "Answer 1",
-           "topic": "Subject area"
-         },
-         {
-           "id": "unique-id-2",
-           "question": "Question 2",
-           "answer": "Answer 2",
-           "topic": "Subject area"
-         }
-       ]
-     }
-     \`\`\`
+    Quiz Question JSON format:
+    \`\`\`json
+    {
+      "type": "question",
+      "data": [ { "id": "...", "question": "...", "options": [...], "correctAnswer": index, "explanation": "..." }, ... ]
+    }
+    \`\`\`
 
-     For quiz questions:
-     \`\`\`json
-     {
-       "type": "question",
-       "data": [
-         {
-           "id": "unique-id-1",
-           "question": "Question 1",
-           "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
-           "correctAnswer": 0,
-           "explanation": "Explanation 1"
-         },
-         {
-           "id": "unique-id-2",
-           "question": "Question 2",
-           "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
-           "correctAnswer": 1,
-           "explanation": "Explanation 2"
-         }
-       ]
-     }
-     \`\`\`
+7.  **No Meta-Commentary:** Do not talk about yourself as an AI or explain your reasoning unless asked. Avoid phrases like "Based on your items...", "Here's what I found...", etc. Just give the answer or suggestion directly.
+8.  **No Code Blocks (Unless JSON):** Do not generate code snippets (Python, JS, etc.) unless specifically requested for educational purposes related to programming.
+9.  **Error Handling:** If you cannot fulfill a request, politely state that you cannot help with that specific query.
+10. **Response Start:** Directly start the response. Do not use greetings like "Hello" or "Hi" unless it's the very first message of a new session.
 
-   - Do not include any JSON unless ${userName} explicitly requests it.
-   - The JSON must be valid, complete, and include multiple items in its "data" array.
+Respond directly to the NEW USER MESSAGE based on the CONTEXT and CONVERSATION HISTORY. Assistant:`;
 
-3. Response Structure:
-   - Provide a direct response to ${userName} without any extraneous openings or meta-text.
-   - Do not mix JSON with regular text. JSON is only for requested educational content.
-   - Always address ${userName} in a friendly, helpful tone.
 
-Follow these instructions strictly. Assistant:
-`; // Added "Assistant:" to encourage direct response
-
+      // Add placeholder message for streaming UI
+        const assistantMsgId = Date.now().toString(); // Unique ID for the message
+        const placeholderMsg: ChatMessage = { id: assistantMsgId, role: 'assistant', content: "..." };
+        setChatHistory(prev => [...prev, placeholderMsg]);
 
       try {
         const geminiOptions = {
@@ -530,13 +558,13 @@ Follow these instructions strictly. Assistant:
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{ parts: [{ text: prompt }] }],
-             // Add generation config if needed (optional, defaults are usually fine)
              generationConfig: {
-              // temperature: 0.7, // Example: Adjust creativity
-              // maxOutputTokens: 1024, // Example: Limit response length
-            },
-             // Add safety settings if needed (optional)
-             safetySettings: [
+               temperature: 0.7,
+               maxOutputTokens: 1000,
+               // topP: 0.9, // Alternative to temperature
+               // topK: 40, // Alternative to temperature
+             },
+             safetySettings: [ // Standard safety settings
                 { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
                 { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
                 { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
@@ -545,112 +573,85 @@ Follow these instructions strictly. Assistant:
           })
         };
 
-        let streamingResponseText = ""; // Accumulate stream chunks here
-        const assistantMsgContainer: ChatMessage = { role: 'assistant', content: "" }; // Placeholder for the final message
-
-         // Add a placeholder message immediately for the assistant
-         setChatHistory(prev => [...prev, assistantMsgContainer]);
+        let streamingResponseText = "";
+        let finalResponseText = ""; // Store final text after stream ends
 
         await streamResponse(geminiEndpoint, geminiOptions, (chunk) => {
-            let currentText = extractCandidateText(chunk); // Process chunk text
-            streamingResponseText = currentText; // Update accumulated text
+            // Process chunk text using the improved extractor
+            streamingResponseText = extractCandidateText(chunk);
 
-            // Update the last message (the assistant's placeholder) in the history
-             setChatHistory(prev => {
-                const updatedHistory = [...prev];
-                const lastMessageIndex = updatedHistory.length - 1;
-                if (lastMessageIndex >= 0 && updatedHistory[lastMessageIndex].role === 'assistant') {
-                    // Check for JSON structure within the streaming text
-                    const jsonMatch = streamingResponseText.match(/```json\n([\s\S]*?)(\n```)?$/); // Match potentially incomplete JSON block at the end
-                    let textPart = streamingResponseText;
-                    let parsedJson: any = null;
+            // Update the placeholder message content in the history
+            setChatHistory(prev => prev.map(msg =>
+                msg.id === assistantMsgId
+                    ? { ...msg, content: streamingResponseText || "..." } // Update content, ensure ellipsis if empty
+                    : msg
+            ));
 
-                    if (jsonMatch && jsonMatch[1]) {
-                        try {
-                            // Attempt to parse, even if potentially incomplete
-                            parsedJson = JSON.parse(jsonMatch[1].trim());
-                            // If parsing succeeds, remove the JSON block from the text part (only if complete)
-                             if (jsonMatch[2]) { // Check if closing ``` exists
-                                textPart = streamingResponseText.substring(0, jsonMatch.index).trim();
-                             } else {
-                                // Keep text part as everything before the potential JSON start
-                                textPart = streamingResponseText.substring(0, jsonMatch.index).trim();
-                             }
-                        } catch (e) {
-                            // JSON is incomplete or invalid, keep parsing attempt for next chunk
-                             textPart = streamingResponseText.substring(0, jsonMatch.index).trim();
-                             parsedJson = null; // Reset parsedJson if error
-                        }
-                    }
+        });
 
-                    // Update the message content
-                    updatedHistory[lastMessageIndex] = {
-                        ...updatedHistory[lastMessageIndex],
-                        content: textPart,
-                        flashcard: (parsedJson?.type === 'flashcard' && parsedJson.data) ? parsedJson : undefined,
-                        question: (parsedJson?.type === 'question' && parsedJson.data) ? parsedJson : undefined,
-                    };
-                }
-                return updatedHistory;
-            });
+         finalResponseText = streamingResponseText; // Text accumulated from the last chunk update
 
-        }, 45000); // 45 second timeout
+         // Final processing after stream ends to handle potential JSON
+          setChatHistory(prev => {
+              return prev.map(msg => {
+                  if (msg.id === assistantMsgId) {
+                      let finalAssistantText = finalResponseText;
+                      let parsedJson: any = null;
+                      let jsonType: 'flashcard' | 'question' | null = null;
 
-        // Final processing after stream ends (ensure final state is correct)
-         setChatHistory(prev => {
-             const updatedHistory = [...prev];
-             const lastMessageIndex = updatedHistory.length - 1;
-             if (lastMessageIndex >= 0 && updatedHistory[lastMessageIndex].role === 'assistant') {
-                 const finalRawText = streamingResponseText; // Use the fully accumulated text
-                 let finalAssistantText = finalRawText;
-                 let finalParsedJson: any = null;
+                      // Check for JSON block in the final accumulated text
+                      const finalJsonMatch = finalAssistantText.match(/```json\s*([\s\S]*?)\s*```/);
 
-                 const finalJsonMatch = finalAssistantText.match(/```json\n([\s\S]*?)\n```/);
-                 if (finalJsonMatch && finalJsonMatch[1]) {
-                     try {
-                         finalParsedJson = JSON.parse(finalJsonMatch[1].trim());
-                         finalAssistantText = finalAssistantText.replace(/```json\n[\s\S]*?\n```/, '').trim(); // Remove JSON block
+                      if (finalJsonMatch && finalJsonMatch[1]) {
+                          try {
+                              parsedJson = JSON.parse(finalJsonMatch[1].trim());
+                               // Basic validation of JSON structure
+                               if ( (parsedJson.type === 'flashcard' || parsedJson.type === 'question') && Array.isArray(parsedJson.data) && parsedJson.data.length > 0) {
+                                   // Valid structure
+                                   finalAssistantText = finalAssistantText.replace(finalJsonMatch[0], '').trim(); // Remove JSON block from text
+                                   jsonType = parsedJson.type;
+                               } else {
+                                   console.warn("Received JSON block, but structure is invalid:", parsedJson);
+                                   parsedJson = null; // Invalidate if structure is wrong
+                               }
+                          } catch (e) {
+                              console.error('Failed to parse final JSON content:', e, "JSON String:", finalJsonMatch[1]);
+                              parsedJson = null; // Invalidate on parse error
+                          }
+                      }
 
-                         // Basic validation
-                          if (!(finalParsedJson.type && finalParsedJson.data && Array.isArray(finalParsedJson.data))) {
-                             console.error("Invalid JSON structure received:", finalParsedJson);
-                             finalParsedJson = null; // Invalidate if structure is wrong
-                             finalAssistantText = finalRawText; // Revert text if JSON was bad
-                         }
-
-                     } catch (e) {
-                         console.error('Failed to parse final JSON content:', e);
-                         finalParsedJson = null; // Invalidate on parse error
-                         finalAssistantText = finalRawText; // Revert text if JSON was bad
-                     }
-                 }
-
-                  updatedHistory[lastMessageIndex] = {
-                     ...updatedHistory[lastMessageIndex],
-                     content: finalAssistantText || "...", // Ensure content isn't empty
-                     flashcard: (finalParsedJson?.type === 'flashcard') ? finalParsedJson : undefined,
-                     question: (finalParsedJson?.type === 'question') ? finalParsedJson : undefined,
-                 };
-
-             }
-             return updatedHistory;
-         });
+                      // Return the final message object
+                       return {
+                           ...msg,
+                           content: finalAssistantText || "...", // Ensure some content is shown
+                           flashcard: jsonType === 'flashcard' ? parsedJson : undefined,
+                           question: jsonType === 'question' ? parsedJson : undefined,
+                       };
+                  }
+                  return msg; // Return other messages unchanged
+              });
+          });
 
 
       } catch (err: any) {
-        console.error('Chat error:', err);
-         // Update the placeholder or add a new error message
+        console.error('Chat Submit Error:', err);
+         // Update the placeholder message to show the error or add a new error message
          setChatHistory(prev => {
-            const updatedHistory = [...prev];
-            const lastMessageIndex = updatedHistory.length - 1;
-             // Check if the last message was the placeholder assistant message
-            if (lastMessageIndex >= 0 && updatedHistory[lastMessageIndex].role === 'assistant' && updatedHistory[lastMessageIndex].content === "" ) {
-                 updatedHistory[lastMessageIndex].content = 'Sorry, I encountered an error. Please try again.';
-                 return updatedHistory;
-             } else {
-                // If placeholder wasn't there or was already updated, add a new error message
-                 return [...prev, { role: 'assistant', content: 'Sorry, I encountered an error. Please try again.' }];
+             const errorMsgContent = `Sorry, I encountered an error${err.message ? ': ' + err.message : '.'} Please try again.`;
+              // Try to update the placeholder first
+             let updated = false;
+             const updatedHistory = prev.map(msg => {
+                 if (msg.id === assistantMsgId) {
+                     updated = true;
+                     return { ...msg, content: errorMsgContent, error: true };
+                 }
+                 return msg;
+             });
+             // If placeholder wasn't found (shouldn't happen), add a new error message
+             if (!updated) {
+                 updatedHistory.push({ role: 'assistant', content: errorMsgContent, error: true });
              }
+             return updatedHistory;
          });
       } finally {
         setIsChatLoading(false);
@@ -659,7 +660,7 @@ Follow these instructions strictly. Assistant:
 
 
   // ---------------------
-  // 2. COLLECTION STATES (NO CHANGES HERE)
+  // 2. COLLECTION STATES
   // ---------------------
   const [tasks, setTasks] = useState<Array<{ id: string; data: any }>>([]);
   const [goals, setGoals] = useState<Array<{ id: string; data: any }>>([]);
@@ -667,63 +668,164 @@ Follow these instructions strictly. Assistant:
   const [plans, setPlans] = useState<Array<{ id: string; data: any }>>([]);
   const [customTimers, setCustomTimers] = useState<Array<{ id: string; data: any }>>([]);
 
-  // Smart insights state and handlers (NO CHANGES HERE)
+  // Smart insights state and handlers
   const [smartInsights, setSmartInsights] = useState<SmartInsight[]>([]);
   const [showInsightsPanel, setShowInsightsPanel] = useState(false); // Default to collapsed
+
+   // Debounce for insight generation
+  const insightTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [debouncedItemsSigForInsights, setDebouncedItemsSigForInsights] = useState("");
+
+  // Create a signature of the items for insights
+  const createItemsSignatureForInsights = (items: any[][]): string => {
+        return items
+        .flat()
+        .map(item => `${item.id}-${item.data.completed}-${item.data.dueDate?.seconds || 'null'}`) // Include relevant fields
+        .sort()
+        .join('|');
+  };
+
+  // Effect to update debounced signature for insights
+  useEffect(() => {
+    if (!user) return;
+    const currentSig = createItemsSignatureForInsights([tasks, goals, projects, plans]);
+
+    if (insightTimeoutRef.current) {
+        clearTimeout(insightTimeoutRef.current);
+    }
+
+    insightTimeoutRef.current = setTimeout(() => {
+        setDebouncedItemsSigForInsights(currentSig);
+    }, 2000); // Wait 2 seconds after last item change for insights
+
+    return () => {
+        if (insightTimeoutRef.current) {
+            clearTimeout(insightTimeoutRef.current);
+        }
+    };
+  }, [user, tasks, goals, projects, plans]);
+
+   // Generate client-side insights based on debounced items
+  useEffect(() => {
+        if (!user || !debouncedItemsSigForInsights) return; // Run only when debounced signature changes
+
+        const now = new Date();
+        now.setHours(0, 0, 0, 0); // Compare dates only
+
+        const allActiveItems = [...tasks, ...goals, ...projects, ...plans].filter(item => !item.data.completed);
+        let newInsights: SmartInsight[] = [];
+
+        // Check for overdue items
+        allActiveItems.forEach(item => {
+            if (item.data.dueDate) {
+                 let dueDate: Date | null = null;
+                 if (item.data.dueDate?.toDate) dueDate = item.data.dueDate.toDate();
+                 else try { dueDate = new Date(item.data.dueDate); if (isNaN(dueDate.getTime())) dueDate = null; } catch { dueDate = null; }
+
+                 if (dueDate) {
+                     dueDate.setHours(0, 0, 0, 0);
+                     if (dueDate < now) {
+                         const itemType = item.data.task ? 'task' : item.data.goal ? 'goal' : item.data.project ? 'project' : 'plan';
+                         const itemName = item.data[itemType] || 'Untitled';
+                         const insightId = `overdue-${item.id}`;
+                          newInsights.push({
+                             id: insightId,
+                             text: `"${itemName}" (${itemType}) is overdue. Reschedule or mark complete?`,
+                             type: 'warning',
+                             relatedItemId: item.id,
+                             createdAt: new Date()
+                         });
+                     }
+                 }
+            }
+        });
+
+        // Check for upcoming deadlines (due within next 2 days, including today)
+        allActiveItems.forEach(item => {
+            // Skip if already marked as overdue
+             if (newInsights.some(ni => ni.relatedItemId === item.id && ni.type === 'warning')) return;
+
+             if (item.data.dueDate) {
+                 let dueDate: Date | null = null;
+                 if (item.data.dueDate?.toDate) dueDate = item.data.dueDate.toDate();
+                 else try { dueDate = new Date(item.data.dueDate); if (isNaN(dueDate.getTime())) dueDate = null; } catch { dueDate = null; }
+
+                 if (dueDate) {
+                     dueDate.setHours(0, 0, 0, 0);
+                     const diffTime = dueDate.getTime() - now.getTime();
+                     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                     if (diffDays >= 0 && diffDays <= 2) { // Due today, tomorrow, or day after
+                         const itemType = item.data.task ? 'task' : item.data.goal ? 'goal' : item.data.project ? 'project' : 'plan';
+                         const itemName = item.data[itemType] || 'Untitled';
+                         const insightId = `upcoming-${item.id}`;
+                          newInsights.push({
+                             id: insightId,
+                             text: `"${itemName}" (${itemType}) is due soon (${diffDays === 0 ? 'Today' : diffDays === 1 ? 'Tomorrow' : 'in ' + diffDays + ' days'}). Plan time for it?`,
+                             type: 'suggestion',
+                             relatedItemId: item.id,
+                             createdAt: new Date()
+                         });
+                     }
+                 }
+            }
+        });
+
+        // Update state: Add new insights, keep existing non-dismissed ones, remove duplicates
+        setSmartInsights(prev => {
+            const existingActive = prev.filter(i => !i.accepted && !i.rejected);
+            const combined = [...newInsights, ...existingActive];
+            // Remove duplicates based on id, keeping the newest one (from newInsights)
+            const uniqueMap = new Map<string, SmartInsight>();
+            combined.forEach(insight => uniqueMap.set(insight.id, insight));
+            // Convert map back to array and limit count
+            return Array.from(uniqueMap.values()).slice(0, 10);
+        });
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user, debouncedItemsSigForInsights]); // Depend only on debounced signature
+
 
   const handleMarkComplete = async (itemId: string) => {
     if (!user) return;
     try {
-      await markItemComplete(activeTab, itemId);
-
-      // Generate a completion insight
-      const item = currentItems.find(item => item.id === itemId);
-      if (item) {
-        const itemName = item.data[titleField] || 'Untitled';
-        const newInsight: SmartInsight = {
-          id: Math.random().toString(36).substr(2, 9),
-          text: `Great job completing "${itemName}"! Consider adding a follow-up.`,
-          type: 'achievement',
-          relatedItemId: itemId,
-          createdAt: new Date()
-        };
-        // Add insight only if a similar recent one doesn't exist
-         if (!smartInsights.some(i => i.relatedItemId === itemId && i.type === 'achievement' && !i.accepted && !i.rejected)) {
-           setSmartInsights(prev => [newInsight, ...prev.slice(0, 9)]); // Keep max 10 insights
-         }
-      }
+      await markItemComplete(activeTab, itemId); // Assumes this function exists and works
+      // Insight generation is handled by the debounced useEffect
     } catch (error) {
       console.error("Error marking item as complete:", error);
+      // Add user feedback if needed
     }
   };
 
   const handleSetPriority = async (itemId: string, priority: 'high' | 'medium' | 'low') => {
     if (!user) return;
     try {
-      await updateItem(activeTab, itemId, { priority });
+      await updateItem(activeTab, itemId, { priority }); // Assumes this function exists and works
     } catch (error) {
       console.error("Error updating priority:", error);
+       // Add user feedback if needed
     }
   };
 
   // ---------------------
-  // 3. WEATHER STATE (NO CHANGES HERE)
+  // 3. WEATHER STATE
   // ---------------------
   const [weatherData, setWeatherData] = useState<any>(null);
+  const [weatherLoading, setWeatherLoading] = useState<boolean>(true); // Add loading state
+  const [weatherError, setWeatherError] = useState<string | null>(null); // Add error state
 
   // ---------------------
-  // 4. GREETING UPDATE (NO CHANGES HERE)
+  // 4. GREETING UPDATE
   // ---------------------
   useEffect(() => {
-    const updateGreeting = () => {
-      setGreeting(getTimeBasedGreeting());
-    };
-    const interval = setInterval(updateGreeting, 60000);
+    const interval = setInterval(() => {
+        setGreeting(getTimeBasedGreeting());
+        setQuote(getRandomQuote()); // Refresh quote periodically too? Optional.
+    }, 60000); // Update every minute
     return () => clearInterval(interval);
   }, []);
 
   // ---------------------
-  // 5. UI STATES (NO CHANGES HERE, except removing chat modal state)
+  // 5. UI STATES
   // ---------------------
   const [activeTab, setActiveTab] = useState<"tasks" | "goals" | "projects" | "plans">("tasks");
   const [newItemText, setNewItemText] = useState("");
@@ -740,35 +842,50 @@ Follow these instructions strictly. Assistant:
   const [showAnalytics, setShowAnalytics] = useState(false);
 
   useEffect(() => {
-    setCardVisible(true);
+    // Trigger card animation on mount
+    const timer = setTimeout(() => setCardVisible(true), 100); // Small delay for effect
+    return () => clearTimeout(timer);
   }, []);
 
   // ---------------------
-  // 6. MAIN POMODORO TIMER (NO CHANGES HERE)
+  // 6. MAIN POMODORO TIMER
   // ---------------------
   const [pomodoroTimeLeft, setPomodoroTimeLeft] = useState(25 * 60);
   const [pomodoroRunning, setPomodoroRunning] = useState(false);
   const pomodoroRef = useRef<NodeJS.Timer | null>(null);
   const pomodoroAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [pomodoroFinished, setPomodoroFinished] = useState(false);
 
   const handlePomodoroStart = () => {
     if (pomodoroRunning) return;
     setPomodoroRunning(true);
+    setPomodoroFinished(false); // Reset finished state on start
     if (pomodoroAudioRef.current) { // Stop alarm if starting timer again
         pomodoroAudioRef.current.pause();
         pomodoroAudioRef.current.currentTime = 0;
         pomodoroAudioRef.current = null;
     }
+    // Ensure timer starts from the current value if paused, or reset if finished
+    if (pomodoroTimeLeft <= 0) {
+        setPomodoroTimeLeft(25 * 60); // Reset if starting after finish
+    }
+
     pomodoroRef.current = setInterval(() => {
       setPomodoroTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(pomodoroRef.current as NodeJS.Timer);
           setPomodoroRunning(false);
+          setPomodoroFinished(true); // Set finished state
           if (!pomodoroAudioRef.current) {
-            const alarmAudio = new Audio('https://firebasestorage.googleapis.com/v0/b/deepworkai-c3419.appspot.com/o/ios-17-ringtone-tilt-gg8jzmiv_pUhS32fz.mp3?alt=media&token=a0a522e0-8a49-408a-9dfe-17e41d3bc801');
-            alarmAudio.loop = true;
-            alarmAudio.play().catch(e => console.error("Error playing sound:", e)); // Add catch
-            pomodoroAudioRef.current = alarmAudio;
+             // Ensure Audio context is available (might require user interaction first)
+             try {
+                const alarmAudio = new Audio('https://firebasestorage.googleapis.com/v0/b/deepworkai-c3419.appspot.com/o/ios-17-ringtone-tilt-gg8jzmiv_pUhS32fz.mp3?alt=media&token=a0a522e0-8a49-408a-9dfe-17e41d3bc801');
+                alarmAudio.loop = true; // Let it loop until reset
+                alarmAudio.play().catch(e => console.error("Error playing sound:", e));
+                pomodoroAudioRef.current = alarmAudio;
+             } catch (e) {
+                 console.error("Could not create or play audio:", e)
+             }
           }
           return 0;
         }
@@ -778,14 +895,16 @@ Follow these instructions strictly. Assistant:
   };
 
   const handlePomodoroPause = () => {
+    if (!pomodoroRunning) return;
     setPomodoroRunning(false);
     if (pomodoroRef.current) clearInterval(pomodoroRef.current);
-    // Don't pause the alarm sound here, let reset handle it
   };
 
   const handlePomodoroReset = () => {
     setPomodoroRunning(false);
+    setPomodoroFinished(false); // Reset finished state
     if (pomodoroRef.current) clearInterval(pomodoroRef.current);
+    pomodoroRef.current = null; // Clear the ref itself
     setPomodoroTimeLeft(25 * 60);
     if (pomodoroAudioRef.current) {
       pomodoroAudioRef.current.pause();
@@ -800,33 +919,47 @@ Follow these instructions strictly. Assistant:
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // Cleanup timer interval on component unmount
+  useEffect(() => {
+    return () => {
+      if (pomodoroRef.current) clearInterval(pomodoroRef.current);
+      if (pomodoroAudioRef.current) {
+          pomodoroAudioRef.current.pause();
+          pomodoroAudioRef.current = null;
+      }
+    };
+  }, []);
+
+
   // ---------------------
-  // 7. AUTH LISTENER (NO CHANGES HERE)
+  // 7. AUTH LISTENER
   // ---------------------
   useEffect(() => {
-    const unsubscribe = onFirebaseAuthStateChanged((firebaseUser) => {
-      setUser(firebaseUser);
+    const unsubscribe = onFirebaseAuthStateChanged((firebaseUser) => { // Assumes this sets up the listener correctly
+      setUser(firebaseUser); // Update user state
       if (firebaseUser) {
-        if (firebaseUser.displayName) {
-          setUserName(firebaseUser.displayName);
-        } else {
-          getDoc(doc(db, "users", firebaseUser.uid))
+        // Fetch display name preference or fallback
+        getDoc(doc(db, "users", firebaseUser.uid))
             .then((docSnap) => {
+              let nameToSet = "User"; // Default fallback
               if (docSnap.exists() && docSnap.data().name) {
-                setUserName(docSnap.data().name);
-              } else {
-                  // Fallback if name field doesn't exist or is empty
-                  setUserName(firebaseUser.email ? firebaseUser.email.split('@')[0] : "User");
+                nameToSet = docSnap.data().name;
+              } else if (firebaseUser.displayName) {
+                 nameToSet = firebaseUser.displayName;
+              } else if (firebaseUser.email) {
+                  nameToSet = firebaseUser.email.split('@')[0]; // Use email prefix if no name
               }
+              setUserName(nameToSet);
             })
             .catch((error) => {
               console.error("Error fetching user data:", error);
-              setUserName(firebaseUser.email ? firebaseUser.email.split('@')[0] : "User"); // Fallback on error
+               // Use fallback even on error
+               setUserName(firebaseUser.displayName || (firebaseUser.email ? firebaseUser.email.split('@')[0] : "User"));
             });
-        }
       } else {
-        setUserName("Loading...");
-        // Clear potentially sensitive data on logout
+        // User is signed out
+        setUserName("Loading..."); // Or "Guest" or appropriate state
+        // Clear sensitive data if needed
          setTasks([]);
          setGoals([]);
          setProjects([]);
@@ -835,176 +968,217 @@ Follow these instructions strictly. Assistant:
          setWeatherData(null);
          setSmartOverview("");
          setSmartInsights([]);
-         setChatHistory([ // Reset chat history
-            { role: 'assistant', content: "👋 Hi I'm TaskMaster, How can I help you today?" }
-         ]);
+         setChatHistory([ { role: 'assistant', content: "👋 Hi I'm TaskMaster, How can I help you today?" } ]);
+         // Reset Pomodoro on logout? Optional.
+         // handlePomodoroReset();
       }
     });
+    // Cleanup listener on component unmount
     return () => unsubscribe();
-  }, []);
+  }, []); // Run only once on mount
 
   // ---------------------
-  // 8. COLLECTION SNAPSHOTS (NO CHANGES HERE)
+  // 8. COLLECTION SNAPSHOTS
   // ---------------------
   useEffect(() => {
-    if (!user) return;
-    const unsubTasks = onCollectionSnapshot('tasks', user.uid, (items) => setTasks(items));
-    const unsubGoals = onCollectionSnapshot('goals', user.uid, (items) => setGoals(items));
-    const unsubProjects = onCollectionSnapshot('projects', user.uid, (items) => setProjects(items));
-    const unsubPlans = onCollectionSnapshot('plans', user.uid, (items) => setPlans(items));
-    const unsubTimers = onCustomTimersSnapshot(user.uid, (timers) => {
-      setCustomTimers(timers);
-    });
+    if (!user?.uid) {
+         // Ensure data is cleared if user logs out while listeners are active
+         setTasks([]);
+         setGoals([]);
+         setProjects([]);
+         setPlans([]);
+         setCustomTimers([]);
+         return;
+     };
+
+    // Setup listeners and store unsubscribe functions
+    const unsubFunctions = [
+        onCollectionSnapshot('tasks', user.uid, (items) => setTasks(items)),
+        onCollectionSnapshot('goals', user.uid, (items) => setGoals(items)),
+        onCollectionSnapshot('projects', user.uid, (items) => setProjects(items)),
+        onCollectionSnapshot('plans', user.uid, (items) => setPlans(items)),
+        onCustomTimersSnapshot(user.uid, (timers) => setCustomTimers(timers)), // Assumes this handles custom timers correctly
+    ];
+
+    // Return cleanup function to unsubscribe all listeners
     return () => {
-      unsubTasks();
-      unsubGoals();
-      unsubProjects();
-      unsubPlans();
-      unsubTimers();
+      unsubFunctions.forEach(unsub => {
+          try { unsub(); } catch (e) { console.warn("Error unsubscribing:", e); }
+      });
     };
-  }, [user]);
+  }, [user]); // Re-run when user changes
 
   // ---------------------
-  // 9. WEATHER FETCH (NO CHANGES HERE)
+  // 9. WEATHER FETCH
   // ---------------------
-  useEffect(() => {
-    if (!user || !weatherApiKey) { // Also check if API key exists
-      setWeatherData(null);
-      return;
+   useEffect(() => {
+    if (!user || !weatherApiKey) {
+        setWeatherLoading(false);
+        setWeatherData(null);
+        setWeatherError(null); // Ensure error is cleared if no user/key
+        return;
     }
+
+    let isMounted = true; // Prevent state updates on unmounted component
+    setWeatherLoading(true);
+    setWeatherError(null);
+
     navigator.geolocation.getCurrentPosition(
       async (position) => {
+         if (!isMounted) return;
         const { latitude, longitude } = position.coords;
         try {
           const response = await fetch(
             `https://api.weatherapi.com/v1/forecast.json?key=${weatherApiKey}&q=${latitude},${longitude}&days=3`
           );
-          if (!response.ok) throw new Error(`Weather fetch failed: ${response.statusText}`);
+          if (!response.ok) {
+              let errorMsg = `Weather fetch failed (${response.status})`;
+              try {
+                 const errorData = await response.json();
+                 errorMsg = errorData?.error?.message || errorMsg;
+              } catch { /* Ignore parsing error */ }
+              throw new Error(errorMsg);
+          }
           const data = await response.json();
-          setWeatherData(data);
-        } catch (error) {
-          console.error("Failed to fetch weather:", error);
-          setWeatherData(null); // Set to null on error
+           if (isMounted) {
+              setWeatherData(data);
+              setWeatherLoading(false);
+           }
+        } catch (error: any) {
+           if (isMounted) {
+              console.error("Failed to fetch weather:", error);
+              setWeatherData(null);
+              setWeatherError(error.message || "Failed to fetch weather data.");
+              setWeatherLoading(false);
+           }
         }
       },
       (error) => {
-        console.error("Geolocation error:", error);
-        setWeatherData(null); // Set to null on geolocation error
+         if (isMounted) {
+              console.error("Geolocation error:", error);
+              setWeatherData(null);
+              setWeatherError(`Geolocation Error: ${error.message}`);
+              setWeatherLoading(false);
+         }
+      },
+      { // Geolocation options
+          enableHighAccuracy: false, // Lower accuracy is often faster and sufficient
+          timeout: 10000, // 10 seconds timeout
+          maximumAge: 600000 // Accept cached position up to 10 minutes old
       }
     );
+
+     return () => { isMounted = false; }; // Cleanup flag
+
   }, [user]); // Re-fetch only when user changes
 
   // ---------------------
-  // 10. SMART OVERVIEW GENERATION (NO CHANGES IN LOGIC)
+  // 10. SMART OVERVIEW GENERATION
   // ---------------------
     const [smartOverview, setSmartOverview] = useState<string>("");
     const [overviewLoading, setOverviewLoading] = useState(false);
-    const [lastGeneratedDataSig, setLastGeneratedDataSig] = useState<string>(""); // Use a signature/hash instead of full data
+    const [lastGeneratedDataSig, setLastGeneratedDataSig] = useState<string>("");
     const [lastResponse, setLastResponse] = useState<string>("");
 
-    // Debounce state for overview generation
-    const [debouncedItemsSig, setDebouncedItemsSig] = useState("");
     const overviewTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const [debouncedItemsSigForOverview, setDebouncedItemsSigForOverview] = useState("");
 
-    // Create a signature of the items to detect changes more efficiently
-    const createItemsSignature = (items: any[][]): string => {
+    // Signature includes more relevant fields for overview
+    const createItemsSignatureForOverview = (items: any[][]): string => {
         return items
         .flat()
-        .map(item => `${item.id}-${item.data.completed}-${item.data.dueDate?.seconds}-${item.data.priority || ''}`)
+        .map(item => `${item.id}-${item.data.completed}-${item.data.dueDate?.seconds || 'null'}-${item.data.priority || 'm'}-${item.data.task||item.data.goal||item.data.project||item.data.plan||''}`)
         .sort()
         .join('|');
     };
 
-     // Effect to update debounced signature
+     // Effect to update debounced signature for overview
     useEffect(() => {
         if (!user) return;
-        const currentSig = createItemsSignature([tasks, goals, projects, plans]);
+        const currentSig = createItemsSignatureForOverview([tasks, goals, projects, plans]);
 
         if (overviewTimeoutRef.current) {
             clearTimeout(overviewTimeoutRef.current);
         }
 
         overviewTimeoutRef.current = setTimeout(() => {
-            setDebouncedItemsSig(currentSig);
-        }, 1500); // Wait 1.5 seconds after last item change
+            setDebouncedItemsSigForOverview(currentSig);
+        }, 1500);
 
         return () => {
             if (overviewTimeoutRef.current) {
                 clearTimeout(overviewTimeoutRef.current);
             }
         };
-    }, [user, tasks, goals, projects, plans]); // Depend on raw items
+    }, [user, tasks, goals, projects, plans]);
 
      // Effect to generate overview based on debounced signature
     useEffect(() => {
-        if (!user || !geminiApiKey || !debouncedItemsSig) {
-            setSmartOverview('<div class="text-gray-400 text-sm">Add items or enable AI for your Smart Overview.</div>');
+        if (!user || !geminiApiKey || !debouncedItemsSigForOverview) {
+            setSmartOverview(`<div class="text-gray-400 text-xs italic">Add items for an AI overview.</div>`);
+            setOverviewLoading(false); // Ensure loading is off
             return;
         };
 
-        // Prevent regeneration if the signature hasn't changed
-        if (debouncedItemsSig === lastGeneratedDataSig) {
+        if (debouncedItemsSigForOverview === lastGeneratedDataSig && !overviewLoading) { // Don't regenerate if signature hasn't changed and not already loading
             return;
         }
 
         const generateOverview = async () => {
+            // Prevent concurrent runs
+            if (overviewLoading) return;
+
             setOverviewLoading(true);
-            setLastGeneratedDataSig(debouncedItemsSig); // Store the signature we're generating for
+            setLastGeneratedDataSig(debouncedItemsSigForOverview);
 
             const formatItem = (item: any, type: string) => {
-                const dueDate = item.data.dueDate?.toDate?.();
+                 let dueDate: Date | null = null;
+                 if (item.data.dueDate?.toDate) dueDate = item.data.dueDate.toDate();
+                 else if (item.data.dueDate) try { dueDate = new Date(item.data.dueDate); if (isNaN(dueDate.getTime())) dueDate = null; } catch { dueDate = null; }
+
                 const title = item.data[type] || item.data.title || 'Untitled';
                 const priority = item.data.priority || calculatePriority(item);
-                const completed = item.data.completed ? 'Completed' : 'Not completed';
-                 // Format due date nicely if it exists
+                const completed = item.data.completed ? 'Completed' : 'Pending';
                 const dueDateFormatted = dueDate
                     ? ` (Due: ${dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`
                     : '';
                 return `• ${title}${dueDateFormatted} [Priority: ${priority}] [Status: ${completed}]`;
             };
 
-            const allItems = [
-                ...tasks.map(t => formatItem(t, 'task')),
-                ...goals.map(g => formatItem(g, 'goal')),
-                ...projects.map(p => formatItem(p, 'project')),
-                ...plans.map(p => formatItem(p, 'plan'))
-            ];
+             const allActiveItems = [...tasks, ...goals, ...projects, ...plans].filter(i => !i.data.completed); // Focus overview on active items
+             const formattedData = allActiveItems.length > 0
+                ? allActiveItems.map(item => {
+                      if (item.data.task) return formatItem(item, 'task');
+                      if (item.data.goal) return formatItem(item, 'goal');
+                      if (item.data.project) return formatItem(item, 'project');
+                      if (item.data.plan) return formatItem(item, 'plan');
+                      return null;
+                  }).filter(Boolean).join('\n')
+                : "No pending items.";
 
-            if (!allItems.length) {
-                setSmartOverview('<div class="text-gray-400 text-sm">Add some items to get started!</div>');
+
+            if (formattedData === "No pending items.") {
+                setSmartOverview(`<div class="text-gray-400 text-xs italic">No pending items to generate overview from.</div>`);
                 setOverviewLoading(false);
                 return;
             }
 
-            const formattedData = allItems.join('\n');
             const firstName = userName.split(" ")[0];
 
-            // *** Use the exact same prompt structure as before ***
-            const prompt = `[INST] <<SYS>>
-You are TaskMaster, an advanced AI productivity assistant. Analyze the following items for user "${firstName}" and generate a concise, actionable Smart Overview.
+             // Refined prompt focusing on brevity and action
+              const prompt = `[INST] <<SYS>>
+You are TaskMaster, an AI assistant embedded in a dashboard. Analyze these pending items for user "${firstName}" and provide a *very concise* (1-2 sentences) Smart Overview focusing on immediate priorities.
 
 ${formattedData}
 
-Follow these guidelines exactly:
-1.  Deliver the response as one short paragraph (2-3 sentences max). Focus on what needs attention.
-2.  Highlight 1-2 key upcoming deadlines or high-priority items. Use "Month Day" format (e.g., "March 7th") for dates.
-3.  Suggest 1-2 clear, actionable next steps based *only* on the provided items (e.g., "Focus on completing [High Priority Task Name]" or "Prepare for [Upcoming Project Name] due [Date]").
-4.  Maintain a helpful but impersonal and concise tone.
-5.  The entire response must be formatted as plain text suitable for direct display in HTML.
+Guidelines:
+- Identify the most urgent task/item (highest priority or nearest due date).
+- Suggest one single, clear action related to that item.
+- Be extremely brief and direct. No greetings, no fluff.
+- Format as plain text.
 
-FORBIDDEN IN YOUR FINAL RESPONSE:
-*   Directly addressing the user (e.g., "Hello ${firstName}", "You should...")
-*   Greetings or closings.
-*   Meta-commentary (e.g., "Here's your overview:", "Based on the list...")
-*   Using markdown, bolding, italics, or lists.
-*   Mentioning item counts (e.g., "You have 5 tasks...").
-*   Generic advice not tied to the specific items provided.
-*   Phrases like "items", "to-do list", "tasks/goals/projects/plans".
-*   Numeric date formats (e.g., 03/07/2025).
-
-Keep it extremely brief, focused on action, and directly derived from the input.
-<</SYS>>[/INST]`;
-
+Example: "Focus on high-priority 'Submit Report' due today. Next, tackle 'Plan Project Kickoff'."
+<</SYS>> [/INST]`;
 
             try {
                 const geminiOptions = {
@@ -1012,77 +1186,61 @@ Keep it extremely brief, focused on action, and directly derived from the input.
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                         contents: [{ parts: [{ text: prompt }] }],
-                        // Optional: Add generation config for conciseness
                         generationConfig: {
-                            // temperature: 0.5,
-                             maxOutputTokens: 150, // Limit length
-                             stopSequences: ["\n\n"] // Stop after a double newline potentially
-                        },
-                         safetySettings: [ // Keep safety settings
-                            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-                            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-                            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-                            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-                        ]
+                             maxOutputTokens: 80, // Keep it very short
+                             temperature: 0.5,
+                         },
+                         safetySettings: [
+                             { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+                             { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+                             { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+                             { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+                         ]
                     })
                 };
 
-                // Use fetchWithTimeout for a simpler, non-streaming response for overview
-                const response = await fetchWithTimeout(geminiEndpoint, geminiOptions, 30000); // 30s timeout
+                // Use simple fetch for overview, no streaming needed
+                 const response = await fetchWithTimeout(geminiEndpoint, geminiOptions, 20000); // 20s timeout is enough
                  if (!response.ok) {
                     const errorText = await response.text();
                      throw new Error(`Gemini API error (${response.status}): ${errorText}`);
                  }
                 const resultJson = await response.json();
+                const rawText = extractCandidateText(JSON.stringify(resultJson)); // Ensure extractor gets the JSON string
 
-                // Extract text carefully, handling potential errors
-                let rawText = "";
-                 if (resultJson.candidates && resultJson.candidates[0]?.content?.parts[0]?.text) {
-                     rawText = resultJson.candidates[0].content.parts[0].text;
-                 } else if (resultJson.error) {
-                     console.error("Gemini API Error in Response:", resultJson.error.message);
-                     rawText = "Error generating overview.";
-                 } else {
-                     console.error("Unexpected Gemini response structure:", resultJson);
-                     rawText = "Could not generate overview.";
-                 }
-
-
-                // Clean the response aggressively
+                // Minimal cleaning, relying on prompt constraints
                 const cleanText = rawText
-                    .replace(/\[\/?(INST|SYS)\]/gi, '') // Remove instruction tags
-                    .replace(/<</?SYS>>/gi, '')
-                    .replace(/^(Okay|Alright|Sure|Got it|Hello|Hi)[\s,.:!]*?/i, '') // Remove common greetings
-                    .replace(/^[Hh]ere('s| is) your [Ss]mart [Oo]verview:?\s*/, '') // Remove intro phrases
-                    .replace(/\b(TaskMaster|AI assistant|I am|I can)\b/gi, '') // Remove self-mentions
-                    .replace(/(\*\*|###|\*)/g, '') // Remove markdown formatting
-                    .replace(/\n+/g, ' ') // Replace newlines with spaces
-                    .replace(/\s{2,}/g, ' ') // Condense multiple spaces
+                    .replace(/^(Okay|Alright|Sure|Got it|Hello|Hi)[\s,.:!]*?/i, '')
+                    .replace(/^[Hh]ere('s| is) your [Ss]mart [Oo]verview:?\s*/, '')
+                    .replace(/\*+/g, '') // Remove any lingering markdown bold/italics
+                    .replace(/\n+/g, ' ')
+                    .replace(/\s{2,}/g, ' ')
                     .trim();
 
-                 // Simple validation: Check if it's reasonably short and not just an error message.
-                if (cleanText.length < 10 || cleanText.startsWith("Error") || cleanText.startsWith("Could not")) {
-                     setSmartOverview('<div class="text-yellow-400 text-sm">Overview unavailable. Try again later.</div>');
-                 } else if (cleanText !== lastResponse) {
+                if (!cleanText || cleanText.toLowerCase().includes("error") || cleanText.length < 10) {
+                     throw new Error("Received invalid overview response."); // Treat empty or error-like responses as errors
+                 }
+
+                if (cleanText !== lastResponse) {
                     setLastResponse(cleanText);
-                    // Use the theme-based color, smaller font size
                     setSmartOverview(
-                    `<div class="${isIlluminateEnabled ? 'text-gray-700' : 'text-gray-300'} text-sm">${cleanText}</div>`
+                        `<div class="${isIlluminateEnabled ? 'text-gray-700' : 'text-gray-300'} text-sm">${cleanText}</div>`
                     );
                 }
-                 // If cleanText is the same as lastResponse, do nothing to prevent flicker
-
 
             } catch (error: any) {
                 console.error("Overview generation error:", error);
-                 if (error.message.includes('429')) { // Specific handling for rate limits
-                    setSmartOverview('<div class="text-yellow-400 text-sm">Overview temporarily unavailable (rate limit). Please wait.</div>');
+                 // Show more specific errors if possible
+                 let errorMsg = "AI overview currently unavailable.";
+                 if (error.message.includes('429') || error.message.includes('rate limit')) {
+                     errorMsg = "Overview limit reached. Try again later.";
                  } else if (error.message.includes('API key not valid')) {
-                     setSmartOverview('<div class="text-red-400 text-sm">Invalid AI configuration. Check API key.</div>');
+                      errorMsg = "Invalid AI config.";
+                 } else if (error.message.includes('timed out')) {
+                     errorMsg = "Overview request timed out.";
                  }
-                 else {
-                    setSmartOverview('<div class="text-red-400 text-sm">Error generating overview.</div>');
-                 }
+                setSmartOverview(`<div class="text-yellow-500 text-xs italic">${errorMsg}</div>`);
+                 setLastResponse(""); // Clear last response on error
             } finally {
                 setOverviewLoading(false);
             }
@@ -1090,92 +1248,10 @@ Keep it extremely brief, focused on action, and directly derived from the input.
 
         generateOverview();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [user, debouncedItemsSig, userName, geminiApiKey, isIlluminateEnabled]); // Depend on debounced signature and theme
-
-
-  // ---------------------
-  // SMART INSIGHTS GENERATION (Client-side logic - NO CHANGES HERE)
-  // ---------------------
-  useEffect(() => {
-    if (!user) return;
-    const now = new Date();
-    now.setHours(0,0,0,0); // Compare dates only
-
-    const allActiveItems = [...tasks, ...goals, ...projects, ...plans].filter(item => !item.data.completed);
-
-    // Check for overdue items
-    const overdueItems = allActiveItems.filter(item => {
-      if (!item.data.dueDate) return false;
-      const dueDate = item.data.dueDate.toDate ? item.data.dueDate.toDate() : new Date(item.data.dueDate);
-      dueDate.setHours(0, 0, 0, 0);
-      return dueDate < now;
-    });
-
-    // Generate insights for overdue items
-    overdueItems.forEach(item => {
-      const itemType = item.data.task ? 'task' : item.data.goal ? 'goal' : item.data.project ? 'project' : 'plan';
-      const itemName = item.data[itemType] || 'Untitled';
-      const insightId = `overdue-${item.id}`;
-
-      // Check if we already have an active insight for this item
-      const existingInsight = smartInsights.find(insight => insight.id === insightId && !insight.accepted && !insight.rejected);
-
-      if (!existingInsight) {
-        const newInsight: SmartInsight = {
-          id: insightId, // Use predictable ID
-          text: `"${itemName}" (${itemType}) is overdue. Reschedule or mark complete?`,
-          type: 'warning',
-          relatedItemId: item.id,
-          createdAt: new Date()
-        };
-         setSmartInsights(prev => [newInsight, ...prev.filter(i => i.id !== insightId)].slice(0, 10));
-      }
-    });
-
-    // Check for upcoming deadlines (due within 2 days, including today)
-    const upcomingItems = allActiveItems.filter(item => {
-      if (!item.data.dueDate) return false;
-      const dueDate = item.data.dueDate.toDate ? item.data.dueDate.toDate() : new Date(item.data.dueDate);
-       dueDate.setHours(0,0,0,0); // Compare date part only
-      const diffTime = dueDate.getTime() - now.getTime();
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      return diffDays >= 0 && diffDays <= 2; // Due today, tomorrow, or day after
-    });
-
-    // Generate insights for upcoming deadlines
-    upcomingItems.forEach(item => {
-       // Don't generate 'upcoming' if already 'overdue'
-       if (overdueItems.some(overdueItem => overdueItem.id === item.id)) return;
-
-      const itemType = item.data.task ? 'task' : item.data.goal ? 'goal' : item.data.project ? 'project' : 'plan';
-      const itemName = item.data[itemType] || 'Untitled';
-      const insightId = `upcoming-${item.id}`;
-
-      const existingInsight = smartInsights.find(insight => insight.id === insightId && !insight.accepted && !insight.rejected);
-
-      if (!existingInsight) {
-        const newInsight: SmartInsight = {
-          id: insightId,
-          text: `"${itemName}" (${itemType}) is due soon. Set a reminder or start working?`,
-          type: 'suggestion',
-          relatedItemId: item.id,
-          createdAt: new Date()
-        };
-         setSmartInsights(prev => [newInsight, ...prev.filter(i => i.id !== insightId)].slice(0, 10));
-      }
-    });
-
-    // Clean up old insights periodically (e.g., older than a week or dismissed)
-    const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-     setSmartInsights(prev => prev.filter(insight =>
-         (insight.accepted || insight.rejected) ? insight.createdAt > oneWeekAgo : true // Keep dismissed for a week
-     ).slice(0, 10)); // Ensure max 10 insights
-
-
-  }, [user, tasks, goals, projects, plans]); // Re-run when items change
+    }, [user, debouncedItemsSigForOverview, userName, geminiApiKey, isIlluminateEnabled]); // Depend on debounced sig
 
   // ---------------------
-  // 11. CREATE & EDIT & DELETE (NO CHANGES IN LOGIC)
+  // 11. CREATE & EDIT & DELETE
   // ---------------------
   const handleTabChange = (tabName: "tasks" | "goals" | "projects" | "plans") => {
     setActiveTab(tabName);
@@ -1183,185 +1259,224 @@ Keep it extremely brief, focused on action, and directly derived from the input.
   };
 
   const handleCreate = async () => {
-    if (!user) return;
-    if (!newItemText.trim()) {
-      alert("Please enter a name before creating.");
+    if (!user || !newItemText.trim()) {
+      // Maybe add visual feedback instead of alert?
+      console.warn("Cannot create empty item");
       return;
     }
     let dateValue: Date | null = null;
     if (newItemDate) {
-      const [year, month, day] = newItemDate.split('-').map(Number);
-      dateValue = new Date(Date.UTC(year, month - 1, day, 12, 0, 0)); // Use UTC to avoid timezone shifts affecting the date
+      try {
+        // Parse YYYY-MM-DD and treat as local date, set time to midday UTC to avoid timezone boundary issues
+        const [year, month, day] = newItemDate.split('-').map(Number);
+         // Important: Month is 0-indexed in Date constructor
+        dateValue = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+         if (isNaN(dateValue.getTime())) dateValue = null; // Invalid date entered
+      } catch {
+          dateValue = null; // Handle potential parsing errors
+      }
     }
 
+    // Use the activeTab to determine the field name (task, goal, project, plan)
+    const typeField = activeTab.slice(0, -1); // "task", "goal", etc.
     const itemData = {
-        [activeTab.slice(0, -1)]: newItemText, // e.g., task: 'text'
+        [typeField]: newItemText,
         dueDate: dateValue,
-        priority: newItemPriority, // Include priority on creation
-        createdAt: new Date(),
-        completed: false
+        priority: newItemPriority,
+        createdAt: new Date(), // Use client-side timestamp for creation order
+        completed: false,
+        userId: user.uid // Associate with user
     };
 
     try {
-      if (activeTab === "tasks") await createTask(user.uid, itemData.task, itemData.dueDate, itemData.priority);
-      else if (activeTab === "goals") await createGoal(user.uid, itemData.goal, itemData.dueDate, itemData.priority);
-      else if (activeTab === "projects") await createProject(user.uid, itemData.project, itemData.dueDate, itemData.priority);
-      else if (activeTab === "plans") await createPlan(user.uid, itemData.plan, itemData.dueDate, itemData.priority);
+       // Call the appropriate create function based on activeTab
+       // These functions should exist in dashboard-firebase.ts
+       if (activeTab === "tasks") await createTask(user.uid, itemData.task, itemData.dueDate, itemData.priority);
+       else if (activeTab === "goals") await createGoal(user.uid, itemData.goal, itemData.dueDate, itemData.priority);
+       else if (activeTab === "projects") await createProject(user.uid, itemData.project, itemData.dueDate, itemData.priority);
+       else if (activeTab === "plans") await createPlan(user.uid, itemData.plan, itemData.dueDate, itemData.priority);
 
+      // Reset form fields on successful creation
       setNewItemText("");
       setNewItemDate("");
-      setNewItemPriority("medium"); // Reset priority dropdown
+      setNewItemPriority("medium");
 
-      // Generate insight (keep this simple)
-      const newInsight: SmartInsight = {
-        id: Math.random().toString(36).substr(2, 9),
-        text: `New ${activeTab.slice(0, -1)} added!`,
-        type: 'achievement',
-        createdAt: new Date()
-      };
-      // Only add if no similar recent 'achievement' insight exists
-       if (!smartInsights.some(i => i.type === 'achievement' && Date.now() - i.createdAt.getTime() < 60000)) {
-            setSmartInsights(prev => [newInsight, ...prev].slice(0, 10));
-       }
+      // Insight generation is handled by the debounced useEffect
 
     } catch (error) {
-      console.error("Error creating item:", error);
-      alert(`Failed to create ${activeTab.slice(0, -1)}. Please try again.`);
+      console.error(`Error creating ${typeField}:`, error);
+      alert(`Failed to create ${typeField}. Please try again.`); // Provide user feedback
     }
   };
 
-  // Determine current items and title field (NO CHANGES HERE)
+  // Determine current items and title field dynamically
   let currentItems: Array<{ id: string; data: any }> = [];
-  let titleField = "";
-  let collectionName = activeTab;
+  let titleField = "task"; // Default
+  let collectionName = activeTab; // "tasks", "goals", etc.
   if (activeTab === "tasks") { currentItems = tasks; titleField = "task"; }
   else if (activeTab === "goals") { currentItems = goals; titleField = "goal"; }
   else if (activeTab === "projects") { currentItems = projects; titleField = "project"; }
   else if (activeTab === "plans") { currentItems = plans; titleField = "plan"; }
 
-  const handleEditClick = (itemId: string, currentData: any) => {
-    setEditingItemId(itemId);
-    setEditingText(currentData[titleField] || "");
-    if (currentData.dueDate) {
-        const dueDateObj = currentData.dueDate.toDate ? currentData.dueDate.toDate() : new Date(currentData.dueDate);
-        // Format as YYYY-MM-DD for the input type="date"
-        const year = dueDateObj.getFullYear();
-        const month = (dueDateObj.getMonth() + 1).toString().padStart(2, '0');
-        const day = dueDateObj.getDate().toString().padStart(2, '0');
-        setEditingDate(`${year}-${month}-${day}`);
-    } else {
-        setEditingDate("");
-    }
-    setEditingPriority(currentData.priority || 'medium'); // Use existing or default
-};
+   const handleEditClick = (itemId: string, currentData: any) => {
+        setEditingItemId(itemId);
+        setEditingText(currentData[titleField] || ""); // Use dynamic title field
+
+        // Format date for input type="date" (YYYY-MM-DD)
+        let dateForInput = "";
+        if (currentData.dueDate) {
+            try {
+                 const dueDateObj = currentData.dueDate.toDate ? currentData.dueDate.toDate() : new Date(currentData.dueDate);
+                 if (!isNaN(dueDateObj.getTime())) { // Check if date is valid
+                     dateForInput = dueDateObj.toISOString().split('T')[0];
+                 }
+             } catch { /* Ignore date conversion errors */ }
+        }
+        setEditingDate(dateForInput);
+        setEditingPriority(currentData.priority || 'medium');
+    };
 
 
   const handleEditSave = async (itemId: string) => {
     if (!user || !editingText.trim()) {
-      alert("Please enter a valid name.");
+       console.warn("Cannot save empty item name");
       return;
     }
     let dateValue: Date | null = null;
     if (editingDate) {
-      const [year, month, day] = editingDate.split('-').map(Number);
-      dateValue = new Date(Date.UTC(year, month - 1, day, 12, 0, 0)); // Use UTC
+       try {
+            const [year, month, day] = editingDate.split('-').map(Number);
+            dateValue = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+            if (isNaN(dateValue.getTime())) dateValue = null;
+       } catch {
+           dateValue = null;
+       }
     }
 
     try {
-      await updateItem(collectionName, itemId, {
-        [titleField]: editingText,
-        dueDate: dateValue, // Send null if date was cleared
-        priority: editingPriority
-      });
-      setEditingItemId(null);
-      // Don't clear fields here, they'll be cleared by the component re-render
+        // Use dynamic titleField determined by activeTab
+        const dataToUpdate = {
+          [titleField]: editingText,
+          dueDate: dateValue, // Send null if date was cleared or invalid
+          priority: editingPriority
+        };
+        // Use dynamic collectionName determined by activeTab
+        await updateItem(collectionName, itemId, dataToUpdate); // Assumes updateItem takes collection name
+
+      setEditingItemId(null); // Exit edit mode on success
+
     } catch (error) {
-      console.error("Error updating item:", error);
-      alert(`Failed to update ${collectionName.slice(0, -1)}. Please try again.`);
+      console.error(`Error updating ${collectionName.slice(0, -1)}:`, error);
+       alert(`Failed to update ${collectionName.slice(0, -1)}. Please try again.`);
     }
   };
 
   const handleDelete = async (itemId: string) => {
     if (!user) return;
-    const confirmDel = window.confirm(`Are you sure you want to delete this ${collectionName.slice(0, -1)}?`);
+    // Use dynamic collectionName in confirmation message
+    const itemType = collectionName.slice(0, -1);
+    const confirmDel = window.confirm(`Are you sure you want to delete this ${itemType}? This action cannot be undone.`);
     if (!confirmDel) return;
     try {
-      await deleteItem(collectionName, itemId);
-       // Optionally remove related insights
+      await deleteItem(collectionName, itemId); // Assumes deleteItem takes collection name
+      // Remove related insights if any
        setSmartInsights(prev => prev.filter(i => i.relatedItemId !== itemId));
+       if (editingItemId === itemId) {
+           setEditingItemId(null); // Ensure edit mode is closed if the item being edited is deleted
+       }
     } catch (error) {
-      console.error("Error deleting item:", error);
-       alert(`Failed to delete ${collectionName.slice(0, -1)}. Please try again.`);
+      console.error(`Error deleting ${itemType}:`, error);
+      alert(`Failed to delete ${itemType}. Please try again.`);
     }
   };
 
   // ---------------------
-  // 12. CUSTOM TIMERS (NO CHANGES IN LOGIC)
+  // 12. CUSTOM TIMERS
   // ---------------------
   const [runningTimers, setRunningTimers] = useState<{
     [id: string]: {
       isRunning: boolean;
       timeLeft: number;
       intervalRef: NodeJS.Timer | null;
-      audio?: HTMLAudioElement | null;
+      audio?: HTMLAudioElement | null; // Store audio instance
+      finished?: boolean; // Track finished state
     };
   }>({});
 
   const handleAddCustomTimer = async () => {
     if (!user) return;
     try {
-      // Prompt for name and duration? For now, use default.
       const name = prompt("Enter timer name:", "Focus Block");
-      if (!name) return; // User cancelled
-      const durationMinutes = parseInt(prompt("Enter duration in minutes:", "25") || "25", 10);
+      if (!name || !name.trim()) return; // User cancelled or entered empty name
+
+       let durationMinutesStr = prompt("Enter duration in minutes:", "25");
+       if (durationMinutesStr === null) return; // User cancelled
+
+       const durationMinutes = parseInt(durationMinutesStr, 10);
        if (isNaN(durationMinutes) || durationMinutes <= 0) {
           alert("Invalid duration. Please enter a positive number of minutes.");
           return;
        }
 
-      await addCustomTimer(name, durationMinutes * 60, user.uid);
+      await addCustomTimer(name.trim(), durationMinutes * 60, user.uid); // Pass data to firebase function
     } catch (error) {
       console.error("Error adding custom timer:", error);
        alert("Failed to add custom timer. Please try again.");
     }
   };
 
-  // Effect to sync runningTimers state with customTimers from Firestore (NO CHANGES HERE)
-  useEffect(() => {
-    setRunningTimers((prev) => {
-      const nextState: typeof prev = {};
-      customTimers.forEach((timer) => {
-        if (prev[timer.id]) {
-          // Preserve running state if it exists
-          nextState[timer.id] = {
-              ...prev[timer.id],
-              // Update timeLeft only if NOT running, otherwise let interval handle it
-              timeLeft: prev[timer.id].isRunning ? prev[timer.id].timeLeft : timer.data.time,
-          };
-        } else {
-          // Initialize new timers
-          nextState[timer.id] = {
-            isRunning: false,
-            timeLeft: timer.data.time,
-            intervalRef: null,
-          };
-        }
-      });
-       // Clean up timers that were deleted from Firestore but might still be in local state
-       Object.keys(prev).forEach(id => {
-           if (!customTimers.some(t => t.id === id) && prev[id].intervalRef) {
-               clearInterval(prev[id].intervalRef as NodeJS.Timer);
-               if (prev[id].audio) {
-                   prev[id].audio?.pause();
-               }
-           }
-       });
-      return nextState;
-    });
-  }, [customTimers]);
+  // Effect to sync runningTimers state with customTimers from Firestore
+   useEffect(() => {
+        setRunningTimers(prev => {
+            const nextState: typeof prev = {};
+            const now = Date.now(); // To check for recently deleted timers
+
+            customTimers.forEach(timer => {
+                 // If timer exists in previous state, preserve its running status
+                 if (prev[timer.id]) {
+                     // Update timeLeft only if NOT running OR if the source data changed significantly
+                      const sourceTime = timer.data.time;
+                      const localState = prev[timer.id];
+                      nextState[timer.id] = {
+                          ...localState,
+                          // Only update timeLeft from source if timer isn't running
+                          timeLeft: localState.isRunning ? localState.timeLeft : sourceTime,
+                          // Reset finished flag if source time changes and timer wasn't running
+                          finished: (localState.isRunning || localState.timeLeft > 0) ? localState.finished : false,
+                      };
+                 } else {
+                     // Initialize new timers from Firestore data
+                     nextState[timer.id] = {
+                         isRunning: false,
+                         timeLeft: timer.data.time,
+                         intervalRef: null,
+                         finished: timer.data.time <= 0, // Mark as finished if initial time is 0
+                     };
+                 }
+            });
+
+             // Cleanup: Stop intervals and audio for timers removed from Firestore
+             Object.keys(prev).forEach(id => {
+                 if (!nextState[id]) { // Timer was in prev state but not in current Firestore data
+                     const timerState = prev[id];
+                     if (timerState.intervalRef) {
+                         clearInterval(timerState.intervalRef);
+                     }
+                     if (timerState.audio) {
+                         timerState.audio.pause();
+                         timerState.audio.currentTime = 0;
+                     }
+                      console.log(`Cleaned up removed timer state: ${id}`);
+                 }
+             });
+
+            return nextState;
+        });
+    }, [customTimers]); // Depend only on the source data
 
 
-  const formatCustomTime = (timeInSeconds: number) => {
+  const formatCustomTime = (timeInSeconds: number): string => {
+     if (timeInSeconds < 0) timeInSeconds = 0; // Ensure non-negative
     const hours = Math.floor(timeInSeconds / 3600);
     const remainder = timeInSeconds % 3600;
     const mins = Math.floor(remainder / 60);
@@ -1375,96 +1490,142 @@ Keep it extremely brief, focused on action, and directly derived from the input.
 
   const startCustomTimer = (timerId: string) => {
     setRunningTimers((prev) => {
-      const timerState = { ...prev[timerId] };
-      if (timerState.isRunning || !timerState || timerState.timeLeft <= 0) return prev; // Prevent starting if already running, non-existent, or finished
+        const timerState = prev[timerId];
+        // Prevent starting if already running, non-existent, or finished
+        if (!timerState || timerState.isRunning || timerState.timeLeft <= 0) return prev;
 
-       // Stop alarm if starting timer again
-      if (timerState.audio) {
-          timerState.audio.pause();
-          timerState.audio.currentTime = 0;
-          timerState.audio = null;
-      }
+        const newState = { ...prev };
+        const newTimerState = { ...timerState };
 
-      timerState.isRunning = true;
-      const intervalId = setInterval(() => {
-        setRunningTimers((currentTimers) => {
-          const updatedTimers = { ...currentTimers };
-          const tState = { ...updatedTimers[timerId] };
+        // Stop alarm if restarting timer
+        if (newTimerState.audio) {
+            newTimerState.audio.pause();
+            newTimerState.audio.currentTime = 0;
+            newTimerState.audio = undefined; // Clear audio instance
+        }
+        newTimerState.isRunning = true;
+        newTimerState.finished = false; // Ensure finished flag is reset
 
-           // Safety check: Ensure timer still exists
-           if (!tState) {
-                clearInterval(intervalId);
+        const intervalId = setInterval(() => {
+            setRunningTimers((currentTimers) => {
+                const updatedTimers = { ...currentTimers };
+                const tState = updatedTimers[timerId];
+
+                 // Safety check: If timer state disappears while interval is running, clear interval
+                 if (!tState) {
+                      clearInterval(intervalId);
+                      console.warn(`Interval cleared for non-existent timer state: ${timerId}`);
+                      return updatedTimers;
+                 }
+
+                 // If timeLeft is already 0 or less, something is wrong, stop interval
+                 if (tState.timeLeft <= 0) {
+                      clearInterval(intervalId);
+                      if (tState.isRunning) { // If it was incorrectly marked as running
+                          tState.isRunning = false;
+                           tState.finished = true;
+                           tState.intervalRef = null;
+                           console.warn(`Corrected running state for timer ${timerId} which reached zero.`);
+                      }
+                      return updatedTimers;
+                 }
+
+                if (tState.timeLeft <= 1) {
+                    clearInterval(tState.intervalRef as NodeJS.Timer); // Use intervalId captured in closure? Or from state? State is safer if reset happens.
+                    tState.isRunning = false;
+                    tState.finished = true;
+                    tState.timeLeft = 0;
+                    tState.intervalRef = null;
+
+                     if (!tState.audio) {
+                         try {
+                            const alarmAudio = new Audio('https://firebasestorage.googleapis.com/v0/b/deepworkai-c3419.appspot.com/o/ios-17-ringtone-tilt-gg8jzmiv_pUhS32fz.mp3?alt=media&token=a0a522e0-8a49-408a-9dfe-17e41d3bc801');
+                            alarmAudio.loop = true;
+                            alarmAudio.play().catch(e => console.error(`Error playing timer sound for ${timerId}:`, e));
+                            tState.audio = alarmAudio;
+                         } catch(e) { console.error("Could not create/play audio:", e)}
+                    }
+                } else {
+                    tState.timeLeft -= 1;
+                }
+                updatedTimers[timerId] = tState;
                 return updatedTimers;
-           }
-
-
-          if (tState.timeLeft <= 1) {
-            clearInterval(tState.intervalRef as NodeJS.Timer);
-            tState.isRunning = false;
-            tState.timeLeft = 0;
-            tState.intervalRef = null; // Clear ref once stopped
-
-            if (!tState.audio) { // Play sound only if not already playing for this timer
-              const alarmAudio = new Audio('https://firebasestorage.googleapis.com/v0/b/deepworkai-c3419.appspot.com/o/ios-17-ringtone-tilt-gg8jzmiv_pUhS32fz.mp3?alt=media&token=a0a522e0-8a49-408a-9dfe-17e41d3bc801');
-              alarmAudio.loop = true;
-              alarmAudio.play().catch(e => console.error("Error playing timer sound:", e));
-              tState.audio = alarmAudio;
-            }
-          } else {
-            tState.timeLeft -= 1;
-          }
-          updatedTimers[timerId] = tState;
-          return updatedTimers;
-        });
-      }, 1000);
-      timerState.intervalRef = intervalId as unknown as NodeJS.Timer;
-      return { ...prev, [timerId]: timerState };
+            });
+        }, 1000);
+        newTimerState.intervalRef = intervalId;
+        newState[timerId] = newTimerState;
+        return newState;
     });
   };
 
   const pauseCustomTimer = (timerId: string) => {
     setRunningTimers((prev) => {
-        const timerState = { ...prev[timerId] };
-         // Safety check
-         if (!timerState || !timerState.isRunning) return prev;
+        const timerState = prev[timerId];
+        if (!timerState || !timerState.isRunning) return prev; // Already paused or doesn't exist
 
-        if (timerState.intervalRef) clearInterval(timerState.intervalRef);
-        timerState.isRunning = false;
-        timerState.intervalRef = null;
-        // Don't pause audio here, let reset handle it
-        return { ...prev, [timerId]: timerState };
+        const newState = { ...prev };
+        const newTimerState = { ...timerState };
+
+        if (newTimerState.intervalRef) {
+            clearInterval(newTimerState.intervalRef);
+            newTimerState.intervalRef = null;
+        }
+        newTimerState.isRunning = false;
+        // Do NOT stop audio here - let reset handle it. Pausing shouldn't silence a finished alarm.
+
+        newState[timerId] = newTimerState;
+        return newState;
     });
 };
 
 
   const resetCustomTimer = (timerId: string) => {
-    const defaultTime = customTimers.find((t) => t.id === timerId)?.data.time;
-     if (defaultTime === undefined) return; // Timer might have been deleted
+    const sourceTimerData = customTimers.find((t) => t.id === timerId)?.data;
+    if (!sourceTimerData) {
+        console.warn(`Cannot reset timer ${timerId}: Source data not found.`);
+        return; // Timer might have been deleted from Firestore
+    }
+    const defaultTime = sourceTimerData.time;
 
     setRunningTimers((prev) => {
-      const timerState = { ...prev[timerId] };
-       // Safety check
-       if (!timerState) return prev;
+        const timerState = prev[timerId];
+        // Even if state doesn't exist locally (e.g., after hot reload), create it from source
+        const newState = { ...prev };
+        const newTimerState = timerState ? { ...timerState } : { // Initialize if needed
+             isRunning: false, timeLeft: defaultTime, intervalRef: null, finished: defaultTime <= 0
+        };
 
-      if (timerState.intervalRef) clearInterval(timerState.intervalRef);
-      timerState.isRunning = false;
-      timerState.timeLeft = defaultTime;
-      timerState.intervalRef = null;
+        // Clear interval if running
+        if (newTimerState.intervalRef) {
+            clearInterval(newTimerState.intervalRef);
+        }
+        // Reset state
+        newTimerState.isRunning = false;
+        newTimerState.timeLeft = defaultTime;
+        newTimerState.intervalRef = null;
+        newTimerState.finished = defaultTime <= 0; // Reset finished state based on default time
 
-      if (timerState.audio) {
-        timerState.audio.pause();
-        timerState.audio.currentTime = 0;
-        timerState.audio = null;
-      }
-      return { ...prev, [timerId]: timerState };
+        // Stop and clear audio if playing
+        if (newTimerState.audio) {
+            newTimerState.audio.pause();
+            newTimerState.audio.currentTime = 0;
+            newTimerState.audio = undefined;
+        }
+        newState[timerId] = newTimerState;
+        return newState;
     });
   };
 
 
   const handleEditTimerClick = (timerId: string, currentName: string, currentTime: number) => {
+     // Pause timer before editing if it's running
+     if (runningTimers[timerId]?.isRunning) {
+         pauseCustomTimer(timerId);
+     }
     setEditingTimerId(timerId);
     setEditingTimerName(currentName);
-    setEditingTimerMinutes(String(Math.floor(currentTime / 60)));
+    // Ensure time is handled correctly (e.g., always positive integer)
+    setEditingTimerMinutes(String(Math.max(1, Math.floor(currentTime / 60))));
   };
 
   const handleEditTimerSave = async (timerId: string) => {
@@ -1481,10 +1642,10 @@ Keep it extremely brief, focused on action, and directly derived from the input.
 
     try {
       const newTimeSeconds = minutes * 60;
-      await updateCustomTimer(timerId, editingTimerName, newTimeSeconds);
-      resetCustomTimer(timerId); // Reset timer display locally after saving
+      await updateCustomTimer(timerId, editingTimerName.trim(), newTimeSeconds); // Assumes this function updates Firestore
+      // Local state will update via the useEffect watching customTimers, which triggers a reset effect internally
       setEditingTimerId(null); // Close edit mode
-      // No need to clear state vars, they'll reset when edit mode closes
+
     } catch (error) {
       console.error("Error updating timer:", error);
        alert("Failed to update timer. Please try again.");
@@ -1495,10 +1656,21 @@ Keep it extremely brief, focused on action, and directly derived from the input.
     const confirmDel = window.confirm("Are you sure you want to delete this timer?");
     if (!confirmDel) return;
     try {
-        // Pause timer before deleting if running
-        pauseCustomTimer(timerId);
-        await deleteCustomTimer(timerId);
-        // Local state `runningTimers` will update via the useEffect watching `customTimers`
+        // Stop timer interval and audio *before* deleting from Firestore
+        setRunningTimers(prev => {
+            const timerState = prev[timerId];
+            if (timerState) {
+                 if (timerState.intervalRef) clearInterval(timerState.intervalRef);
+                 if (timerState.audio) timerState.audio.pause();
+            }
+             // Return previous state without the deleted timer ID
+             const { [timerId]: _, ...rest } = prev;
+             return rest;
+        });
+
+        await deleteCustomTimer(timerId); // Delete from Firestore
+        // No need to manually update customTimers state, Firestore listener will handle it
+
     } catch (error) {
       console.error("Error deleting custom timer:", error);
        alert("Failed to delete timer. Please try again.");
@@ -1506,52 +1678,48 @@ Keep it extremely brief, focused on action, and directly derived from the input.
   };
 
   // ---------------------
-  // 13. PROGRESS BARS (NO CHANGES IN LOGIC)
+  // 13. PROGRESS BARS
   // ---------------------
   const totalTasks = tasks.length;
   const completedTasks = tasks.filter((t) => t.data.completed).length;
-  const tasksProgress = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
+  const tasksProgress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
   const totalGoals = goals.length;
   const completedGoals = goals.filter((g) => g.data.completed).length;
-  const goalsProgress = totalGoals > 0 ? (completedGoals / totalGoals) * 100 : 0;
+  const goalsProgress = totalGoals > 0 ? Math.round((completedGoals / totalGoals) * 100) : 0;
 
   const totalProjects = projects.length;
   const completedProjects = projects.filter((p) => p.data.completed).length;
-  const projectsProgress = totalProjects > 0 ? (completedProjects / totalProjects) * 100 : 0;
+  const projectsProgress = totalProjects > 0 ? Math.round((completedProjects / totalProjects) * 100) : 0;
 
   const totalPlans = plans.length;
   const completedPlans = plans.filter((pl) => pl.data.completed).length;
-  const plansProgress = totalPlans > 0 ? (completedPlans / totalPlans) * 100 : 0;
+  const plansProgress = totalPlans > 0 ? Math.round((completedPlans / totalPlans) * 100) : 0;
 
   // ---------------------
-  // Smart Insights handlers (NO CHANGES IN LOGIC)
+  // Smart Insights handlers
   // ---------------------
   const handleAcceptInsight = (insightId: string) => {
     const insight = smartInsights.find(i => i.id === insightId);
     if (!insight) return;
 
-     // Mark as accepted locally immediately for UI feedback
      setSmartInsights(prev =>
         prev.map(i =>
           i.id === insightId ? { ...i, accepted: true, rejected: false } : i
         )
       );
 
-    // Perform action based on insight type/content
     if (insight.relatedItemId) {
        const item = [...tasks, ...goals, ...projects, ...plans].find(i => i.id === insight.relatedItemId);
        if (item) {
            if (insight.type === 'warning' && insight.text.includes('overdue')) {
-                // Open edit dialog for the overdue item
+               // Ensure item data is passed correctly
                 handleEditClick(item.id, item.data);
            }
-            // Add other potential actions here based on insight text/type
-            // e.g., if insight suggests creating a reminder, you might trigger a notification setup
+           // Add other actions if needed
        }
     }
-
-     // Optionally: Log acceptance to analytics or backend later
+     // Remove accepted insight after a short delay? Or keep it? For now, keep.
   };
 
   const handleRejectInsight = (insightId: string) => {
@@ -1560,18 +1728,21 @@ Keep it extremely brief, focused on action, and directly derived from the input.
           i.id === insightId ? { ...i, accepted: false, rejected: true } : i
         )
       );
-     // Optionally: Log rejection
+     // Remove rejected insight after a short delay?
+      setTimeout(() => {
+          setSmartInsights(prev => prev.filter(i => i.id !== insightId || i.accepted)); // Keep accepted ones
+      }, 2000); // Remove after 2 seconds
   };
 
   // ---------------------
-  // Theme & Style Variables (Minor adjustments possible, but largely unchanged logic)
+  // Theme & Style Variables
   // ---------------------
   const headlineColor = isIlluminateEnabled ? "text-green-700" : "text-green-400";
-  const bulletTextColor = isIlluminateEnabled ? "text-blue-700" : "text-blue-300";
-  const bulletBorderColor = isIlluminateEnabled ? "border-blue-500" : "border-blue-500"; // Keep border consistent or adjust light mode
-  const defaultTextColor = isIlluminateEnabled ? "text-gray-700" : "text-gray-300";
-  const illuminateHighlightToday = isIlluminateEnabled ? "bg-blue-200 text-blue-800 font-bold" : "bg-blue-500/20 text-blue-300 font-bold";
-  const illuminateHighlightDeadline = isIlluminateEnabled ? "bg-red-200 hover:bg-red-300" : "bg-red-500/10 hover:bg-red-500/20";
+  //const bulletTextColor = isIlluminateEnabled ? "text-blue-700" : "text-blue-300"; // Removed as unused
+  //const bulletBorderColor = isIlluminateEnabled ? "border-blue-500" : "border-blue-500"; // Removed as unused
+  //const defaultTextColor = isIlluminateEnabled ? "text-gray-700" : "text-gray-300"; // Removed as unused
+  const illuminateHighlightToday = isIlluminateEnabled ? "bg-blue-100 text-blue-700 font-semibold" : "bg-blue-500/30 text-blue-200 font-semibold";
+  const illuminateHighlightDeadline = isIlluminateEnabled ? "bg-red-100 hover:bg-red-200" : "bg-red-500/20 hover:bg-red-500/30";
   const illuminateHoverGray = isIlluminateEnabled ? "hover:bg-gray-200" : "hover:bg-gray-700/50";
   const illuminateTextBlue = isIlluminateEnabled ? "text-blue-700" : "text-blue-400";
   const illuminateTextPurple = isIlluminateEnabled ? "text-purple-700" : "text-purple-400";
@@ -1580,27 +1751,29 @@ Keep it extremely brief, focused on action, and directly derived from the input.
   const illuminateTextYellow = isIlluminateEnabled ? "text-yellow-700" : "text-yellow-400";
 
   const containerClass = isIlluminateEnabled
-    ? "bg-white text-gray-900"
+    ? "bg-gray-50 text-gray-900" // Slightly off-white bg for light mode
     : isBlackoutEnabled
-      ? "bg-black text-white" // Use pure black for true blackout
-      : "bg-gray-900 text-white"; // Default dark
+      ? "bg-black text-gray-200" // Pure black bg, slightly lighter text for contrast
+      : "bg-gray-900 text-gray-200"; // Default dark
 
-  // Slightly lighter card background for default dark, darker for blackout
   const cardClass = isIlluminateEnabled
-    ? "bg-gray-50 text-gray-900 border border-gray-200/50" // Add subtle border in light mode
+    ? "bg-white text-gray-900 border border-gray-200/70 shadow-sm" // White cards, subtle border/shadow
     : isBlackoutEnabled
-      ? "bg-gray-900 text-gray-300 border border-gray-700/50" // Darker card in blackout, subtle border
-      : "bg-gray-800 text-gray-300 border border-gray-700/50"; // Default dark card, subtle border
+      ? "bg-gray-900 text-gray-300 border border-gray-700/50 shadow-md shadow-black/20" // Darker card in blackout, subtle border/shadow
+      : "bg-gray-800 text-gray-300 border border-gray-700/50 shadow-lg shadow-black/20"; // Default dark card, subtle border/shadow
 
-  const headingClass = isIlluminateEnabled ? "text-gray-800" : "text-white";
+  const headingClass = isIlluminateEnabled ? "text-gray-800" : "text-gray-100"; // Slightly lighter text in dark mode
   const subheadingClass = isIlluminateEnabled ? "text-gray-600" : "text-gray-400";
-  const inputBg = isIlluminateEnabled ? "bg-gray-100" : "bg-gray-700";
-  const iconColor = isIlluminateEnabled ? "text-gray-600" : "text-gray-400"; // Generic icon color
+  const inputBg = isIlluminateEnabled ? "bg-gray-100 hover:bg-gray-200/50" : "bg-gray-700 hover:bg-gray-600/50"; // Input background with subtle hover
+  const iconColor = isIlluminateEnabled ? "text-gray-500" : "text-gray-400"; // Generic icon color
+
+
+  // Memoize expensive calculations if needed (e.g., filtered lists for display)
+  // const upcomingDeadlines = useMemo(() => { ... calculation ... }, [tasks, goals, projects, plans]);
 
 
   return (
-    // Add relative positioning for the fixed AI button placement if needed
-    <div className={`${containerClass} min-h-screen w-full overflow-x-hidden relative`}>
+    <div className={`${containerClass} min-h-screen w-full overflow-x-hidden relative font-sans`}>
       <Sidebar
         userName={userName}
         isCollapsed={isSidebarCollapsed}
@@ -1609,14 +1782,14 @@ Keep it extremely brief, focused on action, and directly derived from the input.
         isIlluminateEnabled={isIlluminateEnabled && isSidebarIlluminateEnabled}
       />
 
-      {/* NEW: AI Chat Trigger Button - Fixed Position */}
+      {/* AI Chat Trigger Button */}
       <button
         onClick={() => setIsAiSidebarOpen(true)}
-        className={`fixed top-4 ${isSidebarCollapsed ? 'right-4 md:right-6' : 'right-4 md:right-6'} z-40 p-2.5 rounded-full shadow-lg transition-all duration-300 transform hover:scale-110 ${
+        className={`fixed top-4 ${isSidebarCollapsed ? 'right-4 md:right-6' : 'right-4 md:right-6 lg:right-8'} z-40 p-2.5 rounded-full shadow-lg transition-all duration-300 transform hover:scale-110 active:scale-100 ${
           isIlluminateEnabled
-            ? 'bg-blue-600 text-white hover:bg-blue-700'
-            : 'bg-gradient-to-br from-purple-600 to-indigo-600 text-white hover:from-purple-700 hover:to-indigo-700'
-        } ${isAiSidebarOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`} // Hide when sidebar is open
+            ? 'bg-white border border-gray-300 text-blue-600 hover:bg-gray-100' // Light mode style
+            : 'bg-gradient-to-br from-purple-600 to-indigo-600 text-white hover:from-purple-700 hover:to-indigo-700' // Dark mode style
+        } ${isAiSidebarOpen ? 'opacity-0 pointer-events-none translate-x-4' : 'opacity-100'}`} // Hide when sidebar is open
         title="Open TaskMaster AI Chat"
       >
         <BrainCircuit className="w-5 h-5" />
@@ -1627,24 +1800,24 @@ Keep it extremely brief, focused on action, and directly derived from the input.
       <main
         className={`transition-all duration-300 ease-in-out min-h-screen
           ${isSidebarCollapsed ? 'ml-16 md:ml-20' : 'ml-0 md:ml-64'}
-          p-3 md:p-4 lg:p-6 overflow-x-hidden`} // Reduced padding
+          p-3 md:p-4 lg:p-5 xl:p-6 overflow-x-hidden`} // Responsive padding
       >
         {/* Header Row */}
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 sm:gap-4 mb-4 sm:mb-5"> {/* Reduced gap/margin */}
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 sm:gap-4 mb-4 sm:mb-5">
           {/* Header Text */}
-          <header className="dashboard-header transform transition-all duration-700 ease-out translate-y-0 opacity-100 pt-2 lg:pt-0 w-full lg:w-auto animate-fadeIn">
+          <header className={`dashboard-header w-full lg:w-auto animate-fadeIn ${cardVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'} transition-all duration-500 ease-out pt-1 lg:pt-0`}>
             <h1
-              className={`text-xl md:text-2xl lg:text-3xl font-bold mb-1 ${headingClass} break-words animate-slideInDown`} // Reduced size/margin
+              className={`text-xl md:text-2xl lg:text-3xl font-bold mb-0.5 ${headingClass} break-words`}
             >
               {React.cloneElement(greeting.icon, {
-                className: `w-5 h-5 lg:w-6 lg:h-6 inline-block align-middle mr-1.5 -translate-y-0.5 animate-pulse ${greeting.icon.props.className ?? ''}`, // Slightly smaller icon/margin
+                className: `w-5 h-5 lg:w-6 lg:h-6 inline-block align-middle mr-1.5 -translate-y-0.5 text-${greeting.color}-500`, // Use greeting color if available
               })}
               {greeting.greeting},{' '}
-              <span className="font-bold">
+              <span className="font-semibold">
                 {userName ? userName.split(' ')[0] : '...'}
               </span>
             </h1>
-            <p className={`italic text-xs md:text-sm ${subheadingClass} animate-slideInUp`}> {/* Reduced size */}
+            <p className={`italic text-xs md:text-sm ${subheadingClass}`}>
               "{quote.text}" -{' '}
               <span className={illuminateTextPurple}>
                 {quote.author}
@@ -1652,62 +1825,61 @@ Keep it extremely brief, focused on action, and directly derived from the input.
             </p>
           </header>
 
-          {/* Calendar Card - Smaller */}
+          {/* Calendar Card - Compact */}
           <div
-             className={`${cardClass} rounded-xl p-2 min-w-[280px] sm:min-w-[320px] w-full max-w-full lg:max-w-[400px] h-[70px] transform hover:scale-[1.01] transition-all duration-300 flex-shrink-0 overflow-hidden shadow-md animate-fadeIn`} // Reduced size/padding/height/hover-scale
+             className={`${cardClass} rounded-xl p-1.5 sm:p-2 min-w-[260px] sm:min-w-[300px] w-full max-w-full lg:max-w-[350px] h-[65px] sm:h-[70px] transform hover:scale-[1.01] transition-all duration-300 flex-shrink-0 overflow-hidden animate-fadeIn ${cardVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'} delay-100`}
           >
-            <div className="grid grid-cols-9 gap-0.5 h-full"> {/* Reduced gap */}
+            <div className="grid grid-cols-9 gap-px sm:gap-0.5 h-full">
               <button
                 onClick={() => {
                   const prevWeek = new Date(currentWeek[0]);
                   prevWeek.setDate(prevWeek.getDate() - 7);
                   setCurrentWeek(getWeekDates(prevWeek));
                 }}
-                className={`w-6 h-full flex items-center justify-center ${iconColor} hover:text-white transition-colors ${illuminateHoverGray} hover:bg-gray-700/30 rounded-lg`}
+                className={`w-5 sm:w-6 h-full flex items-center justify-center ${iconColor} hover:text-white transition-colors ${illuminateHoverGray} hover:bg-gray-700/30 rounded-lg`}
+                title="Previous Week"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
 
+              {/* Calendar Grid */}
               <div className="col-span-7">
-                <div className="grid grid-cols-7 gap-0.5 h-full"> {/* Reduced gap */}
-                  {/* Day labels */}
-                   <div className="col-span-7 grid grid-cols-7 gap-0.5">
-                    {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map( // Abbreviated days
+                <div className="grid grid-cols-7 gap-px sm:gap-0.5 h-full">
+                   <div className="col-span-7 grid grid-cols-7 gap-px sm:gap-0.5">
+                    {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(
                       (day) => (
-                        <div
-                          key={day}
-                          className={`text-center text-[9px] font-medium ${subheadingClass}`} // Smaller text
-                        >
+                        <div key={day} className={`text-center text-[9px] font-medium ${subheadingClass} pt-0.5`}>
                           {day}
                         </div>
                       )
                     )}
                   </div>
-                  {/* Dates */}
-                  {currentWeek.map((date, index) => {
+                  {currentWeek.map((date) => {
+                     const dateStr = formatDateForComparison(date);
                      const allItems = [...tasks, ...goals, ...projects, ...plans];
-                     const hasDeadline = allItems?.some((item) => {
+                     const hasDeadline = allItems.some((item) => {
                         if (!item?.data?.dueDate) return false;
-                        try {
+                         try {
                             const itemDate = item.data.dueDate.toDate ? item.data.dueDate.toDate() : new Date(item.data.dueDate);
-                            return formatDateForComparison(itemDate) === formatDateForComparison(date);
-                         } catch (e) { return false; }
-                      }) || false;
-                    const isToday = formatDateForComparison(date) === formatDateForComparison(today);
-                    const todayClass = illuminateHighlightToday; // Use combined class
+                            return formatDateForComparison(itemDate) === dateStr;
+                         } catch { return false; }
+                      });
+                    const isToday = dateStr === formatDateForComparison(today);
+                    const todayClass = illuminateHighlightToday;
                     const deadlineClass = illuminateHighlightDeadline;
                     const defaultHover = illuminateHoverGray;
 
                     return (
                       <div
-                        key={index}
-                         className={`relative w-full h-5 text-center rounded-md transition-all duration-200 cursor-pointer flex items-center justify-center text-[10px] ${ // Smaller height/text/rounding
+                        key={dateStr}
+                         className={`relative w-full h-5 text-center rounded transition-all duration-150 cursor-pointer flex items-center justify-center text-[10px] ${
                             isToday ? todayClass : `${subheadingClass} ${defaultHover}`
-                         } ${hasDeadline ? `${deadlineClass} font-semibold` : ''} `} // Added font-semibold for deadline
+                         } ${hasDeadline ? `${deadlineClass} font-medium` : ''} `}
+                         title={date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
                       >
                         <span>{date.getDate()}</span>
-                        {hasDeadline && !isToday && ( // Show dot only if deadline and not today (today already highlighted)
-                          <div className="absolute bottom-0.5 left-1/2 transform -translate-x-1/2 w-1 h-1 rounded-full bg-red-500"></div>
+                        {hasDeadline && !isToday && (
+                          <div className={`absolute bottom-0.5 left-1/2 transform -translate-x-1/2 w-1 h-1 rounded-full ${isIlluminateEnabled ? 'bg-red-500' : 'bg-red-400'}`}></div>
                         )}
                       </div>
                     );
@@ -1721,7 +1893,8 @@ Keep it extremely brief, focused on action, and directly derived from the input.
                   nextWeek.setDate(nextWeek.getDate() + 7);
                   setCurrentWeek(getWeekDates(nextWeek));
                 }}
-                 className={`w-6 h-full flex items-center justify-center ${iconColor} hover:text-white transition-colors ${illuminateHoverGray} hover:bg-gray-700/30 rounded-lg`}
+                 className={`w-5 sm:w-6 h-full flex items-center justify-center ${iconColor} hover:text-white transition-colors ${illuminateHoverGray} hover:bg-gray-700/30 rounded-lg`}
+                 title="Next Week"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
@@ -1729,160 +1902,105 @@ Keep it extremely brief, focused on action, and directly derived from the input.
           </div>
         </div>
 
-        {/* AI Insights Panel - Compact */}
+        {/* AI Insights Panel - Only show if insights exist */}
          {smartInsights.filter(insight => !insight.accepted && !insight.rejected).length > 0 && (
           <div
-            className={`${cardClass} rounded-xl p-3 sm:p-4 mb-4 sm:mb-5 shadow-md animate-fadeIn relative overflow-hidden`} // Reduced padding/margin/shadow
+            className={`${cardClass} rounded-xl p-3 sm:p-4 mb-4 sm:mb-5 animate-fadeIn relative overflow-hidden ${cardVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'} delay-200`}
           >
-            <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-purple-500/5 pointer-events-none"></div>
-            <div className="flex items-center justify-between mb-2"> {/* Reduced margin */}
-              <h2 className={`text-base sm:text-lg font-semibold flex items-center ${illuminateTextBlue}`}> {/* Reduced size */}
-                <BrainCircuit className="w-4 h-4 mr-1.5 animate-pulse" /> {/* Reduced size/margin */}
+            {/* Subtle background gradient */}
+            <div className={`absolute inset-0 ${isIlluminateEnabled ? 'bg-gradient-to-r from-blue-50/30 to-purple-50/30' : 'bg-gradient-to-r from-blue-900/10 to-purple-900/10'} pointer-events-none opacity-50`}></div>
+
+            <div className="flex items-center justify-between mb-2 z-10 relative">
+              <h2 className={`text-base sm:text-lg font-semibold flex items-center ${illuminateTextBlue}`}>
+                <BrainCircuit className="w-4 h-4 sm:w-5 sm:h-5 mr-1.5 animate-pulse" />
                 AI Insights
-                <span className="ml-1.5 text-xs bg-gradient-to-r from-pink-500 to-purple-500 text-white px-1.5 py-0.5 rounded-full"> {/* Reduced margin/padding */}
-                  {smartInsights.filter(insight => !insight.accepted && !insight.rejected).length}
+                <span className="ml-1.5 text-[10px] sm:text-xs bg-gradient-to-r from-pink-500 to-purple-500 text-white px-1.5 py-0.5 rounded-full">
+                  {smartInsights.filter(insight => !insight.accepted && !insight.rejected).length} New
                 </span>
               </h2>
               <button
-                onClick={() => setShowInsightsPanel(!showInsightsPanel)}
-                 className={`p-1 rounded-full transition-colors ${
-                  isIlluminateEnabled
-                    ? `hover:bg-gray-200 ${iconColor}`
-                    : `hover:bg-gray-700 ${iconColor}`
-                }`} // Reduced padding
+                onClick={() => setShowInsightsPanel(prev => !prev)} // Toggle based on previous state
+                 className={`p-1 rounded-full transition-colors ${iconColor} ${ isIlluminateEnabled ? 'hover:bg-gray-200' : 'hover:bg-gray-700' }`}
+                 title={showInsightsPanel ? "Collapse Insights" : "Expand Insights"}
               >
-                 {/* Toggle icon based on state */}
-                 {showInsightsPanel ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+                 {showInsightsPanel ? <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" /> : <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />}
               </button>
             </div>
 
             {/* Collapsible Content */}
-             <div className={`space-y-2 transition-all duration-300 overflow-hidden ${showInsightsPanel ? 'max-h-0 opacity-0' : 'max-h-60 opacity-100'}`}> {/* Reduced spacing/max-height */}
-              {smartInsights
-                .filter(insight => !insight.accepted && !insight.rejected)
-                .slice(0, 3) // Show max 3 expanded
-                .map((insight, index) => (
-                  <div
-                    key={insight.id}
-                     className={`p-2 rounded-lg flex items-center justify-between gap-2 animate-slideInRight ${ // Reduced padding/gap
-                      insight.type === 'warning'
-                        ? isIlluminateEnabled ? 'bg-red-100/70' : 'bg-red-900/30'
-                        : insight.type === 'suggestion'
-                          ? isIlluminateEnabled ? 'bg-blue-100/70' : 'bg-blue-900/30'
-                          : isIlluminateEnabled ? 'bg-green-100/70' : 'bg-green-900/30'
-                    }`}
-                    style={{ animationDelay: `${index * 80}ms` }} // Faster animation
-                  >
-                    <div className="flex items-center gap-1.5"> {/* Reduced gap */}
-                      {insight.type === 'warning' && <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />}
-                      {insight.type === 'suggestion' && <Lightbulb className="w-4 h-4 text-blue-500 flex-shrink-0" />}
-                      {insight.type === 'achievement' && <Award className="w-4 h-4 text-green-500 flex-shrink-0" />}
-                      <p className="text-xs sm:text-sm">{insight.text}</p> {/* Smaller base text */}
-                    </div>
-                    <div className="flex gap-1.5 flex-shrink-0"> {/* Reduced gap */}
-                      <button
-                        onClick={() => handleAcceptInsight(insight.id)}
-                        className="p-1 rounded-full bg-green-500/80 text-white hover:bg-green-600 transition-colors"
-                        title="Accept"
-                      >
-                        <ThumbsUp className="w-3.5 h-3.5" /> {/* Smaller icons */}
-                      </button>
-                      <button
-                        onClick={() => handleRejectInsight(insight.id)}
-                        className="p-1 rounded-full bg-red-500/80 text-white hover:bg-red-600 transition-colors"
-                        title="Reject"
-                      >
-                        <ThumbsDown className="w-3.5 h-3.5" /> {/* Smaller icons */}
-                      </button>
-                    </div>
-                  </div>
-                ))}
-                 {smartInsights.filter(insight => !insight.accepted && !insight.rejected).length > 3 && !showInsightsPanel && (
-                     <button
-                        onClick={() => setShowInsightsPanel(true)}
-                        className={`w-full text-center text-xs mt-2 p-1 rounded ${isIlluminateEnabled ? 'bg-gray-200 text-gray-600 hover:bg-gray-300' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`} >
-                        Show {smartInsights.filter(insight => !insight.accepted && !insight.rejected).length - 3} more...
-                     </button>
-                 )}
-            </div>
-
-             {/* Collapsed Preview (Show only if panel is hidden) */}
-            {!showInsightsPanel && (
-                 <div className="flex flex-wrap gap-1.5 mt-1"> {/* Reduced gap/margin */}
+             <div className={`space-y-2 transition-all duration-300 ease-out overflow-hidden z-10 relative ${showInsightsPanel ? 'max-h-96 opacity-100 pt-1' : 'max-h-0 opacity-0'}`}>
                 {smartInsights
-                  .filter(insight => !insight.accepted && !insight.rejected)
-                  .slice(0, 2) // Show fewer previews when collapsed
-                  .map((insight) => (
-                    <div
-                      key={insight.id}
-                       className={`px-2 py-1 rounded-full text-[10px] flex items-center gap-1 animate-fadeIn ${ // Smaller text/padding/gap
-                        insight.type === 'warning'
-                          ? isIlluminateEnabled ? 'bg-red-100 text-red-700' : 'bg-red-900/50 text-red-400'
-                          : insight.type === 'suggestion'
-                            ? isIlluminateEnabled ? 'bg-blue-100 text-blue-700' : 'bg-blue-900/50 text-blue-400'
-                            : isIlluminateEnabled ? 'bg-green-100 text-green-700' : 'bg-green-900/50 text-green-400'
-                      }`}
-                    >
-                      {insight.type === 'warning' && <AlertCircle className="w-2.5 h-2.5 flex-shrink-0" />}
-                      {insight.type === 'suggestion' && <Lightbulb className="w-2.5 h-2.5 flex-shrink-0" />}
-                      {insight.type === 'achievement' && <Award className="w-2.5 h-2.5 flex-shrink-0" />}
-                      <span className="truncate max-w-[150px] sm:max-w-[200px]">{insight.text}</span>
+                    .filter(insight => !insight.accepted && !insight.rejected)
+                    // .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()) // Optional: Sort by newest
+                    .map((insight, index) => (
+                      <div
+                        key={insight.id}
+                        className={`p-2 rounded-lg flex items-center justify-between gap-2 animate-slideInRight ${
+                            insight.type === 'warning'
+                            ? isIlluminateEnabled ? 'bg-red-100/80' : 'bg-red-900/40'
+                            : insight.type === 'suggestion'
+                            ? isIlluminateEnabled ? 'bg-blue-100/80' : 'bg-blue-900/40'
+                            : isIlluminateEnabled ? 'bg-green-100/80' : 'bg-green-900/40'
+                        }`}
+                        style={{ animationDelay: `${index * 70}ms` }}
+                      >
+                        <div className="flex items-center gap-1.5 flex-grow overflow-hidden">
+                        {insight.type === 'warning' && <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />}
+                        {insight.type === 'suggestion' && <Lightbulb className="w-4 h-4 text-blue-400 flex-shrink-0" />}
+                        {insight.type === 'achievement' && <Award className="w-4 h-4 text-green-500 flex-shrink-0" />}
+                        <p className="text-xs sm:text-sm flex-grow truncate" title={insight.text}>{insight.text}</p>
+                        </div>
+                        <div className="flex gap-1 flex-shrink-0">
+                        <button
+                            onClick={() => handleAcceptInsight(insight.id)}
+                            className="p-1 rounded-full bg-green-500/80 text-white hover:bg-green-600 transition-colors"
+                            title="Accept"
+                        >
+                            <ThumbsUp className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                            onClick={() => handleRejectInsight(insight.id)}
+                            className="p-1 rounded-full bg-red-500/80 text-white hover:bg-red-600 transition-colors"
+                            title="Reject"
+                        >
+                            <ThumbsDown className="w-3.5 h-3.5" />
+                        </button>
+                        </div>
                     </div>
-                  ))}
-                {smartInsights.filter(insight => !insight.accepted && !insight.rejected).length > 2 && (
-                  <button
-                    onClick={() => setShowInsightsPanel(false)} // Should be false to expand
-                    className={`px-2 py-1 rounded-full text-[10px] ${ // Smaller text/padding
-                      isIlluminateEnabled ? 'bg-gray-200 text-gray-700' : 'bg-gray-700 text-gray-300'
-                    } hover:opacity-80 transition-opacity`}
-                  >
-                    +{smartInsights.filter(insight => !insight.accepted && !insight.rejected).length - 2} more
-                  </button>
-                )}
-              </div>
-            )}
+                ))}
+             </div>
+
           </div>
         )}
 
 
-        {/* Smart Overview Card - Compact */}
+        {/* Smart Overview Card */}
         <div
-          className={`${cardClass} rounded-xl p-3 sm:p-4 relative min-h-[100px] transform hover:shadow-md hover:shadow-purple-500/10 transition-all duration-300 ease-out ${ // Reduced padding/min-height/shadow
-            cardVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
-          } animate-fadeIn mb-4 sm:mb-5`} // Added margin bottom
+          className={`${cardClass} rounded-xl p-3 sm:p-4 relative min-h-[80px] transition-all duration-300 ease-out animate-fadeIn mb-4 sm:mb-5 ${cardVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'} delay-300`}
         >
-          <div className="flex flex-wrap items-center gap-2 mb-2"> {/* Reduced margin */}
-            <h2
-              className={`text-base sm:text-lg font-semibold mr-1 flex items-center ${illuminateTextBlue}`} // Reduced size/margin
-            >
-              <Sparkles
-                 className="w-4 h-4 mr-1.5 text-yellow-400 animate-pulse" // Reduced size/margin
-                style={{ color: isIlluminateEnabled ? '#D97706' : '' }}
-              />
+          <div className="flex flex-wrap items-center gap-2 mb-1.5">
+            <h2 className={`text-base sm:text-lg font-semibold mr-1 flex items-center ${illuminateTextBlue}`}>
+              <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 mr-1.5 text-yellow-400 animate-pulse" />
               Smart Overview
             </h2>
-             {/* Removed Chat Button here, replaced by global AI button */}
-            {/* <button ... > */}
-            <span className="text-[10px] bg-gradient-to-r from-pink-500 to-purple-500 text-white px-1.5 py-0.5 rounded-full font-medium animate-pulse"> {/* Smaller text/padding */}
-              BETA
+            <span className="text-[9px] sm:text-[10px] bg-gradient-to-r from-pink-500 to-purple-500 text-white px-1.5 py-0.5 rounded-full font-medium">
+              AI BETA
             </span>
           </div>
 
           {overviewLoading ? (
-             <div className="space-y-2 animate-pulse"> {/* Reduced spacing */}
-              <div className={`h-3 rounded-full w-3/4 ${isIlluminateEnabled ? 'bg-gray-300' : 'bg-gray-700'}`}></div>
-              <div className={`h-3 rounded-full w-2/3 ${isIlluminateEnabled ? 'bg-gray-300' : 'bg-gray-700'} delay-75`}></div>
-              {/*<div className={`h-3 rounded-full w-4/5 ${isIlluminateEnabled ? 'bg-gray-300' : 'bg-gray-700'} delay-150`}></div>*/}
+             <div className="space-y-1.5 animate-pulse pt-1">
+              <div className={`h-3 rounded-full w-11/12 ${isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700'}`}></div>
+              <div className={`h-3 rounded-full w-3/4 ${isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700'}`}></div>
             </div>
           ) : (
             <>
-               {/* Render the overview HTML, ensure text size is controlled */}
                <div
-                 className={`text-xs sm:text-sm prose-sm max-w-none animate-fadeIn ${isIlluminateEnabled ? 'text-gray-800' : 'text-gray-300'}`} // Reduced text size, ensure prose styles don't override
-                 dangerouslySetInnerHTML={{ __html: smartOverview || `<div class="${isIlluminateEnabled ? 'text-gray-500' : 'text-gray-400'}">No overview available.</div>` }}
+                 className={`text-xs sm:text-sm prose-sm max-w-none animate-fadeIn ${isIlluminateEnabled ? 'text-gray-800' : 'text-gray-300'} leading-snug`}
+                 dangerouslySetInnerHTML={{ __html: smartOverview || `<div class="${isIlluminateEnabled ? 'text-gray-500' : 'text-gray-400'} text-xs italic">Add pending items for an AI overview.</div>` }}
                />
-              <div className="mt-2 text-left text-[10px] text-gray-500"> {/* Reduced margin/size */}
-                TaskMaster AI can make mistakes. Verify important details.
+               <div className="mt-1.5 text-left text-[10px] text-gray-500/80">
+                 AI responses may be inaccurate. Verify critical info.
               </div>
             </>
           )}
@@ -1890,911 +2008,895 @@ Keep it extremely brief, focused on action, and directly derived from the input.
 
 
         {/* Main Content Grid */}
-         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5"> {/* Reduced gap */}
-          {/* LEFT COLUMN */}
-          <div className="flex flex-col gap-4 sm:gap-5"> {/* Reduced gap */}
+         <div className={`grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5 animate-fadeIn ${cardVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'} delay-400`}>
+           {/* LEFT COLUMN */}
+           <div className="flex flex-col gap-4 sm:gap-5">
 
-            {/* Productivity Card - Compact */}
-            <div
-               className={`${cardClass} rounded-xl p-4 sm:p-5 transform hover:scale-[1.01] transition-all duration-300 shadow-md animate-fadeIn relative overflow-hidden`} // Reduced padding/scale/shadow
-            >
-               <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-blue-500/5 pointer-events-none"></div>
-              <div className="flex justify-between items-center mb-3"> {/* Reduced margin */}
-                <h2
-                  className={`text-lg sm:text-xl font-semibold ${illuminateTextPurple} flex items-center`} // Kept size for emphasis
-                >
-                  <TrendingUp className="w-5 h-5 mr-1.5" /> {/* Reduced margin */}
-                  Productivity
-                </h2>
-                <div className="flex gap-1.5"> {/* Reduced gap */}
-                  <button
-                    onClick={() => setShowAnalytics(!showAnalytics)}
-                     className={`p-1 rounded-full transition-colors ${
-                      isIlluminateEnabled
-                        ? `hover:bg-gray-200 ${iconColor}`
-                        : `hover:bg-gray-700 ${iconColor}`
-                    } flex items-center gap-1 text-[10px] sm:text-xs`} // Reduced padding/size/gap
-                  >
-                    {showAnalytics ? <BarChart className="w-3.5 h-3.5" /> : <PieChart className="w-3.5 h-3.5" />} {/* Smaller icons */}
-                    <span>{showAnalytics ? 'Basic' : 'Analytics'}</span>
-                  </button>
-                </div>
-              </div>
-
-              {showAnalytics ? (
-                <div className="animate-fadeIn">
-                  <TaskAnalytics
-                    tasks={tasks}
-                    goals={goals}
-                    projects={projects}
-                    plans={plans}
-                    isIlluminateEnabled={isIlluminateEnabled}
-                  />
-                </div>
-              ) : (
-                 <div className="space-y-3 animate-fadeIn"> {/* Reduced spacing */}
-                   {/* Progress Bars - Compact */}
-                    {(totalTasks > 0 || totalGoals > 0 || totalProjects > 0 || totalPlans > 0) ? (
-                        <>
-                          {totalTasks > 0 && (
-                            <div>
-                              <div className="flex justify-between items-center mb-1 text-xs sm:text-sm"> {/* Reduced margin/size */}
-                                <p className="flex items-center">
-                                  <Clipboard className="w-3.5 h-3.5 mr-1" /> {/* Smaller icon/margin */}
-                                  Tasks
-                                </p>
-                                 <p className={`${illuminateTextGreen} font-medium`}>
-                                  {completedTasks}/{totalTasks}
-                                </p>
-                              </div>
-                               <div className={`w-full h-1.5 ${isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700'} rounded-full overflow-hidden`}> {/* Thinner bar */}
-                                <div
-                                   className="h-full bg-gradient-to-r from-green-400 to-green-600 rounded-full transition-all duration-700 ease-out"
-                                  style={{ width: `${tasksProgress}%` }}
-                                />
-                              </div>
-                            </div>
-                          )}
-                           {totalGoals > 0 && (
-                            <div>
-                              <div className="flex justify-between items-center mb-1 text-xs sm:text-sm">
-                                <p className="flex items-center">
-                                  <Target className="w-3.5 h-3.5 mr-1" />
-                                  Goals
-                                </p>
-                                 <p className={`${illuminateTextPink} font-medium`}>
-                                  {completedGoals}/{totalGoals}
-                                </p>
-                              </div>
-                               <div className={`w-full h-1.5 ${isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700'} rounded-full overflow-hidden`}>
-                                <div
-                                   className="h-full bg-gradient-to-r from-pink-400 to-pink-600 rounded-full transition-all duration-700 ease-out"
-                                  style={{ width: `${goalsProgress}%` }}
-                                />
-                              </div>
-                            </div>
-                          )}
-                           {totalProjects > 0 && (
-                            <div>
-                              <div className="flex justify-between items-center mb-1 text-xs sm:text-sm">
-                                <p className="flex items-center">
-                                  <Layers className="w-3.5 h-3.5 mr-1" />
-                                  Projects
-                                </p>
-                                 <p className={`${illuminateTextBlue} font-medium`}>
-                                  {completedProjects}/{totalProjects}
-                                </p>
-                              </div>
-                               <div className={`w-full h-1.5 ${isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700'} rounded-full overflow-hidden`}>
-                                <div
-                                   className="h-full bg-gradient-to-r from-blue-400 to-blue-600 rounded-full transition-all duration-700 ease-out"
-                                  style={{ width: `${projectsProgress}%` }}
-                                />
-                              </div>
-                            </div>
-                          )}
-                            {totalPlans > 0 && (
-                            <div>
-                              <div className="flex justify-between items-center mb-1 text-xs sm:text-sm">
-                                <p className="flex items-center">
-                                  <Rocket className="w-3.5 h-3.5 mr-1" />
-                                  Plans
-                                </p>
-                                 <p className={`${illuminateTextYellow} font-medium`}>
-                                  {completedPlans}/{totalPlans}
-                                </p>
-                              </div>
-                               <div className={`w-full h-1.5 ${isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700'} rounded-full overflow-hidden`}>
-                                <div
-                                   className="h-full bg-gradient-to-r from-yellow-400 to-yellow-600 rounded-full transition-all duration-700 ease-out"
-                                  style={{ width: `${plansProgress}%` }}
-                                />
-                              </div>
-                            </div>
-                          )}
-                        </>
-                    ) : (
-                        <p className={`${subheadingClass} text-xs sm:text-sm flex items-center justify-center py-4`}> {/* Centered text */}
-                         <Lightbulb className="w-4 h-4 mr-1.5 text-yellow-400" />
-                         No items yet. Add some to track progress!
-                       </p>
-                    )}
-                </div>
-              )}
-            </div>
-
-
-            {/* Upcoming Deadlines Card - Compact */}
-            <div
-              className={`${cardClass} rounded-xl p-4 sm:p-5 transform hover:scale-[1.01] transition-all duration-300 shadow-md animate-fadeIn`} // Reduced padding/scale/shadow
-            >
-              <h2
-                className={`text-lg sm:text-xl font-semibold mb-3 ${illuminateTextBlue} flex items-center`} // Reduced margin
-              >
-                <Calendar className="w-5 h-5 mr-1.5" /> {/* Reduced margin */}
-                Upcoming
-              </h2>
-              {(() => {
-                  const allItems = [...tasks, ...goals, ...projects, ...plans];
-                  const now = new Date();
-                  now.setHours(0, 0, 0, 0); // Compare date only
-
-                  const upcomingDeadlines = allItems
-                    .filter(item => {
-                       const { dueDate, completed } = item.data;
-                       if (!dueDate || completed) return false;
-                       const dueDateObj = dueDate.toDate ? dueDate.toDate() : new Date(dueDate);
-                       dueDateObj.setHours(0, 0, 0, 0); // Compare date only
-                       return dueDateObj >= now; // Due today or later
-                    })
-                     .sort((a, b) => { // Sort by due date ascending
-                        const aDate = a.data.dueDate.toDate ? a.data.dueDate.toDate() : new Date(a.data.dueDate);
-                        const bDate = b.data.dueDate.toDate ? b.data.dueDate.toDate() : new Date(b.data.dueDate);
-                        return aDate.getTime() - bDate.getTime();
-                    })
-                    .slice(0, 4); // Show top 4 upcoming
-
-                if (!upcomingDeadlines.length) {
-                  return (
-                     <p className={`${subheadingClass} text-xs sm:text-sm flex items-center justify-center py-4`}>
-                      <CheckCircle className="w-4 h-4 mr-1.5 text-green-400" />
-                      No upcoming deadlines!
-                    </p>
-                  );
-                }
-
-                return (
-                   <ul className="space-y-2"> {/* Reduced spacing */}
-                    {upcomingDeadlines.map((item, index) => {
-                      const { id, data } = item;
-                      const itemType = data.task ? 'Task' : data.goal ? 'Goal' : data.project ? 'Project' : 'Plan';
-                      const dueDateObj = data.dueDate.toDate ? data.dueDate.toDate() : new Date(data.dueDate);
-                      const dueDateStr = dueDateObj.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); // Shorter date format
-                      const itemName = data[itemType.toLowerCase()] || 'Untitled';
-
-                       dueDateObj.setHours(0,0,0,0); // For accurate day diff calculation
-                       const daysRemaining = Math.ceil((dueDateObj.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-
-                       let urgencyColor = isIlluminateEnabled ? 'border-l-gray-300' : 'border-l-gray-600'; // Default border
-                       let urgencyText = '';
-                       if (daysRemaining <= 0) { // Today
-                           urgencyColor = isIlluminateEnabled ? 'border-l-red-500' : 'border-l-red-500';
-                           urgencyText = 'Today!';
-                       } else if (daysRemaining <= 1) { // Tomorrow
-                           urgencyColor = isIlluminateEnabled ? 'border-l-orange-500' : 'border-l-orange-500';
-                           urgencyText = 'Tomorrow!';
-                       } else if (daysRemaining <= 3) {
-                           urgencyColor = isIlluminateEnabled ? 'border-l-yellow-500' : 'border-l-yellow-500';
-                           urgencyText = `${daysRemaining} days`;
-                       } else { // More than 3 days
-                           urgencyColor = isIlluminateEnabled ? 'border-l-green-500' : 'border-l-green-500';
-                            urgencyText = `${daysRemaining} days`;
-                       }
-
-                      const priority = data.priority || calculatePriority(item);
-
-                      return (
-                        <li
-                          key={id}
-                           className={`${
-                            isIlluminateEnabled ? 'bg-gray-100/80' : 'bg-gray-700/40' // Slightly more subtle bg
-                          } p-2.5 rounded-lg transition-all hover:bg-opacity-60 border-l-4 ${urgencyColor} animate-slideInRight flex items-center justify-between gap-2`} // Reduced padding, added flex for alignment
-                          style={{ animationDelay: `${index * 80}ms` }}
-                        >
-                           <div className="flex-grow overflow-hidden mr-2">
-                              <div className="text-xs sm:text-sm font-medium flex items-center">
-                                <span className={`font-semibold mr-1 ${isIlluminateEnabled ? 'text-gray-700' : 'text-gray-200'}`}>{itemType}:</span>
-                                <span className="truncate" title={itemName}>{itemName}</span>
-                                 <PriorityBadge priority={priority} isIlluminateEnabled={isIlluminateEnabled} className="ml-1.5 flex-shrink-0" />
-                              </div>
-                           </div>
-                           <div className={`text-[10px] sm:text-xs flex-shrink-0 ${isIlluminateEnabled ? 'text-gray-600' : 'text-gray-400'} flex items-center whitespace-nowrap`}>
-                              <Clock className="w-3 h-3 mr-0.5" />
-                              {dueDateStr}
-                              {urgencyText && (
-                                  <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[9px] ${
-                                      daysRemaining <= 0 ? 'bg-red-500/20 text-red-500' :
-                                      daysRemaining <= 1 ? 'bg-orange-500/20 text-orange-500' :
-                                      daysRemaining <= 3 ? 'bg-yellow-500/20 text-yellow-600' :
-                                      'bg-green-500/10 text-green-500'
-                                  }`}>
-                                      {urgencyText}
-                                  </span>
-                              )}
-                           </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                );
-              })()}
-            </div>
-
-            {/* Tabs & List Card - Compact */}
-            <div
-              className={`${cardClass} rounded-xl p-4 sm:p-5 transform hover:scale-[1.01] transition-all duration-300 shadow-md animate-fadeIn`} // Reduced padding/scale/shadow
-            >
-              {/* Tabs List - Compact */}
-              <div className="overflow-x-auto no-scrollbar mb-4"> {/* Reduced margin */}
-                <div className="flex space-x-1.5 w-full"> {/* Reduced spacing */}
-                  {["tasks", "goals", "projects", "plans"].map((tab) => (
-                    <button
-                      key={tab}
-                       className={`px-3 py-1.5 rounded-full transition-all duration-200 transform hover:scale-[1.03] text-xs sm:text-sm flex items-center whitespace-nowrap ${ // Reduced padding/size, faster transition
-                        activeTab === tab
-                          ? "bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-sm" // Reduced shadow
-                          : isIlluminateEnabled
-                            ? "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                            : "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                      }`}
-                      onClick={() => handleTabChange(tab as "tasks" | "goals" | "projects" | "plans")}
-                    >
-                      {tab === "tasks" && <Clipboard className="w-3.5 h-3.5 mr-1" />}
-                      {tab === "goals" && <Target className="w-3.5 h-3.5 mr-1" />}
-                      {tab === "projects" && <Layers className="w-3.5 h-3.5 mr-1" />}
-                      {tab === "plans" && <Rocket className="w-3.5 h-3.5 mr-1" />}
-                      {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Add New Item Form - Compact */}
-              <div className="flex flex-col md:flex-row gap-1.5 mb-4"> {/* Reduced gap/margin */}
-                <input
-                  type="text"
-                   className={`flex-grow ${inputBg} border ${isIlluminateEnabled ? 'border-gray-300' : 'border-gray-600'} rounded-full px-3 py-1.5 text-sm focus:ring-1 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200 shadow-sm`} // Reduced padding/size/ring
-                  placeholder={`New ${activeTab.slice(0, -1)}...`}
-                  value={newItemText}
-                  onChange={(e) => setNewItemText(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleCreate()} // Add item on Enter key
-                />
-                <div className="flex gap-1.5">
-                  <input
-                    type="date"
-                     className={`${inputBg} border ${isIlluminateEnabled ? 'border-gray-300' : 'border-gray-600'} rounded-full px-3 py-1.5 text-sm focus:ring-1 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200 w-full md:w-auto shadow-sm appearance-none`} // Reduced padding/size
-                    value={newItemDate}
-                    onChange={(e) => setNewItemDate(e.target.value)}
-                     title="Set due date"
-                  />
-                  <select
-                     className={`${inputBg} border ${isIlluminateEnabled ? 'border-gray-300' : 'border-gray-600'} rounded-full pl-3 pr-8 py-1.5 text-sm focus:ring-1 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200 shadow-sm appearance-none`} // Reduced padding/size, added padding-right for icon space
-                    value={newItemPriority}
-                    onChange={(e) => setNewItemPriority(e.target.value as 'high' | 'medium' | 'low')}
-                     title="Set priority"
-                  >
-                    <option value="high">High</option> {/* Shorter labels */}
-                    <option value="medium">Medium</option>
-                    <option value="low">Low</option>
-                  </select>
-                  <button
-                     className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white p-2 rounded-full flex items-center justify-center hover:shadow-md hover:shadow-purple-500/20 transition-all duration-200 transform hover:scale-105 min-w-[32px] min-h-[32px]" // Smaller size
-                    onClick={handleCreate}
-                     title={`Add new ${activeTab.slice(0,-1)}`}
-                  >
-                    <PlusCircle className="w-4 h-4" /> {/* Smaller icon */}
-                  </button>
-                </div>
-              </div>
-
-              {/* Items List - Compact */}
-              <ul className="space-y-2"> {/* Reduced spacing */}
-                {currentItems.length === 0 ? (
-                   <li className={`${subheadingClass} text-sm text-center py-6 animate-pulse`}>
-                    No {activeTab} here yet... Add one above!
-                  </li>
-                ) : (
-                  currentItems.map((item, index) => {
-                    const itemId = item.id;
-                    const { data } = item; // Destructure data
-                    const textValue = data[titleField] || 'Untitled';
-                    const isCompleted = data.completed || false;
-                    const isEditing = editingItemId === itemId;
-                    const priority = data.priority || calculatePriority(item);
-
-                    let dueDateStr = '';
-                    let overdue = false;
-                    if (data.dueDate) {
-                      const dueDateObj = data.dueDate.toDate ? data.dueDate.toDate() : new Date(data.dueDate);
-                       dueDateStr = dueDateObj.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-                       const todayDate = new Date(); todayDate.setHours(0,0,0,0);
-                       const itemDate = new Date(dueDateObj); itemDate.setHours(0,0,0,0);
-                      overdue = itemDate < todayDate && !isCompleted; // Overdue only if not completed
-                    }
-
-                    return (
-                      <li
-                        key={item.id}
-                         className={`p-2 sm:p-2.5 rounded-lg flex flex-col md:flex-row md:items-center md:justify-between gap-1.5 md:gap-2 transition-all duration-200 hover:shadow-md animate-slideInUp ${ // Reduced padding/gap, faster transition
-                            isCompleted
-                              ? isIlluminateEnabled ? 'bg-green-100/60 opacity-70' : 'bg-green-900/30 opacity-60' // More subtle completed
-                              : overdue
-                                ? isIlluminateEnabled ? 'bg-red-100/70' : 'bg-red-900/40'
-                                : isIlluminateEnabled ? 'bg-gray-100/80' : 'bg-gray-700/40'
-                          }
-                           ${isEditing ? (isIlluminateEnabled ? 'ring-2 ring-purple-300' : 'ring-2 ring-purple-500') : ''} // Highlight editing item
-                        `}
-                        style={{ animationDelay: `${index * 70}ms` }} // Faster animation
-                      >
-                        {!isEditing ? (
-                          // Display Mode
-                          <>
-                            <div className="flex items-center gap-1.5 flex-grow overflow-hidden mr-2"> {/* Reduced gap */}
-                              {/* Checkbox */}
-                               <button onClick={() => !isCompleted && handleMarkComplete(itemId)} className={`flex-shrink-0 p-0.5 rounded ${isCompleted ? (isIlluminateEnabled ? 'bg-green-500' : 'bg-green-600') : (isIlluminateEnabled ? 'border border-gray-400 hover:bg-gray-200' : 'border border-gray-500 hover:bg-gray-600')} transition-colors`} title={isCompleted ? "Completed" : "Mark Complete"}>
-                                  <CheckCircle className={`w-3.5 h-3.5 ${isCompleted ? 'text-white' : 'text-transparent'}`} />
-                                </button>
-                              <span
-                                className={`font-medium text-sm sm:text-base truncate ${ // Use base size for readability
-                                  isCompleted ? 'line-through text-gray-500' : (isIlluminateEnabled ? 'text-gray-800' : 'text-gray-100')
-                                }`}
-                                title={textValue}
-                              >
-                                {textValue}
-                              </span>
-                              <PriorityBadge priority={priority} isIlluminateEnabled={isIlluminateEnabled} className="flex-shrink-0" />
-                              {dueDateStr && (
-                                <span
-                                  className={`text-[10px] sm:text-xs font-medium px-1.5 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 ${ // Reduced padding/size
-                                    overdue ? (isIlluminateEnabled ? 'bg-red-200 text-red-700' : 'bg-red-800 text-red-300') : (isIlluminateEnabled ? 'bg-gray-200 text-gray-600' : 'bg-gray-600 text-gray-300')
-                                  } flex items-center`}
-                                >
-                                  <Calendar className="w-2.5 h-2.5 mr-0.5" /> {/* Smaller icon */}
-                                  {dueDateStr}
-                                </span>
-                              )}
-                            </div>
-                            {/* Action Buttons (Display Mode) */}
-                            <div className="flex gap-1 flex-shrink-0"> {/* Reduced gap */}
-                              <button
-                                 className={`p-1.5 rounded ${isIlluminateEnabled ? 'hover:bg-blue-200 text-blue-600' : 'hover:bg-blue-900/50 text-blue-400'} transition-colors`}
-                                onClick={() => handleEditClick(itemId, data)}
-                                title="Edit"
-                              >
-                                <Edit className="w-3.5 h-3.5" /> {/* Smaller icon */}
-                              </button>
-                              <button
-                                 className={`p-1.5 rounded ${isIlluminateEnabled ? 'hover:bg-red-200 text-red-600' : 'hover:bg-red-900/50 text-red-500'} transition-colors`}
-                                onClick={() => handleDelete(itemId)}
-                                title="Delete"
-                              >
-                                <Trash className="w-3.5 h-3.5" /> {/* Smaller icon */}
-                              </button>
-                            </div>
-                          </>
-                        ) : (
-                           // Edit Mode
-                           <>
-                              <div className="flex flex-col sm:flex-row gap-1.5 w-full"> {/* Reduced gap */}
-                                <input
-                                   className={`flex-grow ${inputBg} border ${isIlluminateEnabled ? 'border-gray-300' : 'border-gray-600'} rounded-full px-3 py-1 text-sm focus:ring-1 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200 shadow-sm`} // Reduced padding/size
-                                  value={editingText}
-                                  onChange={(e) => setEditingText(e.target.value)}
-                                   autoFocus
-                                   onKeyDown={(e) => e.key === 'Enter' && handleEditSave(itemId)}
-                                />
-                                <input
-                                  type="date"
-                                   className={`${inputBg} border ${isIlluminateEnabled ? 'border-gray-300' : 'border-gray-600'} rounded-full px-3 py-1 text-sm focus:ring-1 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200 w-full sm:w-auto shadow-sm appearance-none`} // Reduced padding/size
-                                  value={editingDate}
-                                  onChange={(e) => setEditingDate(e.target.value)}
-                                />
-                                <select
-                                   className={`${inputBg} border ${isIlluminateEnabled ? 'border-gray-300' : 'border-gray-600'} rounded-full pl-3 pr-7 py-1 text-sm focus:ring-1 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200 shadow-sm appearance-none`} // Reduced padding/size
-                                  value={editingPriority}
-                                  onChange={(e) => setEditingPriority(e.target.value as 'high' | 'medium' | 'low')}
-                                >
-                                  <option value="high">High</option>
-                                  <option value="medium">Medium</option>
-                                  <option value="low">Low</option>
-                                </select>
-                              </div>
-                              {/* Action Buttons (Edit Mode) */}
-                              <div className="flex gap-1 flex-shrink-0 mt-1 sm:mt-0"> {/* Reduced gap */}
-                                <button
-                                   className="bg-green-500 hover:bg-green-600 px-3 py-1 rounded-full text-white transition-colors text-xs sm:text-sm" // Reduced padding
-                                  onClick={() => handleEditSave(itemId)}
-                                >
-                                  Save
-                                </button>
-                                <button
-                                   className="bg-gray-500 hover:bg-gray-600 px-3 py-1 rounded-full text-white transition-colors text-xs sm:text-sm" // Reduced padding
-                                  onClick={() => setEditingItemId(null)} // Just close edit mode
-                                >
-                                  Cancel
-                                </button>
-                              </div>
-                           </>
-                        )}
-                      </li>
-                    );
-                  })
-                )}
-              </ul>
-            </div>
-          </div>
-
-          {/* RIGHT COLUMN */}
-          <div className="flex flex-col gap-4 sm:gap-5"> {/* Reduced gap */}
-
-             {/* Weather Card - Compact */}
-             <div className={`${cardClass} rounded-xl p-3 sm:p-4 transform hover:scale-[1.01] transition-all duration-300 shadow-md animate-fadeIn`}> {/* Reduced padding/scale/shadow */}
-               <h2 className={`text-base sm:text-lg font-semibold mb-2 ${headingClass} flex items-center`}> {/* Reduced size/margin */}
-                 <Sun className="w-4 h-4 mr-1.5 animate-spin-slow" /> {/* Reduced size/margin */}
-                 Weather
-                 {weatherData?.location?.name && <span className="text-sm font-normal ml-1.5 text-gray-500 truncate">in {weatherData.location.name}</span>}
-               </h2>
-              {weatherData ? (
-                <>
-                  {/* Current weather - Compact */}
-                   <div className="flex items-center gap-2 sm:gap-3 mb-3 border-b ${isIlluminateEnabled ? 'border-gray-200' : 'border-gray-700'} pb-3"> {/* Reduced gap/margin/padding */}
-                     <img
-                       src={weatherData.current.condition.icon || "/placeholder.svg"}
-                       alt={weatherData.current.condition.text}
-                       className="w-8 h-8 sm:w-10 sm:h-10 flex-shrink-0" // Slightly smaller
-                     />
-                     <div className="flex-grow">
-                       <p className={`text-lg sm:text-xl font-bold ${headingClass}`}>
-                           {weatherData.current.temp_f}°F
-                           <span className={`ml-1 text-xs sm:text-sm font-normal ${subheadingClass}`}>
-                             ({weatherData.current.condition.text})
-                           </span>
-                       </p>
-                       <p className={`text-xs ${subheadingClass}`}>
-                           Feels like {weatherData.current.feelslike_f}°F
-                       </p>
-                     </div>
-                     <div className="flex flex-col items-end text-xs gap-0.5 flex-shrink-0"> {/* Reduced size/gap */}
-                       <div className="flex items-center">
-                         <Wind className="w-3 h-3 mr-0.5 text-blue-400" />
-                         {Math.round(weatherData.current.wind_mph)} mph
-                       </div>
-                       <div className="flex items-center">
-                         <Droplets className="w-3 h-3 mr-0.5 text-cyan-400" />
-                         {weatherData.current.humidity}%
-                       </div>
-                       <div className="flex items-center">
-                         <Zap className="w-3 h-3 mr-0.5 text-yellow-400" />
-                         UV: {weatherData.current.uv}
-                       </div>
-                     </div>
-                   </div>
-
-                  {/* Forecast - Compact */}
-                  {weatherData.forecast?.forecastday && (
-                    <div className="space-y-1.5"> {/* Reduced spacing */}
-                      {/*<h3 className={`text-sm font-semibold ${illuminateTextBlue} mb-1 flex items-center`}>
-                        <Calendar className="w-3.5 h-3.5 mr-1" />
-                        Next 3 Days
-                       </h3>*/}
-                      {(() => {
-                        const now = new Date(); now.setHours(0, 0, 0, 0);
-                         const validDays = weatherData.forecast.forecastday.filter((day: any) => {
-                             const d = new Date(day.date_epoch * 1000); // Use epoch for accuracy
-                             d.setHours(0, 0, 0, 0);
-                             return d >= now;
-                         });
-                         return validDays.slice(0, 3).map((day: any, idx: number) => { // Show 3 days including today if applicable
-                           const dateObj = new Date(day.date_epoch * 1000);
-                           const dayLabel = dateObj.toLocaleDateString(undefined, { weekday: 'short' });
-                           const maxF = Math.round(day.day.maxtemp_f);
-                           const minF = Math.round(day.day.mintemp_f);
-                           const icon = day.day.condition.icon;
-                           const forecastBg = isIlluminateEnabled ? 'bg-gray-100/70' : 'bg-gray-700/30'; // Subtle bg
-
-                          return (
-                             <div
-                              key={day.date_epoch}
-                               className={`flex items-center gap-2 ${forecastBg} p-1.5 rounded-md animate-slideInRight`} // Reduced padding/gap/rounding
-                              style={{ animationDelay: `${idx * 100}ms` }}
-                            >
-                               <img src={icon || "/placeholder.svg"} alt={day.day.condition.text} className="w-6 h-6 flex-shrink-0" /> {/* Smaller icon */}
-                               <span className={`text-xs font-medium w-8 flex-shrink-0 ${isIlluminateEnabled ? 'text-gray-700' : 'text-gray-300'}`}>{dayLabel}</span>
-                               <div className="flex-grow h-1 rounded-full bg-gradient-to-r from-blue-400 via-yellow-400 to-red-500 relative overflow-hidden">
-                                  {/* Indicator for min/max temp range (optional visual) */}
-                                  {/* <div className="absolute h-full bg-white/50" style={{ left: `${(minF/100)*100}%`, width: `${((maxF-minF)/100)*100}%` }}></div> */}
-                               </div>
-                               <span className={`text-xs w-12 text-right flex-shrink-0 ${isIlluminateEnabled ? 'text-gray-700' : 'text-gray-300'}`}>
-                                   <span className="font-semibold">{maxF}°</span> / {minF}°
-                               </span>
-                             </div>
-                          );
-                        });
-                      })()}
-                    </div>
-                  )}
-                </>
-              ) : (
-                 <div className="animate-pulse space-y-2 py-4"> {/* Reduced spacing/padding */}
-                   <div className={`h-5 rounded w-1/2 ${isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700'}`}></div>
-                   <div className={`h-4 rounded w-3/4 ${isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700'}`}></div>
-                   <div className={`h-3 rounded w-1/3 ${isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700'}`}></div>
-                 </div>
-              )}
-            </div>
-
-
-            {/* Pomodoro Timer Card - Compact */}
-             <div className={`${cardClass} rounded-xl p-3 sm:p-4 transform hover:scale-[1.01] transition-all duration-300 shadow-md animate-fadeIn`}> {/* Reduced padding/scale/shadow */}
-               <div className="flex items-center justify-between mb-2"> {/* Reduced margin */}
-                 <h2 className={`text-base sm:text-lg font-semibold ${headingClass} flex items-center`}> {/* Reduced size */}
-                   <Clock className="w-4 h-4 mr-1.5" /> {/* Reduced size/margin */}
-                   Pomodoro
+             {/* Productivity Card */}
+             <div className={`${cardClass} rounded-xl p-4 sm:p-5 transition-all duration-300`}>
+                <div className="flex justify-between items-center mb-3">
+                 <h2 className={`text-lg sm:text-xl font-semibold ${illuminateTextPurple} flex items-center`}>
+                   <TrendingUp className="w-5 h-5 mr-1.5" />
+                   Productivity
                  </h2>
                  <button
-                   className="bg-gradient-to-r from-purple-500 to-indigo-500 text-white px-2 py-1 rounded-full font-semibold flex items-center gap-1 hover:shadow-md hover:shadow-purple-500/20 transition-all duration-200 transform hover:scale-105 text-[10px] sm:text-xs" // Smaller button
-                   onClick={handleAddCustomTimer}
-                   title="Add a new custom timer"
-                 >
-                   <PlusCircle className="w-3 h-3" /> New Timer
-                 </button>
+                    onClick={() => setShowAnalytics(prev => !prev)}
+                    className={`p-1 rounded-full transition-colors ${iconColor} ${ isIlluminateEnabled ? 'hover:bg-gray-200' : 'hover:bg-gray-700' } flex items-center gap-1 text-[10px] sm:text-xs`}
+                    title={showAnalytics ? "Show Basic Progress" : "Show Analytics"}
+                  >
+                    {showAnalytics ? <BarChart className="w-3.5 h-3.5" /> : <PieChart className="w-3.5 h-3.5" />}
+                    <span>{showAnalytics ? 'Basic' : 'Analytics'}</span>
+                  </button>
                </div>
-               <div
-                 className={`text-4xl sm:text-5xl font-bold mb-3 text-center bg-clip-text text-transparent ${ // Reduced size/margin
-                  isIlluminateEnabled
-                    ? 'bg-gradient-to-r from-blue-600 to-purple-700'
-                    : 'bg-gradient-to-r from-blue-400 to-purple-500'
-                } ${pomodoroRunning ? 'animate-pulse' : ''}`}
-               >
-                 {formatPomodoroTime(pomodoroTimeLeft)}
-               </div>
-               <div className="flex justify-center gap-2"> {/* Reduced gap */}
-                 <button
-                   className="bg-gradient-to-r from-green-500 to-green-600 px-3 py-1.5 rounded-full font-medium text-white hover:shadow-md hover:shadow-green-500/20 transition-all duration-200 transform hover:scale-105 text-xs sm:text-sm" // Smaller button
-                   onClick={handlePomodoroStart} disabled={pomodoroRunning || pomodoroTimeLeft === 0}
-                 >
-                   Start
-                 </button>
-                 <button
-                   className="bg-gradient-to-r from-yellow-500 to-yellow-600 px-3 py-1.5 rounded-full font-medium text-white hover:shadow-md hover:shadow-yellow-500/20 transition-all duration-200 transform hover:scale-105 text-xs sm:text-sm" // Smaller button
-                   onClick={handlePomodoroPause} disabled={!pomodoroRunning}
-                 >
-                   Pause
-                 </button>
-                 <button
-                   className="bg-gradient-to-r from-red-500 to-red-600 px-3 py-1.5 rounded-full font-medium text-white hover:shadow-md hover:shadow-red-500/20 transition-all duration-200 transform hover:scale-105 text-xs sm:text-sm" // Smaller button
-                   onClick={handlePomodoroReset}
-                 >
-                   Reset
-                 </button>
-               </div>
-               {pomodoroTimeLeft === 0 && !pomodoroRunning && (
-                    <p className="text-center text-xs text-red-400 mt-2 animate-bounce">Time's up!</p>
+
+               {showAnalytics ? (
+                 <div className="animate-fadeIn">
+                   <TaskAnalytics // Ensure this component is adapted for compact display
+                     tasks={tasks}
+                     goals={goals}
+                     projects={projects}
+                     plans={plans}
+                     isIlluminateEnabled={isIlluminateEnabled}
+                   />
+                 </div>
+               ) : (
+                  <div className="space-y-3 animate-fadeIn">
+                    {(totalTasks > 0 || totalGoals > 0 || totalProjects > 0 || totalPlans > 0) ? (
+                         <>
+                           {totalTasks > 0 && (
+                             <div>
+                               <div className="flex justify-between items-center mb-0.5 text-xs sm:text-sm">
+                                 <p className="flex items-center font-medium">
+                                   <Clipboard className="w-3.5 h-3.5 mr-1 text-gray-400" /> Tasks
+                                 </p>
+                                  <p className={`${illuminateTextGreen} font-semibold text-xs`}>
+                                   {completedTasks}/{totalTasks} ({tasksProgress}%)
+                                 </p>
+                               </div>
+                                <div className={`w-full h-1.5 ${isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-600'} rounded-full overflow-hidden`}>
+                                 <div className="h-full bg-gradient-to-r from-green-400 to-green-500 rounded-full transition-all duration-700 ease-out" style={{ width: `${tasksProgress}%` }} />
+                               </div>
+                             </div>
+                           )}
+                            {totalGoals > 0 && (
+                             <div>
+                               <div className="flex justify-between items-center mb-0.5 text-xs sm:text-sm">
+                                 <p className="flex items-center font-medium">
+                                   <Target className="w-3.5 h-3.5 mr-1 text-gray-400" /> Goals
+                                 </p>
+                                  <p className={`${illuminateTextPink} font-semibold text-xs`}>
+                                   {completedGoals}/{totalGoals} ({goalsProgress}%)
+                                 </p>
+                               </div>
+                                <div className={`w-full h-1.5 ${isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-600'} rounded-full overflow-hidden`}>
+                                 <div className="h-full bg-gradient-to-r from-pink-400 to-pink-500 rounded-full transition-all duration-700 ease-out" style={{ width: `${goalsProgress}%` }} />
+                               </div>
+                             </div>
+                           )}
+                             {totalProjects > 0 && (
+                             <div>
+                               <div className="flex justify-between items-center mb-0.5 text-xs sm:text-sm">
+                                 <p className="flex items-center font-medium">
+                                   <Layers className="w-3.5 h-3.5 mr-1 text-gray-400" /> Projects
+                                 </p>
+                                  <p className={`${illuminateTextBlue} font-semibold text-xs`}>
+                                   {completedProjects}/{totalProjects} ({projectsProgress}%)
+                                 </p>
+                               </div>
+                                <div className={`w-full h-1.5 ${isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-600'} rounded-full overflow-hidden`}>
+                                 <div className="h-full bg-gradient-to-r from-blue-400 to-blue-500 rounded-full transition-all duration-700 ease-out" style={{ width: `${projectsProgress}%` }} />
+                               </div>
+                             </div>
+                           )}
+                             {totalPlans > 0 && (
+                             <div>
+                               <div className="flex justify-between items-center mb-0.5 text-xs sm:text-sm">
+                                 <p className="flex items-center font-medium">
+                                   <Rocket className="w-3.5 h-3.5 mr-1 text-gray-400" /> Plans
+                                 </p>
+                                  <p className={`${illuminateTextYellow} font-semibold text-xs`}>
+                                   {completedPlans}/{totalPlans} ({plansProgress}%)
+                                 </p>
+                               </div>
+                                <div className={`w-full h-1.5 ${isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-600'} rounded-full overflow-hidden`}>
+                                 <div className="h-full bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-full transition-all duration-700 ease-out" style={{ width: `${plansProgress}%` }} />
+                               </div>
+                             </div>
+                           )}
+                         </>
+                     ) : (
+                          <p className={`${subheadingClass} text-xs sm:text-sm flex items-center justify-center py-4 italic`}>
+                          <Lightbulb className="w-4 h-4 mr-1.5 text-yellow-400" />
+                          Add items to track your progress.
+                        </p>
+                     )}
+                 </div>
                )}
              </div>
 
 
-             {/* Custom Timers List - Compact */}
-             {customTimers.length > 0 && (
-               <div className={`${cardClass} rounded-xl p-3 sm:p-4 transform hover:scale-[1.01] transition-all duration-300 shadow-md animate-fadeIn`}> {/* Reduced padding/scale/shadow */}
-                 <h2 className={`text-base sm:text-lg font-semibold mb-3 ${headingClass} flex items-center`}> {/* Reduced size/margin */}
-                   <TimerIcon className="w-4 h-4 mr-1.5" /> {/* Reduced size/margin */}
-                   Custom Timers
-                 </h2>
-                 <ul className="space-y-2"> {/* Reduced spacing */}
-                   {customTimers.map((timer, index) => {
-                     const timerId = timer.id;
-                     const runningState = runningTimers[timerId];
-                     const timeLeft = runningState ? runningState.timeLeft : timer.data.time;
-                     const isRunning = runningState ? runningState.isRunning : false;
-                     const isEditing = editingTimerId === timerId;
-                      const isFinished = timeLeft <= 0 && !isRunning;
+             {/* Upcoming Deadlines Card */}
+             <div className={`${cardClass} rounded-xl p-4 sm:p-5 transition-all duration-300`}>
+               <h2 className={`text-lg sm:text-xl font-semibold mb-3 ${illuminateTextBlue} flex items-center`}>
+                 <Calendar className="w-5 h-5 mr-1.5" />
+                 Upcoming
+               </h2>
+               {(() => {
+                   const allItems = [...tasks, ...goals, ...projects, ...plans];
+                   const now = new Date(); now.setHours(0, 0, 0, 0);
 
-                     let itemBgClass = isIlluminateEnabled ? 'bg-gray-100/80' : 'bg-gray-700/40'; // Default
-                      if (isFinished) {
-                         itemBgClass = isIlluminateEnabled ? 'bg-yellow-100/70 opacity-80' : 'bg-yellow-900/30 opacity-70'; // Finished state
-                      }
-                     if (isEditing) {
-                          itemBgClass = isIlluminateEnabled ? 'bg-purple-100/50' : 'bg-purple-900/20'; // Editing state
-                     }
+                   const upcomingDeadlines = allItems
+                     .filter(item => {
+                        const { dueDate, completed } = item.data;
+                        if (!dueDate || completed) return false;
+                         try {
+                             const dueDateObj = dueDate.toDate ? dueDate.toDate() : new Date(dueDate);
+                             dueDateObj.setHours(0, 0, 0, 0);
+                             return dueDateObj >= now; // Due today or later
+                         } catch { return false; }
+                     })
+                      .sort((a, b) => {
+                         try {
+                             const aDate = a.data.dueDate.toDate ? a.data.dueDate.toDate() : new Date(a.data.dueDate);
+                             const bDate = b.data.dueDate.toDate ? b.data.dueDate.toDate() : new Date(b.data.dueDate);
+                             return aDate.getTime() - bDate.getTime();
+                         } catch { return 0; }
+                     })
+                     .slice(0, 5); // Show top 5
 
-                     return (
-                       <li
-                         key={timerId}
-                          className={`p-2 sm:p-2.5 rounded-lg backdrop-blur-sm transform transition-all duration-200 hover:shadow-sm animate-slideInUp ${itemBgClass} ${isEditing ? 'ring-1 ring-purple-400' : ''}`} // Reduced padding/rounding, faster animation, edit ring
-                         style={{ animationDelay: `${index * 80}ms` }}
-                       >
-                         <div className="flex flex-col md:flex-row items-center justify-between gap-2 md:gap-3">
-                           {isEditing ? (
-                               // Timer Edit Form - Compact
-                               <>
-                                 <div className="flex flex-col sm:flex-row gap-1.5 w-full"> {/* Reduced gap */}
-                                   <input
-                                     type="text"
-                                      className={`flex-grow ${inputBg} border ${isIlluminateEnabled ? 'border-gray-300' : 'border-gray-600'} rounded-full px-3 py-1 text-sm focus:ring-1 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200 shadow-sm`} // Reduced padding/size
-                                     value={editingTimerName}
-                                     onChange={(e) => setEditingTimerName(e.target.value)}
-                                     placeholder="Timer name"
+                 if (!upcomingDeadlines.length) {
+                   return (
+                      <p className={`${subheadingClass} text-xs sm:text-sm flex items-center justify-center py-4 italic`}>
+                       <CheckCircle className="w-4 h-4 mr-1.5 text-green-400" />
+                       All caught up! No upcoming deadlines.
+                     </p>
+                   );
+                 }
+
+                 return (
+                    <ul className="space-y-2">
+                     {upcomingDeadlines.map((item, index) => {
+                        const { id, data } = item;
+                        const itemType = data.task ? 'Task' : data.goal ? 'Goal' : data.project ? 'Project' : 'Plan';
+                        const dueDateObj = data.dueDate.toDate ? data.dueDate.toDate() : new Date(data.dueDate);
+                        const dueDateStr = dueDateObj.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+                        const itemName = data[itemType.toLowerCase()] || 'Untitled';
+
+                        dueDateObj.setHours(0,0,0,0);
+                        const daysRemaining = Math.ceil((dueDateObj.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
+                        let urgencyColor = isIlluminateEnabled ? 'border-l-gray-300' : 'border-l-gray-600';
+                        let urgencyText = '';
+                        let urgencyClass = '';
+                         if (daysRemaining <= 0) { urgencyColor = 'border-l-red-500'; urgencyText = 'Today!'; urgencyClass = 'text-red-500'; }
+                         else if (daysRemaining <= 1) { urgencyColor = 'border-l-orange-500'; urgencyText = 'Tomorrow!'; urgencyClass = 'text-orange-500'; }
+                         else if (daysRemaining <= 3) { urgencyColor = 'border-l-yellow-500'; urgencyText = `${daysRemaining} days`; urgencyClass = 'text-yellow-600'; }
+                         else { urgencyColor = 'border-l-green-500'; urgencyText = `${daysRemaining} days`; urgencyClass = 'text-green-600'; }
+
+                       const priority = data.priority || calculatePriority(item);
+
+                       return (
+                         <li
+                           key={id}
+                            className={`${isIlluminateEnabled ? 'bg-gray-100/80 hover:bg-gray-200/60' : 'bg-gray-700/40 hover:bg-gray-700/60'} p-2.5 rounded-lg transition-colors duration-150 border-l-4 ${urgencyColor} animate-slideInRight flex items-center justify-between gap-2`}
+                           style={{ animationDelay: `${index * 60}ms` }}
+                         >
+                            <div className="flex-grow overflow-hidden mr-2">
+                               <div className="text-xs sm:text-sm font-medium flex items-center">
+                                 <span className={`font-semibold mr-1 ${isIlluminateEnabled ? 'text-gray-700' : 'text-gray-200'}`}>{itemType}:</span>
+                                 <span className="truncate" title={itemName}>{itemName}</span>
+                                  <PriorityBadge priority={priority} isIlluminateEnabled={isIlluminateEnabled} className="ml-1.5 flex-shrink-0" />
+                               </div>
+                            </div>
+                            <div className={`text-[10px] sm:text-xs flex-shrink-0 ${isIlluminateEnabled ? 'text-gray-600' : 'text-gray-400'} flex items-center whitespace-nowrap`}>
+                               <Clock className={`w-3 h-3 mr-0.5 ${isIlluminateEnabled ? urgencyClass : urgencyClass.replace('600', '400').replace('500','400')}`} />
+                               <span className={`font-medium mr-1.5 ${isIlluminateEnabled ? urgencyClass : urgencyClass.replace('600', '400').replace('500','400')}`}>{dueDateStr}</span>
+                               {urgencyText && (
+                                   <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-medium ${
+                                       daysRemaining <= 0 ? 'bg-red-500/10 text-red-600 dark:text-red-400' :
+                                       daysRemaining <= 1 ? 'bg-orange-500/10 text-orange-600 dark:text-orange-400' :
+                                       daysRemaining <= 3 ? 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-500' :
+                                       'bg-green-500/10 text-green-600 dark:text-green-500'
+                                   }`}>
+                                       {urgencyText}
+                                   </span>
+                               )}
+                            </div>
+                         </li>
+                       );
+                     })}
+                   </ul>
+                 );
+               })()}
+             </div>
+
+             {/* Tabs & List Card */}
+             <div className={`${cardClass} rounded-xl p-4 sm:p-5 transition-all duration-300`}>
+                {/* Tabs List */}
+               <div className="overflow-x-auto no-scrollbar mb-4">
+                 <div className="flex space-x-1.5 w-full border-b pb-2 ${isIlluminateEnabled ? 'border-gray-200' : 'border-gray-700'}">
+                   {["tasks", "goals", "projects", "plans"].map((tab) => (
+                     <button
+                       key={tab}
+                        className={`px-3 py-1.5 rounded-full transition-all duration-200 transform hover:scale-[1.03] text-xs sm:text-sm font-medium flex items-center whitespace-nowrap ${
+                         activeTab === tab
+                           ? "bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-sm"
+                           : isIlluminateEnabled
+                             ? "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                             : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                       }`}
+                       onClick={() => handleTabChange(tab as "tasks" | "goals" | "projects" | "plans")}
+                     >
+                       {tab === "tasks" && <Clipboard className="w-3.5 h-3.5 mr-1" />}
+                       {tab === "goals" && <Target className="w-3.5 h-3.5 mr-1" />}
+                       {tab === "projects" && <Layers className="w-3.5 h-3.5 mr-1" />}
+                       {tab === "plans" && <Rocket className="w-3.5 h-3.5 mr-1" />}
+                       {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                     </button>
+                   ))}
+                 </div>
+               </div>
+
+               {/* Add New Item Form */}
+               <div className="flex flex-col md:flex-row gap-1.5 mb-4">
+                 <input
+                   type="text"
+                    className={`flex-grow ${inputBg} border ${isIlluminateEnabled ? 'border-gray-300' : 'border-gray-600'} rounded-full px-3.5 py-1.5 text-sm focus:ring-1 focus:ring-purple-500 focus:border-purple-500 transition-colors duration-150 shadow-sm placeholder-gray-400 dark:placeholder-gray-500`}
+                   placeholder={`Add a new ${activeTab.slice(0, -1)}...`}
+                   value={newItemText}
+                   onChange={(e) => setNewItemText(e.target.value)}
+                   onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
+                 />
+                 <div className="flex gap-1.5 flex-shrink-0">
+                   <input
+                     type="date"
+                      className={`${inputBg} border ${isIlluminateEnabled ? 'border-gray-300' : 'border-gray-600'} rounded-full px-3 py-1.5 text-sm focus:ring-1 focus:ring-purple-500 focus:border-purple-500 transition-colors duration-150 w-auto shadow-sm appearance-none ${iconColor}`}
+                     value={newItemDate}
+                     onChange={(e) => setNewItemDate(e.target.value)}
+                      title="Set due date"
+                      style={{ colorScheme: isIlluminateEnabled ? 'light' : 'dark' }} // Hint for date picker theme
+                   />
+                   <div className="relative">
+                      <select
+                        className={`${inputBg} border ${isIlluminateEnabled ? 'border-gray-300' : 'border-gray-600'} rounded-full pl-3 pr-7 py-1.5 text-sm focus:ring-1 focus:ring-purple-500 focus:border-purple-500 transition-colors duration-150 shadow-sm appearance-none ${iconColor}`}
+                        value={newItemPriority}
+                        onChange={(e) => setNewItemPriority(e.target.value as 'high' | 'medium' | 'low')}
+                        title="Set priority"
+                      >
+                        <option value="high">High 🔥</option>
+                        <option value="medium">Medium</option>
+                        <option value="low">Low 🧊</option>
+                      </select>
+                      <ChevronDown className={`w-3.5 h-3.5 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none ${iconColor}`} />
+                   </div>
+                   <button
+                      className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white p-2 rounded-full flex items-center justify-center hover:shadow-md hover:shadow-purple-500/20 transition-all duration-200 transform hover:scale-105 active:scale-100 min-w-[32px] min-h-[32px]"
+                     onClick={handleCreate}
+                      title={`Add new ${activeTab.slice(0,-1)}`}
+                   >
+                     <PlusCircle className="w-4 h-4" />
+                   </button>
+                 </div>
+               </div>
+
+               {/* Items List */}
+               <ul className="space-y-1.5 sm:space-y-2">
+                 {currentItems.length === 0 ? (
+                    <li className={`${subheadingClass} text-sm text-center py-6 italic`}>
+                     No {activeTab} here yet... Add one above!
+                   </li>
+                 ) : (
+                   currentItems
+                     // Optional: Sort items (e.g., by priority then due date, or by creation date)
+                     // .sort((a, b) => { ... sorting logic ... })
+                     .map((item, index) => {
+                       const itemId = item.id;
+                       const { data } = item;
+                       const textValue = data[titleField] || 'Untitled';
+                       const isCompleted = data.completed || false;
+                       const isEditing = editingItemId === itemId;
+                       const priority = data.priority || calculatePriority(item);
+
+                       let dueDateStr = '';
+                       let overdue = false;
+                       if (data.dueDate) {
+                          try {
+                               const dueDateObj = data.dueDate.toDate ? data.dueDate.toDate() : new Date(data.dueDate);
+                               if (!isNaN(dueDateObj.getTime())) {
+                                   dueDateStr = dueDateObj.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+                                   const todayDate = new Date(); todayDate.setHours(0,0,0,0);
+                                   const itemDate = new Date(dueDateObj); itemDate.setHours(0,0,0,0);
+                                   overdue = itemDate < todayDate && !isCompleted;
+                               }
+                          } catch { /* ignore date errors */ }
+                       }
+
+                       return (
+                         <li
+                           key={item.id}
+                            className={`group p-2 sm:p-2.5 rounded-lg flex flex-col md:flex-row md:items-center md:justify-between gap-1.5 md:gap-2 transition-all duration-150 animate-slideInUp ${
+                             isCompleted
+                               ? isIlluminateEnabled ? 'bg-green-100/50 opacity-60' : 'bg-green-900/20 opacity-50'
+                               : overdue
+                                 ? isIlluminateEnabled ? 'bg-red-100/60' : 'bg-red-900/30'
+                                 : isIlluminateEnabled ? 'bg-gray-100/70 hover:bg-gray-200/50' : 'bg-gray-700/30 hover:bg-gray-700/50'
+                           }
+                            ${isEditing ? (isIlluminateEnabled ? 'ring-1 ring-purple-400 bg-purple-50/50' : 'ring-1 ring-purple-500 bg-purple-900/20') : ''}
+                         `}
+                           style={{ animationDelay: `${index * 50}ms` }}
+                         >
+                           {!isEditing ? (
+                             // Display Mode
+                             <>
+                               <div className="flex items-center gap-2 flex-grow overflow-hidden mr-2">
+                                 <button onClick={() => handleMarkComplete(itemId)} className={`flex-shrink-0 p-0.5 rounded-full transition-colors duration-150 ${isCompleted ? (isIlluminateEnabled ? 'bg-green-500 border-green-500' : 'bg-green-600 border-green-600') : (isIlluminateEnabled ? 'border border-gray-400 hover:border-green-500 hover:bg-green-100/50' : 'border border-gray-500 hover:border-green-500 hover:bg-green-900/30')} `} title={isCompleted ? "Mark Pending" : "Mark Complete"}>
+                                   <CheckCircle className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${isCompleted ? 'text-white' : 'text-transparent'}`} />
+                                 </button>
+                                 <span
+                                   className={`font-medium text-sm sm:text-[0.9rem] truncate ${
+                                     isCompleted ? 'line-through text-gray-500 dark:text-gray-600' : (isIlluminateEnabled ? 'text-gray-800' : 'text-gray-100')
+                                   }`}
+                                   title={textValue}
+                                 >
+                                   {textValue}
+                                 </span>
+                                 <PriorityBadge priority={priority} isIlluminateEnabled={isIlluminateEnabled} className="flex-shrink-0 ml-auto sm:ml-1.5" />
+                                 {dueDateStr && (
+                                   <span
+                                     className={`text-[10px] sm:text-xs font-medium px-1.5 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 hidden sm:flex items-center ${
+                                       overdue ? (isIlluminateEnabled ? 'bg-red-200 text-red-700' : 'bg-red-800/50 text-red-300') : (isIlluminateEnabled ? 'bg-gray-200 text-gray-600' : 'bg-gray-600/80 text-gray-300')
+                                     }`}
+                                   >
+                                     <Calendar className="w-2.5 h-2.5 mr-0.5" />
+                                     {dueDateStr}
+                                   </span>
+                                 )}
+                               </div>
+                               {/* Action Buttons (Display Mode) - Appear on Hover */}
+                               <div className="flex gap-1 flex-shrink-0 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-150">
+                                 <button
+                                    className={`p-1.5 rounded ${isIlluminateEnabled ? 'hover:bg-blue-100 text-blue-600' : 'hover:bg-blue-900/50 text-blue-400'} transition-colors`}
+                                   onClick={() => handleEditClick(itemId, data)}
+                                   title="Edit"
+                                 >
+                                   <Edit className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                 </button>
+                                 <button
+                                    className={`p-1.5 rounded ${isIlluminateEnabled ? 'hover:bg-red-100 text-red-600' : 'hover:bg-red-900/50 text-red-500'} transition-colors`}
+                                   onClick={() => handleDelete(itemId)}
+                                   title="Delete"
+                                 >
+                                   <Trash className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                 </button>
+                               </div>
+                             </>
+                           ) : (
+                              // Edit Mode
+                              <>
+                                 <div className="flex flex-col sm:flex-row gap-1.5 w-full">
+                                   <input // Text Input
+                                      className={`flex-grow ${inputBg} border ${isIlluminateEnabled ? 'border-gray-300' : 'border-gray-600'} rounded-full px-3 py-1 text-sm focus:ring-1 focus:ring-purple-500 focus:border-purple-500 transition-colors duration-150 shadow-sm`}
+                                     value={editingText}
+                                     onChange={(e) => setEditingText(e.target.value)}
                                      autoFocus
+                                     onKeyDown={(e) => { if (e.key === 'Enter') handleEditSave(itemId); if (e.key === 'Escape') setEditingItemId(null); }}
                                    />
-                                   <input
-                                     type="number"
-                                      className={`w-20 ${inputBg} border ${isIlluminateEnabled ? 'border-gray-300' : 'border-gray-600'} rounded-full px-3 py-1 text-sm focus:ring-1 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200 shadow-sm appearance-none`} // Reduced padding/size, fixed width
-                                     value={editingTimerMinutes}
-                                     onChange={(e) => setEditingTimerMinutes(e.target.value)}
-                                     placeholder="Min"
-                                     min="1"
-                                      onKeyDown={(e) => e.key === 'Enter' && handleEditTimerSave(timerId)}
-                                   />
+                                    <div className="flex gap-1.5 flex-shrink-0">
+                                        <input // Date Input
+                                            type="date"
+                                            className={`${inputBg} border ${isIlluminateEnabled ? 'border-gray-300' : 'border-gray-600'} rounded-full px-3 py-1 text-sm focus:ring-1 focus:ring-purple-500 focus:border-purple-500 transition-colors duration-150 w-auto shadow-sm appearance-none ${iconColor}`}
+                                            value={editingDate}
+                                            onChange={(e) => setEditingDate(e.target.value)}
+                                            style={{ colorScheme: isIlluminateEnabled ? 'light' : 'dark' }}
+                                        />
+                                        <div className="relative"> {/* Priority Select */}
+                                            <select
+                                                className={`${inputBg} border ${isIlluminateEnabled ? 'border-gray-300' : 'border-gray-600'} rounded-full pl-3 pr-7 py-1 text-sm focus:ring-1 focus:ring-purple-500 focus:border-purple-500 transition-colors duration-150 shadow-sm appearance-none ${iconColor}`}
+                                                value={editingPriority}
+                                                onChange={(e) => setEditingPriority(e.target.value as 'high' | 'medium' | 'low')}
+                                            >
+                                                <option value="high">High 🔥</option>
+                                                <option value="medium">Medium</option>
+                                                <option value="low">Low 🧊</option>
+                                            </select>
+                                             <ChevronDown className={`w-3.5 h-3.5 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none ${iconColor}`} />
+                                        </div>
+                                    </div>
                                  </div>
-                                 <div className="flex gap-1 flex-shrink-0 mt-1 sm:mt-0"> {/* Reduced gap */}
+                                 {/* Action Buttons (Edit Mode) */}
+                                 <div className="flex gap-1 flex-shrink-0 mt-1 sm:mt-0 self-end sm:self-center">
                                    <button
-                                      className="bg-green-500 hover:bg-green-600 px-3 py-1 rounded-full text-white transition-colors text-xs sm:text-sm" // Reduced padding
-                                     onClick={() => handleEditTimerSave(timerId)}
+                                      className="bg-green-500 hover:bg-green-600 px-3 py-1 rounded-full text-white transition-colors text-xs sm:text-sm font-medium"
+                                     onClick={() => handleEditSave(itemId)}
                                    >
                                      Save
                                    </button>
                                    <button
-                                      className="bg-gray-500 hover:bg-gray-600 px-3 py-1 rounded-full text-white transition-colors text-xs sm:text-sm" // Reduced padding
-                                     onClick={() => setEditingTimerId(null)}
+                                      className="bg-gray-500 hover:bg-gray-600 px-3 py-1 rounded-full text-white transition-colors text-xs sm:text-sm"
+                                     onClick={() => setEditingItemId(null)}
                                    >
                                      Cancel
                                    </button>
                                  </div>
-                               </>
-                           ) : (
-                               // Timer Display - Compact
-                               <>
-                                 <div className="flex items-center gap-2 flex-grow overflow-hidden mr-2">
-                                   <span className="font-medium text-sm sm:text-base truncate" title={timer.data.name}>
-                                     {timer.data.name}
-                                   </span>
-                                   <span
-                                     className={`text-xl sm:text-2xl font-semibold ${ // Reduced size
-                                       isIlluminateEnabled ? 'text-purple-700' : 'text-purple-400'
-                                     } ${isRunning ? 'animate-pulse' : ''}`}
-                                   >
-                                     {formatCustomTime(timeLeft)}
-                                   </span>
-                                 </div>
-                                 <div className="flex gap-1 sm:gap-1.5 flex-shrink-0"> {/* Reduced gap */}
-                                    {/* Start/Pause Button */}
-                                     {!isRunning && (
-                                         <button
-                                            className={`p-1.5 rounded-full ${isFinished ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-500 hover:bg-green-600'} text-white transition-colors`}
-                                            onClick={() => !isFinished && startCustomTimer(timerId)}
-                                            title={isFinished ? "Finished" : "Start"}
-                                            disabled={isFinished}
+                              </>
+                           )}
+                         </li>
+                       );
+                     })
+                 )}
+               </ul>
+             </div>
+
+           </div> {/* End Left Column */}
+
+           {/* RIGHT COLUMN */}
+           <div className="flex flex-col gap-4 sm:gap-5">
+
+              {/* Weather Card */}
+              <div className={`${cardClass} rounded-xl p-3 sm:p-4 transition-all duration-300`}>
+                <h2 className={`text-base sm:text-lg font-semibold mb-2 ${headingClass} flex items-center`}>
+                  <Sun className={`w-4 h-4 mr-1.5 ${isIlluminateEnabled ? 'text-yellow-500' : 'text-yellow-400'}`} />
+                  Weather
+                  {weatherData?.location?.name && !weatherLoading && <span className="text-sm font-normal ml-1.5 text-gray-500 truncate hidden sm:inline"> / {weatherData.location.name}</span>}
+                </h2>
+               {weatherLoading ? (
+                  <div className="animate-pulse space-y-2 py-4">
+                    <div className={`h-5 rounded w-1/2 ${isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700'}`}></div>
+                    <div className={`h-4 rounded w-3/4 ${isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700'}`}></div>
+                    <div className={`h-3 rounded w-1/3 ${isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700'}`}></div>
+                  </div>
+               ) : weatherError ? (
+                    <p className="text-center text-xs text-red-500 py-4">{weatherError}</p>
+               ) : weatherData ? (
+                 <>
+                   {/* Current weather */}
+                    <div className={`flex items-center gap-2 sm:gap-3 mb-3 border-b ${isIlluminateEnabled ? 'border-gray-200/80' : 'border-gray-700/80'} pb-3`}>
+                      <img
+                        src={weatherData.current.condition.icon ? `https:${weatherData.current.condition.icon}` : "/placeholder.svg"} // Ensure protocol is added
+                        alt={weatherData.current.condition.text}
+                        className="w-8 h-8 sm:w-10 sm:h-10 flex-shrink-0"
+                        loading="lazy" // Lazy load weather icon
+                      />
+                      <div className="flex-grow">
+                        <p className={`text-lg sm:text-xl font-bold ${headingClass} leading-tight`}>
+                            {weatherData.current.temp_f}°F
+                            <span className={`ml-1 text-xs sm:text-sm font-normal ${subheadingClass}`}>
+                              ({weatherData.current.condition.text})
+                            </span>
+                        </p>
+                        <p className={`text-xs ${subheadingClass}`}>
+                            Feels like {weatherData.current.feelslike_f}°F
+                        </p>
+                      </div>
+                      <div className="flex flex-col items-end text-[10px] sm:text-xs gap-0.5 flex-shrink-0">
+                        <div className="flex items-center" title={`Wind: ${weatherData.current.wind_dir} ${Math.round(weatherData.current.wind_mph)} mph`}>
+                          <Wind className="w-3 h-3 mr-0.5 text-blue-400" />
+                          {Math.round(weatherData.current.wind_mph)} mph
+                        </div>
+                        <div className="flex items-center" title={`Humidity: ${weatherData.current.humidity}%`}>
+                          <Droplets className="w-3 h-3 mr-0.5 text-cyan-400" />
+                          {weatherData.current.humidity}%
+                        </div>
+                        <div className="flex items-center" title={`UV Index: ${weatherData.current.uv}`}>
+                          <Zap className="w-3 h-3 mr-0.5 text-yellow-400" />
+                          UV: {weatherData.current.uv}
+                        </div>
+                      </div>
+                    </div>
+
+                   {/* Forecast */}
+                   {weatherData.forecast?.forecastday?.length > 0 && (
+                     <div className="space-y-1.5">
+                       {(() => {
+                         const now = new Date(); now.setHours(0, 0, 0, 0);
+                          const validDays = weatherData.forecast.forecastday.filter((day: any) => {
+                              try {
+                                const d = new Date(day.date_epoch * 1000);
+                                d.setHours(0, 0, 0, 0);
+                                return d >= now;
+                              } catch { return false; }
+                          });
+                          return validDays.slice(0, 3).map((day: any, idx: number) => {
+                            const dateObj = new Date(day.date_epoch * 1000);
+                            const dayLabel = dateObj.toLocaleDateString(undefined, { weekday: 'short' });
+                            const maxF = Math.round(day.day.maxtemp_f);
+                            const minF = Math.round(day.day.mintemp_f);
+                            const icon = day.day.condition.icon ? `https:${day.day.condition.icon}` : "/placeholder.svg";
+                            const forecastBg = isIlluminateEnabled ? 'bg-gray-100/70' : 'bg-gray-700/30';
+
+                           return (
+                              <div
+                               key={day.date_epoch}
+                                className={`flex items-center gap-2 ${forecastBg} p-1 rounded-md animate-slideInRight`}
+                               style={{ animationDelay: `${idx * 80}ms` }}
+                             >
+                                <img src={icon} alt={day.day.condition.text} className="w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0" loading="lazy"/>
+                                <span className={`text-[10px] sm:text-xs font-medium w-7 sm:w-8 flex-shrink-0 text-center ${isIlluminateEnabled ? 'text-gray-700' : 'text-gray-300'}`}>{dayLabel}</span>
+                                {/* Optional simple temp bar */}
+                                <div className={`flex-grow h-1 rounded-full ${isIlluminateEnabled ? 'bg-gray-200': 'bg-gray-600'} overflow-hidden`}>
+                                   <div className="h-full bg-gradient-to-r from-blue-400 via-yellow-400 to-red-500" style={{width: `${Math.max(0,Math.min(100, (maxF / 100) * 100))}%`}}></div>
+                                </div>
+                                <span className={`text-[10px] sm:text-xs w-12 text-right flex-shrink-0 ${isIlluminateEnabled ? 'text-gray-700' : 'text-gray-300'}`}>
+                                    <span className="font-semibold">{maxF}°</span> / {minF}°
+                                </span>
+                              </div>
+                           );
+                         });
+                       })()}
+                     </div>
+                   )}
+                 </>
+               ) : (
+                  <p className="text-center text-xs text-gray-500 py-4">Weather data unavailable.</p>
+               )}
+             </div>
+
+
+             {/* Pomodoro Timer Card */}
+             <div className={`${cardClass} rounded-xl p-3 sm:p-4 transition-all duration-300`}>
+                <div className="flex items-center justify-between mb-2">
+                  <h2 className={`text-base sm:text-lg font-semibold ${headingClass} flex items-center`}>
+                    <Clock className="w-4 h-4 mr-1.5" />
+                    Pomodoro
+                  </h2>
+                  <button
+                    className="bg-gradient-to-r from-purple-500 to-indigo-500 text-white px-2 py-1 rounded-full font-semibold flex items-center gap-1 hover:shadow-md hover:shadow-purple-500/10 transition-all duration-150 transform hover:scale-105 active:scale-100 text-[10px] sm:text-xs"
+                    onClick={handleAddCustomTimer}
+                    title="Add a new custom timer"
+                  >
+                    <PlusCircle className="w-3 h-3" /> New Timer
+                  </button>
+                </div>
+                <div
+                  className={`text-4xl sm:text-5xl font-bold mb-3 text-center tabular-nums tracking-tight bg-clip-text text-transparent ${
+                   isIlluminateEnabled
+                     ? 'bg-gradient-to-r from-blue-600 to-purple-700'
+                     : 'bg-gradient-to-r from-blue-400 to-purple-500'
+                 } ${pomodoroRunning ? 'animate-pulse' : ''}`}
+                >
+                  {formatPomodoroTime(pomodoroTimeLeft)}
+                </div>
+                <div className="flex justify-center gap-2">
+                  <button
+                    className={`px-3 py-1.5 rounded-full font-medium text-white transition-all duration-150 transform hover:scale-105 active:scale-100 text-xs sm:text-sm ${pomodoroRunning || pomodoroTimeLeft === 0 ? 'bg-gray-400 cursor-not-allowed' : 'bg-gradient-to-r from-green-500 to-green-600 hover:shadow-md hover:shadow-green-500/10'}`}
+                    onClick={handlePomodoroStart} disabled={pomodoroRunning || pomodoroFinished}
+                    title="Start Timer"
+                  >
+                    Start
+                  </button>
+                  <button
+                    className={`px-3 py-1.5 rounded-full font-medium text-white transition-all duration-150 transform hover:scale-105 active:scale-100 text-xs sm:text-sm ${!pomodoroRunning ? 'bg-gray-400 cursor-not-allowed' : 'bg-gradient-to-r from-yellow-500 to-yellow-600 hover:shadow-md hover:shadow-yellow-500/10'}`}
+                    onClick={handlePomodoroPause} disabled={!pomodoroRunning}
+                    title="Pause Timer"
+                  >
+                    Pause
+                  </button>
+                  <button
+                    className={`px-3 py-1.5 rounded-full font-medium text-white transition-all duration-150 transform hover:scale-105 active:scale-100 text-xs sm:text-sm ${pomodoroRunning ? 'bg-gray-400 cursor-not-allowed' : 'bg-gradient-to-r from-red-500 to-red-600 hover:shadow-md hover:shadow-red-500/10'}`}
+                    onClick={handlePomodoroReset}
+                    disabled={pomodoroRunning} // Disable reset only while actively running
+                    title="Reset Timer"
+                  >
+                    Reset
+                  </button>
+                </div>
+                {pomodoroFinished && (
+                     <p className="text-center text-xs text-red-500 mt-2 animate-bounce font-medium">Time's up!</p>
+                )}
+              </div>
+
+
+             {/* Custom Timers List - Only show if timers exist */}
+             {customTimers.length > 0 && (
+                <div className={`${cardClass} rounded-xl p-3 sm:p-4 transition-all duration-300`}>
+                  <h2 className={`text-base sm:text-lg font-semibold mb-3 ${headingClass} flex items-center`}>
+                    <TimerIcon className="w-4 h-4 mr-1.5" />
+                    Custom Timers
+                  </h2>
+                  <ul className="space-y-2">
+                    {customTimers
+                        // .sort((a, b) => a.data.createdAt?.seconds - b.data.createdAt?.seconds) // Optional sort
+                        .map((timer, index) => {
+                            const timerId = timer.id;
+                            const runningState = runningTimers[timerId];
+                            // Ensure state exists before accessing properties
+                            const timeLeft = runningState ? runningState.timeLeft : timer.data.time;
+                            const isRunning = runningState ? runningState.isRunning : false;
+                            const isFinished = runningState ? (runningState.finished ?? timeLeft <= 0) : timer.data.time <= 0; // Check finished state
+                            const isEditing = editingTimerId === timerId;
+
+                            let itemBgClass = isIlluminateEnabled ? 'bg-gray-100/80' : 'bg-gray-700/40';
+                            if (isFinished && !isEditing) itemBgClass = isIlluminateEnabled ? 'bg-yellow-100/70 opacity-80' : 'bg-yellow-900/30 opacity-70';
+                            if (isEditing) itemBgClass = isIlluminateEnabled ? 'bg-purple-100/50 ring-1 ring-purple-400' : 'bg-purple-900/20 ring-1 ring-purple-500';
+
+
+                            return (
+                            <li
+                                key={timerId}
+                                className={`p-2 sm:p-2.5 rounded-lg transition-all duration-150 animate-slideInUp ${itemBgClass}`}
+                                style={{ animationDelay: `${index * 60}ms` }}
+                            >
+                                <div className="flex flex-col md:flex-row items-center justify-between gap-2 md:gap-3">
+                                {isEditing ? (
+                                    // Timer Edit Form
+                                    <>
+                                    <div className="flex flex-col sm:flex-row gap-1.5 w-full">
+                                        <input
+                                        type="text"
+                                        className={`flex-grow ${inputBg} border ${isIlluminateEnabled ? 'border-gray-300' : 'border-gray-600'} rounded-full px-3 py-1 text-sm focus:ring-1 focus:ring-purple-500 focus:border-purple-500 transition-colors duration-150 shadow-sm`}
+                                        value={editingTimerName}
+                                        onChange={(e) => setEditingTimerName(e.target.value)}
+                                        placeholder="Timer name"
+                                        autoFocus
+                                        />
+                                        <input
+                                        type="number"
+                                        className={`w-20 ${inputBg} border ${isIlluminateEnabled ? 'border-gray-300' : 'border-gray-600'} rounded-full px-3 py-1 text-sm focus:ring-1 focus:ring-purple-500 focus:border-purple-500 transition-colors duration-150 shadow-sm appearance-none`}
+                                        value={editingTimerMinutes}
+                                        onChange={(e) => setEditingTimerMinutes(e.target.value)}
+                                        placeholder="Min"
+                                        min="1"
+                                        onKeyDown={(e) => e.key === 'Enter' && handleEditTimerSave(timerId)}
+                                        />
+                                    </div>
+                                    <div className="flex gap-1 flex-shrink-0 mt-1 sm:mt-0 self-end sm:self-center">
+                                        <button
+                                        className="bg-green-500 hover:bg-green-600 px-3 py-1 rounded-full text-white transition-colors text-xs sm:text-sm font-medium"
+                                        onClick={() => handleEditTimerSave(timerId)}
+                                        > Save </button>
+                                        <button
+                                        className="bg-gray-500 hover:bg-gray-600 px-3 py-1 rounded-full text-white transition-colors text-xs sm:text-sm"
+                                        onClick={() => setEditingTimerId(null)}
+                                        > Cancel </button>
+                                    </div>
+                                    </>
+                                ) : (
+                                    // Timer Display
+                                    <>
+                                    <div className="flex items-center gap-2 flex-grow overflow-hidden mr-2">
+                                        <span className="font-medium text-sm sm:text-[0.9rem] truncate" title={timer.data.name}>
+                                        {timer.data.name}
+                                        </span>
+                                        <span
+                                        className={`text-xl sm:text-2xl font-semibold tabular-nums tracking-tight ${
+                                            isIlluminateEnabled ? 'text-purple-700' : 'text-purple-400'
+                                        } ${isRunning ? 'animate-pulse' : ''}`}
+                                        >
+                                        {formatCustomTime(timeLeft)}
+                                        </span>
+                                    </div>
+                                    <div className="flex gap-1 sm:gap-1.5 flex-shrink-0">
+                                        {/* Start/Pause */}
+                                        <button
+                                            className={`p-1.5 rounded-full text-white transition-colors ${isRunning ? 'bg-yellow-500 hover:bg-yellow-600' : isFinished ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-500 hover:bg-green-600'}`}
+                                            onClick={() => isRunning ? pauseCustomTimer(timerId) : startCustomTimer(timerId)}
+                                            title={isRunning ? "Pause" : isFinished ? "Finished" : "Start"}
+                                            disabled={isFinished && !isRunning} // Disable start if finished
                                             >
-                                            <Play className={`w-3.5 h-3.5 ${isFinished ? 'opacity-50' : ''}`} />
-                                            </button>
-                                     )}
-                                     {isRunning && (
-                                         <button
-                                         className="p-1.5 rounded-full bg-yellow-500 hover:bg-yellow-600 text-white transition-colors"
-                                         onClick={() => pauseCustomTimer(timerId)}
-                                         title="Pause"
-                                         >
-                                         <Pause className="w-3.5 h-3.5" />
-                                         </button>
-                                     )}
-                                      {/* Reset Button */}
-                                      <button
-                                        className={`p-1.5 rounded-full ${isIlluminateEnabled ? 'bg-gray-300 hover:bg-gray-400 text-gray-700' : 'bg-gray-600 hover:bg-gray-500 text-gray-200'} transition-colors`}
-                                        onClick={() => resetCustomTimer(timerId)}
-                                        title="Reset"
-                                        disabled={isRunning} // Disable reset while running maybe? Or allow? Let's allow.
-                                        >
-                                        <RotateCcw className="w-3.5 h-3.5" />
-                                      </button>
-                                      {/* Edit Button */}
-                                      <button
-                                        className={`p-1.5 rounded-full ${isIlluminateEnabled ? 'hover:bg-blue-200 text-blue-600' : 'hover:bg-blue-900/50 text-blue-400'} transition-colors`}
-                                        onClick={() => handleEditTimerClick(timerId, timer.data.name, timer.data.time)}
-                                        title="Edit"
-                                        disabled={isRunning} // Disable edit while running
-                                        >
-                                        <Edit className={`w-3.5 h-3.5 ${isRunning ? 'opacity-50' : ''}`} />
-                                      </button>
-                                      {/* Delete Button */}
-                                      <button
-                                        className={`p-1.5 rounded-full ${isIlluminateEnabled ? 'hover:bg-red-200 text-red-600' : 'hover:bg-red-900/50 text-red-500'} transition-colors`}
-                                        onClick={() => handleDeleteTimer(timerId)}
-                                        title="Delete"
-                                        disabled={isRunning} // Disable delete while running
-                                        >
-                                         <Trash className={`w-3.5 h-3.5 ${isRunning ? 'opacity-50' : ''}`} />
-                                      </button>
-                                 </div>
-                               </>
-                           )}
-                         </div>
-                           {isFinished && !isEditing && (
-                                <p className="text-center text-[10px] text-yellow-500 mt-1">Timer finished!</p>
-                           )}
-                       </li>
-                     );
-                   })}
-                 </ul>
-               </div>
-             )}
-          </div>
+                                            {isRunning ? <Pause className="w-3.5 h-3.5" /> : <Play className={`w-3.5 h-3.5 ${isFinished ? 'opacity-50' : ''}`} />}
+                                        </button>
+                                        {/* Reset */}
+                                        <button
+                                            className={`p-1.5 rounded-full transition-colors ${isRunning ? 'bg-gray-400/50 text-gray-600/50 cursor-not-allowed' : isIlluminateEnabled ? 'bg-gray-200 hover:bg-gray-300 text-gray-700' : 'bg-gray-600 hover:bg-gray-500 text-gray-200'}`}
+                                            onClick={() => resetCustomTimer(timerId)}
+                                            title="Reset"
+                                            disabled={isRunning} // Maybe allow reset while running? Currently disabled.
+                                            >
+                                            <RotateCcw className="w-3.5 h-3.5" />
+                                        </button>
+                                        {/* Edit */}
+                                        <button
+                                            className={`p-1.5 rounded-full transition-colors ${isRunning ? 'text-gray-400/50 cursor-not-allowed' : isIlluminateEnabled ? 'hover:bg-blue-100 text-blue-600' : 'hover:bg-blue-900/50 text-blue-400'}`}
+                                            onClick={() => handleEditTimerClick(timerId, timer.data.name, timer.data.time)}
+                                            title="Edit"
+                                            disabled={isRunning}
+                                            >
+                                            <Edit className={`w-3.5 h-3.5 ${isRunning ? 'opacity-50' : ''}`} />
+                                        </button>
+                                        {/* Delete */}
+                                        <button
+                                            className={`p-1.5 rounded-full transition-colors ${isRunning ? 'text-gray-400/50 cursor-not-allowed' : isIlluminateEnabled ? 'hover:bg-red-100 text-red-600' : 'hover:bg-red-900/50 text-red-500'}`}
+                                            onClick={() => handleDeleteTimer(timerId)}
+                                            title="Delete"
+                                            disabled={isRunning}
+                                            >
+                                            <Trash className={`w-3.5 h-3.5 ${isRunning ? 'opacity-50' : ''}`} />
+                                        </button>
+                                    </div>
+                                    </>
+                                )}
+                                </div>
+                                {isFinished && !isEditing && (
+                                    <p className="text-center text-[10px] text-yellow-600 dark:text-yellow-500 mt-1">Timer finished!</p>
+                                )}
+                            </li>
+                            );
+                    })}
+                  </ul>
+                </div>
+             )} {/* End custom timers list */}
+
+           </div> {/* End Right Column */}
+         </div> {/* End Main Content Grid */}
+
+      </main> {/* End Main Content Area */}
+
+      {/* AI Chat Sidebar */}
+      <div
+        // Use `aria-hidden` for accessibility when closed
+        aria-hidden={!isAiSidebarOpen}
+        className={`fixed top-0 right-0 h-full w-full max-w-sm md:max-w-md lg:max-w-[440px] z-50 transform transition-transform duration-300 ease-in-out ${
+          isAiSidebarOpen ? 'translate-x-0' : 'translate-x-full'
+        } ${cardClass} flex flex-col shadow-2xl border-l ${isIlluminateEnabled ? 'border-gray-200' : 'border-gray-700'}`}
+        // Add role for accessibility
+        role="complementary"
+        aria-labelledby="ai-sidebar-title"
+      >
+        {/* Sidebar Header */}
+        <div
+          className={`p-3 sm:p-4 border-b ${
+            isIlluminateEnabled ? 'border-gray-200 bg-gray-100/80' : 'border-gray-700 bg-gray-800/90' // Slightly transparent header
+          } flex justify-between items-center flex-shrink-0 sticky top-0 backdrop-blur-sm z-10`} // Sticky header
+        >
+          <h3 id="ai-sidebar-title" className={`text-base sm:text-lg font-semibold flex items-center gap-2 ${illuminateTextBlue}`}>
+            <BrainCircuit className="w-5 h-5" />
+            TaskMaster AI
+            <span className="text-[9px] sm:text-[10px] bg-gradient-to-r from-pink-500 to-purple-500 text-white px-1.5 py-0.5 rounded-full font-medium">
+               BETA
+           </span>
+          </h3>
+          <button
+            onClick={() => setIsAiSidebarOpen(false)}
+            className={`${
+              isIlluminateEnabled
+                ? 'text-gray-500 hover:text-gray-800 hover:bg-gray-200'
+                : 'text-gray-400 hover:text-gray-100 hover:bg-gray-700'
+            } p-1 rounded-full transition-colors transform hover:scale-110 active:scale-100`}
+             title="Close Chat"
+             aria-label="Close AI Chat Sidebar" // Accessibility label
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
-      </main>
 
-       {/* NEW: AI Chat Sidebar */}
-       <div
-         className={`fixed top-0 right-0 h-full w-full max-w-sm md:max-w-md lg:max-w-lg z-50 transform transition-transform duration-300 ease-in-out ${
-           isAiSidebarOpen ? 'translate-x-0' : 'translate-x-full'
-         } ${cardClass} flex flex-col shadow-2xl border-l ${isIlluminateEnabled ? 'border-gray-300' : 'border-gray-700'}`}
-       >
-         {/* Sidebar Header */}
-         <div
-           className={`p-3 sm:p-4 border-b ${
-             isIlluminateEnabled ? 'border-gray-200 bg-gray-100' : 'border-gray-700 bg-gray-800'
-           } flex justify-between items-center flex-shrink-0`}
-         >
-           <h3 className={`text-base sm:text-lg font-semibold flex items-center gap-2 ${illuminateTextBlue}`}>
-             <BrainCircuit className="w-5 h-5" />
-             TaskMaster AI
-             <span className="text-[10px] bg-gradient-to-r from-pink-500 to-purple-500 text-white px-1.5 py-0.5 rounded-full font-medium"> {/* Smaller text/padding */}
-                BETA
-            </span>
-           </h3>
-           <button
-             onClick={() => setIsAiSidebarOpen(false)}
-             className={`${
-               isIlluminateEnabled
-                 ? 'text-gray-500 hover:text-gray-800 hover:bg-gray-200'
-                 : 'text-gray-400 hover:text-gray-100 hover:bg-gray-700'
-             } p-1 rounded-full transition-colors transform hover:scale-110`}
-              title="Close Chat"
-           >
-             <X className="w-5 h-5" />
-           </button>
-         </div>
-
-         {/* Chat History Area */}
-         <div
-           className="flex-1 overflow-y-auto p-3 space-y-3" // Reduced padding/spacing
-           ref={chatEndRef}
-         >
-           {chatHistory.map((message, index) => (
-             <div
-               key={index}
-               className={`flex ${
-                 message.role === 'user' ? 'justify-end' : 'justify-start'
-               } animate-fadeIn`}
-               style={{ animationDelay: `${index * 50}ms` }} // Faster animation
-             >
-               <div
-                 className={`max-w-[85%] rounded-lg px-3 py-2 text-sm shadow-sm ${ // Reduced padding/size/shadow
-                   message.role === 'user'
-                     ? isIlluminateEnabled
-                       ? 'bg-blue-500 text-white'
-                       : 'bg-blue-600 text-white'
-                     : isIlluminateEnabled
-                       ? 'bg-gray-200 text-gray-800'
-                       : 'bg-gray-700 text-gray-200'
-                 }`}
-               >
-                  {/* Render Markdown, Timers, Flashcards - Logic remains the same */}
-                  {message.content !== "" && ( // Render markdown only if content exists
-                     <ReactMarkdown
-                        remarkPlugins={[remarkMath, remarkGfm]}
-                        rehypePlugins={[rehypeKatex]}
-                        components={{
-                            // Use smaller margins for tighter layout
-                            p: ({ children }) => <p className="mb-1 last:mb-0">{children}</p>,
-                            ul: ({ children }) => <ul className="list-disc ml-4 mb-1 text-xs">{children}</ul>,
-                            ol: ({ children }) => <ol className="list-decimal ml-4 mb-1 text-xs">{children}</ol>,
-                            li: ({ children }) => <li className="mb-0.5">{children}</li>,
-                            code: ({ inline, className, children, ...props }) => {
+        {/* Chat History Area */}
+        <div
+          className="flex-1 overflow-y-auto p-3 space-y-3" // Main chat area
+          ref={chatEndRef}
+          // Add tabindex for keyboard scrolling if needed
+          // tabIndex={0}
+        >
+          {chatHistory.map((message, index) => (
+            <div
+              key={message.id || index} // Use message ID if available, fallback to index
+              className={`flex ${ message.role === 'user' ? 'justify-end' : 'justify-start' } animate-fadeIn`}
+              style={{ animationDelay: `${index * 30}ms`, animationDuration: '300ms' }} // Faster animation
+            >
+              <div
+                 className={`max-w-[85%] rounded-lg px-3 py-1.5 text-sm shadow-sm break-words ${ // Ensure text breaks
+                  message.role === 'user'
+                    ? (isIlluminateEnabled ? 'bg-blue-500 text-white' : 'bg-blue-600 text-white')
+                    : message.error // Style error messages differently
+                      ? (isIlluminateEnabled ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-red-900/30 text-red-300 border border-red-700/50')
+                      : (isIlluminateEnabled ? 'bg-gray-100 text-gray-800 border border-gray-200/80' : 'bg-gray-700/80 text-gray-200 border border-gray-600/50') // Subtle border for assistant messages
+                }`}
+              >
+                 {/* Render Markdown, Timers, Flashcards */}
+                 {message.content && message.content !== "..." && ( // Render markdown only if content exists and is not just ellipsis
+                    <ReactMarkdown
+                       remarkPlugins={[remarkMath, remarkGfm]}
+                       rehypePlugins={[rehypeKatex]}
+                       components={{
+                           p: ({node, ...props}) => <p className="mb-1 last:mb-0" {...props} />,
+                           ul: ({node, ...props}) => <ul className="list-disc list-outside ml-4 mb-1 text-xs sm:text-sm" {...props} />,
+                           ol: ({node, ...props}) => <ol className="list-decimal list-outside ml-4 mb-1 text-xs sm:text-sm" {...props} />,
+                           li: ({node, ...props}) => <li className="mb-0.5" {...props} />,
+                           a: ({node, ...props}) => <a className="text-blue-500 hover:underline" target="_blank" rel="noopener noreferrer" {...props} />, // Style links
+                           code: ({ node, inline, className, children, ...props }) => {
                                 const match = /language-(\w+)/.exec(className || '');
                                 return !inline ? (
-                                <pre className={`!bg-black/30 p-2 rounded-md overflow-x-auto my-1 text-[11px] leading-tight ${className}`} {...props}>
-                                    <code>{children}</code>
+                                <pre className={`!bg-black/40 p-2 rounded-md overflow-x-auto my-1 text-[11px] leading-snug ${className}`} {...props}>
+                                    <code className={`language-${match?.[1] || 'plaintext'}`}>{children}</code>
                                 </pre>
                                 ) : (
                                 <code className={`!bg-black/20 px-1 rounded text-xs ${className}`} {...props}>
                                     {children}
                                 </code>
                                 );
-                            },
-                        }}
-                     >
-                        {message.content || (message.role === 'assistant' && isChatLoading && index === chatHistory.length - 1 ? '...' : '')} {/* Show ellipsis if loading */}
-                    </ReactMarkdown>
-                  )}
-                 {message.timer && (
-                   <div className="mt-1.5"> {/* Reduced margin */}
-                     <div
-                       className={`flex items-center space-x-2 rounded-md px-3 py-1.5 text-sm ${ // Reduced padding/size
-                         isIlluminateEnabled ? 'bg-gray-300/70' : 'bg-gray-900/50'
-                       }`}
-                     >
-                       <TimerIcon className={`w-4 h-4 ${illuminateTextBlue}`} />
-                       <Timer
-                         key={message.timer.id}
-                         initialDuration={message.timer.duration}
-                         onComplete={() => handleTimerComplete(message.timer.id)}
-                         compact={true} // Add a compact prop to Timer component if possible
-                       />
+                           },
+                       }}
+                    >
+                       {message.content}
+                   </ReactMarkdown>
+                 )}
+                 {/* Show ellipsis placeholder for loading state */}
+                 {message.content === "..." && isChatLoading && index === chatHistory.length - 1 && (
+                    <div className="flex space-x-1 p-1">
+                         <div className="w-1.5 h-1.5 bg-current rounded-full animate-bounce opacity-60"></div>
+                         <div className="w-1.5 h-1.5 bg-current rounded-full animate-bounce delay-100 opacity-60"></div>
+                         <div className="w-1.5 h-1.5 bg-current rounded-full animate-bounce delay-200 opacity-60"></div>
                      </div>
-                   </div>
                  )}
-                 {message.flashcard && (
-                   <div className="mt-1.5"> {/* Reduced margin */}
-                     <FlashcardsQuestions
-                       type="flashcard"
-                       data={message.flashcard.data}
-                       onComplete={() => {}}
-                       isIlluminateEnabled={isIlluminateEnabled} // Pass theme
-                     />
-                   </div>
-                 )}
-                 {message.question && (
-                   <div className="mt-1.5"> {/* Reduced margin */}
-                     <FlashcardsQuestions
-                       type="question"
-                       data={message.question.data}
-                       onComplete={() => {}}
-                        isIlluminateEnabled={isIlluminateEnabled} // Pass theme
-                     />
-                   </div>
-                 )}
-               </div>
-             </div>
-           ))}
-           {isChatLoading && chatHistory[chatHistory.length - 1]?.role !== 'assistant' && ( // Show loading dots only if last message isn't the placeholder assistant msg
-             <div className="flex justify-start animate-fadeIn">
-               <div
-                 className={`${
-                   isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700'
-                 } rounded-lg px-3 py-2 max-w-[85%] shadow-sm`}
-               >
-                 <div className="flex space-x-1.5">
-                   <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></div>
-                   <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce delay-100"></div>
-                   <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce delay-200"></div>
-                 </div>
-               </div>
-             </div>
-           )}
-         </div>
 
-         {/* Chat Input Form */}
-          <form onSubmit={handleChatSubmit} className={`p-3 border-t ${isIlluminateEnabled ? 'border-gray-200 bg-gray-100' : 'border-gray-700 bg-gray-800'} flex-shrink-0`}> {/* Reduced padding */}
-           <div className="flex gap-1.5"> {/* Reduced gap */}
-             <input
-               type="text"
-               value={chatMessage}
-               onChange={(e) => setChatMessage(e.target.value)}
-               placeholder="Ask TaskMaster AI..."
-                className={`flex-1 ${inputBg} border ${isIlluminateEnabled ? 'border-gray-300' : 'border-gray-600'} rounded-full px-4 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 shadow-sm`} // Reduced padding/size
-               disabled={isChatLoading}
-             />
-             <button
-               type="submit"
-               disabled={isChatLoading || !chatMessage.trim()}
-               className="bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105 shadow-sm" // Smaller button
-               title="Send Message"
-             >
-               <Send className="w-4 h-4" /> {/* Smaller icon */}
-             </button>
-           </div>
-         </form>
-       </div>
+                {message.timer && (
+                  <div className="mt-1.5">
+                    <div className={`flex items-center space-x-2 rounded-md px-3 py-1.5 text-sm ${isIlluminateEnabled ? 'bg-blue-100/70 border border-blue-200/80' : 'bg-gray-800/60 border border-gray-600/50'}`}>
+                      <TimerIcon className={`w-4 h-4 flex-shrink-0 ${illuminateTextBlue}`} />
+                      <Timer // Ensure Timer component exists and accepts these props
+                        key={message.timer.id}
+                        initialDuration={message.timer.duration}
+                        onComplete={() => handleTimerComplete(message.timer.id)}
+                        compact={true} // Request compact rendering
+                        isIlluminateEnabled={isIlluminateEnabled}
+                      />
+                    </div>
+                  </div>
+                )}
+                {message.flashcard && (
+                  <div className="mt-1.5">
+                    <FlashcardsQuestions
+                      type="flashcard"
+                      data={message.flashcard.data}
+                      onComplete={() => {}}
+                      isIlluminateEnabled={isIlluminateEnabled}
+                    />
+                  </div>
+                )}
+                {message.question && (
+                  <div className="mt-1.5">
+                    <FlashcardsQuestions
+                      type="question"
+                      data={message.question.data}
+                      onComplete={() => {}}
+                      isIlluminateEnabled={isIlluminateEnabled}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+          {/* Loading indicator separate from message content */}
+          {isChatLoading && chatHistory[chatHistory.length - 1]?.content !== "..." && (
+             <div className="flex justify-start animate-fadeIn">
+                 <div className={`${ isIlluminateEnabled ? 'bg-gray-100 border border-gray-200/80' : 'bg-gray-700/80 border border-gray-600/50' } rounded-lg px-3 py-1.5 max-w-[85%] shadow-sm`}>
+                    <div className="flex space-x-1 p-1">
+                        <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></div>
+                        <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce delay-100"></div>
+                        <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce delay-200"></div>
+                    </div>
+                 </div>
+            </div>
+           )}
+        </div>
+
+        {/* Chat Input Form */}
+         <form onSubmit={handleChatSubmit} className={`p-2 sm:p-3 border-t ${isIlluminateEnabled ? 'border-gray-200 bg-gray-100/80' : 'border-gray-700 bg-gray-800/90'} flex-shrink-0 sticky bottom-0 backdrop-blur-sm`}>
+          <div className="flex gap-1.5 items-center">
+            <input
+              type="text"
+              value={chatMessage}
+              onChange={(e) => setChatMessage(e.target.value)}
+              placeholder="Ask TaskMaster AI..."
+               className={`flex-1 ${inputBg} border ${isIlluminateEnabled ? 'border-gray-300' : 'border-gray-600'} rounded-full px-4 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-150 shadow-sm placeholder-gray-400 dark:placeholder-gray-500 disabled:opacity-60`}
+              disabled={isChatLoading}
+              aria-label="Chat input" // Accessibility
+            />
+            <button
+              type="submit"
+              disabled={isChatLoading || !chatMessage.trim()}
+              className="bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105 active:scale-100 shadow-sm flex-shrink-0"
+              title="Send Message"
+              aria-label="Send chat message" // Accessibility
+            >
+              {isChatLoading ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              ) : (
+                  <Send className="w-4 h-4" />
+              )}
+            </button>
+          </div>
+        </form>
+      </div> {/* End AI Chat Sidebar */}
 
     </div> // End container
   );

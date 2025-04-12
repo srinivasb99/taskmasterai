@@ -1256,7 +1256,7 @@ Example: Focus on high-priority 'Submit Report' due today. Next, tackle 'Plan Pr
 Another Example: Check the overdue 'Draft Proposal' task first. Then review upcoming goals.
 Another Example: Looks clear for today. Consider planning your next project step.
 
-Overview:`; // Simplified prompt structure
+`; // Simplified prompt structure
 
             try {
                 // Using the non-streaming endpoint for overview

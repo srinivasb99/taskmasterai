@@ -1982,15 +1982,21 @@ Keep it brief, actionable, impersonal, and readable.
         isIlluminateEnabled={isIlluminateEnabled && isSidebarIlluminateEnabled}
       />
 
-      {/* AI Chat Trigger Button */}
+      {/* AI Chat Trigger Button - Positioned Bottom Right */}
       <button
         onClick={() => setIsAiSidebarOpen(true)}
-        className={`fixed top-4 ${isSidebarCollapsed ? 'right-4 md:right-6' : 'right-4 md:right-6 lg:right-8'} z-40 p-2.5 rounded-full shadow-lg transition-all duration-300 transform hover:scale-110 active:scale-100 ${
+        className={`fixed bottom-4 md:bottom-6 lg:bottom-8 ${ // Changed top-* to bottom-*
+          // Adjust right positioning based on sidebar state if needed, or keep consistent
+          // Example: Keep consistent right padding regardless of sidebar: 'right-4 md:right-6 lg:right-8'
+          // Example: Adjust based on sidebar (as originally done for top):
+          isSidebarCollapsed ? 'right-4 md:right-6' : 'right-4 md:right-6 lg:right-8'
+        } z-40 p-2.5 rounded-full shadow-lg transition-all duration-300 transform hover:scale-110 active:scale-100 ${
           isIlluminateEnabled
             ? 'bg-white border border-gray-300 text-blue-600 hover:bg-gray-100' // Light mode style
             : 'bg-gradient-to-br from-purple-600 to-indigo-600 text-white hover:from-purple-700 hover:to-indigo-700' // Dark mode style
-        } ${isAiSidebarOpen ? 'opacity-0 pointer-events-none translate-x-4' : 'opacity-100'}`} // Hide when sidebar is open
+        } ${isAiSidebarOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`} // Removed translate-x on hide for bottom position
         title="Open TaskMaster AI Chat"
+        aria-label="Open TaskMaster AI Chat" // Added aria-label
       >
         <BrainCircuit className="w-5 h-5" />
       </button>

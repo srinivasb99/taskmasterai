@@ -43,7 +43,7 @@ import { TaskAnalytics } from './TaskAnalytics'; // Ensure this component exists
 // ---------------------
 // Helper functions for Gemini integration
 // ---------------------
-const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}&alt=sse`; // Use 1.5 flash and enable SSE
+const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}&alt=sse`; // Use 1.5 flash and enable SSE
 
 const fetchWithTimeout = async (url: string, options: RequestInit, timeout = 30000) => {
   const controller = new AbortController();
@@ -523,39 +523,75 @@ ${conversationHistory}
 [NEW USER MESSAGE]
 ${userName}: ${currentMessage}
 
-You are TaskMaster, a friendly and highly productive AI assistant integrated into a task management dashboard. Your goal is to assist the user with their tasks, goals, plans, and projects, provide productivity tips, and engage in helpful conversation.
+You are TaskMaster, a friendly and versatile AI productivity assistant. Engage in casual conversation, provide productivity advice, and discuss ${userName}'s items only when explicitly asked by ${userName}.
 
 Guidelines:
 
-1.  **Primary Focus:** Help the user manage their listed items. Be proactive if the user asks vague questions like "What should I do?". Analyze their items (due dates, priorities) and suggest specific actions.
-2.  **Tone:** Friendly, encouraging, concise, and action-oriented. Match the user's tone where appropriate.
-3.  **Item Awareness:** Refer to the user's items accurately when relevant. Use information like due dates and priorities to give better advice.
-4.  **Clarity:** Provide clear, unambiguous responses. Avoid jargon unless the user uses it first.
-5.  **Conciseness:** Get straight to the point. Avoid unnecessary filler text. Short paragraphs are preferred. Use Markdown for basic formatting (like lists or bold text) where it improves readability.
-6.  **Educational Content (JSON):** If the user *explicitly* asks for flashcards or quiz questions on a specific topic, provide *only* a *single* JSON object in the specified format, wrapped in \`\`\`json ... \`\`\`. Do *not* provide JSON otherwise. Do not mix JSON with conversational text in the same response.
+1. General Conversation:
+   - Respond in a friendly, natural tone matching ${userName}'s style.
+   - Do not include any internal instructions, meta commentary, or explanations of your process.
+   - Do not include phrases such as "Here's my response to continue the conversation:"
+     or similar wording that introduces your reply.
+   - Do not include or reference code blocks for languages like Python, Bash, or any other
+     unless explicitly requested by ${userName}.
+   - Only reference ${userName}'s items if ${userName} explicitly asks about them.
+   - When discussing tasks, goals, projects, or plans, consider their priority levels and due dates.
+   - Provide specific advice based on item priorities and completion status.
 
-    Flashcard JSON format:
-    \`\`\`json
-    {
-      "type": "flashcard",
-      "data": [ { "id": "...", "question": "...", "answer": "...", "topic": "..." }, ... ]
-    }
-    \`\`\`
+2. Educational Content (JSON):
+   - If ${userName} explicitly requests educational content (flashcards or quiz questions), provide exactly one JSON object.
+   - Wrap the JSON object in a single code block using triple backticks and the "json" language identifier.
+   - Use one of the following formats:
 
-    Quiz Question JSON format:
-    \`\`\`json
-    {
-      "type": "question",
-      "data": [ { "id": "...", "question": "...", "options": [...], "correctAnswer": index, "explanation": "..." }, ... ]
-    }
-    \`\`\`
+     For flashcards:
+     {
+       "type": "flashcard",
+       "data": [
+         {
+           "id": "unique-id-1",
+           "question": "Question 1",
+           "answer": "Answer 1",
+           "topic": "Subject area"
+         },
+         {
+           "id": "unique-id-2",
+           "question": "Question 2",
+           "answer": "Answer 2",
+           "topic": "Subject area"
+         }
+       ]
+     }
 
-7.  **No Meta-Commentary:** Do not talk about yourself as an AI or explain your reasoning unless asked. Avoid phrases like "Based on your items...", "Here's what I found...", etc. Just give the answer or suggestion directly.
-8.  **No Code Blocks (Unless JSON):** Do not generate code snippets (Python, JS, etc.) unless specifically requested for educational purposes related to programming.
-9.  **Error Handling:** If you cannot fulfill a request, politely state that you cannot help with that specific query.
-10. **Response Start:** Directly start the response. Do not use greetings like "Hello" or "Hi" unless it's the very first message of a new session.
+     For quiz questions:
+     {
+       "type": "question",
+       "data": [
+         {
+           "id": "unique-id-1",
+           "question": "Question 1",
+           "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
+           "correctAnswer": 0,
+           "explanation": "Explanation 1"
+         },
+         {
+           "id": "unique-id-2",
+           "question": "Question 2",
+           "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
+           "correctAnswer": 1,
+           "explanation": "Explanation 2"
+         }
+       ]
+     }
 
-Respond directly to the NEW USER MESSAGE based on the CONTEXT and CONVERSATION HISTORY. Assistant:`;
+   - Do not include any JSON unless ${userName} explicitly requests it.
+   - The JSON must be valid, complete, and include multiple items in its "data" array.
+
+3. Response Structure:
+   - Provide a direct response to ${userName} without any extraneous openings or meta-text.
+   - Do not mix JSON with regular text. JSON is only for requested educational content.
+   - Always address ${userName} in a friendly, helpful tone.
+
+Follow these instructions strictly.`;
 
 
       // Add placeholder message for streaming UI
@@ -1248,19 +1284,39 @@ Respond directly to the NEW USER MESSAGE based on the CONTEXT and CONVERSATION H
             const firstName = userName.split(" ")[0];
 
              // Refined prompt focusing on brevity and action
-              const prompt = `Analyze these pending items for user "${firstName}" and provide a *very concise* (1-2 sentences, max 80 tokens) Smart Overview focusing on the single most immediate priority or suggestion. Format as plain text. No greetings, no fluff.
+              const prompt = `You are TaskMaster, an advanced AI productivity assistant. Analyze the following items and generate a concise Smart Overview:
 
-${formattedData}
 
-Example: Focus on high-priority 'Submit Report' due today. Next, tackle 'Plan Project Kickoff'.
-Another Example: Check the overdue 'Draft Proposal' task first. Then review upcoming goals.
-Another Example: Looks clear for today. Consider planning your next project step.
+Follow these guidelines exactly:
+1. Deliver the response as one short paragraph (2-3 sentences max)
+2. Summarize the focus of the items briefly (1 sentence, no labels like "items" or "to-do list")
+3. Include EXACTLY 3 actionable priorities based ONLY on the data provided
+4. For each priority:
+   - Reference specific tasks from the data naturally
+   - Format due dates as "Month Day" (e.g., "March 7th") if present
+   - Consider priority levels (high, medium, low) when suggesting what to focus on
+   - Suggest ONE clear, actionable next step
+   - Blend seamlessly into the paragraph
+5. Focus on practical execution, not description
+
+FORBIDDEN IN YOUR FINAL RESPONSE:
+- Addressing the user directly (e.g., "Hello", "you")
+-
+- Meta-commentary about the conversation
+- Phrases like "I understand", "I see", "I notice"
+- Explaining the process
+- Using phrases like "Based on the context", "items", "to-do list"
+- Numeric date formats (e.g., 03/07/2025)
+- Don't start of by saying something like "The tasks center on academic preparation and productivity enhancement." or "The focus is on..." or other statements. 
+
+Keep it brief, actionable, impersonal, and readable.
+<</SYS>>[/INST]
 
 `; // Simplified prompt structure
 
             try {
                 // Using the non-streaming endpoint for overview
-                const overviewEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`;
+                const overviewEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`;
                 const geminiOptions = {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },

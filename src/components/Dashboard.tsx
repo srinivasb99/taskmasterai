@@ -2190,7 +2190,7 @@ Keep it brief, actionable, impersonal, and readable.
               Smart Overview
             </h2>
             <span className="text-[9px] sm:text-[10px] bg-gradient-to-r from-pink-500 to-purple-500 text-white px-1.5 py-0.5 rounded-full font-medium">
-              AI BETA
+              BETA
             </span>
           </div>
 
@@ -2946,10 +2946,7 @@ Keep it brief, actionable, impersonal, and readable.
         >
           <h3 id="ai-sidebar-title" className={`text-base sm:text-lg font-semibold flex items-center gap-2 ${illuminateTextBlue}`}>
             <BrainCircuit className="w-5 h-5" />
-            TaskMaster AI
-            <span className="text-[9px] sm:text-[10px] bg-gradient-to-r from-pink-500 to-purple-500 text-white px-1.5 py-0.5 rounded-full font-medium">
-               BETA
-           </span>
+            Chat with TaskMaster
           </h3>
           <button
             onClick={() => setIsAiSidebarOpen(false)}

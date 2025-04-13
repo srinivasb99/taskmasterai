@@ -189,7 +189,7 @@ export async function processTextToAINoteData(text: string, userId: string): Pro
   try {
     console.log("Starting AI processing for text...");
     // 1. Generate Summary and Key Points
-    const summaryPrompt = `Analyze the following text and generate a concise summary (around 4-6 sentences) and exactly 5 distinct key points.
+    const summaryPrompt = `Analyze the following text and generate a concise summary (around 4-6 sentences) and exactly 10 distinct key points.
 
 Format your response strictly as follows:
 
@@ -202,6 +202,11 @@ Key Points:
 3. [Third key point]
 4. [Fourth key point]
 5. [Fifth key point]
+6. [Sixth key point]
+7. [Seventh key point]
+8. [Eight key point]
+9. [Ninth key point]
+10. [Tenth key point]
 
 Text to Analyze:
 ---

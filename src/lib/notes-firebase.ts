@@ -66,7 +66,7 @@ const extractCandidateText = (responseText: string): string => {
   }
 };
 
-// Use 1.5 Flash by default - generally good balance of capability and cost/speed
+// Use 1.5 Flash by default
 const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${geminiApiKey}`;
 
 // --- End Helper Functions ---
@@ -104,7 +104,6 @@ export async function savePersonalNote(userId: string, title: string, content: s
         userId,
         isPublic: false,
         tags,
-        // keyPoints and questions can be added later via processTextToAINote or regeneration
     };
     const docRef = await addDoc(collection(db, 'notes'), {
       ...noteData,
@@ -174,9 +173,9 @@ export async function toggleNotePublicStatus(noteId: string, makePublic: boolean
 }
 
 /**
- * Processes raw text using Gemini to generate summary, key points, and **10 questions**.
+ * Processes raw text using Gemini to generate summary, **10 key points**, and 10 questions.
  * Returns data ready to be saved as a 'personal' type note (or used to update one).
- * Note: This function *doesn't* save the note itself.
+ * Note: This function *doesn't* save the note itself. It exports the correct name.
  */
 export async function processTextToAINoteData(text: string, userId: string): Promise<Omit<NoteData, 'createdAt' | 'updatedAt'>> {
   if (!text.trim()) throw new Error("Input text cannot be empty.");
@@ -189,6 +188,7 @@ export async function processTextToAINoteData(text: string, userId: string): Pro
   try {
     console.log("Starting AI processing for text...");
     // 1. Generate Summary and Key Points
+    // *** CHANGED: Request 10 key points ***
     const summaryPrompt = `Analyze the following text and generate a concise summary (around 4-6 sentences) and exactly 10 distinct key points.
 
 Format your response strictly as follows:
@@ -204,7 +204,7 @@ Key Points:
 5. [Fifth key point]
 6. [Sixth key point]
 7. [Seventh key point]
-8. [Eight key point]
+8. [Eighth key point]
 9. [Ninth key point]
 10. [Tenth key point]
 
@@ -213,13 +213,14 @@ Text to Analyze:
 ${text.slice(0, 30000)}
 ---
 `;
-    console.log("Generating summary and key points...");
+    console.log("Generating summary and 10 key points...");
     const summaryOptions = {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             contents: [{ parts: [{ text: summaryPrompt }] }],
-            generationConfig: { temperature: 0.4, maxOutputTokens: 800 }
+            // Adjust tokens slightly if needed for longer key points list
+            generationConfig: { temperature: 0.4, maxOutputTokens: 1200 }
         })
     };
     const summaryResponse = await fetchWithRetry(GEMINI_ENDPOINT, summaryOptions);
@@ -227,8 +228,7 @@ ${text.slice(0, 30000)}
     const summaryRawText = extractCandidateText(summaryResponseText);
 
     if (summaryRawText.startsWith("Error:")) {
-        console.error("Summary generation failed:", summaryRawText);
-        // Proceed without throwing error, use default values
+        console.error("Summary/Key Points generation failed:", summaryRawText);
     } else {
         const summaryMatch = summaryRawText.match(/Summary:\s*([\s\S]*?)(Key Points:|---|$)/i);
         summary = summaryMatch ? summaryMatch[1].trim() : 'Could not parse summary.';
@@ -239,7 +239,8 @@ ${text.slice(0, 30000)}
                 .split('\n')
                 .map(line => line.trim().replace(/^\d+\.\s*/, ''))
                 .filter(point => point.length > 5)
-                .slice(0, 5);
+                // *** CHANGED: Parse up to 10 key points ***
+                .slice(0, 10);
              if (keyPoints.length === 0 || (keyPoints.length === 1 && !keyPoints[0])) {
                  keyPoints = ['No key points parsed from AI response.'];
              }
@@ -249,8 +250,7 @@ ${text.slice(0, 30000)}
          console.log("Summary and key points generated/parsed.");
     }
 
-    // 2. Generate Study Questions (Attempt even if summary failed)
-    // *** CHANGED: Request 10 questions ***
+    // 2. Generate Study Questions (10 questions)
     const questionsPrompt = `Based on the following text content (and key points if available), generate exactly 10 multiple-choice study questions with 4 options (A, B, C, D), the correct answer letter, and a brief explanation.
 
 Key Points (for context, if generated):
@@ -275,14 +275,13 @@ Explanation: [Brief explanation why it's correct]
 
 Generate 10 questions in this exact format, separated by '---DIVIDER---'. Ensure all 10 questions are complete and follow the format.`;
 
-    console.log("Generating study questions...");
+    console.log("Generating 10 study questions...");
     const questionsOptions = {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             contents: [{ parts: [{ text: questionsPrompt }] }],
-            // *** CHANGED: Increased token limit for 10 questions ***
-            generationConfig: { temperature: 0.5, maxOutputTokens: 3000 }
+            generationConfig: { temperature: 0.5, maxOutputTokens: 3000 } // Keep token limit sufficient
         })
     };
 
@@ -292,13 +291,10 @@ Generate 10 questions in this exact format, separated by '---DIVIDER---'. Ensure
 
     if (questionsRawText.startsWith("Error:")) {
          console.error("Questions generation failed:", questionsRawText);
-         // Proceed without throwing error, questions array will remain empty or have a placeholder
     } else {
-        // *** CHANGED: Parsing loop and logic for 10 questions ***
         const questionBlocks = questionsRawText.split(/---DIVIDER---/i);
         for (const block of questionBlocks) {
-            // *** CHANGED: Loop until 10 questions are parsed ***
-            if (questions.length >= 10) break;
+            if (questions.length >= 10) break; // Limit to 10
 
             const trimmedBlock = block.trim();
             if (!trimmedBlock) continue;
@@ -332,8 +328,6 @@ Generate 10 questions in this exact format, separated by '---DIVIDER---'. Ensure
 
         if (questions.length === 0) {
              console.warn("No valid questions parsed from AI response for text.");
-             // Add a placeholder if desired
-             // questions = [{ question: "Could not generate questions.", options: [], correctAnswer: 0, explanation: "" }];
         } else if (questions.length < 10) {
             console.warn(`Parsed only ${questions.length} out of 10 requested questions from text.`);
         } else {
@@ -343,24 +337,21 @@ Generate 10 questions in this exact format, separated by '---DIVIDER---'. Ensure
 
     // 3. Format result
     const processedNoteData: Omit<NoteData, 'createdAt' | 'updatedAt'> = {
-      title: text.split('\n')[0].slice(0, 60).trim() || 'AI Processed Note', // Use first line as title fallback
-      content: summary, // Use the generated summary as the main content
-      keyPoints,
-      questions: questions.length > 0 ? questions : undefined, // Only add if questions were generated
-      type: 'personal', // Treat AI processed text as a 'personal' note type initially
+      title: text.split('\n')[0].slice(0, 60).trim() || 'AI Processed Note',
+      content: summary,
+      keyPoints, // Now contains up to 10 key points
+      questions: questions.length > 0 ? questions : undefined,
+      type: 'personal',
       userId,
-      isPublic: false, // Default to private
-      tags: ['ai-processed'], // Auto-tag
-      sourceUrl: undefined, // No source URL for raw text input
+      isPublic: false,
+      tags: ['ai-processed'],
+      sourceUrl: undefined,
     };
     console.log("AI processing complete for text.");
     return processedNoteData;
 
   } catch (error) {
-      // Catch unexpected errors during the overall process
     console.error('Unexpected error during AI processing of text:', error);
-    // Return potentially partially processed data with error indicators if needed, or re-throw
-    // For now, we'll return the defaults set at the beginning
      const errorNoteData: Omit<NoteData, 'createdAt' | 'updatedAt'> = {
         title: text.split('\n')[0].slice(0, 60).trim() || 'AI Processing Failed',
         content: "AI processing failed to generate content.",
@@ -368,14 +359,13 @@ Generate 10 questions in this exact format, separated by '---DIVIDER---'. Ensure
         questions: [{ question: "AI processing failed.", options: [], correctAnswer: 0, explanation:"" }],
         type: 'personal', userId, isPublic: false, tags: ['ai-error']
      }
-    return errorNoteData; // Or throw error depending on desired handling
-    // throw new Error(`AI processing failed unexpectedly: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    return errorNoteData;
   }
 }
 
 
 /**
- * Regenerates **10** study questions for an existing note using Gemini.
+ * Regenerates 10 study questions for an existing note using Gemini.
  * Updates the note in Firestore directly.
  */
 export async function regenerateStudyQuestions(noteId: string, content: string): Promise<NoteData['questions']> {
@@ -384,7 +374,7 @@ export async function regenerateStudyQuestions(noteId: string, content: string):
 
    console.log(`Regenerating 10 questions for note: ${noteId}`);
   try {
-    // *** CHANGED: Request 10 questions ***
+    // Request 10 questions
     const questionsPrompt = `Based on the following note content, generate exactly 10 multiple-choice study questions with 4 options (A, B, C, D), the correct answer letter, and a brief explanation.
 
 Note Content:
@@ -411,8 +401,7 @@ Generate 10 questions in this exact format, separated by '---DIVIDER---'. Ensure
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             contents: [{ parts: [{ text: questionsPrompt }] }],
-            // *** CHANGED: Increased token limit for 10 questions ***
-            generationConfig: { temperature: 0.5, maxOutputTokens: 3000 }
+            generationConfig: { temperature: 0.5, maxOutputTokens: 3000 } // Keep token limit sufficient
         })
     };
 
@@ -425,16 +414,14 @@ Generate 10 questions in this exact format, separated by '---DIVIDER---'. Ensure
     }
 
     let newQuestions: NoteData['questions'] = [];
-    // *** CHANGED: Parsing loop and logic for 10 questions ***
+    // Parse up to 10 questions
     const questionBlocks = questionsRawText.split(/---DIVIDER---/i);
     for (const block of questionBlocks) {
-        // *** CHANGED: Loop until 10 questions are parsed ***
-        if (newQuestions.length >= 10) break;
+        if (newQuestions.length >= 10) break; // Limit to 10
 
         const trimmedBlock = block.trim();
         if (!trimmedBlock) continue;
 
-        // Use the same robust parsing logic
         const questionMatch = trimmedBlock.match(/^Question:\s*([\s\S]*?)\s*A\)/i);
         const optionsMatch = trimmedBlock.match(/A\)\s*(.*?)\s*B\)\s*(.*?)\s*C\)\s*(.*?)\s*D\)\s*(.*?)\s*Correct:/is);
         const correctMatch = trimmedBlock.match(/Correct:\s*([A-D])\b/i);
@@ -463,7 +450,6 @@ Generate 10 questions in this exact format, separated by '---DIVIDER---'. Ensure
     } // End for loop
 
     if (newQuestions.length === 0) {
-        // Check if the raw response had *any* indication of questions
          if (questionsRawText.toLowerCase().includes("question:")) {
               throw new Error(`Failed to parse any valid questions during regeneration, although response seemed to contain question text.`);
          } else {
@@ -471,7 +457,6 @@ Generate 10 questions in this exact format, separated by '---DIVIDER---'. Ensure
          }
     } else if (newQuestions.length < 10) {
          console.warn(`Successfully regenerated only ${newQuestions.length} out of 10 requested questions for note ${noteId}.`);
-         // Proceed with updating the note with the questions that were parsed
     } else {
         console.log(`Successfully regenerated 10 questions for note ${noteId}.`);
     }
@@ -479,7 +464,7 @@ Generate 10 questions in this exact format, separated by '---DIVIDER---'. Ensure
     // Update the note in Firestore
     const noteRef = doc(db, 'notes', noteId);
     await updateDoc(noteRef, {
-      questions: newQuestions, // Update with the successfully parsed questions
+      questions: newQuestions,
       updatedAt: Timestamp.now()
     });
 
@@ -488,7 +473,6 @@ Generate 10 questions in this exact format, separated by '---DIVIDER---'. Ensure
 
   } catch (error) {
     console.error(`Error regenerating questions for note ${noteId}:`, error);
-    // Rethrow the error so the calling UI can handle it
     throw new Error(`Failed to regenerate questions: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }

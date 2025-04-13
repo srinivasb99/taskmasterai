@@ -7,7 +7,8 @@ import { createWorker } from 'tesseract.js';
 import { v4 as uuidv4 } from 'uuid';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from './firebase';
-import { geminiApiKey } from './dashboard-firebase'; // Assuming this correctly exports the key
+// Assuming geminiApiKey is correctly imported or passed elsewhere
+// For this example, let's assume it's passed as an argument like geminiKey below
 
 // Set PDF.js worker source (Ensure this path is correct for your setup)
 GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`; // Example CDN path
@@ -69,14 +70,17 @@ const extractCandidateText = (responseText: string): string => {
     // Check for error messages within the response
     if (jsonResponse?.error?.message) {
         console.error("Gemini API Error in response:", jsonResponse.error.message);
-        // Decide if you want to return the error message or throw an error
-        // Returning it might be useful for the UI progress indicator
+        // Return the error message for handling upstream
         return `Error: ${jsonResponse.error.message}`;
-        // Or throw new Error(`Gemini API Error: ${jsonResponse.error.message}`);
     }
     // Handle cases where the response might be valid JSON but doesn't contain text (e.g., safety ratings only)
+     if (jsonResponse?.candidates?.[0]?.finishReason && jsonResponse.candidates[0].finishReason !== 'STOP') {
+        console.warn(`Gemini generation finished unexpectedly: ${jsonResponse.candidates[0].finishReason}`, jsonResponse);
+        return `Error: Generation stopped due to ${jsonResponse.candidates[0].finishReason}`;
+     }
+
      console.warn("Gemini response parsed but no candidate text found:", jsonResponse);
-    return ""; // Return empty or a placeholder if no text found
+     return "Error: No text content found in AI response."; // Return error if no text and no specific API error
 
   } catch (err) {
     // This catches JSON parsing errors or unexpected structures
@@ -87,16 +91,16 @@ const extractCandidateText = (responseText: string): string => {
   }
 };
 
-// Gemini API endpoint using flash model
-const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`;
 
 export async function processPDF(
   file: File,
   userId: string,
-  geminiKey: string, // Explicitly accept key
+  geminiApiKey: string, // Accept the key directly
   onProgress: (progress: ProcessingProgress) => void
 ): Promise<ProcessedPDF> {
   const safeProgress = typeof onProgress === 'function' ? onProgress : () => {};
+  // Construct the endpoint URL using the provided key
+  const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${geminiApiKey}`; // Use 1.5 flash
 
   try {
     safeProgress({ progress: 0, status: 'Starting PDF processing...', error: null });
@@ -138,7 +142,7 @@ export async function processPDF(
     extractedText = extractedText.replace(/\s{3,}/g, ' ').trim();
 
     // 4. Check if OCR is needed (very little text extracted)
-    if (extractedText.length < 100 * numPages) { // Heuristic: less than 100 chars per page avg might need OCR
+    if (extractedText.length < 100 * numPages && numPages > 0) { // Heuristic + ensure pages > 0
       safeProgress({ progress: 40, status: 'Low text detected, attempting OCR...', error: null });
       let ocrText = '';
       const worker = await createWorker('eng'); // Initialize worker once
@@ -206,7 +210,7 @@ Text to Analyze:
 ---
 ${extractedText.slice(0, 30000)}
 ---
-`; // Limit input size (Gemini Flash context window is large, but keep it reasonable)
+`; // Limit input size
 
     const summaryOptions = {
       method: 'POST',
@@ -227,32 +231,36 @@ ${extractedText.slice(0, 30000)}
       summaryText = extractCandidateText(summaryResponseText); // Parse/extract
 
       if (summaryText.startsWith("Error:")) {
-          throw new Error(summaryText); // Propagate API error
+          // Don't throw here, allow fallback summary/key points and proceed
+          console.error("Summary generation failed:", summaryText);
+          safeProgress({ progress: 80, status: 'Summary generation failed. Generating questions...', error: summaryText });
+      } else {
+          // Parse summary and key points carefully
+          const summaryMatch = summaryText.match(/Summary:\s*([\s\S]*?)(Key Points:|---|$)/i);
+          summary = summaryMatch ? summaryMatch[1].trim() : 'Could not parse summary.';
+
+          const keyPointsMatch = summaryText.match(/Key Points:\s*([\s\S]*)/i);
+          if (keyPointsMatch) {
+            keyPoints = keyPointsMatch[1]
+              .split('\n')
+              .map(line => line.trim().replace(/^\d+\.\s*/, '')) // Remove numbering
+              .filter(point => point.length > 5) // Filter out empty/short lines
+              .slice(0, 5); // Ensure max 5 points
+            if (keyPoints.length === 0) keyPoints = ['No key points parsed.'];
+          }
+          safeProgress({ progress: 80, status: 'Generating study questions...', error: null });
       }
 
-      // Parse summary and key points carefully
-      const summaryMatch = summaryText.match(/Summary:\s*([\s\S]*?)(Key Points:|---|$)/i);
-      summary = summaryMatch ? summaryMatch[1].trim() : 'Could not parse summary.';
-
-      const keyPointsMatch = summaryText.match(/Key Points:\s*([\s\S]*)/i);
-      if (keyPointsMatch) {
-        keyPoints = keyPointsMatch[1]
-          .split('\n')
-          .map(line => line.trim().replace(/^\d+\.\s*/, '')) // Remove numbering
-          .filter(point => point.length > 5) // Filter out empty/short lines
-          .slice(0, 5); // Ensure max 5 points
-        if (keyPoints.length === 0) keyPoints = ['No key points parsed.'];
-      }
-
-      safeProgress({ progress: 80, status: 'Generating study questions...', error: null });
     } catch (summaryError) {
-      console.error('Summary/Key Points generation error:', summaryError);
+      console.error('Summary/Key Points generation fetch/network error:', summaryError);
       safeProgress({
         progress: 80, // Still move to next step
         status: 'Summary generation failed. Generating questions...',
         error: summaryError instanceof Error ? summaryError.message : 'Unknown summary error'
       });
     }
+
+    // --- Start of Question Generation Changes ---
 
     // 6. Generate Study Questions using Gemini
     const questionsPrompt = `Based on the following text content (and key points if available), generate exactly 10 multiple-choice study questions with 4 options (A, B, C, D), the correct answer letter, and a brief explanation.
@@ -277,14 +285,17 @@ Explanation: [Brief explanation why it's correct]
 
 ---DIVIDER---
 
-Generate 3 questions in this exact format, separated by '---DIVIDER---'.`;
+Generate 10 questions in this exact format, separated by '---DIVIDER---'. Ensure all 10 questions are complete and follow the format.`; // *** CHANGED: Ask for 10 and reinforce format ***
 
     const questionsOptions = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ parts: [{ text: questionsPrompt }] }],
-        generationConfig: { temperature: 0.5, maxOutputTokens: 1500 }
+        generationConfig: {
+            temperature: 0.5,
+            maxOutputTokens: 2500 // *** CHANGED: Increased token limit for 10 questions ***
+        }
       })
     };
 
@@ -295,41 +306,52 @@ Generate 3 questions in this exact format, separated by '---DIVIDER---'.`;
       const questionsRawText = extractCandidateText(questionsResponseText);
 
        if (questionsRawText.startsWith("Error:")) {
-          throw new Error(questionsRawText); // Propagate API error
+          throw new Error(questionsRawText); // Propagate API or parsing error
       }
 
       // Parse questions carefully
       const questionBlocks = questionsRawText.split(/---DIVIDER---/i);
 
       for (const block of questionBlocks) {
-        if (questions.length >= 3) break; // Stop after getting 3 questions
+        // *** CHANGED: Loop until 10 questions are successfully parsed ***
+        if (questions.length >= 10) break;
 
-        const questionMatch = block.match(/Question:\s*([\s\S]*?)(A\)|$)/i);
-        const optionsMatch = block.match(/A\)\s*(.*?)\s*B\)\s*(.*?)\s*C\)\s*(.*?)\s*D\)\s*(.*?)\s*(Correct:|$)/is);
-        const correctMatch = block.match(/Correct:\s*([A-D])/i);
-        const explanationMatch = block.match(/Explanation:\s*([\s\S]*)/i);
+        const trimmedBlock = block.trim();
+        if (!trimmedBlock) continue; // Skip empty blocks
+
+        const questionMatch = trimmedBlock.match(/^Question:\s*([\s\S]*?)\s*A\)/i);
+        const optionsMatch = trimmedBlock.match(/A\)\s*(.*?)\s*B\)\s*(.*?)\s*C\)\s*(.*?)\s*D\)\s*(.*?)\s*Correct:/is);
+        const correctMatch = trimmedBlock.match(/Correct:\s*([A-D])/i);
+        const explanationMatch = trimmedBlock.match(/Explanation:\s*([\s\S]*?)(?:---DIVIDER---|$)/i); // Match until next divider or end
 
         if (questionMatch && optionsMatch && correctMatch && explanationMatch) {
             const questionText = questionMatch[1].trim();
-            const optionsList = [optionsMatch[1], optionsMatch[2], optionsMatch[3], optionsMatch[4]].map(opt => opt.trim());
+            // Ensure options are captured correctly, even if multi-line before the next letter
+            const optionsList = [optionsMatch[1], optionsMatch[2], optionsMatch[3], optionsMatch[4]].map(opt => opt.trim().replace(/\s*B\)$|\s*C\)$|\s*D\)$|\s*Correct:$/is, '').trim()); // Clean up trailing markers if captured
             const correctLetter = correctMatch[1].toUpperCase();
             const explanationText = explanationMatch[1].trim();
 
-             if (questionText && optionsList.every(o => o) && ['A', 'B', 'C', 'D'].includes(correctLetter) && explanationText) {
+             if (questionText && optionsList.length === 4 && optionsList.every(o => o) && ['A', 'B', 'C', 'D'].includes(correctLetter) && explanationText) {
                 questions.push({
                   question: questionText,
                   options: optionsList,
                   correctAnswer: ['A', 'B', 'C', 'D'].indexOf(correctLetter),
                   explanation: explanationText,
                 });
+            } else {
+                 console.warn("Partially parsed question block (missing data):", { questionText, optionsList, correctLetter, explanationText, block: trimmedBlock });
             }
         } else {
-             console.warn("Could not parse question block:", block);
+             console.warn("Could not parse question block structure:", trimmedBlock);
         }
       }
 
+      // Check if we got *any* questions, even if fewer than 10
       if (questions.length === 0) {
            throw new Error("No valid questions parsed from AI response.");
+      } else if (questions.length < 10) {
+          console.warn(`Successfully parsed only ${questions.length} out of 10 requested questions.`);
+          // Proceed with the questions that were parsed
       }
 
       safeProgress({ progress: 95, status: 'Finalizing note...', error: null });
@@ -341,14 +363,18 @@ Generate 3 questions in this exact format, separated by '---DIVIDER---'.`;
         status: 'Questions generation failed.',
         error: questionsError instanceof Error ? questionsError.message : 'Unknown questions error'
       });
-      // Provide default placeholder question if generation fails
-      questions = [{
-        question: 'Study questions could not be generated for this document.',
-        options: ['Ok', 'Understood', 'Review Manually', 'N/A'],
-        correctAnswer: 0,
-        explanation: 'The AI failed to generate questions based on the content.'
-      }];
+      // Provide default placeholder question if generation fails *completely*
+      if (questions.length === 0) {
+          questions = [{
+            question: 'Study questions could not be generated for this document.',
+            options: ['Ok', 'Understood', 'Review Manually', 'N/A'],
+            correctAnswer: 0,
+            explanation: 'The AI failed to generate questions based on the content or the response could not be parsed.'
+          }];
+      }
     }
+    // --- End of Question Generation Changes ---
+
 
     // 7. Return Processed Data
     safeProgress({ progress: 100, status: 'Processing complete!', error: null });
@@ -356,7 +382,7 @@ Generate 3 questions in this exact format, separated by '---DIVIDER---'.`;
       title: file.name.replace(/\.pdf$/i, ''), // Remove .pdf extension case-insensitively
       content: summary, // Use the generated summary as the main content
       keyPoints,
-      questions,
+      questions, // Contains up to 10 questions, or fewer if parsing failed/AI returned less, or default if error
       sourceUrl: pdfUrl,
       // extractedText: extractedText // Optionally return full text
     };

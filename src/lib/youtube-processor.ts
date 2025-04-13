@@ -30,7 +30,7 @@ const YOUTUBE_API_KEY = 'AIzaSyD4iosX8Y1X4bOThSGhYyUfCmWKBEkc6x4'; // Replace wi
 
 // Construct Gemini endpoint using the imported key
 // Using 1.5 Flash as it's generally faster and cheaper for these tasks
-const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-latest:generateContent?key=${geminiApiKey}`;
+const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`;
 
 // Helper function to delay execution
 function sleep(ms: number): Promise<void> {

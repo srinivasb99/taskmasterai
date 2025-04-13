@@ -2403,8 +2403,16 @@ export function Folders() {
                                                                       <span className={`text-[9px] font-medium px-1 py-0 rounded-full whitespace-nowrap mr-1 ${folderTypeColors[sub.type]}`}>
                                                                          {sub.itemCount || 0}
                                                                       </span>
-                                                                       {/* Corrected Comment - Removed problematic syntax */}
-                                                                       {/* <button onClick={(e) => { e.stopPropagation(); /* eslint-disable-line */ }} className={`p-0.5 rounded ${iconColor}`}><Edit className="w-2.5 h-2.5" /></button> */}
+<button
+  onClick={(e) => {
+    e.stopPropagation();
+    handleEditSubFolder(folder.id, sub.id);
+  }}
+  className={`p-0.5 rounded ${iconColor}`}
+  title="Edit Subfolder"
+>
+  <Edit className="w-2.5 h-2.5" />
+</button>
                                                                        <button onClick={(e) => { e.stopPropagation(); handleDeleteSubFolder(folder.id, sub.id); }} className={`p-0.5 rounded ${isIlluminateEnabled ? 'text-red-500 hover:bg-red-100' : 'text-red-500 hover:bg-red-900/50'}`} title="Delete Subfolder"><Trash className="w-2.5 h-2.5" /></button>
                                                                   </div>
                                                              </div>

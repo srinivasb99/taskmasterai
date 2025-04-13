@@ -88,7 +88,7 @@ const extractCandidateText = (responseText: string): string => {
 };
 
 // Gemini API endpoint using flash model
-const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`;
+const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`;
 
 export async function processPDF(
   file: File,
@@ -255,7 +255,7 @@ ${extractedText.slice(0, 30000)}
     }
 
     // 6. Generate Study Questions using Gemini
-    const questionsPrompt = `Based on the following text content (and key points if available), generate exactly 3 multiple-choice study questions with 4 options (A, B, C, D), the correct answer letter, and a brief explanation.
+    const questionsPrompt = `Based on the following text content (and key points if available), generate exactly 10 multiple-choice study questions with 4 options (A, B, C, D), the correct answer letter, and a brief explanation.
 
 Key Points (for context):
 ${keyPoints.join('\n')}

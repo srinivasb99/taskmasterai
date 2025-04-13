@@ -540,7 +540,7 @@ export function Notes() {
     try {
       // Step 1: Process text using AI
       setUploadProgress(prev => ({ ...prev, progress: 20 }));
-      const processedText = await processTextToAINote(text, user.uid, geminiApiKey);
+      const processedText = await processTextToAINoteData(text, user.uid, geminiApiKey);
 
       // Step 2: Save the processed note
       setUploadProgress(prev => ({ ...prev, progress: 80, status: 'Saving note...' }));

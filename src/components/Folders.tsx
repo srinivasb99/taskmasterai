@@ -47,7 +47,7 @@ import "katex/dist/katex.min.css";
 // Gemini Integration (Reusing from Dashboard.tsx with minor tweaks)
 // ---------------------
 // Use 1.5 flash and enable SSE - Adjust model if needed
-const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}&alt=sse`; // Updated model
+const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}&alt=sse`; // Updated model
 
 const fetchWithTimeout = async (url: string, options: RequestInit, timeout = 30000) => {
     const controller = new AbortController();
@@ -835,6 +835,10 @@ export function Folders() {
       setIsCreatingSubFolder(true); // Open the form
       setIsCreatingFolder(false); // Ensure top-level form is closed
       setEditingFolderId(null);
+      // Also close other right-pane forms
+      setIsAddingItem(false);
+      setEditingItem(null);
+      setShowImportModal(false);
       // Move focus to the form? Optional.
   };
 
@@ -2270,7 +2274,7 @@ export function Folders() {
                          <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-1.5">
                              {/* Create/Edit Top-Level Folder Form */}
                              <AnimatePresence>
-                                {(isCreatingFolder || (editingFolderId && !subFolderParent)) && ( // Show only if creating top-level or editing a folder (and not inside subfolder creation flow)
+                                {(isCreatingFolder || (editingFolderId && !subFolderParent && !isCreatingSubFolder)) && ( // Refined condition
                                 <motion.div
                                     initial={{ height: 0, opacity: 0 }}
                                     animate={{ height: 'auto', opacity: 1 }}
@@ -2356,7 +2360,7 @@ export function Folders() {
                                                      >
                                                           <button onClick={() => { handleSelectFolder(folder); setActiveDropdownId(null); }} className={`w-full text-left px-3 py-1.5 text-xs flex items-center ${illuminateBgHover}`}><FileText className="w-3.5 h-3.5 mr-1.5" />View Content</button>
                                                           <button onClick={() => { handleToggleStar(folder.id); setActiveDropdownId(null); }} className={`w-full text-left px-3 py-1.5 text-xs flex items-center ${illuminateBgHover}`}><Star className="w-3.5 h-3.5 mr-1.5" />{folder.isStarred ? "Unstar" : "Star"}</button>
-                                                          <button onClick={() => { resetFolderForm(); setEditingFolderId(folder.id); setNewFolderName(folder.name); setNewFolderDescription(folder.description || ""); setNewFolderType(folder.type); setNewFolderTags(folderTagsMap[folder.id] || []); setIsCreatingFolder(true); setIsCreatingSubFolder(false); /* Open top-level form for editing */ setActiveDropdownId(null); }} className={`w-full text-left px-3 py-1.5 text-xs flex items-center ${illuminateBgHover}`}><Edit className="w-3.5 h-3.5 mr-1.5" />Edit</button>
+                                                           <button onClick={() => { resetFolderForm(); setEditingFolderId(folder.id); setNewFolderName(folder.name); setNewFolderDescription(folder.description || ""); setNewFolderType(folder.type); setNewFolderTags(folderTagsMap[folder.id] || []); setIsCreatingFolder(true); /* Open top-level form for editing */ setIsCreatingSubFolder(false); setSubFolderParent(null); setActiveDropdownId(null); }} className={`w-full text-left px-3 py-1.5 text-xs flex items-center ${illuminateBgHover}`}><Edit className="w-3.5 h-3.5 mr-1.5" />Edit</button>
                                                           <button onClick={() => { handleDeleteFolder(folder.id); setActiveDropdownId(null); }} className={`w-full text-left px-3 py-1.5 text-xs flex items-center ${isIlluminateEnabled ? 'text-red-600 hover:bg-red-50' : 'text-red-400 hover:bg-red-900/30'}`}><Trash className="w-3.5 h-3.5 mr-1.5" />Delete</button>
                                                       </motion.div>
                                                  )}
@@ -2394,14 +2398,14 @@ export function Folders() {
                                                                       <Folder className="w-3 h-3 mr-1 flex-shrink-0 opacity-70"/>
                                                                       <span className="truncate">{sub.name}</span>
                                                                   </div>
-                                                                  {/* Subfolder Actions (Delete Only?) */}
+                                                                  {/* Subfolder Actions */}
                                                                   <div className="flex items-center flex-shrink-0">
                                                                       <span className={`text-[9px] font-medium px-1 py-0 rounded-full whitespace-nowrap mr-1 ${folderTypeColors[sub.type]}`}>
                                                                          {sub.itemCount || 0}
                                                                       </span>
-                                                                       {/* Edit Subfolder? Might need a dedicated edit subfolder form/state */}
-                                                                       {/* <button onClick={(e) => { e.stopPropagation(); /* Handle Edit Sub */ }} className={`p-0.5 rounded ${iconColor}`}><Edit className="w-2.5 h-2.5" /></button> */}
-                                                                      <button onClick={(e) => { e.stopPropagation(); handleDeleteSubFolder(folder.id, sub.id); }} className={`p-0.5 rounded ${isIlluminateEnabled ? 'text-red-500 hover:bg-red-100' : 'text-red-500 hover:bg-red-900/50'}`} title="Delete Subfolder"><Trash className="w-2.5 h-2.5" /></button>
+                                                                       {/* Corrected Comment - Removed problematic syntax */}
+                                                                       {/* <button onClick={(e) => { e.stopPropagation(); /* TODO: Handle Edit Subfolder */ }} className={`p-0.5 rounded ${iconColor}`}><Edit className="w-2.5 h-2.5" /></button> */}
+                                                                       <button onClick={(e) => { e.stopPropagation(); handleDeleteSubFolder(folder.id, sub.id); }} className={`p-0.5 rounded ${isIlluminateEnabled ? 'text-red-500 hover:bg-red-100' : 'text-red-500 hover:bg-red-900/50'}`} title="Delete Subfolder"><Trash className="w-2.5 h-2.5" /></button>
                                                                   </div>
                                                              </div>
                                                          ))
@@ -2746,7 +2750,7 @@ export function Folders() {
              </div>
 
              {/* Chat History Area */}
-              <div className="flex-1 overflow-y-auto p-3 space-y-3 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800/50" ref={chatEndRef}>
+              <div className="flex-1 overflow-y-auto p-3 space-y-3 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800/50" >
                  {chatHistory.map((message) => (
                      <motion.div
                          key={message.id} // Use unique ID for key
@@ -2791,7 +2795,7 @@ export function Folders() {
                          </div>
                      </motion.div>
                  ))}
-                  <div ref={chatEndRef} /> {/* Element to scroll to */}
+                  <div ref={chatEndRef} className="h-0"/> {/* Element to scroll to - ensure it has no height */}
              </div>
 
              {/* Suggestion Buttons */}

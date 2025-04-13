@@ -8,6 +8,7 @@ import {
   ChevronRight,
   AlertTriangle,
   Tag,
+  Sparkles,
   Loader2, // Added for loading state
   Briefcase // Changed icon for Personal Note
 } from 'lucide-react';

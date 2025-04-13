@@ -1283,36 +1283,16 @@ Follow these instructions strictly.`;
 
             const firstName = userName.split(" ")[0];
 
-        const prompt = `[INST] <<SYS>>
-You are TaskMaster, an advanced AI productivity assistant. Analyze the following items and generate a concise Smart Overview:
+             // Refined prompt focusing on brevity and action
+              const prompt = `Analyze these pending items for user "${firstName}" and provide a *very concise* (1-2 sentences, max 80 tokens) Smart Overview focusing on the single most immediate priority or suggestion. Format as plain text. No greetings, no fluff.
 
 ${formattedData}
 
-Follow these guidelines exactly:
-1. Deliver the response as one short paragraph (2-3 sentences max)
-2. Summarize the focus of the items briefly (1 sentence, no labels like "items" or "to-do list")
-3. Include EXACTLY 3 actionable priorities based ONLY on the data provided
-4. For each priority:
-   - Reference specific tasks from the data naturally
-   - Format due dates as "Month Day" (e.g., "March 7th") if present
-   - Consider priority levels (high, medium, low) when suggesting what to focus on
-   - Suggest ONE clear, actionable next step
-   - Blend seamlessly into the paragraph
-5. Focus on practical execution, not description
+Example: Focus on high-priority 'Submit Report' due today. Next, tackle 'Plan Project Kickoff'.
+Another Example: Check the overdue 'Draft Proposal' task first. Then review upcoming goals.
+Another Example: Looks clear for today. Consider planning your next project step.
 
-FORBIDDEN IN YOUR FINAL RESPONSE:
-- Addressing the user directly (e.g., "Hello", "you")
--
-- Meta-commentary about the conversation
-- Phrases like "I understand", "I see", "I notice"
-- Explaining the process
-- Using phrases like "Based on the context", "items", "to-do list"
-- Numeric date formats (e.g., 03/07/2025)
-- Don't start of by saying something like "The tasks center on academic preparation and productivity enhancement." or "The focus is on..." or other statements. 
-
-Keep it brief, actionable, impersonal, and readable.
-<</SYS>>[/INST]
-`;
+`; // Simplified prompt structure
 
             try {
                 // Using the non-streaming endpoint for overview

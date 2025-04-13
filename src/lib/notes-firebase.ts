@@ -23,7 +23,19 @@ interface NoteData {
   updatedAt?: Timestamp; // Optional for updates
 }
 
-// --- Helper Functions (Assume these are correct and consistent) ---
+// --- Helper Functions ---
+
+// Helper function to remove properties with undefined values
+function removeUndefinedFields(obj: any): any {
+    const newObj: any = {};
+    Object.keys(obj).forEach(key => {
+        if (obj[key] !== undefined) {
+            newObj[key] = obj[key];
+        }
+    });
+    return newObj;
+}
+
 async function fetchWithRetry(url: string, options: RequestInit, retries = 3, delayMs = 3000): Promise<Response> {
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
@@ -73,13 +85,23 @@ const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models
 
 
 /**
- * Saves a new note (typically generated from PDF/YouTube/Audio) to Firestore.
+ * Saves a new note (typically generated from PDF/YouTube/Audio or processed text) to Firestore.
+ * Cleans data before saving to prevent Firestore errors with undefined values.
  */
 export async function saveNote(noteData: Omit<NoteData, 'createdAt' | 'updatedAt'>) {
   if (!geminiApiKey) throw new Error("Gemini API Key not configured for saving note.");
   try {
+    // Clean the object to remove undefined fields before saving
+    const dataToSave = removeUndefinedFields(noteData);
+
+    // Ensure required fields are present after cleaning (add more checks if needed)
+    if (!dataToSave.title || !dataToSave.content || !dataToSave.userId || !dataToSave.type) {
+        console.error("Missing required fields after cleaning data:", dataToSave);
+        throw new Error("Cannot save note: Missing required fields (title, content, userId, type).");
+    }
+
     const docRef = await addDoc(collection(db, 'notes'), {
-      ...noteData,
+      ...dataToSave, // Use the cleaned object
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now()
     });
@@ -87,6 +109,11 @@ export async function saveNote(noteData: Omit<NoteData, 'createdAt' | 'updatedAt
     return docRef.id;
   } catch (error) {
     console.error('Error saving note:', error);
+    // Provide more context if it's a FirebaseError
+    if (error instanceof Error && error.message.includes('invalid data')) {
+         console.error('Invalid data details (before cleaning):', noteData); // Log original data for debugging
+         throw new Error(`Failed to save note: Firestore rejected data. Check console logs for details. Original Error: ${error.message}`);
+    }
     throw new Error(`Failed to save note: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
@@ -97,7 +124,8 @@ export async function saveNote(noteData: Omit<NoteData, 'createdAt' | 'updatedAt
 export async function savePersonalNote(userId: string, title: string, content: string, tags: string[] = []) {
   if (!geminiApiKey) throw new Error("Gemini API Key not configured for saving personal note.");
   try {
-    const noteData: Omit<NoteData, 'createdAt' | 'updatedAt'> = {
+    // Personal notes generally don't have undefined optional fields initially
+    const noteData: Omit<NoteData, 'createdAt' | 'updatedAt' | 'keyPoints' | 'questions' | 'sourceUrl'> = {
         title: title.trim() || 'Untitled Note',
         content: content.trim(),
         type: 'personal',
@@ -105,6 +133,7 @@ export async function savePersonalNote(userId: string, title: string, content: s
         isPublic: false,
         tags,
     };
+    // No need to clean this specific object as undefined fields are explicitly omitted
     const docRef = await addDoc(collection(db, 'notes'), {
       ...noteData,
       createdAt: Timestamp.now(),
@@ -120,19 +149,41 @@ export async function savePersonalNote(userId: string, title: string, content: s
 
 /**
  * Updates an existing note in Firestore.
+ * Cleans update data before sending to prevent Firestore errors with undefined values.
  */
 export async function updateNote(noteId: string, updates: Partial<Omit<NoteData, 'userId' | 'createdAt'>>) {
   if (!noteId) throw new Error("Note ID is required for update.");
   if (!geminiApiKey) throw new Error("Gemini API Key not configured for updating note.");
+  if (Object.keys(updates).length === 0) {
+      console.warn("updateNote called with empty updates object.");
+      return; // Nothing to update
+  }
   try {
+    // Clean the updates object to remove undefined fields before updating
+    const dataToUpdate = removeUndefinedFields(updates);
+
+    // Ensure there's still something to update after cleaning
+    if (Object.keys(dataToUpdate).length === 0) {
+         console.warn("updateNote called but all update fields were undefined after cleaning.");
+         // If you want to update just the timestamp even if other fields are undefined,
+         // you could add `dataToUpdate.updatedAt = Timestamp.now()` here,
+         // but the current logic updates it within the updateDoc call.
+         // For now, just return if no actual field changes.
+         return;
+    }
+
     const noteRef = doc(db, 'notes', noteId);
     await updateDoc(noteRef, {
-      ...updates,
+      ...dataToUpdate, // Use the cleaned object
       updatedAt: Timestamp.now() // Always update the timestamp
     });
     console.log("Note updated:", noteId);
   } catch (error) {
     console.error('Error updating note:', error);
+     if (error instanceof Error && error.message.includes('invalid data')) {
+         console.error('Invalid update data details (before cleaning):', updates); // Log original data for debugging
+         throw new Error(`Failed to update note ${noteId}: Firestore rejected data. Check console logs for details. Original Error: ${error.message}`);
+    }
     throw new Error(`Failed to update note ${noteId}: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
@@ -161,6 +212,7 @@ export async function toggleNotePublicStatus(noteId: string, makePublic: boolean
   if (!geminiApiKey) throw new Error("Gemini API Key not configured for toggling public status.");
   try {
     const noteRef = doc(db, 'notes', noteId);
+    // No need to clean here, `isPublic` is boolean
     await updateDoc(noteRef, {
       isPublic: makePublic,
       updatedAt: Timestamp.now()
@@ -174,21 +226,20 @@ export async function toggleNotePublicStatus(noteId: string, makePublic: boolean
 
 /**
  * Processes raw text using Gemini to generate summary, **10 key points**, and 10 questions.
- * Returns data ready to be saved as a 'personal' type note (or used to update one).
- * Note: This function *doesn't* save the note itself. It exports the correct name.
+ * Returns data ready to be saved (use `saveNote` afterwards).
+ * Exports the correct function name.
  */
 export async function processTextToAINoteData(text: string, userId: string): Promise<Omit<NoteData, 'createdAt' | 'updatedAt'>> {
   if (!text.trim()) throw new Error("Input text cannot be empty.");
   if (!geminiApiKey) throw new Error("Gemini API Key is required for AI processing.");
 
   let summary = 'Summary could not be generated.';
-  let keyPoints: string[] = ['Key points could not be generated.'];
-  let questions: NoteData['questions'] = [];
+  let keyPoints: string[] | undefined = undefined; // Initialize as undefined
+  let questions: NoteData['questions'] = undefined; // Initialize as undefined
 
   try {
     console.log("Starting AI processing for text...");
     // 1. Generate Summary and Key Points
-    // *** CHANGED: Request 10 key points ***
     const summaryPrompt = `Analyze the following text and generate a concise summary (around 4-6 sentences) and exactly 10 distinct key points.
 
 Format your response strictly as follows:
@@ -219,8 +270,7 @@ ${text.slice(0, 30000)}
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             contents: [{ parts: [{ text: summaryPrompt }] }],
-            // Adjust tokens slightly if needed for longer key points list
-            generationConfig: { temperature: 0.4, maxOutputTokens: 1200 }
+            generationConfig: { temperature: 0.4, maxOutputTokens: 1200 } // Increased slightly for 10 points
         })
     };
     const summaryResponse = await fetchWithRetry(GEMINI_ENDPOINT, summaryOptions);
@@ -229,20 +279,24 @@ ${text.slice(0, 30000)}
 
     if (summaryRawText.startsWith("Error:")) {
         console.error("Summary/Key Points generation failed:", summaryRawText);
+        summary = `Summary/Key Points generation failed: ${summaryRawText}`;
+        keyPoints = ["Generation failed."]; // Provide fallback content
     } else {
         const summaryMatch = summaryRawText.match(/Summary:\s*([\s\S]*?)(Key Points:|---|$)/i);
         summary = summaryMatch ? summaryMatch[1].trim() : 'Could not parse summary.';
 
         const keyPointsMatch = summaryRawText.match(/Key Points:\s*([\s\S]*)/i);
         if (keyPointsMatch) {
-            keyPoints = keyPointsMatch[1]
+            const parsedPoints = keyPointsMatch[1]
                 .split('\n')
                 .map(line => line.trim().replace(/^\d+\.\s*/, ''))
                 .filter(point => point.length > 5)
-                // *** CHANGED: Parse up to 10 key points ***
-                .slice(0, 10);
-             if (keyPoints.length === 0 || (keyPoints.length === 1 && !keyPoints[0])) {
-                 keyPoints = ['No key points parsed from AI response.'];
+                .slice(0, 10); // Get up to 10 points
+
+             if (parsedPoints.length > 0) {
+                 keyPoints = parsedPoints;
+             } else {
+                  keyPoints = ['No valid key points parsed from AI response.'];
              }
         } else {
              keyPoints = ['Could not find Key Points section in AI response.'];
@@ -254,7 +308,7 @@ ${text.slice(0, 30000)}
     const questionsPrompt = `Based on the following text content (and key points if available), generate exactly 10 multiple-choice study questions with 4 options (A, B, C, D), the correct answer letter, and a brief explanation.
 
 Key Points (for context, if generated):
-${keyPoints.join('\n')}
+${keyPoints?.join('\n') ?? 'N/A'}
 
 Full Text (excerpt for context):
 ---
@@ -281,20 +335,24 @@ Generate 10 questions in this exact format, separated by '---DIVIDER---'. Ensure
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             contents: [{ parts: [{ text: questionsPrompt }] }],
-            generationConfig: { temperature: 0.5, maxOutputTokens: 3000 } // Keep token limit sufficient
+            generationConfig: { temperature: 0.5, maxOutputTokens: 3000 }
         })
     };
 
     const questionsResponse = await fetchWithRetry(GEMINI_ENDPOINT, questionsOptions);
     const questionsResponseText = await questionsResponse.text();
     const questionsRawText = extractCandidateText(questionsResponseText);
+    let parsedQuestions: NoteData['questions'] = []; // Temp array for parsing
 
     if (questionsRawText.startsWith("Error:")) {
          console.error("Questions generation failed:", questionsRawText);
+         // Don't set the main 'questions' variable here, let it remain undefined
+         // Optionally add a fallback question if desired:
+         // parsedQuestions = [{ question: `Question generation failed: ${questionsRawText}`, options:[], correctAnswer: 0, explanation:""}];
     } else {
         const questionBlocks = questionsRawText.split(/---DIVIDER---/i);
         for (const block of questionBlocks) {
-            if (questions.length >= 10) break; // Limit to 10
+            if (parsedQuestions.length >= 10) break; // Limit to 10
 
             const trimmedBlock = block.trim();
             if (!trimmedBlock) continue;
@@ -312,7 +370,7 @@ Generate 10 questions in this exact format, separated by '---DIVIDER---'. Ensure
                 const explanationText = explanationMatch[1].trim();
 
                 if (questionText && optionsList.length === 4 && optionsList.every(o => o && o.length > 0) && ['A', 'B', 'C', 'D'].includes(correctLetter) && explanationText) {
-                    questions.push({
+                    parsedQuestions.push({
                         question: questionText,
                         options: optionsList,
                         correctAnswer: ['A', 'B', 'C', 'D'].indexOf(correctLetter),
@@ -326,40 +384,50 @@ Generate 10 questions in this exact format, separated by '---DIVIDER---'. Ensure
             }
         } // End for loop
 
-        if (questions.length === 0) {
+        if (parsedQuestions.length === 0) {
              console.warn("No valid questions parsed from AI response for text.");
-        } else if (questions.length < 10) {
-            console.warn(`Parsed only ${questions.length} out of 10 requested questions from text.`);
+        } else if (parsedQuestions.length < 10) {
+            console.warn(`Parsed only ${parsedQuestions.length} out of 10 requested questions from text.`);
         } else {
              console.log("Successfully parsed 10 questions from text.");
+        }
+        // Assign the parsed questions if any were found
+        if (parsedQuestions.length > 0) {
+            questions = parsedQuestions;
         }
     } // End else block (questions generation)
 
     // 3. Format result
+    // Explicitly construct the object to be returned
     const processedNoteData: Omit<NoteData, 'createdAt' | 'updatedAt'> = {
       title: text.split('\n')[0].slice(0, 60).trim() || 'AI Processed Note',
-      content: summary,
-      keyPoints, // Now contains up to 10 key points
-      questions: questions.length > 0 ? questions : undefined,
-      type: 'personal',
+      content: summary, // Use the generated summary as the main content
+      keyPoints: keyPoints, // Will be undefined if generation failed and no fallback set
+      questions: questions, // Will be undefined if generation failed or none parsed
+      type: 'personal', // Treat AI processed text as a 'personal' note type initially
       userId,
-      isPublic: false,
-      tags: ['ai-processed'],
-      sourceUrl: undefined,
+      isPublic: false, // Default to private
+      tags: ['ai-processed'], // Auto-tag
+      // sourceUrl is intentionally omitted as it's not applicable here
     };
     console.log("AI processing complete for text.");
+    // The removeUndefinedFields in saveNote will handle cleaning optional fields before saving
     return processedNoteData;
 
   } catch (error) {
+      // Catch unexpected errors during the overall process
     console.error('Unexpected error during AI processing of text:', error);
+    // Return an object indicating failure
      const errorNoteData: Omit<NoteData, 'createdAt' | 'updatedAt'> = {
         title: text.split('\n')[0].slice(0, 60).trim() || 'AI Processing Failed',
-        content: "AI processing failed to generate content.",
-        keyPoints: ["AI processing failed."],
-        questions: [{ question: "AI processing failed.", options: [], correctAnswer: 0, explanation:"" }],
+        content: `AI processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        // keyPoints: ["AI processing failed."], // Keep as undefined or provide error array
+        // questions: [{ question: "AI processing failed.", options: [], correctAnswer: 0, explanation:"" }], // Keep as undefined or provide error obj
         type: 'personal', userId, isPublic: false, tags: ['ai-error']
      }
-    return errorNoteData;
+    // Consider throwing the error instead if the calling code needs to handle it more specifically
+    // throw new Error(`AI processing failed unexpectedly: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    return errorNoteData; // Return error state data
   }
 }
 
@@ -401,7 +469,7 @@ Generate 10 questions in this exact format, separated by '---DIVIDER---'. Ensure
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             contents: [{ parts: [{ text: questionsPrompt }] }],
-            generationConfig: { temperature: 0.5, maxOutputTokens: 3000 } // Keep token limit sufficient
+            generationConfig: { temperature: 0.5, maxOutputTokens: 3000 }
         })
     };
 
@@ -413,7 +481,7 @@ Generate 10 questions in this exact format, separated by '---DIVIDER---'. Ensure
         throw new Error(`Failed to regenerate questions (API/Parse Error): ${questionsRawText}`);
     }
 
-    let newQuestions: NoteData['questions'] = [];
+    let newQuestions: NoteData['questions'] = []; // Initialize as empty array
     // Parse up to 10 questions
     const questionBlocks = questionsRawText.split(/---DIVIDER---/i);
     for (const block of questionBlocks) {
@@ -462,17 +530,25 @@ Generate 10 questions in this exact format, separated by '---DIVIDER---'. Ensure
     }
 
     // Update the note in Firestore
+    // The dataToUpdate object will only contain the 'questions' field
+    const dataToUpdate = {
+        questions: newQuestions // Update with the successfully parsed questions (even if fewer than 10)
+    };
+
     const noteRef = doc(db, 'notes', noteId);
+    // No need to clean dataToUpdate here as 'questions' is always an array (even if empty)
     await updateDoc(noteRef, {
-      questions: newQuestions,
-      updatedAt: Timestamp.now()
+       ...dataToUpdate, // Spread the questions update
+       updatedAt: Timestamp.now()
     });
+
 
     console.log("Questions regenerated and updated in Firestore for note:", noteId);
     return newQuestions; // Return the newly generated questions
 
   } catch (error) {
     console.error(`Error regenerating questions for note ${noteId}:`, error);
+    // Rethrow the error so the calling UI can handle it
     throw new Error(`Failed to regenerate questions: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }

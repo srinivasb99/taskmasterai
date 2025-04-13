@@ -906,13 +906,7 @@ Respond directly to the user's message following these guidelines.`;
   // ---------------------------
   //   Loading State
   // ---------------------------
-  if (loading) { // Show loading indicator until all data sources confirm loaded (or error)
-    return (
-      <div className={`flex items-center justify-center h-screen ${containerClass}`}>
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-      </div>
-    );
-  }
+
 
   if (!user) {
     return null; // Should be redirected by auth effect

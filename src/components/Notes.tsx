@@ -55,7 +55,7 @@ import {
   saveNote,
   savePersonalNote,
   updateNote,
-  processTextToAINote,
+  processTextToAINoteData,
   deleteNote,
   toggleNotePublicStatus,
   regenerateStudyQuestions

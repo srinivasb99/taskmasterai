@@ -113,30 +113,21 @@ export function Notes() {
     return stored ? JSON.parse(stored) : false;
   });
 
-  useEffect(() => {
-    const firebaseUser = getCurrentUser();
-    if (firebaseUser) {
-      // List of authorized developer emails
-      const devEmails = [
-        'srinibaj10@gmail.com',
-        'bajinsrinivasr@lexington1.net',
-        'fugegate@gmail.com'
-      ];
-      
-      // If the user's email is not in the developer list, redirect to the outage page
-      if (!devEmails.includes(firebaseUser.email)) {
-        navigate('/notes');
-        return;
-      }
-      
-      // User is authenticated and is a developer
-      setUser(firebaseUser);
-      setUserName(firebaseUser.displayName || "User");
-    } else {
-      navigate('/login');
-    }
-    setLoading(false);
-  }, [navigate]);
+useEffect(() => {
+  const firebaseUser = getCurrentUser();
+
+  if (firebaseUser) {
+    // User is authenticated
+    setUser(firebaseUser);
+    setUserName(firebaseUser.displayName || "User");
+  } else {
+    // User is not authenticated, redirect to login
+    navigate('/login');
+  }
+
+  setLoading(false);
+}, [navigate]);
+
 
   // Editing state
   const [isEditing, setIsEditing] = useState(false);

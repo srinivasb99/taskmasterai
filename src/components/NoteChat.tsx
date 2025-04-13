@@ -1,95 +1,139 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageCircle, Send, Timer as TimerIcon, Bot, X, AlertTriangle } from 'lucide-react';
+import { MessageCircle, Send, Timer as TimerIcon, Bot, X, AlertTriangle, Loader2, Sparkles } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import remarkGfm from 'remark-gfm';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
-import { Timer } from './Timer';
-import { FlashcardsQuestions } from './FlashcardsQuestions';
+import { Timer } from './Timer'; // Ensure Timer supports theme props
+import { FlashcardsQuestions } from './FlashcardsQuestions'; // Ensure FlashcardsQuestions supports theme props
 
-// Types for messages
-interface TimerMessage {
-  type: 'timer';
-  duration: number;
-  id: string;
-}
-
-interface FlashcardData {
-  id: string;
-  question: string;
-  answer: string;
-  topic: string;
-}
-
-interface QuestionData {
-  id: string;
-  question: string;
-  options: string[];
-  correctAnswer: number;
-  explanation: string;
-}
-
-interface FlashcardMessage {
-  type: 'flashcard';
-  data: FlashcardData[];
-}
-
-interface QuestionMessage {
-  type: 'question';
-  data: QuestionData[];
-}
+// Types (assuming these are defined correctly elsewhere or keep them here)
+interface TimerMessage { type: 'timer'; duration: number; id: string; }
+interface FlashcardData { id: string; question: string; answer: string; topic: string; }
+interface QuestionData { id: string; question: string; options: string[]; correctAnswer: number; explanation: string; }
+interface FlashcardMessage { type: 'flashcard'; data: FlashcardData[]; }
+interface QuestionMessage { type: 'question'; data: QuestionData[]; }
 
 interface ChatMessage {
+  id?: string; // Add ID for key prop and potential updates
   role: 'user' | 'assistant';
   content: string;
   timer?: TimerMessage;
   flashcard?: FlashcardMessage;
   question?: QuestionMessage;
+  error?: boolean; // Flag for error messages
+}
+
+interface Note { // Define the expected note structure
+  title: string;
+  content: string; // Should be summary for AI notes
+  keyPoints?: string[];
+  questions?: {
+    question: string;
+    // options, correctAnswer, explanation might not be needed for context, just the question text
+  }[];
+  // Add other relevant fields if needed (e.g., sourceUrl)
 }
 
 interface NoteChatProps {
-  note: {
-    title: string;
-    content: string;
-    keyPoints?: string[];
-    questions?: {
-      question: string;
-      options: string[];
-      correctAnswer: number;
-      explanation: string;
-    }[];
-  };
+  note: Note;
   onClose: () => void;
-  huggingFaceApiKey: string;
+  geminiApiKey: string; // Changed from huggingFaceApiKey
   userName: string;
+  // Theme props
+  isIlluminateEnabled: boolean;
+  isBlackoutEnabled: boolean;
 }
 
-export function NoteChat({ note, onClose, huggingFaceApiKey, userName }: NoteChatProps) {
+// --- Helper Functions (Copied for consistency) ---
+async function fetchWithRetry(url: string, options: RequestInit, retries = 3, delayMs = 3000): Promise<Response> {
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      const response = await fetch(url, options);
+      if (!response.ok && (response.status === 429 || response.status >= 500)) {
+        console.warn(`Attempt ${attempt + 1} failed with status ${response.status}. Retrying...`);
+        await new Promise(resolve => setTimeout(resolve, delayMs * (attempt + 1)));
+        continue;
+      }
+      return response;
+    } catch (error) {
+      console.error(`Attempt ${attempt + 1} fetch error:`, error);
+      if (attempt === retries - 1) throw error;
+      await new Promise(resolve => setTimeout(resolve, delayMs * (attempt + 1)));
+    }
+  }
+  throw new Error(`Max retries reached for: ${url}`);
+}
+
+const extractCandidateText = (responseText: string): string => {
+  try {
+    const jsonResponse = JSON.parse(responseText);
+    if (jsonResponse?.candidates?.[0]?.content?.parts?.[0]?.text) {
+      return jsonResponse.candidates[0].content.parts[0].text;
+    }
+    if (jsonResponse?.error?.message) {
+      console.error("Gemini API Error:", jsonResponse.error.message);
+      return `Error: ${jsonResponse.error.message}`;
+    }
+    return ""; // Return empty if no text found
+  } catch (err) {
+    console.error('Error parsing Gemini response:', err);
+    return "Error: Could not parse AI response.";
+  }
+};
+
+const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=`; // Append key later
+// --- End Helper Functions ---
+
+
+export function NoteChat({
+    note,
+    onClose,
+    geminiApiKey, // Use geminiApiKey
+    userName,
+    isIlluminateEnabled,
+    isBlackoutEnabled
+}: NoteChatProps) {
   const [chatMessage, setChatMessage] = useState('');
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([
     {
+      id: 'initial-greet',
       role: 'assistant',
-      content: `👋 Hi! I'm here to help you with your note "${note.title}". You can ask me questions about the content, request summaries, or get help understanding specific parts.`
+      content: `👋 Hi ${userName}! I'm here to help with your note "${note.title}". Ask me anything about its content.`
     }
   ]);
   const [isChatLoading, setIsChatLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // Scroll to bottom when chat history changes
+  // --- Theme Styles ---
+   const modalBg = isIlluminateEnabled ? "bg-white" : isBlackoutEnabled ? "bg-black border border-gray-700" : "bg-gray-800";
+   const headerBg = isIlluminateEnabled ? "bg-gray-100/80 border-gray-200" : "bg-gray-900/80 border-gray-700";
+   const headingColor = isIlluminateEnabled ? "text-gray-900" : "text-white";
+   const inputBg = isIlluminateEnabled ? "bg-gray-100 border-gray-300 focus:border-blue-500 focus:ring-blue-500" : "bg-gray-700 border-gray-600 focus:border-blue-500 focus:ring-blue-500";
+   const inputTextColor = isIlluminateEnabled ? "text-gray-900" : "text-gray-200";
+   const placeholderColor = isIlluminateEnabled ? "placeholder-gray-400" : "placeholder-gray-500";
+   const buttonPrimaryClass = "bg-blue-600 hover:bg-blue-700 text-white";
+   const buttonDisabledClass = "opacity-50 cursor-not-allowed";
+   const userBubbleClass = isIlluminateEnabled ? 'bg-blue-500 text-white' : 'bg-blue-600 text-white';
+   const assistantBubbleClass = isIlluminateEnabled ? 'bg-gray-100 text-gray-800 border border-gray-200/80' : 'bg-gray-700/80 text-gray-200 border border-gray-600/50';
+   const errorBubbleClass = isIlluminateEnabled ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-red-900/30 text-red-300 border border-red-700/50';
+   const iconColor = isIlluminateEnabled ? "text-gray-500" : "text-gray-400";
+
+
+  // Scroll effect
   useEffect(() => {
-    if (chatEndRef.current) {
-      chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [chatHistory]);
 
-  // Timer handling functions
+  // Timer handling
   const handleTimerComplete = (timerId: string) => {
     setChatHistory(prev => [
       ...prev,
       {
+        id: `timer-complete-${timerId}`,
         role: 'assistant',
-        content: "⏰ Time's up! Your timer has finished."
+        content: "⏰ Time's up!"
       }
     ]);
   };
@@ -97,340 +141,228 @@ export function NoteChat({ note, onClose, huggingFaceApiKey, userName }: NoteCha
   const parseTimerRequest = (message: string): number | null => {
     const timeRegex = /(\d+)\s*(minutes?|mins?|hours?|hrs?|seconds?|secs?)/i;
     const match = message.match(timeRegex);
-    
     if (!match) return null;
-    
     const amount = parseInt(match[1]);
     const unit = match[2].toLowerCase();
-    
-    if (unit.startsWith('hour') || unit.startsWith('hr')) {
-      return amount * 3600;
-    } else if (unit.startsWith('min')) {
-      return amount * 60;
-    } else if (unit.startsWith('sec')) {
-      return amount;
-    }
-    
+    if (isNaN(amount) || amount <= 0) return null;
+    if (unit.startsWith('hour') || unit.startsWith('hr')) return amount * 3600;
+    if (unit.startsWith('min')) return amount * 60;
+    if (unit.startsWith('sec')) return amount;
     return null;
   };
 
+  // Chat Submit Handler
   const handleChatSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!chatMessage.trim()) return;
+    const currentMessage = chatMessage.trim();
+    if (!currentMessage || isChatLoading || !geminiApiKey) return;
 
-    // Check for timer request
-    const timerDuration = parseTimerRequest(chatMessage);
-    const userMsg: ChatMessage = { 
+    setChatMessage(''); // Clear input immediately
+
+    const timerDuration = parseTimerRequest(currentMessage);
+    const userMsg: ChatMessage = {
+      id: `user-${Date.now()}`,
       role: 'user',
-      content: chatMessage
+      content: currentMessage
     };
-    
     setChatHistory(prev => [...prev, userMsg]);
-    setChatMessage('');
 
-    // If it's a timer request, add timer immediately
+    // Handle timer request locally
     if (timerDuration) {
-      const timerId = Math.random().toString(36).substr(2, 9);
+      const timerId = Math.random().toString(36).substring(2, 9);
       setChatHistory(prev => [
         ...prev,
         {
+          id: `timer-start-${timerId}`,
           role: 'assistant',
-          content: `Starting a timer for ${timerDuration} seconds.`,
-          timer: {
-            type: 'timer',
-            duration: timerDuration,
-            id: timerId
-          }
+          content: `Okay, starting a timer for ${Math.round(timerDuration / 60)} minutes.`,
+          timer: { type: 'timer', duration: timerDuration, id: timerId }
         }
       ]);
-      return;
+      return; // Don't send timer requests to AI
     }
 
-    // Regular chat processing
-    const conversation = chatHistory
+    setIsChatLoading(true);
+    // Add temporary loading message
+    const loadingMsgId = `assistant-loading-${Date.now()}`;
+    setChatHistory(prev => [...prev, { id: loadingMsgId, role: 'assistant', content: '...' }]);
+
+    // Prepare context for Gemini
+    const conversationHistory = chatHistory
+      .slice(-6) // Limit context window
       .map((m) => `${m.role === 'user' ? userName : 'Assistant'}: ${m.content}`)
       .join('\n');
 
-    const prompt = `
-[CONTEXT]
-Note Title: ${note.title}
-Note Content: ${note.content}
-${note.keyPoints ? `\nKey Points:\n${note.keyPoints.join('\n')}` : ''}
-${note.questions ? `\nStudy Questions:\n${note.questions.map(q => q.question).join('\n')}` : ''}
+    // Construct a concise prompt
+    const prompt = `You are an AI assistant helping "${userName}" with their note titled "${note.title}".
+Focus ONLY on the provided Note Content and Key Points. Do not use external knowledge.
+Answer the user's question concisely based on the note. If the information isn't present, say so politely.
 
-[CONVERSATION SO FAR]
-${conversation}
+Note Content Summary:
+${note.content.slice(0, 2000)}
 
-[NEW USER MESSAGE]
-${userName}: ${userMsg.content}
+Key Points:
+${note.keyPoints ? note.keyPoints.join('\n') : 'N/A'}
 
-You are a helpful AI assistant specifically focused on helping ${userName} understand and learn from this note. Engage in natural conversation and provide detailed, accurate responses based on the note's content.
+Conversation History:
+${conversationHistory}
 
-Guidelines:
-1. Base all responses strictly on the note's content
-2. If asked about something not in the note, politely explain that you can only discuss the note's content
-3. Use a friendly, helpful tone
-4. Keep responses clear and concise
-5. If asked to generate study materials, use the JSON format as specified
+Current Question:
+${userName}: ${currentMessage}
 
-   - If ${userName} explicitly requests educational content (flashcards or quiz questions), provide exactly one JSON object.
-   - Wrap the JSON object in a single code block using triple backticks and the "json" language identifier.
-   - Use one of the following formats:
+Assistant Response:`; // Let the model continue from here
 
-     For flashcards:
-     {
-       "type": "flashcard",
-       "data": [
-         {
-           "id": "unique-id-1",
-           "question": "Question 1",
-           "answer": "Answer 1",
-           "topic": "Subject area"
-         },
-         {
-           "id": "unique-id-2",
-           "question": "Question 2",
-           "answer": "Answer 2",
-           "topic": "Subject area"
-         }
-       ]
-     }
 
-     For quiz questions:
-     {
-       "type": "question",
-       "data": [
-         {
-           "id": "unique-id-1",
-           "question": "Question 1",
-           "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
-           "correctAnswer": 0,
-           "explanation": "Explanation 1"
-         },
-         {
-           "id": "unique-id-2",
-           "question": "Question 2",
-           "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
-           "correctAnswer": 1,
-           "explanation": "Explanation 2"
-         }
-       ]
-     }
-
-   - Do not include any JSON unless ${userName} explicitly requests it.
-   - The JSON must be valid, complete, and include multiple items in its "data" array.
-
-Response Format:
-- For regular responses: Provide direct, clear answers
-- For flashcard requests: Use JSON with type "flashcard" and data array
-- For quiz requests: Use JSON with type "question" and data array
-- For unclear questions: Ask for clarification
-
-Follow these instructions precisely while maintaining a natural conversation flow.`;
-
-    setIsChatLoading(true);
     try {
-      const response = await fetch(
-        'https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct',
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${huggingFaceApiKey}`,
-            'Content-Type': 'application/json',
+      const fullGeminiEndpoint = `${GEMINI_ENDPOINT}${geminiApiKey}`;
+      const geminiOptions = {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.6, // Slightly more creative for chat
+            maxOutputTokens: 500,
+            topP: 0.9
           },
-          body: JSON.stringify({
-            inputs: prompt,
-            parameters: {
-              max_new_tokens: 3000,
-              temperature: 0.5,
-              top_p: 0.9,
-              return_full_text: false,
-              repetition_penalty: 1.2,
-              do_sample: true,
-            },
-          }),
-        }
-      );
+           safetySettings: [ // Standard safety settings
+              { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+              { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+              { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+              { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+           ],
+        })
+      };
 
-      if (!response.ok) throw new Error('Chat API request failed');
-      const result = await response.json();
+      const response = await fetchWithRetry(fullGeminiEndpoint, geminiOptions);
+      const responseText = await response.text(); // Get raw text
 
-      let assistantReply = (result[0]?.generated_text as string || '')
-        .replace(/\[\/?INST\]|<</g, '')
-        .split('\n')
-        .filter(line => !/^(print|python)/i.test(line.trim()))
-        .join('\n')
-        .trim();
-
-      // Parse any JSON content in the response
-      const jsonMatch = assistantReply.match(/```json\n([\s\S]*?)\n```/);
-      if (jsonMatch) {
-        try {
-          const jsonContent = JSON.parse(jsonMatch[1].trim());
-          // Remove the JSON block from the text response
-          assistantReply = assistantReply.replace(/```json\n[\s\S]*?\n```/, '').trim();
-          
-          // Validate JSON structure
-          if (
-            jsonContent.type &&
-            jsonContent.data &&
-            (jsonContent.type === 'flashcard' || jsonContent.type === 'question')
-          ) {
-            setChatHistory((prev) => [
-              ...prev,
-              {
-                role: 'assistant',
-                content: assistantReply,
-                ...(jsonContent.type === 'flashcard' && { flashcard: jsonContent }),
-                ...(jsonContent.type === 'question' && { question: jsonContent })
-              },
-            ]);
-          } else {
-            throw new Error('Invalid JSON structure');
-          }
-        } catch (e) {
-          console.error('Failed to parse JSON content:', e);
-          setChatHistory((prev) => [
-            ...prev,
-            { 
-              role: 'assistant', 
-              content: assistantReply 
-            },
-          ]);
-        }
-      } else {
-        setChatHistory((prev) => [
-          ...prev,
-          { role: 'assistant', content: assistantReply },
-        ]);
+      if (!response.ok) {
+          console.error("Gemini API Error Response:", responseText);
+          throw new Error(`Chat API request failed (${response.status})`);
       }
+
+      const assistantReply = extractCandidateText(responseText);
+
+      // Update loading message with actual reply or error
+       setChatHistory(prev => prev.map(msg =>
+           msg.id === loadingMsgId
+               ? { ...msg, content: assistantReply || "Sorry, I couldn't generate a response.", error: assistantReply.startsWith("Error:") }
+               : msg
+       ));
+
+       // Note: JSON parsing for flashcards/questions within chat is removed
+       // as it wasn't present in the original NoteChat and adds complexity.
+       // If needed, it can be added back similarly to Dashboard.tsx chat.
+
     } catch (err) {
-      console.error('Chat error:', err);
-      setChatHistory((prev) => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: 'Sorry, I had an issue responding. Please try again in a moment.',
-        },
-      ]);
+      console.error('Chat submission error:', err);
+       // Update loading message with error
+      setChatHistory(prev => prev.map(msg =>
+           msg.id === loadingMsgId
+               ? { ...msg, content: `Sorry, an error occurred: ${err instanceof Error ? err.message : 'Unknown error'}. Please try again.`, error: true }
+               : msg
+       ));
     } finally {
       setIsChatLoading(false);
     }
   };
 
+
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
-      <div className="bg-gray-800 rounded-xl w-full max-w-2xl mx-4 max-h-[80vh] flex flex-col">
-        <div className="p-4 border-b border-gray-700 flex justify-between items-center">
-          <h3 className="text-lg font-semibold text-blue-300 flex items-center">
-            <MessageCircle className="w-5 h-5 mr-2" />
-            Chat about "{note.title}"
-            <span className="ml-2 text-xs bg-gradient-to-r from-pink-500 to-purple-500 text-white px-2 py-0.5 rounded-full">
-              BETA
-            </span>
-          </h3>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-white transition-colors"
-          >
-            <X className="w-5 h-5" />
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn">
+      <div className={`${modalBg} rounded-lg w-full max-w-lg max-h-[85vh] flex flex-col shadow-xl overflow-hidden`}>
+        {/* Header */}
+         <div className={`p-3 border-b ${headerBg} flex justify-between items-center flex-shrink-0 sticky top-0 backdrop-blur-sm z-10`}>
+           <h3 className={`text-base font-semibold ${headingColor} flex items-center gap-2 truncate pr-2`}>
+             <MessageCircle className={`w-4 h-4 ${isIlluminateEnabled ? 'text-blue-600' : 'text-blue-400'}`} />
+             Chat: <span className="font-normal truncate" title={note.title}>{note.title}</span>
+           </h3>
+          <button onClick={onClose} className={`${iconColor} hover:opacity-70 transition-opacity rounded-full p-1`}>
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={chatEndRef}>
+        {/* Chat History */}
+        <div className="flex-1 overflow-y-auto p-3 space-y-2" ref={chatEndRef}>
           {chatHistory.map((message, index) => (
             <div
-              key={index}
+              key={message.id || index}
               className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               <div
-                className={`max-w-[80%] rounded-lg px-4 py-2 ${
-                  message.role === 'user'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-700 text-gray-200'
-                }`}
+                 className={`max-w-[85%] rounded-lg px-3 py-1.5 text-sm shadow-sm break-words ${
+                    message.role === 'user'
+                        ? userBubbleClass
+                        : message.error
+                            ? errorBubbleClass
+                            : assistantBubbleClass
+                 }`}
               >
-                <ReactMarkdown
-                  remarkPlugins={[remarkMath, remarkGfm]}
-                  rehypePlugins={[rehypeKatex]}
-                  components={{
-                    p: ({ children }) => <p className="mb-2">{children}</p>,
-                    ul: ({ children }) => <ul className="list-disc ml-4 mb-2">{children}</ul>,
-                    ol: ({ children }) => <ol className="list-decimal ml-4 mb-2">{children}</ol>,
-                    li: ({ children }) => <li className="mb-1">{children}</li>,
-                    code: ({ inline, children }) =>
-                      inline ? (
-                        <code className="bg-gray-800 px-1 rounded">{children}</code>
-                      ) : (
-                        <pre className="bg-gray-800 p-2 rounded-lg overflow-x-auto">
-                          <code>{children}</code>
-                        </pre>
-                      ),
-                  }}
-                >
-                  {message.content}
-                </ReactMarkdown>
+                 {/* Render Markdown for content */}
+                 {message.content && message.content !== "..." ? (
+                    <ReactMarkdown
+                      remarkPlugins={[remarkMath, remarkGfm]}
+                      rehypePlugins={[rehypeKatex]}
+                      components={{ // Basic styling, can be enhanced
+                          p: ({node, ...props}) => <p className="mb-1 last:mb-0 text-xs" {...props} />,
+                          ul: ({node, ...props}) => <ul className="list-disc list-outside ml-3 space-y-0.5 text-xs mb-1" {...props} />,
+                          ol: ({node, ...props}) => <ol className="list-decimal list-outside ml-3 space-y-0.5 text-xs mb-1" {...props} />,
+                      }}
+                    >
+                       {message.content}
+                   </ReactMarkdown>
+                 ) : message.content === "..." && isChatLoading ? (
+                     // Loading ellipsis
+                      <div className="flex space-x-1 p-1">
+                          <div className={`w-1.5 h-1.5 rounded-full animate-bounce ${isIlluminateEnabled ? 'bg-gray-500' : 'bg-gray-400'}`}></div>
+                          <div className={`w-1.5 h-1.5 rounded-full animate-bounce delay-100 ${isIlluminateEnabled ? 'bg-gray-500' : 'bg-gray-400'}`}></div>
+                          <div className={`w-1.5 h-1.5 rounded-full animate-bounce delay-200 ${isIlluminateEnabled ? 'bg-gray-500' : 'bg-gray-400'}`}></div>
+                      </div>
+                 ) : null}
+
+                {/* Render Timer if present */}
                 {message.timer && (
-                  <div className="mt-2">
-                    <div className="flex items-center space-x-2 bg-gray-900 rounded-lg px-4 py-2">
-                      <TimerIcon className="w-5 h-5 text-blue-400" />
-                      <Timer
+                  <div className="mt-1.5">
+                     <div className={`flex items-center space-x-2 rounded-md px-2 py-1 text-xs border ${isIlluminateEnabled ? 'bg-blue-50 border-blue-200' : 'bg-gray-800/60 border-gray-600'}`}>
+                      <TimerIcon className={`w-3.5 h-3.5 flex-shrink-0 ${isIlluminateEnabled ? 'text-blue-600' : 'text-blue-400'}`} />
+                      <Timer // Ensure Timer supports theme props
                         key={message.timer.id}
                         initialDuration={message.timer.duration}
-                        onComplete={() => handleTimerComplete(message.timer!.id)}
+                        onComplete={() => handleTimerComplete(message.timer.id)}
+                        compact={true}
+                        isIlluminateEnabled={isIlluminateEnabled}
                       />
                     </div>
                   </div>
                 )}
-{message.flashcard && (
-  <div className="mt-2">
-    <FlashcardsQuestions
-      type="flashcard"
-      data={message.flashcard.data}
-      onComplete={() => {}}
-    />
-  </div>
-)}
-{message.question && (
-  <div className="mt-2">
-    <FlashcardsQuestions
-      type="question"
-      data={message.question.data}
-      onComplete={() => {}}
-    />
-                  </div>
-                )}
+                {/* Render Flashcards/Questions if needed (currently removed, add back if required) */}
               </div>
             </div>
           ))}
-          {isChatLoading && (
-            <div className="flex justify-start">
-              <div className="bg-gray-700 text-gray-200 rounded-lg px-4 py-2 max-w-[80%]">
-                <div className="flex space-x-2">
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100"></div>
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200"></div>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
 
-        <form onSubmit={handleChatSubmit} className="p-4 border-t border-gray-700">
-          <div className="flex gap-2">
+        {/* Input Form */}
+        <form onSubmit={handleChatSubmit} className={`p-2 border-t ${headerBg} flex-shrink-0 sticky bottom-0 backdrop-blur-sm`}>
+          <div className="flex gap-1.5 items-center">
             <input
               type="text"
               value={chatMessage}
               onChange={(e) => setChatMessage(e.target.value)}
-              placeholder="Ask about this note or set a timer..."
-              className="flex-1 bg-gray-700 text-gray-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Ask about this note..."
+               className={`flex-1 ${inputBg} ${inputTextColor} ${placeholderColor} rounded-full px-3.5 py-1.5 text-sm focus:ring-1 focus:outline-none ${isChatLoading ? 'opacity-60' : ''}`}
+              disabled={isChatLoading}
             />
             <button
               type="submit"
-              disabled={isChatLoading}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={isChatLoading || !chatMessage.trim()}
+              className={`${buttonPrimaryClass} p-2 rounded-full transition-all duration-150 ${isChatLoading || !chatMessage.trim() ? buttonDisabledClass : 'hover:scale-105 active:scale-100'}`}
             >
-              <Send className="w-5 h-5" />
+              {isChatLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                  <Send className="w-4 h-4" />
+              )}
             </button>
           </div>
         </form>

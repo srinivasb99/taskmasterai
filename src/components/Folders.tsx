@@ -2404,7 +2404,7 @@ export function Folders() {
                                                                          {sub.itemCount || 0}
                                                                       </span>
                                                                        {/* Corrected Comment - Removed problematic syntax */}
-                                                                       {/* <button onClick={(e) => { e.stopPropagation(); /* TODO: Handle Edit Subfolder */ }} className={`p-0.5 rounded ${iconColor}`}><Edit className="w-2.5 h-2.5" /></button> */}
+                                                                       {/* <button onClick={(e) => { e.stopPropagation(); /* eslint-disable-line */ }} className={`p-0.5 rounded ${iconColor}`}><Edit className="w-2.5 h-2.5" /></button> */}
                                                                        <button onClick={(e) => { e.stopPropagation(); handleDeleteSubFolder(folder.id, sub.id); }} className={`p-0.5 rounded ${isIlluminateEnabled ? 'text-red-500 hover:bg-red-100' : 'text-red-500 hover:bg-red-900/50'}`} title="Delete Subfolder"><Trash className="w-2.5 h-2.5" /></button>
                                                                   </div>
                                                              </div>

@@ -488,7 +488,6 @@ export function Calendar() {
     useEffect(() => {
         if (!user?.uid) return;
 
-        setLoading(true);
         let eventLoaded = false, taskLoaded = false, goalLoaded = false, projectLoaded = false, planLoaded = false;
         const checkAllLoaded = () => {
             if (eventLoaded && taskLoaded && goalLoaded && projectLoaded && planLoaded) {

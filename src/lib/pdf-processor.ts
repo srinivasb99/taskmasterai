@@ -100,7 +100,7 @@ export async function processPDF(
 ): Promise<ProcessedPDF> {
   const safeProgress = typeof onProgress === 'function' ? onProgress : () => {};
   // Construct the endpoint URL using the provided key
-  const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${geminiApiKey}`; // Use 1.5 flash
+  const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-latest:generateContent?key=${geminiApiKey}`; // Use 1.5 flash
 
   try {
     safeProgress({ progress: 0, status: 'Starting PDF processing...', error: null });

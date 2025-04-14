@@ -29,6 +29,7 @@ import {
 import { pricing, db } from '../lib/firebase';
 import {
   doc, getDoc, updateDoc, addDoc, collection, query, where, onSnapshot, documentId, Timestamp, getDocs,
+  runTransaction, // <--- ADD THIS IMPORT
 } from 'firebase/firestore';
 import { geminiApiKey } from '../lib/dashboard-firebase'; // Assuming API key is shared
 

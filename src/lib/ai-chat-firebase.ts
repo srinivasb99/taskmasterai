@@ -13,7 +13,7 @@ import {
   query,
   where,
   orderBy,
-  getDocs // <-- Import getDocs
+  getDocs
 } from "firebase/firestore";
 import { createDeepInsightAction, updateDeepInsightActionStatus, voteOnDeepInsightAction } from './ai-context-firebase';
 import { createUserTask, createUserGoal, createUserPlan, createUserProject } from './ai-actions-firebase';
@@ -25,16 +25,15 @@ export interface ChatFileAttachment {
   type: string;
 }
 
-// Updated ChatMessage interface to include optional files array
+// Updated ChatMessage interface
 export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   createdAt?: any;
-  files?: ChatFileAttachment[]; // Array to hold file info
-  // Existing optional fields for timer/flashcard/question
+  files?: ChatFileAttachment[];
   timer?: { type: 'timer'; duration: number; id: string; };
-  flashcard?: { type: 'flashcard'; data: any[]; }; // Use specific types if available
-  question?: { type: 'question'; data: any[]; }; // Use specific types if available
+  flashcard?: { type: 'flashcard'; data: any[]; };
+  question?: { type: 'question'; data: any[]; };
 }
 
 
@@ -75,16 +74,28 @@ export async function createChatConversation(userId: string, chatName: string): 
   return conversationRef.id;
 }
 
-// Save a chat message to a conversation's subcollection "messages".
-// Now accepts the full ChatMessage interface including optional files.
+// *** CORRECTED saveChatMessage function ***
 export async function saveChatMessage(conversationId: string, message: ChatMessage): Promise<string> {
-  // Ensure files is an array or undefined, not null
-  const messageData = {
-    ...message,
-    files: message.files && message.files.length > 0 ? message.files : undefined, // Store undefined if empty
+
+  // Start building the data object WITHOUT the 'files' field initially
+  const messageData: any = { // Use 'any' or create a specific write type if preferred
+    role: message.role,
+    content: message.content,
     createdAt: serverTimestamp(),
+    // Include other optional fields directly if they exist
+    ...(message.timer && { timer: message.timer }),
+    ...(message.flashcard && { flashcard: message.flashcard }),
+    ...(message.question && { question: message.question }),
   };
 
+  // Conditionally add the 'files' field ONLY if it's a non-empty array
+  if (message.files && Array.isArray(message.files) && message.files.length > 0) {
+    messageData.files = message.files;
+  }
+  // If message.files is undefined, null, or empty, the 'files' key
+  // will simply not be added to messageData, which is what Firestore expects.
+
+  // Add the document with the correctly structured data
   const messageRef = await addDoc(collection(db, "chatConversations", conversationId, "messages"), messageData);
 
   // Update the conversation's last updated timestamp
@@ -93,6 +104,7 @@ export async function saveChatMessage(conversationId: string, message: ChatMessa
   });
   return messageRef.id;
 }
+
 
 // Listen for real-time updates to a conversation's messages.
 export function onChatMessagesSnapshot(

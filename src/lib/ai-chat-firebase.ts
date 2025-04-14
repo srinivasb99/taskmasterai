@@ -13,29 +13,30 @@ import {
   query,
   where,
   orderBy,
-  getDocs // Added this import
+  getDocs // <-- Import getDocs
 } from "firebase/firestore";
 import { createDeepInsightAction, updateDeepInsightActionStatus, voteOnDeepInsightAction } from './ai-context-firebase';
-import { 
-  createUserTask, 
-  createUserGoal, 
-  createUserPlan, 
-  createUserProject,
-  updateUserTask,
-  updateUserGoal,
-  updateUserPlan,
-  updateUserProject,
-  deleteUserTask,
-  deleteUserGoal,
-  deleteUserPlan,
-  deleteUserProject
-} from './ai-actions-firebase';
+import { createUserTask, createUserGoal, createUserPlan, createUserProject } from './ai-actions-firebase';
 
+// Interface for file attachments
+export interface ChatFileAttachment {
+  name: string;
+  url: string;
+  type: string;
+}
+
+// Updated ChatMessage interface to include optional files array
 export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   createdAt?: any;
+  files?: ChatFileAttachment[]; // Array to hold file info
+  // Existing optional fields for timer/flashcard/question
+  timer?: { type: 'timer'; duration: number; id: string; };
+  flashcard?: { type: 'flashcard'; data: any[]; }; // Use specific types if available
+  question?: { type: 'question'; data: any[]; }; // Use specific types if available
 }
+
 
 /**
  * Find an item by name in a specific collection
@@ -45,49 +46,21 @@ export interface ChatMessage {
  * @param fieldName The field name to match against (e.g., 'task', 'goal')
  * @returns The document ID if found, null otherwise
  */
-export async function findItemByName(collectionName: string, userId: string, itemName: string, fieldName: string) {
+export async function findItemByName(collectionName: string, userId: string, itemName: string, fieldName: string): Promise<string | null> { // Added return type promise
   try {
-    console.log(`Searching for ${fieldName}: "${itemName}" in ${collectionName} for user ${userId}`);
-    
-    // First try: look for the item by its unique ID field
-    const idFieldName = fieldName + 'Id'; // e.g., "taskId", "goalId"
-    const itemsRef = collection(db, collectionName);
-    
-    // Try to find by unique ID first (if the itemName looks like an ID)
-    if (itemName.startsWith(`${fieldName}_`)) {
-      const idQuery = query(
-        itemsRef, 
-        where(idFieldName, "==", itemName), 
-        where("userId", "==", userId)
-      );
-      
-      let querySnapshot = await getDocs(idQuery);
-      if (!querySnapshot.empty) {
-        const docId = querySnapshot.docs[0].id;
-        console.log(`Found by ${idFieldName}: ${docId}`);
-        return docId;
-      }
-    }
-    
-    // If not found by ID, try by name
-    const nameQuery = query(
-      itemsRef, 
-      where(fieldName, "==", itemName), 
-      where("userId", "==", userId)
-    );
-    
-    let querySnapshot = await getDocs(nameQuery);
+    const itemsRef = collection(db, collectionName)
+    const q = query(itemsRef, where(fieldName, "==", itemName), where("userId", "==", userId))
+    const querySnapshot = await getDocs(q) // Use getDocs here
+
     if (!querySnapshot.empty) {
-      const docId = querySnapshot.docs[0].id;
-      console.log(`Found by name: ${docId}`);
-      return docId;
+      // Return the ID of the first matching document
+      return querySnapshot.docs[0].id
     }
-    
-    console.log(`No matching ${fieldName} found with name: "${itemName}"`);
-    return null;
+    console.log(`No ${collectionName} found with name "${itemName}" for user ${userId}`);
+    return null
   } catch (error) {
-    console.error(`Error finding ${collectionName} by name:`, error);
-    return null;
+    console.error(`Error finding ${collectionName} by name "${itemName}":`, error)
+    return null // Return null on error
   }
 }
 
@@ -103,11 +76,18 @@ export async function createChatConversation(userId: string, chatName: string): 
 }
 
 // Save a chat message to a conversation's subcollection "messages".
+// Now accepts the full ChatMessage interface including optional files.
 export async function saveChatMessage(conversationId: string, message: ChatMessage): Promise<string> {
-  const messageRef = await addDoc(collection(db, "chatConversations", conversationId, "messages"), {
+  // Ensure files is an array or undefined, not null
+  const messageData = {
     ...message,
+    files: message.files && message.files.length > 0 ? message.files : undefined, // Store undefined if empty
     createdAt: serverTimestamp(),
-  });
+  };
+
+  const messageRef = await addDoc(collection(db, "chatConversations", conversationId, "messages"), messageData);
+
+  // Update the conversation's last updated timestamp
   await updateDoc(doc(db, "chatConversations", conversationId), {
     updatedAt: serverTimestamp(),
   });
@@ -117,7 +97,7 @@ export async function saveChatMessage(conversationId: string, message: ChatMessa
 // Listen for real-time updates to a conversation's messages.
 export function onChatMessagesSnapshot(
   conversationId: string,
-  callback: (messages: ChatMessage[]) => void
+  callback: (messages: ChatMessage[]) => void // Use updated ChatMessage type
 ) {
   const messagesQuery = query(
     collection(db, "chatConversations", conversationId, "messages"),
@@ -126,7 +106,7 @@ export function onChatMessagesSnapshot(
   return onSnapshot(messagesQuery, (snapshot) => {
     const messages: ChatMessage[] = [];
     snapshot.forEach((docSnap) => {
-      messages.push(docSnap.data() as ChatMessage);
+      messages.push(docSnap.data() as ChatMessage); // Cast to updated ChatMessage type
     });
     callback(messages);
   });
@@ -159,13 +139,16 @@ export async function updateChatConversationName(conversationId: string, newName
   });
 }
 
-// Delete a chat conversation
+// Delete a chat conversation (and optionally its messages - requires backend function for subcollection deletion)
 export async function deleteChatConversation(conversationId: string): Promise<void> {
-  // Delete the conversation doc and possibly all subcollection messages if desired
+  // IMPORTANT: Deleting a document does NOT delete its subcollections in Firestore client-side SDK.
+  // You typically need a Cloud Function to recursively delete subcollection documents.
+  // For now, this just deletes the conversation document itself.
   await deleteDoc(doc(db, "chatConversations", conversationId));
+  console.warn(`Conversation document ${conversationId} deleted. Messages subcollection requires manual or Cloud Function deletion.`);
 }
 
-// Helper to extract JSON from AI response
+// Helper to extract JSON from AI response (remains the same)
 export const extractJsonFromResponse = (text: string): any[] => {
   const jsonBlocks: any[] = [];
   const regex = /```json\s*([\s\S]*?)\s*```/g;
@@ -181,22 +164,44 @@ export const extractJsonFromResponse = (text: string): any[] => {
     }
   }
 
+  // Fallback for simple { } blocks if no ```json``` blocks found
+  if (jsonBlocks.length === 0) {
+      const curlyRegex = /(\{[^{}]+\})/g;
+      let curlyMatch = curlyRegex.exec(text);
+      while (curlyMatch) {
+          try {
+              jsonBlocks.push(JSON.parse(curlyMatch[1]));
+          } catch(e) {
+              // Ignore parse errors for simple blocks
+          }
+          curlyMatch = curlyRegex.exec(text);
+      }
+  }
+
   return jsonBlocks;
 };
 
-// Process AI actions
-export const processAiActions = async (userId: string, actions: any[]) => {
-  for (const action of actions) {
-    if (!action.action || !action.payload) continue;
 
-    // Add userId to all payloads for name-based operations
-    if (action.payload) {
-      action.payload.userId = userId;
+// Process AI actions (remains largely the same, but ensure it handles errors gracefully)
+export const processAiActions = async (userId: string, actions: any[]) => {
+  if (!userId) {
+    console.error("Cannot process AI actions without a user ID.");
+    return;
+  }
+  for (const action of actions) {
+    if (!action || !action.action || !action.payload) {
+      console.warn("Skipping invalid AI action:", action);
+      continue;
+    };
+
+    // Add userId to payload if not present, helpful for some actions
+    if (!action.payload.userId) {
+        action.payload.userId = userId;
     }
 
     try {
+      console.log("Processing AI Action:", action.action, action.payload); // Logging
       switch (action.action) {
-        // Create operations
         case 'createTask':
           await createUserTask(userId, action.payload);
           break;
@@ -209,151 +214,48 @@ export const processAiActions = async (userId: string, actions: any[]) => {
         case 'createProject':
           await createUserProject(userId, action.payload);
           break;
+        // Add update/delete cases here if the AI should trigger them directly
+        // (Currently handled in AI-Chat.tsx based on JSON response)
 
-        // Update operations
-        case 'updateTask':
-          if (action.payload.id) {
-            // If ID is provided, update directly
-            await updateUserTask(action.payload.id, action.payload);
-          } else if (action.payload.task) {
-            // Otherwise find by name
-            const taskId = await findItemByName('tasks', userId, action.payload.task, 'task');
-            if (taskId) {
-              await updateUserTask(taskId, {
-                ...action.payload,
-                id: taskId
-              });
-            } else {
-              console.error('Task not found for update:', action.payload.task);
-            }
-          }
-          break;
-        case 'updateGoal':
-          if (action.payload.id) {
-            await updateUserGoal(action.payload.id, action.payload);
-          } else if (action.payload.goal) {
-            const goalId = await findItemByName('goals', userId, action.payload.goal, 'goal');
-            if (goalId) {
-              await updateUserGoal(goalId, {
-                ...action.payload,
-                id: goalId
-              });
-            } else {
-              console.error('Goal not found for update:', action.payload.goal);
-            }
-          }
-          break;
-        case 'updatePlan':
-          if (action.payload.id) {
-            await updateUserPlan(action.payload.id, action.payload);
-          } else if (action.payload.plan) {
-            const planId = await findItemByName('plans', userId, action.payload.plan, 'plan');
-            if (planId) {
-              await updateUserPlan(planId, {
-                ...action.payload,
-                id: planId
-              });
-            } else {
-              console.error('Plan not found for update:', action.payload.plan);
-            }
-          }
-          break;
-        case 'updateProject':
-          if (action.payload.id) {
-            await updateUserProject(action.payload.id, action.payload);
-          } else if (action.payload.project) {
-            const projectId = await findItemByName('projects', userId, action.payload.project, 'project');
-            if (projectId) {
-              await updateUserProject(projectId, {
-                ...action.payload,
-                id: projectId
-              });
-            } else {
-              console.error('Project not found for update:', action.payload.project);
-            }
-          }
-          break;
-
-        // Delete operations
-        case 'deleteTask':
-          if (action.payload.id) {
-            await deleteUserTask(action.payload.id);
-          } else if (action.payload.task) {
-            const taskId = await findItemByName('tasks', userId, action.payload.task, 'task');
-            if (taskId) {
-              await deleteUserTask(taskId);
-            } else {
-              console.error('Task not found for deletion:', action.payload.task);
-            }
-          }
-          break;
-        case 'deleteGoal':
-          if (action.payload.id) {
-            await deleteUserGoal(action.payload.id);
-          } else if (action.payload.goal) {
-            const goalId = await findItemByName('goals', userId, action.payload.goal, 'goal');
-            if (goalId) {
-              await deleteUserGoal(goalId);
-            } else {
-              console.error('Goal not found for deletion:', action.payload.goal);
-            }
-          }
-          break;
-        case 'deletePlan':
-          if (action.payload.id) {
-            await deleteUserPlan(action.payload.id);
-          } else if (action.payload.plan) {
-            const planId = await findItemByName('plans', userId, action.payload.plan, 'plan');
-            if (planId) {
-              await deleteUserPlan(planId);
-            } else {
-              console.error('Plan not found for deletion:', action.payload.plan);
-            }
-          }
-          break;
-        case 'deleteProject':
-          if (action.payload.id) {
-            await deleteUserProject(action.payload.id);
-          } else if (action.payload.project) {
-            const projectId = await findItemByName('projects', userId, action.payload.project, 'project');
-            if (projectId) {
-              await deleteUserProject(projectId);
-            } else {
-              console.error('Project not found for deletion:', action.payload.project);
-            }
-          }
-          break;
-
+        // Keep DeepInsight handling if used
         case 'deepInsight':
+          if (!action.payload.type || !action.payload.description) {
+              console.warn("Skipping incomplete deepInsight action:", action.payload);
+              continue;
+          }
           await createDeepInsightAction(userId, {
             type: action.payload.type,
             description: action.payload.description,
-            reasoning: action.payload.reasoning,
-            impact: action.payload.impact,
-            actionPayload: action.payload.actionPayload
+            reasoning: action.payload.reasoning || 'No reasoning provided.',
+            impact: action.payload.impact || 'No impact provided.',
+            actionPayload: action.payload.actionPayload // This might be the task/goal data itself
           });
           break;
+        default:
+            console.warn(`Unknown AI action type: ${action.action}`);
       }
     } catch (error) {
-      console.error(`Error processing action ${action.action}:`, error);
+      console.error(`Error processing action ${action.action}:`, error, "Payload:", action.payload);
     }
   }
 };
 
-// Handle DeepInsight voting
+// Handle DeepInsight voting (remains the same)
 export const handleDeepInsightVote = async (actionId: string, vote: 'up' | 'down') => {
   await voteOnDeepInsightAction(actionId, vote);
 };
 
-// Handle DeepInsight acceptance
+// Handle DeepInsight acceptance (remains the same)
 export const handleDeepInsightAccept = async (actionId: string, action: any) => {
   await updateDeepInsightActionStatus(actionId, 'accepted');
-  if (action.actionPayload) {
+  if (action.actionPayload && action.userId) { // Ensure userId is available
     await processAiActions(action.userId, [action.actionPayload]);
+  } else {
+    console.warn("Cannot process accepted DeepInsight action payload - missing actionPayload or userId", action);
   }
 };
 
-// Handle DeepInsight decline
+// Handle DeepInsight decline (remains the same)
 export const handleDeepInsightDecline = async (actionId: string) => {
   await updateDeepInsightActionStatus(actionId, 'declined');
 };

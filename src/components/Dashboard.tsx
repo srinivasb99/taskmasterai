@@ -2777,7 +2777,7 @@ Another Example: Looks clear for today. Consider planning your next project step
                 <div className={`${cardClass} rounded-xl p-3 sm:p-4 transition-all duration-300`}>
                   <h2 className={`text-base sm:text-lg font-semibold mb-3 ${headingClass} flex items-center`}>
                     <TimerIcon className="w-4 h-4 mr-1.5" />
-                    Custom Timers
+                    Timers
                   </h2>
                   <ul className="space-y-2">
                     {customTimers

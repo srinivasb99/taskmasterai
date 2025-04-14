@@ -233,7 +233,7 @@ const chatPanelVariants = {
 
 // Helper to create context for AI
 const createPrompt = (userMessage: string, folder?: FolderWithItems | null, items?: FolderItem[]): string => {
-  let context = `You are a helpful AI Study Assistant integrated into a flashcard/notes application. The user is currently interacting with the folder system.\n`;
+  let context = `You are a variant of TaskMaster AI, an agent specifically designed to help the user study. You are integrated into a flashcard/notes application. The user is currently interacting with the folder system.\n`;
 
   if (folder) {
     context += `\nThe user has the folder "${folder.name}" selected.`;

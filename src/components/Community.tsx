@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, ChangeEvent, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
@@ -1057,8 +1056,8 @@ Assistant:`; // Ready for the AI's response
        <button
          onClick={() => setIsAiSidebarOpen(true)}
          className={`fixed bottom-4 md:bottom-6 lg:bottom-8 ${ isSidebarCollapsed ? 'right-4 md:right-6' : 'right-4 md:right-6 lg:right-8' } z-40 p-2.5 rounded-full shadow-lg transition-all duration-300 transform hover:scale-110 active:scale-100 ${ isIlluminateEnabled ? 'bg-white border border-gray-300 text-blue-600 hover:bg-gray-100' : 'bg-gradient-to-br from-purple-600 to-indigo-600 text-white hover:from-purple-700 hover:to-indigo-700' } ${isAiSidebarOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
-         title="Open TaskMaster AI Chat"
-         aria-label="Open TaskMaster AI Chat"
+         title="Open AI Chat"
+         aria-label="Open AI Chat"
        >
          <BrainCircuit className="w-5 h-5" />
        </button>
@@ -1071,7 +1070,7 @@ Assistant:`; // Ready for the AI's response
             <div className="flex items-center gap-2">
               <Globe2 className={`w-6 h-6 ${illuminateTextBlue}`} />
               <h1 className={`text-xl md:text-2xl font-bold ${headingClass}`}>
-                Community Hub
+                Community
               </h1>
             </div>
             {tokens !== null && (

@@ -60,6 +60,10 @@ const DEV_EMAILS = [
   'fugegate@gmail.com'
 ];
 
+// --- Constants ---
+const TOKENS_PER_BONUS_THRESHOLD = 50; // Tokens awarded
+const FILES_PER_BONUS_THRESHOLD = 5;  // Files needed to trigger bonus
+
 // --- Helper Functions ---
 
 const getDisplayName = (fileName: string): string => {

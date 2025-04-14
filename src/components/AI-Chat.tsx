@@ -29,8 +29,9 @@ import {
     updateChatConversationName,
     deleteChatConversation,
     findItemByName,
-    type ChatMessage, // Import the updated interface
-    type ChatFileAttachment // Import file attachment interface
+    processAiActions, // <-- ADD THIS LINE
+    type ChatMessage,
+    type ChatFileAttachment
 } from '../lib/ai-chat-firebase';
 
 // Context functions
@@ -45,7 +46,7 @@ import {
 import {
     createUserTask, createUserGoal, createUserPlan, createUserProject,
     updateUserTask, updateUserGoal, updateUserPlan, updateUserProject,
-    deleteUserTask, deleteUserGoal, deleteUserPlan, deleteUserProject,
+    deleteUserTask, deleteUserGoal, deleteUserPlan, deleteUserProject, 
 } from '../lib/ai-actions-firebase';
 
 // Storage Upload function

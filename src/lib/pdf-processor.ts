@@ -192,7 +192,7 @@ export async function processPDF(
     safeProgress({ progress: 60, status: 'Generating summary & key points...', error: null });
 
     // 5. Generate Summary and Key Points using Gemini
-    const summaryPrompt = `Analyze the following text extracted from a PDF document and generate a concise summary (around 4-6 sentences) and exactly 5 distinct key points.
+    const summaryPrompt = `Analyze the following text extracted from a PDF document and generate a concise summary (around 4-6 sentences) and exactly 10 distinct key points.
 
 Format your response strictly as follows:
 
@@ -205,6 +205,11 @@ Key Points:
 3. [Third key point]
 4. [Fourth key point]
 5. [Fifth key point]
+6. [Sixth key point]
+7. [Seventh key point]
+8. [Eighth key point]
+9. [Ninth key point]
+10. [Tenth key point]
 
 Text to Analyze:
 ---

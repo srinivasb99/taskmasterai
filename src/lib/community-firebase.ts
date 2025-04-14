@@ -12,202 +12,205 @@ import {
   getDoc,
   updateDoc,
   setDoc,
-  deleteDoc, // Import deleteDoc
-  writeBatch, // Import writeBatch for cleaning up unlocks
-  Timestamp, // Import Timestamp
+  deleteDoc,
+  writeBatch,
+  Timestamp,
+  runTransaction, // <-- Import runTransaction
+  increment,      // <-- Import increment
 } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
 
 // --- Constants ---
-const TOKENS_PER_BONUS_THRESHOLD = 50; // Tokens awarded
-const FILES_PER_BONUS_THRESHOLD = 5;  // Files needed to trigger bonus
+const TOKENS_PER_BONUS_THRESHOLD = 50;
+const FILES_PER_BONUS_THRESHOLD = 5;
+const TOKENS_PER_DOWNLOAD = 5; // <-- New constant for download bonus
 
 // Upload a file to Firebase Storage and record its metadata in Firestore
 export async function uploadCommunityFile(userId: string, file: File): Promise<string> {
   console.log(`Uploading file: ${file.name} for user: ${userId}`);
-  // Create a unique file name to prevent collisions
   const uniqueFileName = `${uuidv4()}_${file.name}`;
   const fileRef = ref(storage, `community/${userId}/${uniqueFileName}`);
 
   try {
-    // Upload the file
     await uploadBytes(fileRef, file);
     console.log("File uploaded to storage.");
-
-    // Get the file's download URL
     const downloadURL = await getDownloadURL(fileRef);
     console.log("Download URL obtained:", downloadURL);
 
-    // Save file metadata to Firestore in "communityFiles" collection
     await addDoc(collection(db, 'communityFiles'), {
       userId,
       fileName: file.name,
-      uniqueFileName, // Store the unique name for deletion
+      uniqueFileName,
       downloadURL,
       fileType: file.type,
-      fileSize: file.size, // <-- Store file size
-      uploadedAt: Timestamp.now(), // Use Firestore Timestamp
-      // Add other relevant metadata if needed (e.g., description, tags)
+      fileSize: file.size,
+      uploadedAt: Timestamp.now(),
+      downloadCount: 0, // <-- Initialize download count
+      // likes: [], // Example for future like feature
+      // totalRating: 0, // Example for future rating feature
+      // ratingCount: 0, // Example for future rating feature
     });
     console.log("File metadata added to Firestore.");
 
-    // Award bonus tokens based on the *new* total file count
-    await awardTokensForUpload(userId);
+    await awardTokensForUpload(userId); // Check for upload bonus
 
     return downloadURL;
   } catch (error) {
     console.error("Error during file upload process:", error);
-    // Rethrow the error so the calling function can handle it (e.g., show alert)
     throw new Error(`Failed to upload file. ${error instanceof Error ? error.message : ''}`);
   }
 }
 
 // Award tokens based on file count thresholds.
 export async function awardTokensForUpload(userId: string): Promise<void> {
-  console.log(`Checking token award for user: ${userId}`);
-  // Count how many files the user has uploaded *now*
-  const q = query(collection(db, 'communityFiles'), where('userId', '==', userId));
-  const querySnapshot = await getDocs(q);
-  const fileCount = querySnapshot.size;
-  console.log(`User ${userId} has ${fileCount} files.`);
+    // ... (no changes needed in the logic itself) ...
+    console.log(`Checking token award for user: ${userId}`);
+    const q = query(collection(db, 'communityFiles'), where('userId', '==', userId));
+    const querySnapshot = await getDocs(q);
+    const fileCount = querySnapshot.size;
+    console.log(`User ${userId} has ${fileCount} files.`);
+    const expectedBonusGroups = Math.floor(fileCount / FILES_PER_BONUS_THRESHOLD);
+    console.log(`Expected bonus groups based on file count: ${expectedBonusGroups}`);
+    const userDocRef = doc(db, 'users', userId);
 
-  // Calculate how many bonus groups (e.g., of 5 files) should have been reached
-  const expectedBonusGroups = Math.floor(fileCount / FILES_PER_BONUS_THRESHOLD);
-  console.log(`Expected bonus groups based on file count: ${expectedBonusGroups}`);
+    try {
+        const userDocSnap = await getDoc(userDocRef);
+        let currentBonusCount = 0;
+        let currentTokens = 500;
+        if (userDocSnap.exists()) {
+            const data = userDocSnap.data();
+            currentBonusCount = data.uploadBonusCount ?? 0;
+            currentTokens = data.tokens ?? 500;
+            console.log(`User doc exists. Current Bonus Count: ${currentBonusCount}, Current Tokens: ${currentTokens}`);
+        } else {
+            console.log("User doc doesn't exist, creating with defaults.");
+            await setDoc(userDocRef, { tokens: 500, uploadBonusCount: 0, createdAt: Timestamp.now() });
+        }
 
-  // Reference the user's document in Firestore
-  const userDocRef = doc(db, 'users', userId);
+        if (expectedBonusGroups > currentBonusCount) {
+            const groupsToAward = expectedBonusGroups - currentBonusCount;
+            const bonusTokens = groupsToAward * TOKENS_PER_BONUS_THRESHOLD;
+            const newTokens = currentTokens + bonusTokens;
+            console.log(`Awarding upload bonus for ${groupsToAward} group(s). Bonus Tokens: ${bonusTokens}. New Total Tokens: ${newTokens}`);
+            await updateDoc(userDocRef, {
+                tokens: newTokens,
+                uploadBonusCount: expectedBonusGroups
+            });
+            console.log(`User ${userId} tokens and upload bonus count updated.`);
+        } else {
+            console.log(`No new upload bonus threshold reached (Expected: ${expectedBonusGroups}, Current: ${currentBonusCount}).`);
+        }
+    } catch (error) {
+        console.error(`Error awarding upload bonus for user ${userId}:`, error);
+    }
+}
 
-  try {
-    const userDocSnap = await getDoc(userDocRef);
-
-    let currentBonusCount = 0;
-    let currentTokens = 500; // Default tokens if doc doesn't exist yet
-
-    if (userDocSnap.exists()) {
-      const data = userDocSnap.data();
-      currentBonusCount = data.uploadBonusCount ?? 0;
-      currentTokens = data.tokens ?? 500; // Ensure default is applied if field missing
-      console.log(`User doc exists. Current Bonus Count: ${currentBonusCount}, Current Tokens: ${currentTokens}`);
-    } else {
-      // If the user document doesn't exist, create one with default tokens and no bonus awarded yet
-      console.log("User doc doesn't exist, creating with defaults.");
-      await setDoc(userDocRef, { tokens: 500, uploadBonusCount: 0, createdAt: Timestamp.now() });
-      // No bonus to award yet, as currentBonusCount is 0 and expectedBonusGroups will also be 0 or 1 max after first upload
+// --- NEW: Function to handle download count and award tokens ---
+export async function handleFileDownload(fileId: string, uploaderId: string, downloaderId: string): Promise<void> {
+    // Prevent uploader from getting tokens for downloading their own file
+    if (uploaderId === downloaderId) {
+        console.log(`User ${downloaderId} downloaded their own file ${fileId}. No tokens awarded.`);
+        // Optionally still increment download count? Decided against it for now.
+        // const fileDocRef = doc(db, 'communityFiles', fileId);
+        // await updateDoc(fileDocRef, { downloadCount: increment(1) });
+        return;
     }
 
-    // Award bonus tokens ONLY if the expected groups based on count exceed the recorded count
-    if (expectedBonusGroups > currentBonusCount) {
-      const groupsToAward = expectedBonusGroups - currentBonusCount;
-      const bonusTokens = groupsToAward * TOKENS_PER_BONUS_THRESHOLD;
-      const newTokens = currentTokens + bonusTokens;
+    console.log(`Processing download for file ${fileId} by user ${downloaderId}. Uploader: ${uploaderId}`);
+    const fileDocRef = doc(db, 'communityFiles', fileId);
+    const uploaderDocRef = doc(db, 'users', uploaderId);
 
-      console.log(`Awarding bonus for ${groupsToAward} group(s). Bonus Tokens: ${bonusTokens}. New Total Tokens: ${newTokens}`);
-      await updateDoc(userDocRef, {
-        tokens: newTokens,
-        uploadBonusCount: expectedBonusGroups // Update count to the new total expected groups
-      });
-      console.log(`User ${userId} tokens and bonus count updated.`);
-    } else {
-         console.log(`No new bonus threshold reached (Expected: ${expectedBonusGroups}, Current: ${currentBonusCount}).`);
+    try {
+        await runTransaction(db, async (transaction) => {
+            // 1. Read the current uploader's token count (optional but safer)
+            const uploaderDocSnap = await transaction.get(uploaderDocRef);
+            if (!uploaderDocSnap.exists()) {
+                // This shouldn't happen if the user uploaded, but handle defensively
+                console.error(`Uploader document ${uploaderId} not found! Cannot award tokens.`);
+                // Optionally create the doc here? Or just throw error?
+                // For now, let's just log and not award.
+                // throw new Error("Uploader data not found."); // Or just return
+            } else {
+                 // 2. Update the uploader's token count
+                 transaction.update(uploaderDocRef, {
+                    tokens: increment(TOKENS_PER_DOWNLOAD),
+                    // Optionally track total community earnings
+                    // tokensEarnedFromCommunity: increment(TOKENS_PER_DOWNLOAD)
+                 });
+                 console.log(`Awarded ${TOKENS_PER_DOWNLOAD} tokens to uploader ${uploaderId}`);
+            }
+
+
+            // 3. Update the file's download count
+            transaction.update(fileDocRef, {
+                downloadCount: increment(1)
+            });
+            console.log(`Incremented download count for file ${fileId}`);
+        });
+        console.log(`Transaction successful for download of file ${fileId}`);
+    } catch (error) {
+        console.error(`Transaction failed for file download ${fileId}:`, error);
+        // Don't throw error back to user necessarily, as download might still proceed.
+        // Log it for monitoring.
     }
-  } catch (error) {
-    console.error(`Error awarding tokens for user ${userId}:`, error);
-    // Decide if you want to throw error or just log it
-  }
 }
 
 // --- Function for USER to delete their OWN file ---
 export async function deleteUserFile(userId: string, fileId: string): Promise<void> {
-    const fileDocRef = doc(db, 'communityFiles', fileId);
-
-    try {
+    // ... (no changes needed from previous version) ...
+     const fileDocRef = doc(db, 'communityFiles', fileId);
+     try {
         const fileDocSnap = await getDoc(fileDocRef);
-
-        if (!fileDocSnap.exists()) {
-            throw new Error("File not found.");
-        }
-
+        if (!fileDocSnap.exists()) throw new Error("File not found.");
         const fileData = fileDocSnap.data();
+        if (fileData.userId !== userId) throw new Error("Permission denied.");
 
-        // Security Check: Ensure the user owns the file
-        if (fileData.userId !== userId) {
-            throw new Error("Permission denied. You can only delete your own files.");
-        }
-
-        // Delete Firestore document
         await deleteDoc(fileDocRef);
         console.log(`Deleted Firestore doc for file ${fileId}`);
-
-        // Delete file from Storage using the uniqueFileName
         if (fileData.uniqueFileName) {
              const fileRef = ref(storage, `community/${userId}/${fileData.uniqueFileName}`);
              await deleteObject(fileRef);
              console.log(`Deleted file from storage: community/${userId}/${fileData.uniqueFileName}`);
-        } else {
-            console.warn(`Could not delete file from storage for ${fileId}: uniqueFileName missing.`);
-        }
+        } else { console.warn(`Could not delete file from storage for ${fileId}: uniqueFileName missing.`); }
 
-        // Optional: Clean up associated unlock records (prevents dangling unlocks)
         const batch = writeBatch(db);
         const unlockQuery = query(collection(db, 'unlockedFiles'), where('fileId', '==', fileId));
         const unlockSnapshot = await getDocs(unlockQuery);
-        unlockSnapshot.forEach(docSnap => {
-            batch.delete(docSnap.ref);
-        });
+        unlockSnapshot.forEach(docSnap => batch.delete(docSnap.ref));
         await batch.commit();
         console.log(`Cleaned up ${unlockSnapshot.size} unlock records for file ${fileId}`);
-
-        // IMPORTANT: We do NOT adjust tokens or uploadBonusCount here directly.
-        // The abuse check logic in Community.tsx handles discrepancies later if needed.
-        // Recalculating bonuses immediately on delete is complex and prone to race conditions.
-
-    } catch (error) {
+     } catch (error) {
         console.error(`Error deleting file ${fileId} for user ${userId}:`, error);
-        throw error; // Rethrow to be caught by the UI
-    }
+        throw error;
+     }
 }
 
-
 // --- Function for ADMIN (Dev) to delete ANY file ---
-// Renamed for clarity
 export async function deleteAnyFileAsAdmin(adminUserId: string, fileToDelete: any): Promise<void> {
-    // Reuse validation or specific dev list check here if needed
+   // ... (no changes needed from previous version) ...
     console.log(`Admin ${adminUserId} attempting to delete file ${fileToDelete.id}`);
-
     const fileDocRef = doc(db, 'communityFiles', fileToDelete.id);
-
     try {
-        // Optional: Add specific admin role check here if you have roles implemented
-
-        // Delete Firestore document
         await deleteDoc(fileDocRef);
         console.log(`ADMIN: Deleted Firestore doc for file ${fileToDelete.id}`);
-
-        // Delete file from Storage using the uniqueFileName
         if (fileToDelete.uniqueFileName && fileToDelete.userId) {
              const fileRef = ref(storage, `community/${fileToDelete.userId}/${fileToDelete.uniqueFileName}`);
              await deleteObject(fileRef);
              console.log(`ADMIN: Deleted file from storage: community/${fileToDelete.userId}/${fileToDelete.uniqueFileName}`);
-        } else {
-             console.warn(`ADMIN: Could not delete file from storage for ${fileToDelete.id}: uniqueFileName or userId missing.`);
-        }
+        } else { console.warn(`ADMIN: Could not delete file from storage for ${fileToDelete.id}: uniqueFileName or userId missing.`); }
 
-        // Optional: Clean up associated unlock records
         const batch = writeBatch(db);
         const unlockQuery = query(collection(db, 'unlockedFiles'), where('fileId', '==', fileToDelete.id));
         const unlockSnapshot = await getDocs(unlockQuery);
-        unlockSnapshot.forEach(docSnap => {
-            batch.delete(docSnap.ref);
-        });
+        unlockSnapshot.forEach(docSnap => batch.delete(docSnap.ref));
         await batch.commit();
         console.log(`ADMIN: Cleaned up ${unlockSnapshot.size} unlock records for file ${fileToDelete.id}`);
-
     } catch (error) {
         console.error(`ADMIN: Error deleting file ${fileToDelete.id}:`, error);
-        throw error; // Rethrow to be caught by the UI
+        throw error;
     }
 }
+
 
 
 // --- NO CHANGES NEEDED BELOW THIS LINE ---

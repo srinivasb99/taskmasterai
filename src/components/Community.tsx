@@ -1014,14 +1014,7 @@ Assistant:`; // Ready for the AI's response
       </div>
   );
 
-  // --- Main Render ---
-  if (loadingAuth) {
-    return (
-      <div className={`${containerClass} min-h-screen flex items-center justify-center`}>
-        <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
-      </div>
-    );
-  }
+
   if (!user) return null; // Should be redirected by auth effect
 
 

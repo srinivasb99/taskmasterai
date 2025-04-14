@@ -494,7 +494,7 @@ ${styleInstruction}
 ${conversationSoFar}
 
 [LATEST USER MESSAGE]
-${userName}: ${userMessage} ${attachedFilesInfo} ${/* Append file info */ }
+${userName}: ${userMessage} ${attachedFilesInfo} 
 
 [AI INSTRUCTIONS]
 You are TaskMaster, a friendly and versatile AI productivity assistant. Engage in casual conversation, provide productivity advice, and discuss ${userName}'s items only when explicitly asked by ${userName}.

@@ -33,7 +33,12 @@ import {
 import { geminiApiKey } from '../lib/dashboard-firebase'; // Assuming API key is shared
 
 // --- AI Chat Helper Functions (Copied from Dashboard.tsx, adjust endpoint/models if needed) ---
-const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}&alt=sse`; // Use 1.5 flash and enable SSE
+const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}&alt=sse`; // Use 1.5 flash and enable SSE
+
+// --- Constants ---
+const TOKENS_PER_BONUS_THRESHOLD = 50;
+const FILES_PER_BONUS_THRESHOLD = 5;
+const TOKENS_PER_DOWNLOAD = 5;
 
 const fetchWithTimeout = async (url: string, options: RequestInit, timeout = 30000) => {
   const controller = new AbortController();

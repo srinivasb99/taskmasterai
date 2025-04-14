@@ -903,7 +903,7 @@ export function Community() {
       const filesContext = formatCommunityFilesForChat();
 
       const prompt = `
-You are TaskMaster, an AI assistant helping the user "${userName}" navigate the Community Hub file sharing platform. Your goal is to assist with finding relevant files and discussing potential content based *only* on file metadata (name, type, uploader).
+You are TaskMaster, an AI agent helping the user "${userName}" navigate the Community file-sharing platform. Your goal is to assist with finding relevant files and discussing potential content based *only* on file metadata (name, type, uploader).
 
 **Crucial Constraint:** You CANNOT access the actual content of any uploaded files. Do not claim to read or summarize file contents directly.
 

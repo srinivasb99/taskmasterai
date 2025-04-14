@@ -1,35 +1,64 @@
+
+// src/lib/ai-actions-firebase.ts
 import { db } from './firebase';
 import { collection, addDoc, serverTimestamp, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 
 /**
- * Helper to parse a date string and return a Date object set to local midnight,
- * then add one day to avoid timezone offset issues.
+ * Helper to parse a date string (YYYY-MM-DD) and return a Date object
+ * representing the start of that day in UTC.
+ * Returns null if the date string is invalid.
  */
-function parseDueDate(dateString: string): Date {
-  const temp = new Date(dateString);
-  // Set to local midnight
-  const localMidnight = new Date(temp.getFullYear(), temp.getMonth(), temp.getDate());
-  // Add one day
-  localMidnight.setDate(localMidnight.getDate() + 1);
-  return localMidnight;
+function parseDueDate(dateString: string | null | undefined): Date | null {
+  if (!dateString) return null;
+
+  // Basic check for YYYY-MM-DD format
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+      console.warn(`Invalid date format for dueDate: "${dateString}". Expected YYYY-MM-DD.`);
+      // Try parsing anyway, Date constructor is lenient
+  }
+
+  try {
+      // Parse the date string. Date.parse returns NaN for invalid dates.
+      // IMPORTANT: Create Date object directly, then use UTC methods to avoid timezone pitfalls.
+      const parts = dateString.split('-').map(Number);
+      if (parts.length !== 3 || parts.some(isNaN)) {
+          throw new Error("Invalid date components");
+      }
+      // Month is 0-indexed in Date.UTC
+      const date = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
+
+      // Check if the resulting date is valid
+      if (isNaN(date.getTime())) {
+         console.warn(`Could not parse dueDate: "${dateString}" into a valid date.`);
+         return null;
+      }
+      return date; // Return the UTC date object
+  } catch (error) {
+      console.error(`Error parsing dueDate "${dateString}":`, error);
+      return null;
+  }
 }
+
 
 /**
  * Create a Task document in the top-level 'tasks' collection.
  * @param uid The user’s unique ID.
  * @param data An object with at least { task: string, dueDate?: string }.
  */
-// Modified version of createUserTask in ai-actions-firebase.ts
 export async function createUserTask(uid: string, data: any) {
-  // Generate a unique ID for the task that will be used for lookups
-  const taskId = `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  
+  if (!uid || !data || !data.task) {
+    console.error("Missing required data for creating task:", { uid, data });
+    throw new Error("Task name and user ID are required.");
+  }
+  const parsedDate = parseDueDate(data.dueDate);
   await addDoc(collection(db, 'tasks'), {
-    task: data.task || 'Untitled Task',
+    task: data.task,
     userId: uid,
-    dueDate: data.dueDate ? parseDueDate(data.dueDate) : null,
+    dueDate: parsedDate, // Store Date object or null
     createdAt: serverTimestamp(),
-    taskId: taskId // Store this unique ID with the task
+    completed: false, // Default to not completed
+    priority: data.priority || 'medium', // Add default priority
+    // Removed taskId field as Firestore auto-generates document ID
   });
 }
 
@@ -39,15 +68,18 @@ export async function createUserTask(uid: string, data: any) {
  * @param data An object with at least { goal: string, dueDate?: string }.
  */
 export async function createUserGoal(uid: string, data: any) {
-
-    const goalId = `goal_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
+  if (!uid || !data || !data.goal) {
+    console.error("Missing required data for creating goal:", { uid, data });
+    throw new Error("Goal name and user ID are required.");
+  }
+  const parsedDate = parseDueDate(data.dueDate);
   await addDoc(collection(db, 'goals'), {
-    goal: data.goal || 'Untitled Goal',
+    goal: data.goal,
     userId: uid,
-    dueDate: data.dueDate ? parseDueDate(data.dueDate) : null,
+    dueDate: parsedDate,
     createdAt: serverTimestamp(),
-    goalId: goalId
+    completed: false,
+    priority: data.priority || 'medium',
   });
 }
 
@@ -57,15 +89,18 @@ export async function createUserGoal(uid: string, data: any) {
  * @param data An object with at least { plan: string, dueDate?: string }.
  */
 export async function createUserPlan(uid: string, data: any) {
-
-    const planId = `plan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
+  if (!uid || !data || !data.plan) {
+    console.error("Missing required data for creating plan:", { uid, data });
+    throw new Error("Plan name and user ID are required.");
+  }
+  const parsedDate = parseDueDate(data.dueDate);
   await addDoc(collection(db, 'plans'), {
-    plan: data.plan || 'Untitled Plan',
+    plan: data.plan,
     userId: uid,
-    dueDate: data.dueDate ? parseDueDate(data.dueDate) : null,
+    dueDate: parsedDate,
     createdAt: serverTimestamp(),
-    planId: planId
+    completed: false,
+    priority: data.priority || 'medium',
   });
 }
 
@@ -75,29 +110,37 @@ export async function createUserPlan(uid: string, data: any) {
  * @param data An object with at least { project: string, dueDate?: string }.
  */
 export async function createUserProject(uid: string, data: any) {
-    const projectId = `project_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
+  if (!uid || !data || !data.project) {
+    console.error("Missing required data for creating project:", { uid, data });
+    throw new Error("Project name and user ID are required.");
+  }
+  const parsedDate = parseDueDate(data.dueDate);
   await addDoc(collection(db, 'projects'), {
-    project: data.project || 'Untitled Project',
+    project: data.project,
     userId: uid,
-    dueDate: data.dueDate ? parseDueDate(data.dueDate) : null,
+    dueDate: parsedDate,
     createdAt: serverTimestamp(),
-    projectId: projectId
+    completed: false,
+    priority: data.priority || 'medium',
   });
 }
 
 /**
  * Update an existing Task document in the 'tasks' collection.
  * @param docId The document ID of the task.
- * @param data An object with the fields to update (e.g., { task, dueDate }).
+ * @param data An object with the fields to update (e.g., { task, dueDate, priority, completed }).
  */
 export async function updateUserTask(docId: string, data: any) {
   const taskRef = doc(db, 'tasks', docId);
-  const updateData: any = {
-    ...(data.task !== undefined && { task: data.task }),
-    ...(data.dueDate !== undefined && { dueDate: data.dueDate ? parseDueDate(data.dueDate) : null })
-  };
-  await updateDoc(taskRef, updateData);
+  const updateData: any = {};
+  if (data.task !== undefined) updateData.task = data.task;
+  if (data.dueDate !== undefined) updateData.dueDate = parseDueDate(data.dueDate); // Use helper
+  if (data.priority !== undefined) updateData.priority = data.priority;
+  if (data.completed !== undefined) updateData.completed = data.completed;
+  // Only update if there's something to update
+  if (Object.keys(updateData).length > 0) {
+      await updateDoc(taskRef, updateData);
+  }
 }
 
 /**
@@ -112,15 +155,18 @@ export async function deleteUserTask(docId: string) {
 /**
  * Update an existing Goal document in the 'goals' collection.
  * @param docId The document ID of the goal.
- * @param data An object with the fields to update (e.g., { goal, dueDate }).
+ * @param data An object with the fields to update (e.g., { goal, dueDate, priority, completed }).
  */
 export async function updateUserGoal(docId: string, data: any) {
   const goalRef = doc(db, 'goals', docId);
-  const updateData: any = {
-    ...(data.goal !== undefined && { goal: data.goal }),
-    ...(data.dueDate !== undefined && { dueDate: data.dueDate ? parseDueDate(data.dueDate) : null })
-  };
-  await updateDoc(goalRef, updateData);
+  const updateData: any = {};
+  if (data.goal !== undefined) updateData.goal = data.goal;
+  if (data.dueDate !== undefined) updateData.dueDate = parseDueDate(data.dueDate);
+  if (data.priority !== undefined) updateData.priority = data.priority;
+  if (data.completed !== undefined) updateData.completed = data.completed;
+  if (Object.keys(updateData).length > 0) {
+      await updateDoc(goalRef, updateData);
+  }
 }
 
 /**
@@ -135,15 +181,18 @@ export async function deleteUserGoal(docId: string) {
 /**
  * Update an existing Plan document in the 'plans' collection.
  * @param docId The document ID of the plan.
- * @param data An object with the fields to update (e.g., { plan, dueDate }).
+ * @param data An object with the fields to update (e.g., { plan, dueDate, priority, completed }).
  */
 export async function updateUserPlan(docId: string, data: any) {
   const planRef = doc(db, 'plans', docId);
-  const updateData: any = {
-    ...(data.plan !== undefined && { plan: data.plan }),
-    ...(data.dueDate !== undefined && { dueDate: data.dueDate ? parseDueDate(data.dueDate) : null })
-  };
-  await updateDoc(planRef, updateData);
+   const updateData: any = {};
+   if (data.plan !== undefined) updateData.plan = data.plan;
+   if (data.dueDate !== undefined) updateData.dueDate = parseDueDate(data.dueDate);
+   if (data.priority !== undefined) updateData.priority = data.priority;
+   if (data.completed !== undefined) updateData.completed = data.completed;
+   if (Object.keys(updateData).length > 0) {
+      await updateDoc(planRef, updateData);
+   }
 }
 
 /**
@@ -158,15 +207,18 @@ export async function deleteUserPlan(docId: string) {
 /**
  * Update an existing Project document in the 'projects' collection.
  * @param docId The document ID of the project.
- * @param data An object with the fields to update (e.g., { project, dueDate }).
+ * @param data An object with the fields to update (e.g., { project, dueDate, priority, completed }).
  */
 export async function updateUserProject(docId: string, data: any) {
   const projectRef = doc(db, 'projects', docId);
-  const updateData: any = {
-    ...(data.project !== undefined && { project: data.project }),
-    ...(data.dueDate !== undefined && { dueDate: data.dueDate ? parseDueDate(data.dueDate) : null })
-  };
-  await updateDoc(projectRef, updateData);
+  const updateData: any = {};
+  if (data.project !== undefined) updateData.project = data.project;
+  if (data.dueDate !== undefined) updateData.dueDate = parseDueDate(data.dueDate);
+  if (data.priority !== undefined) updateData.priority = data.priority;
+  if (data.completed !== undefined) updateData.completed = data.completed;
+  if (Object.keys(updateData).length > 0) {
+      await updateDoc(projectRef, updateData);
+  }
 }
 
 /**

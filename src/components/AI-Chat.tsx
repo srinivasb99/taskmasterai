@@ -1,15 +1,14 @@
-// AI-Chat.tsx CODE:
+// AI-Chat.tsx (Completely Revamped)
 
-import React, { useState, useEffect, useRef } from 'react';
-import { motion } from 'framer-motion';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion'; // Added AnimatePresence
 import { useNavigate } from 'react-router-dom';
 import {
-  Send, TimerIcon, Bot, Brain, AlertTriangle, MoreHorizontal, Plus, PlusCircle, MessageSquare,
+  Send, TimerIcon, Bot, Brain, AlertTriangle, MoreHorizontal, Plus, MessageSquare,
   Edit2, Share, Trash2, CheckCircle, Goal, Calendar, Folder, BarChart2, Clock, Bell,
   TrendingUp, Lightbulb, Target, FileText, Notebook, Wand, ListChecks, SortAsc, Search,
-  Timer, ClipboardList, Sun, Layers, AlignLeft, UserCheck, Hourglass, Settings, Columns,
-  PieChart, Users, CalendarCheck, Eye, Paperclip, X, Image as ImageIcon, File as FileIcon,
-  Menu, ChevronLeft // Added icons for sidebar toggle and file types
+  Layers, AlignLeft, UserCheck, Hourglass, Settings, Columns, PieChart, Users, CalendarCheck,
+  Eye, Paperclip, X, Image as ImageIcon, File as FileIcon, Menu, ChevronLeft, Loader2 // Added Loader2
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
@@ -17,9 +16,10 @@ import remarkGfm from 'remark-gfm';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
 
-import { auth } from '../lib/firebase';
+import { auth, db } from '../lib/firebase'; // Added db for potential future use
 import { User, onAuthStateChanged } from 'firebase/auth';
-import { geminiApiKey, onCollectionSnapshot } from '../lib/dashboard-firebase'; // Keep relevant imports
+import { Timestamp } from 'firebase/firestore'; // Import Timestamp
+import { geminiApiKey, onCollectionSnapshot } from '../lib/dashboard-firebase';
 import { getCurrentUser } from '../lib/settings-firebase';
 
 // Firebase chat functions
@@ -33,211 +33,197 @@ import {
   findItemByName
 } from '../lib/ai-chat-firebase';
 
-// Context and DeepInsight functions
+// Context functions
 import {
   saveUserContext,
-  // getUserContext, // Not used directly in this component currently
   onUserContextChange,
   type UserContext,
 } from '../lib/ai-context-firebase';
 
 // Firestore item CRUD helpers
 import {
-  createUserTask,
-  createUserGoal,
-  createUserPlan,
-  createUserProject,
-  updateUserTask,
-  updateUserGoal,
-  updateUserPlan,
-  updateUserProject,
-  deleteUserTask,
-  deleteUserGoal,
-  deleteUserPlan,
-  deleteUserProject,
+  createUserTask, createUserGoal, createUserPlan, createUserProject,
+  updateUserTask, updateUserGoal, updateUserPlan, updateUserProject,
+  deleteUserTask, deleteUserGoal, deleteUserPlan, deleteUserProject,
 } from '../lib/ai-actions-firebase';
 
-import { Sidebar } from './Sidebar'; // Main app sidebar
-import { Timer as TimerComponent } from './Timer'; // Renamed Timer import
+// UI Components
+import { Sidebar } from './Sidebar';
+import { Timer as TimerComponent } from './Timer';
 import { FlashcardsQuestions } from './FlashcardsQuestions';
 import { ChatControls } from './chat-controls';
 import { ContextDialog } from './context-dialog';
 
-// ----- Types ----- (Keep existing types)
+// ----- Types -----
 interface TimerMessage { type: 'timer'; duration: number; id: string; }
 interface FlashcardData { id: string; question: string; answer: string; topic: string; }
 interface QuestionData { id: string; question: string; options: string[]; correctAnswer: number; explanation: string; }
 interface FlashcardMessage { type: 'flashcard'; data: FlashcardData[]; }
 interface QuestionMessage { type: 'question'; data: QuestionData[]; }
+
 export interface ChatMessageData {
+  id: string; // Unique ID for each message, crucial for streaming updates
   role: 'user' | 'assistant';
   content: string;
-  createdAt?: any; // Consider using Firestore Timestamp type here
+  createdAt: Timestamp; // Use Firestore Timestamp for consistent sorting
   timer?: TimerMessage;
   flashcard?: FlashcardMessage;
   question?: QuestionMessage;
-  // Optional: Add file metadata if needed in history
-  // fileInfo?: { name: string; type: string; size: number };
+  error?: boolean; // Flag for error messages
+  fileInfo?: { name: string; type: string; size: number }; // Store basic file info
 }
 
-// ----- Gemini Endpoint & Utilities ----- (Keep existing utilities)
-const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`; // Use appropriate model
+// ----- Gemini Endpoint & Utilities -----
+// Using 1.5 Flash as it's generally faster and supports system instructions well
+const geminiEndpointBase = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest`;
+const geminiGenerateContent = `${geminiEndpointBase}:generateContent?key=${geminiApiKey}`;
+const geminiStreamGenerateContent = `${geminiEndpointBase}:streamGenerateContent?key=${geminiApiKey}&alt=sse`;
 
 const fetchWithTimeout = async (url: string, options: RequestInit, timeout = 30000) => {
-  const controller = new AbortController();
-  const { signal } = controller;
-  const timeoutId = setTimeout(() => controller.abort(), timeout);
-  try {
-    const response = await fetch(url, { ...options, signal });
-    clearTimeout(timeoutId);
-    return response;
-  } catch (error) {
-    clearTimeout(timeoutId);
-    // Don't rethrow generic error if it's an AbortError from timeout
-    if ((error as Error).name === 'AbortError') {
-         console.warn('Fetch timed out:', url);
-         throw new Error('Request timed out');
-    }
-    throw error; // Rethrow other errors
-  }
-};
-
-const streamResponse = async (
-  url: string,
-  options: RequestInit,
-  onStreamUpdate: (accumulatedText: string) => void, // Pass accumulated text
-  timeout = 45000 // Slightly longer timeout for streaming
-) => {
-  try {
-    // Use fetch directly for streaming - timeout handled by server/browser inactivity typically
-    const response = await fetch(url, options);
-
-    if (!response.ok) {
-      // Try to get error message from response body
-      let errorBody = '';
-      try {
-        errorBody = await response.text();
-        const errorJson = JSON.parse(errorBody);
-        if (errorJson?.error?.message) {
-          throw new Error(`API Error (${response.status}): ${errorJson.error.message}`);
-        }
-      } catch (parseError) {
-        // Ignore parsing error, use raw text if available
-      }
-      throw new Error(`API Request Failed (${response.status}): ${response.statusText} ${errorBody || ''}`);
-    }
-
-    if (!response.body) {
-      const text = await response.text();
-      onStreamUpdate(text); // Send the full non-streamed text
-      return text; // Return the full text
-    }
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder('utf-8');
-    let done = false;
-    let accumulatedText = '';
-
-    while (!done) {
-      const { value, done: doneReading } = await reader.read();
-      done = doneReading;
-      if (value) {
-        const chunk = decoder.decode(value, { stream: !done });
-        accumulatedText += chunk;
-        // Pass the *accumulated* text to the callback
-        onStreamUpdate(accumulatedText);
-      }
-    }
-    return accumulatedText; // Return the final accumulated text
-
-  } catch (error) {
-    console.error("Streaming Error:", error);
-    throw error; // Propagate the error
-  }
-};
-
-const extractCandidateText = (rawResponseText: string): string => {
-    // Goal: Find and return only the text content from the *first candidate*.
-    // Avoid returning the raw JSON wrapper or metadata. Handles SSE chunks.
+    const controller = new AbortController();
+    const { signal } = controller;
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
     try {
-        let extractedText = "";
-        let potentialJson = "";
-
-        // Split potential SSE chunks (Gemini SSE format: data: {...})
-        const lines = rawResponseText.trim().split('\n');
-        const lastDataLine = lines.filter(line => line.startsWith('data:')).pop();
-
-        if (lastDataLine) {
-             potentialJson = lastDataLine.substring(5).trim(); // Remove 'data:' prefix
-        } else if (rawResponseText.trim().startsWith('{')) {
-            // Might be a non-SSE JSON response (e.g., error or non-streamed)
-            potentialJson = rawResponseText.trim();
+        const response = await fetch(url, { ...options, signal });
+        clearTimeout(timeoutId);
+        if (!response.ok && response.status === 408) { // Handle explicit 408 timeout status
+             throw new Error('Request timed out (408)');
         }
-
-        if (potentialJson) {
-            try {
-                const parsedJson = JSON.parse(potentialJson);
-
-                // 1. Check for the target candidate text
-                if (parsedJson.candidates?.[0]?.content?.parts?.[0]?.text) {
-                    extractedText = parsedJson.candidates[0].content.parts[0].text;
-                }
-                // 2. Check for an error message within the JSON
-                else if (parsedJson.error?.message) {
-                    console.error("Gemini API Error in response:", parsedJson.error.message);
-                    return `Error: ${parsedJson.error.message}`; // Return formatted error
-                }
-                // 3. If parsed but no text/error found (e.g., only safety ratings in chunk)
-                else {
-                    extractedText = ""; // Wait for next chunk
-                }
-
-            } catch (e) {
-                // JSON parsing failed - likely incomplete chunk. Wait for more data.
-                extractedText = "";
-            }
-        } else {
-            // Doesn't look like SSE or JSON.
-            extractedText = "";
+        return response;
+    } catch (error) {
+        clearTimeout(timeoutId);
+        if ((error as Error).name === 'AbortError') {
+            console.warn('Fetch timed out (AbortController):', url);
+            throw new Error('Request timed out');
         }
-        // Clean common prefixes
-        return extractedText.replace(/^Assistant:\s*/, '').replace(/^(User|Human):\s*/, '').trim();
-
-    } catch (err) {
-        console.error("Error *during* extraction logic:", err, "Original text:", rawResponseText);
-        return ""; // Fallback cautiously
+        throw error;
     }
+};
+
+// Simplified streamResponse - assumes SSE format from Gemini 1.5 Flash
+const streamResponse = async (
+    url: string,
+    options: RequestInit,
+    onDelta: (delta: string) => void, // Callback for each text delta
+    onError: (error: Error) => void // Callback for errors during stream
+): Promise<string> => {
+    let accumulatedText = "";
+    try {
+        const response = await fetch(url, options); // No explicit timeout for SSE fetch
+
+        if (!response.ok) {
+            let errorBody = '';
+            try {
+                errorBody = await response.text();
+                const errorJson = JSON.parse(errorBody);
+                if (errorJson?.error?.message) {
+                   throw new Error(`API Error (${response.status}): ${errorJson.error.message}`);
+                }
+            } catch (parseError) { /* Ignore */ }
+            throw new Error(`API Request Failed (${response.status}): ${response.statusText} ${errorBody || ''}`);
+        }
+
+        if (!response.body) {
+            throw new Error("Response body is null");
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let buffer = "";
+
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+
+            // Process buffer line by line for SSE events
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || ""; // Keep the last potentially incomplete line
+
+            for (const line of lines) {
+                if (line.startsWith("data:")) {
+                    const jsonData = line.substring(5).trim();
+                    try {
+                        const parsed = JSON.parse(jsonData);
+                        // Extract text delta (Gemini 1.5 format might differ slightly, adjust if needed)
+                        const delta = parsed?.candidates?.[0]?.content?.parts?.[0]?.text;
+                        if (delta) {
+                            accumulatedText += delta;
+                            onDelta(delta); // Pass *only the change*
+                        }
+                         // Check for finish reason or errors within the stream data
+                        if (parsed?.candidates?.[0]?.finishReason && parsed.candidates[0].finishReason !== "STOP") {
+                            console.warn("Stream finished with reason:", parsed.candidates[0].finishReason, parsed?.candidates?.[0]?.safetyRatings);
+                            // Potentially throw an error based on finishReason or safety ratings
+                            if (parsed.candidates[0].finishReason === "SAFETY") {
+                                throw new Error("Response blocked due to safety settings.");
+                            }
+                        }
+                    } catch (e) {
+                        console.warn("Error parsing SSE data chunk:", e, "Chunk:", jsonData);
+                        // Decide how to handle parse errors, maybe ignore minor ones
+                    }
+                }
+            }
+        }
+         // Final decode for any remaining buffer content (likely empty)
+        buffer += decoder.decode();
+        if (buffer.startsWith("data:")) {
+           // Process final chunk if necessary (similar logic as above)
+           const jsonData = buffer.substring(5).trim();
+             try {
+               const parsed = JSON.parse(jsonData);
+               const delta = parsed?.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (delta) {
+                    accumulatedText += delta;
+                    onDelta(delta);
+                }
+             } catch (e) { /* Ignore final parse error */ }
+        }
+
+
+        return accumulatedText; // Return final accumulated text
+
+    } catch (error) {
+        console.error("Streaming Error:", error);
+        onError(error as Error); // Call error callback
+        throw error; // Re-throw to be caught by handleChatSubmit
+    }
+};
+
+// Function to extract *all* text from a standard Gemini NON-STREAMING response
+const extractFullTextFromApiResponse = (apiResponse: any): string => {
+    try {
+        if (apiResponse?.candidates?.[0]?.content?.parts?.[0]?.text) {
+            return apiResponse.candidates[0].content.parts[0].text.trim();
+        }
+        if (apiResponse?.error?.message) {
+            return `Error: ${apiResponse.error.message}`;
+        }
+    } catch (e) {
+        console.error("Error extracting full text:", e);
+    }
+    return ""; // Fallback
 };
 
 
 function extractJsonBlocks(text: string): string[] {
-  const blocks: string[] = [];
-  // Look for ```json blocks first
-  const codeBlockRegex = /```json\s*([\s\S]*?)\s*```/g;
-  let match;
-  while ((match = codeBlockRegex.exec(text)) !== null) {
-    blocks.push(match[1].trim());
-  }
-
-  if (blocks.length > 0) {
-    return blocks;
-  }
-
-  // Fallback: Try to find JSON objects directly if no code blocks found
-  // This is less reliable but can catch cases where the LLM forgets backticks
-  try {
-    // Attempt to parse the entire string as JSON if it starts/ends with braces
-    if (text.trim().startsWith('{') && text.trim().endsWith('}')) {
-      JSON.parse(text.trim()); // Validate it's parseable
-      blocks.push(text.trim());
-      return blocks;
+    const blocks: string[] = [];
+    const codeBlockRegex = /```json\s*([\s\S]*?)\s*```/g;
+    let match;
+    while ((match = codeBlockRegex.exec(text)) !== null) {
+        try {
+             // Validate JSON syntax before adding
+             JSON.parse(match[1].trim());
+             blocks.push(match[1].trim());
+        } catch (e) {
+             console.warn("Invalid JSON found in code block, skipping:", match[1].trim());
+        }
     }
-    // More complex regex for finding JSON objects is possible but prone to errors
-  } catch (e) {
-    // Ignore parsing errors for the fallback
-  }
-
-  return blocks; // Return empty if no reliable JSON found
+    // Do not fall back to parsing the whole text as JSON - too unreliable.
+    // Only trust explicitly marked ```json blocks.
+    return blocks;
 }
 
 
@@ -245,868 +231,671 @@ function extractJsonBlocks(text: string): string[] {
 export function AIChat() {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
-  const [userName, setUserName] = useState<string>('Loading...');
+  const [userName, setUserName] = useState<string>('User'); // Default to 'User'
   const truncatedName = userName.split(' ')[0] || userName;
 
   const [chatMessage, setChatMessage] = useState('');
   const [chatHistory, setChatHistory] = useState<ChatMessageData[]>([]);
   const [isChatLoading, setIsChatLoading] = useState(false);
-  const [streamingAssistantContent, setStreamingAssistantContent] = useState('');
   const chatEndRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null); // Ref for file input
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Context state
   const [isContextDialogOpen, setIsContextDialogOpen] = useState(false);
   const [userContext, setUserContext] = useState<UserContext | null>(null);
 
-  // Chat style state
   const [activeStyle, setActiveStyle] = useState<string | null>(null);
   const [activePrompt, setActivePrompt] = useState<string | null>(null);
   const [customStyles, setCustomStyles] = useState<Record<string, { description: string; prompt: string }>>({});
 
-  // Collections
   const [tasks, setTasks] = useState<Array<{ id: string; data: any }>>([]);
   const [goals, setGoals] = useState<Array<{ id: string; data: any }>>([]);
   const [projects, setProjects] = useState<Array<{ id: string; data: any }>>([]);
   const [plans, setPlans] = useState<Array<{ id: string; data: any }>>([]);
 
-  // Conversation management
   const [hasGeneratedChatName, setHasGeneratedChatName] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
-  const [conversationList, setConversationList] = useState<any[]>([]);
-  const [activeConvMenu, setActiveConvMenu] = useState<string | null>(null); // State for active menu
-  const [isConvListOpen, setIsConvListOpen] = useState(false); // State for mobile conv list toggle
+  const [conversationList, setConversationList] = useState<Array<{ id: string; chatName: string; createdAt: Timestamp; updatedAt?: Timestamp }>>([]); // Add type
+  const [activeConvMenu, setActiveConvMenu] = useState<string | null>(null);
+  const [isConvListOpen, setIsConvListOpen] = useState(false);
 
-  // File Upload State
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-  // ----- Theming & Sidebar States ----- (Adopted from Dashboard.tsx)
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
-    const stored = localStorage.getItem('isSidebarCollapsed');
-    return stored ? JSON.parse(stored) : false;
-  });
-  const [isBlackoutEnabled, setIsBlackoutEnabled] = useState(() => {
-    const stored = localStorage.getItem('isBlackoutEnabled');
-    return stored ? JSON.parse(stored) : false;
-  });
-  const [isSidebarBlackoutEnabled, setIsSidebarBlackoutEnabled] = useState(() => {
-    const stored = localStorage.getItem('isSidebarBlackoutEnabled');
-    return stored ? JSON.parse(stored) : false;
-  });
-  const [isIlluminateEnabled, setIsIlluminateEnabled] = useState(() => {
-    // Default to true (light mode)
-    const stored = localStorage.getItem('isIlluminateEnabled');
-    return stored ? JSON.parse(stored) : true;
-  });
-  const [isSidebarIlluminateEnabled, setIsSidebarIlluminateEnabled] = useState(() => {
-    const stored = localStorage.getItem('isSidebarIlluminateEnabled');
-    return stored ? JSON.parse(stored) : false; // Default sidebar illuminate to off? Or match main? Let's match main.
-    // return stored ? JSON.parse(stored) : true;
-  });
+  // ----- Theming & Sidebar States -----
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => JSON.parse(localStorage.getItem('isSidebarCollapsed') || 'false'));
+  const [isBlackoutEnabled, setIsBlackoutEnabled] = useState(() => JSON.parse(localStorage.getItem('isBlackoutEnabled') || 'false'));
+  const [isSidebarBlackoutEnabled, setIsSidebarBlackoutEnabled] = useState(() => JSON.parse(localStorage.getItem('isSidebarBlackoutEnabled') || 'false'));
+  const [isIlluminateEnabled, setIsIlluminateEnabled] = useState(() => JSON.parse(localStorage.getItem('isIlluminateEnabled') || 'true'));
+  const [isSidebarIlluminateEnabled, setIsSidebarIlluminateEnabled] = useState(() => JSON.parse(localStorage.getItem('isSidebarIlluminateEnabled') || 'true'));
 
-  // ----- Theme Variables (from Dashboard.tsx) -----
-  const containerClass = isIlluminateEnabled
-    ? "bg-gray-50 text-gray-900"
-    : isBlackoutEnabled
-      ? "bg-black text-gray-200"
-      : "bg-gray-900 text-gray-200";
-
-  const cardClass = isIlluminateEnabled // Used for chat bubbles, input areas, sidebars
-    ? "bg-white text-gray-900 border border-gray-200/70 shadow-sm"
-    : isBlackoutEnabled
-      ? "bg-gray-900 text-gray-300 border border-gray-700/50 shadow-md shadow-black/20"
-      : "bg-gray-800 text-gray-300 border border-gray-700/50 shadow-lg shadow-black/20";
-
+ // ----- Theme Variables -----
+  const containerClass = isIlluminateEnabled ? "bg-gray-50 text-gray-900" : isBlackoutEnabled ? "bg-black text-gray-200" : "bg-gray-900 text-gray-200";
+  const cardClass = isIlluminateEnabled ? "bg-white text-gray-900 border border-gray-200/70 shadow-sm" : isBlackoutEnabled ? "bg-gray-900 text-gray-300 border border-gray-700/50" : "bg-gray-800 text-gray-300 border border-gray-700/50";
   const headingClass = isIlluminateEnabled ? "text-gray-800" : "text-gray-100";
   const subheadingClass = isIlluminateEnabled ? "text-gray-600" : "text-gray-400";
-  const inputBg = isIlluminateEnabled ? "bg-gray-100 hover:bg-gray-200/50 border-gray-300 focus:border-blue-500 focus:ring-blue-500" : "bg-gray-700 hover:bg-gray-600/50 border-gray-600 focus:border-blue-500 focus:ring-blue-500";
+  const inputBg = isIlluminateEnabled ? "bg-gray-100 border-gray-300 focus:border-blue-500 focus:ring-blue-500" : "bg-gray-700 border-gray-600 focus:border-blue-500 focus:ring-blue-500";
   const iconColor = isIlluminateEnabled ? "text-gray-500 hover:text-gray-700" : "text-gray-400 hover:text-gray-200";
-  const illuminateTextBlue = isIlluminateEnabled ? "text-blue-700" : "text-blue-400";
-  const illuminateTextPurple = isIlluminateEnabled ? "text-purple-700" : "text-purple-400";
-  const illuminateBorder = isIlluminateEnabled ? "border-gray-300" : "border-gray-600/80";
-  const illuminateBgHover = isIlluminateEnabled ? "hover:bg-gray-100" : "hover:bg-gray-700";
+  const illuminateTextBlue = isIlluminateEnabled ? "text-blue-600" : "text-blue-400"; // Adjusted light mode blue
+  const illuminateTextPurple = isIlluminateEnabled ? "text-purple-600" : "text-purple-400";
+  const illuminateBorder = isIlluminateEnabled ? "border-gray-200" : "border-gray-700"; // Adjusted border contrast
+  const illuminateBgHover = isIlluminateEnabled ? "hover:bg-gray-100" : "hover:bg-gray-700/50"; // Slightly transparent dark hover
+  const userBubbleClass = isIlluminateEnabled ? 'bg-blue-500 text-white' : 'bg-blue-600 text-white';
+  const assistantBubbleClass = isIlluminateEnabled ? 'bg-gray-100 text-gray-800 border border-gray-200/80' : isBlackoutEnabled ? 'bg-gray-800 text-gray-200 border border-gray-700/50' : 'bg-gray-700 text-gray-200 border border-gray-600/50'; // Adjusted assistant bubble
 
-  const userBubbleClass = isIlluminateEnabled
-    ? 'bg-blue-500 text-white'
-    : 'bg-blue-600 text-white'; // Keep user bubble distinct
-
-  const assistantBubbleClass = isIlluminateEnabled
-    ? 'bg-gray-100 text-gray-800 border border-gray-200/80' // Lighter assistant bubble
-    : isBlackoutEnabled
-      ? 'bg-gray-800 text-gray-200 border border-gray-700/50' // Darker in blackout
-      : 'bg-gray-700/80 text-gray-200 border border-gray-600/50'; // Default dark
 
   // ----- Effects -----
-  // LocalStorage sync effects (keep existing)
   useEffect(() => { localStorage.setItem('isSidebarCollapsed', JSON.stringify(isSidebarCollapsed)); }, [isSidebarCollapsed]);
   useEffect(() => { localStorage.setItem('isBlackoutEnabled', JSON.stringify(isBlackoutEnabled)); }, [isBlackoutEnabled]);
   useEffect(() => { localStorage.setItem('isSidebarBlackoutEnabled', JSON.stringify(isSidebarBlackoutEnabled)); }, [isSidebarBlackoutEnabled]);
   useEffect(() => { localStorage.setItem('isIlluminateEnabled', JSON.stringify(isIlluminateEnabled)); }, [isIlluminateEnabled]);
   useEffect(() => { localStorage.setItem('isSidebarIlluminateEnabled', JSON.stringify(isSidebarIlluminateEnabled)); }, [isSidebarIlluminateEnabled]);
 
-  // Body class toggling for themes
   useEffect(() => {
-    if (isIlluminateEnabled) {
-      document.body.classList.add('illuminate-mode');
-      document.body.classList.remove('blackout-mode');
-    } else {
-      document.body.classList.remove('illuminate-mode');
-      document.body.classList.toggle('blackout-mode', isBlackoutEnabled);
-    }
+    document.body.classList.toggle('illuminate-mode', isIlluminateEnabled);
+    document.body.classList.toggle('blackout-mode', !isIlluminateEnabled && isBlackoutEnabled);
   }, [isIlluminateEnabled, isBlackoutEnabled]);
 
-  // Auth effect (keep existing)
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      setUser(firebaseUser);
       if (firebaseUser) {
+        setUser(firebaseUser);
         setUserName(firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User');
       } else {
-        // Redirect if user logs out while on this page
+        setUser(null);
+        setUserName('User');
+        setConversationId(null); // Clear conversation on logout
+        setChatHistory([]);
         navigate('/login');
       }
     });
     return () => unsubscribe();
   }, [navigate]);
 
-  // Initial auth check (keep existing)
   useEffect(() => {
     const firebaseUser = getCurrentUser();
-    if (firebaseUser) {
-      setUser(firebaseUser);
-      setUserName(firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User');
-    } else {
-      navigate('/login');
-    }
+    if (!firebaseUser) navigate('/login');
+    else setUser(firebaseUser);
   }, [navigate]);
 
-  // Collection listeners (keep existing)
+  // Collection listeners (unchanged)
   useEffect(() => {
     if (!user) return;
-    const unsubTasks = onCollectionSnapshot('tasks', user.uid, (items) => setTasks(items));
-    const unsubGoals = onCollectionSnapshot('goals', user.uid, (items) => setGoals(items));
-    const unsubProjects = onCollectionSnapshot('projects', user.uid, (items) => setProjects(items));
-    const unsubPlans = onCollectionSnapshot('plans', user.uid, (items) => setPlans(items));
-    return () => { unsubTasks(); unsubGoals(); unsubProjects(); unsubPlans(); };
+    const unsubs = [
+        onCollectionSnapshot('tasks', user.uid, setTasks),
+        onCollectionSnapshot('goals', user.uid, setGoals),
+        onCollectionSnapshot('projects', user.uid, setProjects),
+        onCollectionSnapshot('plans', user.uid, setPlans),
+        onUserContextChange(user.uid, setUserContext),
+        onChatConversationsSnapshot(user.uid, setConversationList)
+    ];
+    return () => { unsubs.forEach(unsub => unsub()); };
   }, [user]);
 
-  // Context listener (keep existing)
-  useEffect(() => {
-    if (!user) return;
-    const unsubscribe = onUserContextChange(user.uid, (context) => setUserContext(context));
-    return () => unsubscribe();
-  }, [user]);
+   // Messages listener - simplified and memoized callback
+  const handleMessagesSnapshot = useCallback((messages: ChatMessageData[]) => {
+    // Sort messages by timestamp just in case they arrive out of order
+    messages.sort((a, b) => a.createdAt.toMillis() - b.createdAt.toMillis());
+    setChatHistory(messages);
+  }, []); // No dependencies needed for the callback itself
 
-  // Conversation list listener (keep existing)
-  useEffect(() => {
-    if (!user) return;
-    const unsubscribe = onChatConversationsSnapshot(user.uid, (conversations) => setConversationList(conversations));
-    return () => unsubscribe();
-  }, [user]);
-
-  // Messages listener (keep existing)
   useEffect(() => {
     if (!conversationId || !user) {
-      setChatHistory([]); // Clear history if no user or conversation
+      setChatHistory([]);
       return;
     }
-    // Ensure listener runs only when conversationId and user are valid
-    const unsubscribe = onChatMessagesSnapshot(conversationId, (messages) => setChatHistory(messages));
+    const unsubscribe = onChatMessagesSnapshot(conversationId, handleMessagesSnapshot);
     return () => unsubscribe();
-  }, [conversationId, user]); // Add user dependency
+  }, [conversationId, user, handleMessagesSnapshot]); // Re-run if conversationId, user, or callback changes
 
-  // Scroll to bottom on chat updates (keep existing)
+
+  // Scroll to bottom
   useEffect(() => {
-    setTimeout(() => { // Add slight delay for smoother scroll after render
+    // Debounce or throttle? For now, simple timeout
+    const timer = setTimeout(() => {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-    }, 100);
-  }, [chatHistory, streamingAssistantContent]); // Scroll when streaming too
+    }, 150); // Slightly longer delay
+    return () => clearTimeout(timer);
+  }, [chatHistory]); // Trigger only when history definitively changes
 
-
-  // ----- Context Handlers ----- (Keep existing)
-  const handleSaveContext = async (context: Partial<UserContext>) => {
+  // ----- Context, Style, Timer Handlers (Keep existing logic) -----
+  const handleSaveContext = useCallback(async (context: Partial<UserContext>) => {
     if (!user) return;
     await saveUserContext(user.uid, context);
-  };
+  }, [user]);
 
-  // ----- Style Handlers ----- (Keep existing)
-  const handleStyleSelect = (style: string, prompt: string) => {
+  const handleStyleSelect = useCallback((style: string, prompt: string) => {
     setActiveStyle(style);
     setActivePrompt(prompt);
-  };
-  const handleCustomStyleCreate = (style: { name: string; description: string; prompt: string }) => {
+  }, []);
+
+  const handleCustomStyleCreate = useCallback((style: { name: string; description: string; prompt: string }) => {
     setCustomStyles(prev => ({ ...prev, [style.name]: { description: style.description, prompt: style.prompt } }));
     setActiveStyle(style.name);
     setActivePrompt(style.prompt);
-  };
+  }, []);
 
-  // ----- UI Toggles ----- (Keep existing)
-  const handleToggleSidebar = () => setIsSidebarCollapsed((prev) => !prev);
-  // const handleToggleBlackout = () => setIsBlackoutEnabled((prev) => !prev); // Removed as it's in Sidebar now
+  const parseTimerRequest = useCallback((message: string): number | null => {
+     const timeRegex = /(\d+)\s*(minutes?|mins?|hours?|hrs?|seconds?|secs?)/i;
+     const match = message.match(timeRegex);
+     if (!match) return null;
+     const amount = parseInt(match[1], 10);
+     const unit = match[2].toLowerCase();
+     if (isNaN(amount) || amount <= 0) return null;
+     if (unit.startsWith('hour') || unit.startsWith('hr')) return amount * 3600;
+     if (unit.startsWith('min')) return amount * 60;
+     if (unit.startsWith('sec')) return amount;
+     return null;
+   }, []);
 
-  // ----- Timer Logic ----- (Keep existing)
-  const parseTimerRequest = (message: string): number | null => {
-    const timeRegex = /(\d+)\s*(minutes?|mins?|hours?|hrs?|seconds?|secs?)/i;
-    const match = message.match(timeRegex);
-    if (!match) return null;
-    const amount = parseInt(match[1], 10);
-    const unit = match[2].toLowerCase();
-    if (isNaN(amount) || amount <= 0) return null;
-    if (unit.startsWith('hour') || unit.startsWith('hr')) return amount * 3600;
-    if (unit.startsWith('min')) return amount * 60;
-    if (unit.startsWith('sec')) return amount;
-    return null;
-  };
+  const handleTimerComplete = useCallback((timerId: string) => {
+     if (!conversationId || !user) return;
+     const completeMsg: Omit<ChatMessageData, 'id' | 'createdAt'> = { // Omit fields generated by saveChatMessage
+       role: 'assistant',
+       content: `⏰ Timer (${timerId.substring(0,4)}...) finished!`,
+     };
+     saveChatMessage(conversationId, completeMsg);
+   }, [conversationId, user]);
 
-  const handleTimerComplete = (timerId: string) => {
-    if (!conversationId || !user) return;
-    saveChatMessage(conversationId, {
-      role: 'assistant',
-      content: "⏰ Time's up! Your timer has finished.",
-    });
-  };
+  // ----- Prompt Generation -----
+   const formatItemsForChat = useCallback(() => {
+     const allItems = [...tasks, ...goals, ...projects, ...plans];
+     if (allItems.length === 0) return "No items found.";
+     const formatDate = (date: Date) => date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+     let text = `Current items for ${userName}:\n`;
+     text += tasks.map(t => `- Task: ${t.data.task || 'Untitled'} ${t.data.dueDate?.toDate ? `(Due: ${formatDate(t.data.dueDate.toDate())})` : ''} [${t.data.completed ? 'Done' : 'Pending'}]`).join('\n');
+     text += goals.map(g => `- Goal: ${g.data.goal || 'Untitled'} ${g.data.dueDate?.toDate ? `(Due: ${formatDate(g.data.dueDate.toDate())})` : ''} [${g.data.completed ? 'Done' : 'Pending'}]`).join('\n');
+     text += projects.map(p => `- Project: ${p.data.project || 'Untitled'} ${p.data.dueDate?.toDate ? `(Due: ${formatDate(p.data.dueDate.toDate())})` : ''} [${p.data.completed ? 'Done' : 'Pending'}]`).join('\n');
+     text += plans.map(pl => `- Plan: ${pl.data.plan || 'Untitled'} ${pl.data.dueDate?.toDate ? `(Due: ${formatDate(pl.data.dueDate.toDate())})` : ''} [${pl.data.completed ? 'Done' : 'Pending'}]`).join('\n');
+     return text.replace(/\n+/g, '\n').trim(); // Clean up extra newlines
+   }, [tasks, goals, projects, plans, userName]);
 
-  // ----- Build Prompt for Gemini ----- (Keep existing logic)
-  const formatItemsForChat = () => {
-    // Use smaller date format like Dashboard
-    const formatDate = (date: Date) => date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    const lines: string[] = [];
-    if ([...tasks, ...goals, ...projects, ...plans].length === 0) return "No items found.";
-
-    lines.push(`Current items for ${userName}:\n`);
-    tasks.forEach((t) => lines.push(`- Task: ${t.data.task || 'Untitled'}${t.data.dueDate?.toDate ? ` (Due: ${formatDate(t.data.dueDate.toDate())})` : ''} [${t.data.completed ? 'Done' : 'Pending'}]`));
-    goals.forEach((g) => lines.push(`- Goal: ${g.data.goal || 'Untitled'}${g.data.dueDate?.toDate ? ` (Due: ${formatDate(g.data.dueDate.toDate())})` : ''} [${g.data.completed ? 'Done' : 'Pending'}]`));
-    projects.forEach((p) => lines.push(`- Project: ${p.data.project || 'Untitled'}${p.data.dueDate?.toDate ? ` (Due: ${formatDate(p.data.dueDate.toDate())})` : ''} [${p.data.completed ? 'Done' : 'Pending'}]`));
-    plans.forEach((pl) => lines.push(`- Plan: ${pl.data.plan || 'Untitled'}${pl.data.dueDate?.toDate ? ` (Due: ${formatDate(pl.data.dueDate.toDate())})` : ''} [${pl.data.completed ? 'Done' : 'Pending'}]`));
-    return lines.join('\n');
-  };
-
-  const createPrompt = (userMessage: string, uploadedFileInfo?: { name: string; type: string }): string => {
-    // Slice history to keep prompt length reasonable
-    const conversationSoFar = chatHistory
-      .slice(-8) // Limit to last ~8 turns
+  const createPrompt = useCallback((userMessage: string, uploadedFileInfo?: { name: string; type: string }): string => {
+    const conversationHistoryText = chatHistory
+      .slice(-6) // Limit context window
       .map((m) => `${m.role === 'user' ? userName : 'Assistant'}: ${m.content}`)
       .join('\n');
 
     const itemsText = formatItemsForChat();
     const now = new Date();
-    const currentDateTime = {
-      date: now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
-      time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }),
-    };
+    const dateTimeInfo = `${now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}, ${now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`;
 
-    let styleInstruction = activePrompt ? `\n[RESPONSE STYLE]\n${activePrompt}\n` : '';
-    let contextSection = '';
-    if (userContext && (userContext.workDescription || userContext.shortTermFocus || userContext.longTermGoals || userContext.otherContext)) {
-        contextSection = `\n[USER CONTEXT]\n`;
-        if (userContext.workDescription) contextSection += `- Work: ${userContext.workDescription}\n`;
-        if (userContext.shortTermFocus) contextSection += `- Focus: ${userContext.shortTermFocus}\n`;
-        if (userContext.longTermGoals) contextSection += `- Goals: ${userContext.longTermGoals}\n`;
-        if (userContext.otherContext) contextSection += `- Other: ${userContext.otherContext}\n`;
+    let contextText = "";
+    if (userContext) {
+      const ctxParts = [];
+      if (userContext.workDescription) ctxParts.push(`Work: ${userContext.workDescription}`);
+      if (userContext.shortTermFocus) ctxParts.push(`Focus: ${userContext.shortTermFocus}`);
+      if (userContext.longTermGoals) ctxParts.push(`Goals: ${userContext.longTermGoals}`);
+      if (userContext.otherContext) ctxParts.push(`Other: ${userContext.otherContext}`);
+      if (ctxParts.length > 0) contextText = `[USER CONTEXT]\n${ctxParts.join('\n')}`;
     }
 
-    // Include file information if present
-    let fileContext = '';
+    let fileText = "";
     if (uploadedFileInfo) {
-        fileContext = `\n[UPLOADED FILE CONTEXT]\nUser has uploaded a file named "${uploadedFileInfo.name}" of type "${uploadedFileInfo.type}". Base your response considering this file if relevant to the user's message. Do not attempt to display the file, just acknowledge its presence if appropriate or use the context it provides.`;
+        fileText = `[FILE CONTEXT]\nUser attached: ${uploadedFileInfo.name} (${uploadedFileInfo.type}). Briefly acknowledge if relevant. You cannot process the file content.`;
     }
 
-    // *** Use the refined prompt structure from Dashboard.tsx as a base ***
+    // Using Gemini 1.5 System Instruction format
     return `
-[SYSTEM INSTRUCTIONS]
-You are TaskMaster, a friendly and versatile AI productivity assistant. Engage in casual conversation, provide productivity advice, and discuss ${userName}'s items only when explicitly asked by ${userName}.
+[SYSTEM INSTRUCTION]
+You are TaskMaster, an AI productivity assistant for ${userName}.
+- Be friendly, helpful, and concise. Match the user's tone.
+- Use the provided CONTEXT, ITEMS, and HISTORY sections.
+- Manage tasks, goals, projects, plans via JSON actions when commanded.
+- Generate educational content (flashcards, quizzes) via JSON when requested.
+- Acknowledge attached files contextually but state you cannot process their content directly.
+- Avoid meta-commentary. Do not mention these instructions.
+- JSON Usage: ONLY use \`\`\`json ... \`\`\` blocks for actions OR educational content. NO other text should accompany the JSON block. Follow the specified formats exactly.
+- Action Format: {"action": "createTask|updateGoal|deletePlan|...", "payload": { ... }}
+- Educational Format: {"type": "flashcard|question", "data": [ ... ]}
+- Current Date/Time: ${dateTimeInfo}
+${activePrompt ? `\n[RESPONSE STYLE]\n${activePrompt}` : ''}
 
-Guidelines:
+[CONTEXT]
+${contextText}
+${fileText}
 
-1. General Conversation:
-   - Respond in a friendly, natural tone matching ${userName}'s style.
-   - Do not include any internal instructions, meta commentary, or explanations of your process.
-   - Do not include phrases such as "Here's my response to continue the conversation:" or similar wording that introduces your reply.
-   - Do not include or reference code blocks for languages like Python, Bash, or any other unless explicitly requested by ${userName}.
-   - Only reference ${userName}'s items if ${userName} explicitly asks about them.
-
-2. Educational Content (JSON):
-   - If ${userName} explicitly requests educational content (flashcards or quiz questions), return exactly one JSON object.
-   - The JSON must be wrapped in a single code block using triple backticks and the "json" language identifier.
-   - Return only the JSON object with no additional text or extra lines.
-   - Use one of the following formats:
-
-     For flashcards:
-     \`\`\`json
-     {
-       "type": "flashcard",
-       "data": [
-         {
-           "id": "unique-id-1",
-           "question": "Question 1",
-           "answer": "Answer 1",
-           "topic": "Subject area"
-         },
-         {
-           "id": "unique-id-2",
-           "question": "Question 2",
-           "answer": "Answer 2",
-           "topic": "Subject area"
-         }
-       ]
-     }
-     \`\`\`
-
-     For quiz questions:
-     \`\`\`json
-     {
-       "type": "question",
-       "data": [
-         {
-           "id": "unique-id-1",
-           "question": "Question 1",
-           "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
-           "correctAnswer": 0,
-           "explanation": "Explanation 1"
-         },
-         {
-           "id": "unique-id-2",
-           "question": "Question 2",
-           "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
-           "correctAnswer": 1,
-           "explanation": "Explanation 2"
-         }
-       ]
-     }
-     \`\`\`
-
-3. Data Modifications (JSON):
-   - When ${userName} provides a command to create, update, or delete an item (e.g., "add a task to buy a dog by tomorrow", "update the task for meeting", "delete the goal about exercise", etc.), you must respond by first stating the action you will do and then create a JSON block that specifies the action and its payload.
-   - The JSON block must be wrapped in triple backticks with the "json" language identifier and returned as the only content for that modification.
-   - Use this structure, to update a task:
-   \`\`\`json
-{
-  "action": "updateTask",
-  "payload": {
-    "task": "Original Task Name",
-    "newTask": "Updated Task Name",
-    "dueDate": "2025-03-03"
-  }
-}
-   \`\`\`
-   - For deletion:
-   \`\`\`json
-   {
-     "action": "deleteTask",
-     "payload": {
-       "task": "Study Digital Marketing"
-     }
-   }
-   \`\`\`
-   - For creating:
-      \`\`\`json
-   {
-     "action": "createTask",
-     "payload": {
-       "task": "Study Digital Marketing",
-       "dueDate": "2025-03-03"
-     }
-   }
-   \`\`\`
-   - You may return multiple JSON blocks if multiple items are to be created, updated, or deleted.
-   - Do not include any additional text with the JSON block; it should be the sole output for that command.
-
-4. Response Structure:
-   - Provide a direct, natural response to ${userName} without extraneous meta-text.
-   - Do not mix JSON with regular text. If you return JSON (for educational content or data modifications), return it as the only content (i.e. no additional text or empty lines).
-   - Always address ${userName} in a friendly and helpful tone.
-
-Follow these instructions strictly.
-
-[CURRENT DATE/TIME]
-${currentDateTime.date}, ${currentDateTime.time}
-${styleInstruction}${contextSection}${fileContext}
 [USER ITEMS]
 ${itemsText}
 
-[CONVERSATION HISTORY (Last few turns)]
-${conversationSoFar}
+[CONVERSATION HISTORY]
+${conversationHistoryText}
 
-[NEW USER MESSAGE]
-${userName}: ${userMessage}
+[USER MESSAGE]
+${userMessage}
 
-[YOUR RESPONSE]
-Assistant:`;
-  };
+[ASSISTANT RESPONSE]`;
+}, [chatHistory, userName, formatItemsForChat, userContext, activePrompt]);
 
-  // ----- Generate Chat Name ----- (Keep existing logic)
-  const generateChatName = async (convId: string, conversationSoFar: string) => {
-    if (!geminiApiKey || !user) return; // Ensure API key and user exist
+
+  // ----- Chat Name Generation -----
+  const generateChatName = useCallback(async (convId: string, history: ChatMessageData[]) => {
+    if (!geminiApiKey || !user || history.length < 2) return; // Need at least user + assistant message
+    console.log("Attempting to generate chat name for:", convId);
+    setHasGeneratedChatName(true); // Mark as attempted
+
+    const conversationSample = history
+        .slice(-5) // Use last few messages
+        .map(m => `${m.role}: ${m.content}`)
+        .join('\n');
+
+    const namePrompt = `Create a very short (3-6 words) title for this conversation:\n\n${conversationSample}\n\nTitle:`;
+
     try {
-      const namePrompt = `Summarize this conversation in 3-5 words for a concise title:\n\n${conversationSoFar.split('\n').slice(-6).join('\n')}\n\nTitle:`; // Limit context for naming
-      const options = {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: namePrompt }] }],
-          generationConfig: { maxOutputTokens: 15, temperature: 0.4 }, // Short, less creative title
-           safetySettings: [ // Standard safety settings
-                { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-                { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-                { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-                { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-            ],
-        }),
-      };
-      const response = await fetchWithTimeout(geminiEndpoint, options, 15000); // Shorter timeout for naming
-      const resultJson = await response.json();
-      const rawText = extractCandidateText(JSON.stringify(resultJson));
-      const finalTitle = rawText.replace(/["*]/g, '').trim() || 'Chat'; // Clean title
-      await updateChatConversationName(convId, finalTitle.slice(0, 50)); // Limit length
+        const options = {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: namePrompt }] }],
+                generationConfig: { maxOutputTokens: 20, temperature: 0.5 },
+                safetySettings: [ /* Standard safety settings */
+                    { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+                    { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+                    { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+                    { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+                ],
+            }),
+        };
+        // Use non-streaming endpoint for chat naming
+        const response = await fetchWithTimeout(geminiGenerateContent, options, 15000);
+        if (!response.ok) throw new Error(`API Error (${response.status})`);
+        const resultJson = await response.json();
+        const rawText = extractFullTextFromApiResponse(resultJson); // Use full text extractor
+        const finalTitle = rawText.replace(/["*]/g, '').trim().slice(0, 60) || 'Chat';
+        await updateChatConversationName(convId, finalTitle);
+        console.log("Generated chat name:", finalTitle);
     } catch (err) {
-      console.error('Error generating chat name:', err);
-      // Don't block user, just proceed without renaming if it fails
+        console.error('Error generating chat name:', err);
+        // Don't reset hasGeneratedChatName - we tried.
     }
-  };
+  }, [user]); // Depends on user
+
 
   // ----- File Handling -----
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files[0]) {
-      const file = event.target.files[0];
-      // Optional: Add file type/size validation here
-      // const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/gif'];
-      // if (!allowedTypes.includes(file.type)) {
-      //   alert('Unsupported file type. Please upload PDF or Images.');
-      //   return;
-      // }
-      // if (file.size > 5 * 1024 * 1024) { // 5MB limit example
-      //   alert('File size exceeds 5MB limit.');
-      //   return;
-      // }
-      setSelectedFile(file);
-    }
-  };
-
-  const triggerFileSelect = () => {
-    fileInputRef.current?.click();
-  };
-
-  const removeSelectedFile = () => {
-    setSelectedFile(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ""; // Reset the input field
-    }
-  };
-
- // ----- Chat Submission -----
-  const handleChatSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const messageToSend = chatMessage.trim();
-    const currentFile = selectedFile; // Capture file state
-
-    if (!messageToSend && !currentFile) return; // Need message or file
-    if (!user) return; // Need user
-
-    // Ensure conversation exists or create one
-    let currentConvId = conversationId;
-    if (!currentConvId) {
-      currentConvId = await createChatConversation(user.uid, "New Chat");
-      if (!currentConvId) {
-        console.error("Failed to create conversation");
-        alert("Error starting conversation. Please try again.");
+  const handleFileSelect = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      // Basic validation example (optional)
+      if (file.size > 10 * 1024 * 1024) { // 10MB limit
+        alert("File is too large (max 10MB).");
+        event.target.value = ""; // Clear selection
         return;
       }
-      setConversationId(currentConvId);
-      setHasGeneratedChatName(false); // Reset name generation flag for new chat
+      setSelectedFile(file);
     }
+  }, []);
 
-    // Construct user message content
-    let userMessageContent = messageToSend;
-    let fileInfoForPrompt: { name: string; type: string } | undefined = undefined;
+  const triggerFileSelect = useCallback(() => fileInputRef.current?.click(), []);
 
-    if (currentFile) {
-      // Append file mention to message if text exists, otherwise make it the message
-      const fileMention = `[Attached file: ${currentFile.name}]`;
-      userMessageContent = messageToSend ? `${messageToSend}\n${fileMention}` : fileMention;
-      fileInfoForPrompt = { name: currentFile.name, type: currentFile.type };
-    }
-
-    // Save user message to Firestore
-    const userMsgData: ChatMessageData = { role: 'user', content: userMessageContent };
-    await saveChatMessage(currentConvId, userMsgData);
-
-    // Clear input and file state *after* capturing them
-    setChatMessage('');
+  const removeSelectedFile = useCallback(() => {
     setSelectedFile(null);
-    if (fileInputRef.current) fileInputRef.current.value = ""; // Reset file input visually
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }, []);
 
-    // --- Early Exit for Timer ---
-    const timerDuration = parseTimerRequest(messageToSend); // Check original text for timer keyword
+  // ----- Chat Submission (Revised Logic) -----
+  const handleChatSubmit = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+
+    const messageText = chatMessage.trim();
+    const currentFile = selectedFile; // Capture file at submission time
+
+    if (!messageText && !currentFile) return; // Must have text or file
+
+    let currentConvId = conversationId;
+
+    // 1. Ensure Conversation Exists
+    if (!currentConvId) {
+      const newConvId = await createChatConversation(user.uid, "New Chat");
+      if (!newConvId) {
+        alert("Error starting conversation."); return;
+      }
+      currentConvId = newConvId;
+      setConversationId(newConvId);
+      setHasGeneratedChatName(false); // Will generate name later
+      // No need to clear chatHistory here, listener will fetch for new ID
+    }
+
+    // 2. Prepare and Save User Message
+    let userMessageContent = messageText;
+    let fileInfo: ChatMessageData['fileInfo'] | undefined = undefined;
+    if (currentFile) {
+      fileInfo = { name: currentFile.name, type: currentFile.type, size: currentFile.size };
+      const fileMention = `[File attached: ${currentFile.name}]`;
+      userMessageContent = messageText ? `${messageText}\n${fileMention}` : fileMention;
+    }
+
+    const userMsgData: Omit<ChatMessageData, 'id' | 'createdAt'> = {
+      role: 'user',
+      content: userMessageContent,
+      fileInfo: fileInfo
+    };
+
+    // Clear input fields immediately
+    setChatMessage('');
+    removeSelectedFile();
+
+    // Save user message (let saveChatMessage handle ID and timestamp)
+    const savedUserMsg = await saveChatMessage(currentConvId, userMsgData);
+    if (!savedUserMsg) { alert("Error saving your message."); return; } // Handle save failure
+
+    // 3. Handle Timer Request (if applicable)
+    const timerDuration = parseTimerRequest(messageText); // Check original text
     if (timerDuration) {
-      const timerId = Math.random().toString(36).substring(2, 9);
-      const timerMsg: ChatMessageData = {
+      const timerId = `timer-${Date.now()}`;
+      const timerMsgData: Omit<ChatMessageData, 'id' | 'createdAt'> = {
         role: 'assistant',
-        content: `Okay, starting a timer for ${Math.round(timerDuration / 60)} minutes.`,
+        content: `Okay, starting timer for ${Math.round(timerDuration / 60)} min.`,
         timer: { type: 'timer', duration: timerDuration, id: timerId }
       };
-      await saveChatMessage(currentConvId, timerMsg);
-      return; // Exit after handling timer
+      await saveChatMessage(currentConvId, timerMsgData);
+      return; // Stop processing if it was a timer command
     }
 
-    // --- Prepare for AI Call ---
+    // 4. Prepare for AI Response
     setIsChatLoading(true);
-    setStreamingAssistantContent("..."); // Use ellipsis as initial placeholder
+    const assistantMessageId = `assistant-${Date.now()}`; // Unique ID for placeholder
 
-    // Build prompt including file context if applicable
-    const prompt = createPrompt(userMessageContent, fileInfoForPrompt);
+    // Add placeholder to local state IMMEDIATELY
+    setChatHistory(prev => [
+        ...prev,
+        {
+            id: assistantMessageId,
+            role: 'assistant',
+            content: "...", // Initial placeholder state
+            createdAt: Timestamp.now(), // Use client-side timestamp for placeholder
+            error: false,
+        }
+    ]);
+
+    // 5. Call AI (Streaming)
+    const prompt = createPrompt(userMessageContent, fileInfo);
     const geminiOptions = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
-         generationConfig: {
-             temperature: 0.7, // Adjust creativity/factuality
-             maxOutputTokens: 1500, // Allow longer responses if needed
-             // topP: 0.9,
-             // topK: 40,
-         },
-         safetySettings: [ // Standard safety settings
+        generationConfig: { temperature: 0.7, maxOutputTokens: 2000 },
+        safetySettings: [ /* Standard safety settings */
             { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
             { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
             { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
             { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
         ],
+        // systemInstruction: { parts: [{ text: "..." }] } // Alternative for system prompt with Gemini 1.5
       })
     };
 
-    // Add placeholder for streaming UI (using unique ID)
-    const assistantMsgId = `assistant-${Date.now()}`;
-    const placeholderMsg: ChatMessageData = { role: 'assistant', content: "..." };
-    // Add placeholder to local state immediately for responsiveness
-    setChatHistory(prev => [...prev, { ...placeholderMsg, createdAt: new Date() } ]); // Add timestamp locally
-
-    let finalRawResponseText = ""; // Store final *raw* text after stream ends
-    let accumulatedExtractedText = ""; // Store extracted text during streaming
+    let finalAccumulatedText = "";
+    let streamError: Error | null = null;
 
     try {
-      // Use streaming endpoint
-      const streamingEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?key=${geminiApiKey}&alt=sse`;
-
-      await streamResponse(streamingEndpoint, geminiOptions, (rawChunkAccumulated) => {
-          finalRawResponseText = rawChunkAccumulated; // Store latest raw response
-          const currentExtractedText = extractCandidateText(rawChunkAccumulated);
-          accumulatedExtractedText = currentExtractedText; // Update with latest extracted text
-
-          // Update the streaming placeholder in local state
-          setChatHistory(prev => prev.map((msg, idx) =>
-              idx === prev.length - 1 && msg.role === 'assistant' // Target the last assistant message (placeholder)
-                  ? { ...msg, content: accumulatedExtractedText || "..." }
-                  : msg
+      await streamResponse(
+        geminiStreamGenerateContent,
+        geminiOptions,
+        (delta) => { // onDelta callback
+          finalAccumulatedText += delta;
+          // Update the placeholder message content in the local state
+          setChatHistory(prev => prev.map(msg =>
+            msg.id === assistantMessageId
+              ? { ...msg, content: finalAccumulatedText || "..." } // Update content
+              : msg
           ));
-      });
+        },
+        (error) => { // onError callback
+          streamError = error;
+          console.error("Stream Error Callback:", error);
+           // Update placeholder with error immediately
+          setChatHistory(prev => prev.map(msg =>
+            msg.id === assistantMessageId
+              ? { ...msg, content: `Error during response: ${error.message}`, error: true }
+              : msg
+          ));
+        }
+      );
 
-      // --- Final Processing After Stream Ends ---
-       setChatHistory(prev => {
-           const finalHistory = [...prev];
-           const lastMsgIndex = finalHistory.length - 1;
+       // If stream completed without critical errors passed to onError
+      if (!streamError) {
+        // 6. Final Processing After Stream
+        let finalContent = finalAccumulatedText;
+        let actionJsonBlocks: any[] = [];
+        let educationalContent: FlashcardMessage | QuestionMessage | undefined = undefined;
 
-           if (lastMsgIndex >= 0 && finalHistory[lastMsgIndex].role === 'assistant') {
-               let finalExtractedAssistantText = extractCandidateText(finalRawResponseText);
-               let parsedJsonBlocks: any[] = [];
-               let educationalContent: FlashcardMessage | QuestionMessage | undefined = undefined;
+        const jsonStrings = extractJsonBlocks(finalContent); // Extract from final text
+        if (jsonStrings.length > 0) {
+            // If JSON blocks are present, assume they are the *intended* response
+            // Potentially clear any text surrounding them, unless specific instructions allow mixing.
+            // Let's assume JSON block means ONLY JSON for actions/education.
+            finalContent = ""; // Clear text if JSON is found (adjust if mixing is allowed)
 
-               // Extract and process all valid JSON blocks from the *final raw* text
-               const jsonStrings = extractJsonBlocks(finalRawResponseText);
-               for (const jsonString of jsonStrings) {
-                   try {
-                       const parsed = JSON.parse(jsonString);
-                       // Remove this specific JSON block from the text to be displayed
-                       finalExtractedAssistantText = finalExtractedAssistantText.replace(jsonString, '').replace(/```json\s*|\s*```/g, '').trim();
-
-                       // Check if it's an action or educational content
-                       if (parsed.action && parsed.payload) {
-                           // Queue action for processing after state update
-                            parsedJsonBlocks.push(parsed);
-                       } else if (parsed.type && parsed.data && (parsed.type === 'flashcard' || parsed.type === 'question')) {
-                           // Found educational content (take the first one if multiple somehow generated)
-                            if (!educationalContent) {
-                               educationalContent = parsed;
-                            }
-                       } else {
-                           console.warn("Parsed JSON block, but unknown structure:", parsed);
-                       }
-                   } catch (e) {
-                       console.error('Failed to parse JSON block in final response:', e, "JSON String:", jsonString);
-                       // If parsing fails, maybe leave the raw block in text? Or try to remove?
-                       // Let's try removing the likely malformed block attempt
-                        finalExtractedAssistantText = finalExtractedAssistantText.replace(jsonString, '').replace(/```json\s*|\s*```/g, '').trim();
-                   }
-               }
-
-               // Handle cases where extraction might fail but raw text exists
-               if (!finalExtractedAssistantText && finalRawResponseText && !educationalContent && parsedJsonBlocks.length === 0) {
-                   console.warn("Extraction failed on final text, using raw fallback.");
-                   // Basic cleaning on raw text (remove SSE prefix, might still contain raw JSON)
-                   finalExtractedAssistantText = finalRawResponseText.replace(/^data:\s*/gm, '').trim();
-                   // If it still looks like JSON, try to parse as error
-                   if (finalExtractedAssistantText.startsWith('{')) {
-                       try {
-                           const parsedFallback = JSON.parse(finalExtractedAssistantText);
-                           if (parsedFallback?.error?.message) {
-                               finalExtractedAssistantText = `Error: ${parsedFallback.error.message}`;
-                           } else {
-                               // Avoid showing raw JSON if it's not an error or known format
-                               finalExtractedAssistantText = "Error: Received an unexpected response format.";
-                           }
-                       } catch {
-                           finalExtractedAssistantText = "Error: Could not process the response.";
-                       }
-                   }
-               }
-
-               // Update the last message in the history
-               finalHistory[lastMsgIndex] = {
-                   ...finalHistory[lastMsgIndex],
-                   content: finalExtractedAssistantText || (educationalContent ? '' : '...'), // Show empty if only JSON, else final text or ellipsis
-                   flashcard: educationalContent?.type === 'flashcard' ? educationalContent as FlashcardMessage : undefined,
-                   question: educationalContent?.type === 'question' ? educationalContent as QuestionMessage : undefined,
-                   // We'll save this final version to Firestore below
-               };
-
-                // Process queued JSON actions asynchronously (don't block UI update)
-               if (parsedJsonBlocks.length > 0) {
-                    processActionJsonBlocks(parsedJsonBlocks, user.uid);
-               }
-
-               // Save the final message to Firestore *after* state update
-               // Use the corrected final message object
-               saveChatMessage(currentConvId, finalHistory[lastMsgIndex]).catch(err => {
-                   console.error("Error saving final assistant message:", err);
-               });
-
-           } else {
-               console.error("Could not find the assistant placeholder message to update.");
-           }
-           return finalHistory;
-       });
-
-      // --- Generate Chat Name (if needed) ---
-      const currentHistory = await (async () => {
-        // Re-fetch history if needed, or use state if confident it's up-to-date
-        // For simplicity, let's use the state snapshot *before* the final update
-         return chatHistory;
-      })();
-      const totalUserMessages = currentHistory.filter((m) => m.role === 'user').length + 1; // +1 for the message just sent
-
-      if (!hasGeneratedChatName && totalUserMessages >= 2) { // Generate after 2 user messages
-        const conversationTextForNaming = [...currentHistory, { role: 'assistant', content: accumulatedExtractedText }] // Include latest assistant reply
-          .slice(-6) // Limit context
-          .map((m) => `${m.role === 'user' ? userName : 'Assistant'}: ${m.content}`)
-          .join('\n');
-
-        // Don't await, let it run in background
-        generateChatName(currentConvId, conversationTextForNaming)
-            .then(() => setHasGeneratedChatName(true))
-            .catch(err => console.error("Background chat name generation failed:", err));
-      }
-
-    } catch (err: any) {
-      console.error('Chat submission/streaming error:', err);
-      const errorMsgContent = `Sorry, I encountered an error: ${err.message || 'Please try again.'}`;
-      // Update the placeholder with error or add new error message
-       setChatHistory(prev => {
-             const updatedHistory = [...prev];
-             const lastMsgIndex = updatedHistory.length - 1;
-             if (lastMsgIndex >= 0 && updatedHistory[lastMsgIndex].role === 'assistant') {
-                 updatedHistory[lastMsgIndex].content = errorMsgContent;
-                 updatedHistory[lastMsgIndex].flashcard = undefined; // Clear any potential partial data
-                 updatedHistory[lastMsgIndex].question = undefined;
-                 // Save error message to Firestore
-                  saveChatMessage(currentConvId, updatedHistory[lastMsgIndex]).catch(saveErr => {
-                      console.error("Error saving error message:", saveErr);
-                  });
-             } else {
-                 // If placeholder wasn't found, add a new error message
-                 const errorMsg: ChatMessageData = { role: 'assistant', content: errorMsgContent };
-                 updatedHistory.push(errorMsg);
-                 // Save error message to Firestore
-                 saveChatMessage(currentConvId, errorMsg).catch(saveErr => {
-                     console.error("Error saving new error message:", saveErr);
-                 });
-             }
-             return updatedHistory;
-         });
-
-    } finally {
-      setIsChatLoading(false);
-      setStreamingAssistantContent(''); // Clear streaming state
-    }
-  };
-
-    // Helper function to process action JSON blocks found in the response
-    const processActionJsonBlocks = async (blocks: any[], userId: string) => {
-        console.log("Processing JSON action blocks:", blocks);
-        for (const block of blocks) {
-            if (!block.action || !block.payload) continue;
-
-            try {
-                const payload = { ...block.payload, userId }; // Ensure userId is in payload
-
-                switch (block.action) {
-                    // Create Actions
-                    case 'createTask': await createUserTask(userId, payload); break;
-                    case 'createGoal': await createUserGoal(userId, payload); break;
-                    case 'createPlan': await createUserPlan(userId, payload); break;
-                    case 'createProject': await createUserProject(userId, payload); break;
-
-                    // Update Actions (Find by name if ID missing)
-                    case 'updateTask': {
-                        const id = payload.id ?? await findItemByName('tasks', userId, payload.task, 'task');
-                        if (id) await updateUserTask(id, payload); else console.warn(`Task not found for update: ${payload.task}`);
-                        break;
+            for (const jsonString of jsonStrings) {
+                try {
+                    const parsed = JSON.parse(jsonString);
+                    if (parsed.action && parsed.payload) {
+                        actionJsonBlocks.push(parsed);
+                         // Optionally add a simple text confirmation for actions
+                         // finalContent += `\n(Action: ${parsed.action} processed)`;
+                    } else if (parsed.type && parsed.data && (parsed.type === 'flashcard' || parsed.type === 'question')) {
+                        if (!educationalContent) educationalContent = parsed; // Take the first one
+                         // Optionally add text confirmation for educational content
+                        // finalContent += `\n(Educational content generated)`;
                     }
-                    case 'updateGoal': {
-                        const id = payload.id ?? await findItemByName('goals', userId, payload.goal, 'goal');
-                        if (id) await updateUserGoal(id, payload); else console.warn(`Goal not found for update: ${payload.goal}`);
-                        break;
-                    }
-                     case 'updatePlan': {
-                        const id = payload.id ?? await findItemByName('plans', userId, payload.plan, 'plan');
-                        if (id) await updateUserPlan(id, payload); else console.warn(`Plan not found for update: ${payload.plan}`);
-                        break;
-                    }
-                    case 'updateProject': {
-                        const id = payload.id ?? await findItemByName('projects', userId, payload.project, 'project');
-                        if (id) await updateUserProject(id, payload); else console.warn(`Project not found for update: ${payload.project}`);
-                        break;
-                    }
-
-                    // Delete Actions (Find by name if ID missing)
-                    case 'deleteTask': {
-                        const id = payload.id ?? await findItemByName('tasks', userId, payload.task, 'task');
-                        if (id) await deleteUserTask(id); else console.warn(`Task not found for delete: ${payload.task}`);
-                        break;
-                    }
-                    case 'deleteGoal': {
-                         const id = payload.id ?? await findItemByName('goals', userId, payload.goal, 'goal');
-                        if (id) await deleteUserGoal(id); else console.warn(`Goal not found for delete: ${payload.goal}`);
-                        break;
-                    }
-                    case 'deletePlan': {
-                        const id = payload.id ?? await findItemByName('plans', userId, payload.plan, 'plan');
-                        if (id) await deleteUserPlan(id); else console.warn(`Plan not found for delete: ${payload.plan}`);
-                        break;
-                    }
-                    case 'deleteProject': {
-                        const id = payload.id ?? await findItemByName('projects', userId, payload.project, 'project');
-                        if (id) await deleteUserProject(id); else console.warn(`Project not found for delete: ${payload.project}`);
-                        break;
-                    }
-
-                    default: console.warn(`Unknown AI action: ${block.action}`);
+                } catch (e) {
+                    console.error("Error parsing final JSON block:", e);
+                    finalContent += `\n[Error parsing JSON block: ${e}]`; // Include parse error notice
                 }
-                 console.log(`Action processed: ${block.action}`);
-            } catch (error) {
-                console.error(`Error processing AI action ${block.action}:`, error, "Payload:", block.payload);
-                // Optionally notify user of failure via chat?
             }
         }
-    };
+
+         // 7. Update Final Message & Save to Firestore
+         const finalAssistantMsg: ChatMessageData = {
+             id: assistantMessageId, // Use the same ID as placeholder
+             role: 'assistant',
+             content: finalContent.trim() || (educationalContent ? "" : "..."), // Ensure some content if not educational
+             createdAt: Timestamp.now(), // Use server-side timestamp ideally, or consistent client time
+             flashcard: educationalContent?.type === 'flashcard' ? educationalContent as FlashcardMessage : undefined,
+             question: educationalContent?.type === 'question' ? educationalContent as QuestionMessage : undefined,
+             error: false // Reset error flag if stream succeeded
+         };
+
+         // Update local state definitively
+         setChatHistory(prev => prev.map(msg => msg.id === assistantMessageId ? finalAssistantMsg : msg));
+
+         // Save the final, complete message to Firestore
+         // NOTE: This will overwrite the placeholder if Firestore listener hasn't updated yet,
+         // or potentially add a duplicate if listener was fast. Consider updating instead of adding.
+         // For simplicity, we'll rely on the listener catching up or saveChatMessage handling upserts.
+         await saveChatMessage(currentConvId, finalAssistantMsg, true); // Pass flag to indicate it might be an update
+
+         // Process actions asynchronously
+         if (actionJsonBlocks.length > 0) {
+              processActionJsonBlocks(actionJsonBlocks, user.uid);
+         }
+
+          // 8. Generate Chat Name (if needed)
+          // Check based on the state *before* this response was added
+          const historyBeforeResponse = chatHistory.filter(m => m.id !== assistantMessageId);
+          const userMessagesCount = historyBeforeResponse.filter(m => m.role === 'user').length;
+          if (!hasGeneratedChatName && userMessagesCount >= 1) { // Generate after 1st user msg + response
+              generateChatName(currentConvId, [...historyBeforeResponse, finalAssistantMsg]); // Use final history
+          }
+
+      } else {
+           // Error occurred during stream (already handled by onError updating state)
+           // Save the error message to Firestore
+           const errorMsg = chatHistory.find(m => m.id === assistantMessageId);
+           if (errorMsg) {
+               await saveChatMessage(currentConvId, errorMsg, true); // Update placeholder with error
+           }
+      }
+
+    } catch (error: any) { // Catch errors from streamResponse setup or other issues
+        console.error('Chat Submit Error:', error);
+        const errorContent = `Sorry, an error occurred: ${error.message || 'Please try again.'}`;
+        // Update placeholder with the error
+         setChatHistory(prev => prev.map(msg =>
+            msg.id === assistantMessageId
+              ? { ...msg, content: errorContent, error: true }
+              : msg
+         ));
+         // Save error message to Firestore
+         const errorMsg = chatHistory.find(m => m.id === assistantMessageId);
+         if (errorMsg) {
+             await saveChatMessage(currentConvId, errorMsg, true);
+         }
+    } finally {
+      setIsChatLoading(false);
+    }
+  }, [
+      user, chatMessage, selectedFile, conversationId, parseTimerRequest,
+      createPrompt, removeSelectedFile, saveChatMessage, processActionJsonBlocks,
+      generateChatName, hasGeneratedChatName, chatHistory // Include chatHistory dependency
+  ]);
 
 
-  // ----- Conversation Management -----
-  const handleNewConversation = async () => {
+  // Helper to process actions (extracted for clarity)
+  const processActionJsonBlocks = useCallback(async (blocks: any[], userId: string) => {
+    for (const block of blocks) {
+      if (!block.action || !block.payload) continue;
+      const payload = { ...block.payload, userId }; // Ensure userId
+      console.log(`Executing AI Action: ${block.action}`, payload);
+      try {
+        let id: string | null = payload.id; // Use provided ID if available
+        switch (block.action) {
+          case 'createTask': await createUserTask(userId, payload); break;
+          case 'createGoal': await createUserGoal(userId, payload); break;
+          case 'createPlan': await createUserPlan(userId, payload); break;
+          case 'createProject': await createUserProject(userId, payload); break;
+
+          case 'updateTask':
+            if (!id) id = await findItemByName('tasks', userId, payload.task, 'task');
+            if (id) await updateUserTask(id, payload); else console.warn(`Task not found for update: ${payload.task}`);
+            break;
+          // ... (add similar findItemByName logic for updateGoal, updatePlan, updateProject)
+           case 'updateGoal':
+                if (!id) id = await findItemByName('goals', userId, payload.goal, 'goal');
+                if (id) await updateUserGoal(id, payload); else console.warn(`Goal not found for update: ${payload.goal}`);
+                break;
+           case 'updatePlan':
+                if (!id) id = await findItemByName('plans', userId, payload.plan, 'plan');
+                if (id) await updateUserPlan(id, payload); else console.warn(`Plan not found for update: ${payload.plan}`);
+                break;
+           case 'updateProject':
+                if (!id) id = await findItemByName('projects', userId, payload.project, 'project');
+                if (id) await updateUserProject(id, payload); else console.warn(`Project not found for update: ${payload.project}`);
+                break;
+
+
+          case 'deleteTask':
+            if (!id) id = await findItemByName('tasks', userId, payload.task, 'task');
+            if (id) await deleteUserTask(id); else console.warn(`Task not found for delete: ${payload.task}`);
+            break;
+          // ... (add similar findItemByName logic for deleteGoal, deletePlan, deleteProject)
+            case 'deleteGoal':
+                if (!id) id = await findItemByName('goals', userId, payload.goal, 'goal');
+                if (id) await deleteUserGoal(id); else console.warn(`Goal not found for delete: ${payload.goal}`);
+                break;
+            case 'deletePlan':
+                if (!id) id = await findItemByName('plans', userId, payload.plan, 'plan');
+                if (id) await deleteUserPlan(id); else console.warn(`Plan not found for delete: ${payload.plan}`);
+                break;
+            case 'deleteProject':
+                if (!id) id = await findItemByName('projects', userId, payload.project, 'project');
+                if (id) await deleteUserProject(id); else console.warn(`Project not found for delete: ${payload.project}`);
+                break;
+
+          default: console.warn(`Unknown AI action: ${block.action}`);
+        }
+      } catch (error) {
+        console.error(`Error processing AI action ${block.action}:`, error);
+        // Consider adding an error message back to the chat?
+        // await saveChatMessage(conversationId!, { role: 'assistant', content: `Failed to execute action: ${block.action}` });
+      }
+    }
+  }, []); // No dependencies needed if functions are stable
+
+
+  // ----- Conversation Management Callbacks -----
+  const handleNewConversation = useCallback(async () => {
     if (!user) return;
-    const newConvId = await createChatConversation(user.uid, 'New Chat');
+    const newConvId = await createChatConversation(user.uid, "New Chat");
     if (newConvId) {
-        setConversationId(newConvId);
-        setChatHistory([]);
-        setHasGeneratedChatName(false); // Reset flag for new chat
-        setIsConvListOpen(false); // Close list on mobile after selection
+      setConversationId(newConvId);
+      setHasGeneratedChatName(false);
+      setIsConvListOpen(false);
     } else {
-        alert("Failed to create new conversation.");
+      alert("Failed to create conversation.");
     }
-  };
+  }, [user]);
 
-  const handleSelectConversation = (convId: string) => {
+  const handleSelectConversation = useCallback((convId: string) => {
     if (conversationId !== convId) {
-        setConversationId(convId);
-        setChatHistory([]); // Clear history immediately for visual feedback
-        setHasGeneratedChatName(true); // Assume existing chats already have names (or tried)
-        setActiveConvMenu(null); // Close any open menu
+      setConversationId(convId);
+      setActiveConvMenu(null); // Close menu
+      // Message loading is handled by useEffect
     }
-    setIsConvListOpen(false); // Close list on mobile after selection
-  };
+    setIsConvListOpen(false); // Close list on mobile
+  }, [conversationId]);
 
-  const handleRenameConversation = async (conv: any) => {
-    setActiveConvMenu(null); // Close menu
-    const newName = window.prompt('Enter new chat name:', conv.chatName);
+  const handleRenameConversation = useCallback(async (conv: any) => {
+    setActiveConvMenu(null);
+    const newName = prompt('Enter new chat name:', conv.chatName); // Use prompt for simplicity
     if (!newName || !newName.trim()) return;
     try {
-        await updateChatConversationName(conv.id, newName.trim());
+      await updateChatConversationName(conv.id, newName.trim());
     } catch (error) {
-        console.error("Failed to rename conversation:", error);
-        alert("Error renaming conversation.");
+      alert("Error renaming conversation.");
     }
-  };
+  }, []);
 
-  const handleDeleteConversationClick = async (conv: any) => {
-    setActiveConvMenu(null); // Close menu
-    const confirmed = window.confirm(`Are you sure you want to delete "${conv.chatName || 'this chat'}"?`);
-    if (!confirmed) return;
+  const handleDeleteConversationClick = useCallback(async (conv: any) => {
+    setActiveConvMenu(null);
+    if (!window.confirm(`Delete "${conv.chatName || 'this chat'}"?`)) return;
     try {
-        await deleteChatConversation(conv.id);
-        if (conversationId === conv.id) {
-            setConversationId(null); // Go back to welcome screen if active chat deleted
-            setChatHistory([]);
-        }
-        // Conversation list will update via snapshot listener
+      await deleteChatConversation(conv.id);
+      if (conversationId === conv.id) setConversationId(null);
     } catch (error) {
-        console.error("Failed to delete conversation:", error);
-        alert("Error deleting conversation.");
+      alert("Error deleting conversation.");
     }
-  };
+  }, [conversationId]);
 
-  const handleShareConversation = async (conv: any) => {
-    setActiveConvMenu(null); // Close menu
-    // Implement actual sharing logic (e.g., generate public link, copy to clipboard)
-    const shareUrl = `${window.location.origin}/shared-chat/${conv.id}`; // Example URL structure
+  const handleShareConversation = useCallback(async (conv: any) => {
+    setActiveConvMenu(null);
+    const shareUrl = `${window.location.origin}/shared-chat/${conv.id}`;
     try {
-        await navigator.clipboard.writeText(`Check out this conversation: ${shareUrl}`);
-        alert(`Link copied to clipboard! (Sharing functionality is conceptual)`);
+      await navigator.clipboard.writeText(`TaskMaster Chat: ${shareUrl}`);
+      alert(`Link copied! (Sharing is conceptual)`);
     } catch (err) {
-        alert(`Could not copy link. Sharing conversation ID: ${conv.id} (Conceptual)`);
+      alert(`Could not copy link.`);
     }
-  };
+  }, []);
 
-  const toggleConvMenu = (convId: string, e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent triggering conversation selection
+  const toggleConvMenu = useCallback((convId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
     setActiveConvMenu(prev => (prev === convId ? null : convId));
-  };
+  }, []);
 
-  // ----- Quick Actions ----- (Revised Structure)
+  // ----- Quick Actions ----- (Keep existing structure)
   const quickActions = [
-    { name: 'Create a Task', icon: <CheckCircle className="w-4 h-4" /> },
-    { name: 'Create a Goal', icon: <Goal className="w-4 h-4" /> },
-    { name: 'Create a Plan', icon: <Calendar className="w-4 h-4" /> },
-    { name: 'Create a Project', icon: <Folder className="w-4 h-4" /> },
-    { name: 'Analyze my items', icon: <BarChart2 className="w-4 h-4" /> },
+    { name: 'Create Task', icon: <CheckCircle className="w-4 h-4" /> },
+    { name: 'Create Goal', icon: <Goal className="w-4 h-4" /> },
+    { name: 'Create Plan', icon: <Calendar className="w-4 h-4" /> },
+    { name: 'Create Project', icon: <Folder className="w-4 h-4" /> },
+    { name: 'Analyze Items', icon: <BarChart2 className="w-4 h-4" /> },
     { name: 'Plan My Day', icon: <Sun className="w-4 h-4" /> },
-    { name: 'Start a Timer', icon: <TimerIcon className="w-4 h-4" /> },
-    { name: 'Set a Reminder', icon: <Bell className="w-4 h-4" /> },
-    { name: 'Brainstorm Ideas', icon: <Lightbulb className="w-4 h-4" /> },
-    { name: 'Summarize Text', icon: <AlignLeft className="w-4 h-4" /> },
-    { name: 'Review My Goals', icon: <Target className="w-4 h-4" /> },
+    { name: 'Start Timer', icon: <TimerIcon className="w-4 h-4" /> },
+    { name: 'Set Reminder', icon: <Bell className="w-4 h-4" /> },
+    { name: 'Brainstorm', icon: <Lightbulb className="w-4 h-4" /> },
+    { name: 'Summarize', icon: <AlignLeft className="w-4 h-4" /> },
+    { name: 'Review Goals', icon: <Target className="w-4 h-4" /> },
     { name: 'Prioritize Tasks', icon: <SortAsc className="w-4 h-4" /> },
   ];
-
-  const handleQuickActionClick = (actionName: string) => {
+  const handleQuickActionClick = useCallback((actionName: string) => {
     setChatMessage(actionName);
-    // Consider submitting automatically or just filling the input
-    // Let's just fill the input for now
-    // handleChatSubmit(new Event('submit')); // Requires form ref or synthetic event
-  };
-
+    // Optionally trigger submit or focus input
+  }, []);
 
   // ----- Render -----
   return (
     <div className={`flex h-screen overflow-hidden ${containerClass}`}>
-      {/* Left App Sidebar */}
       <Sidebar
         isCollapsed={isSidebarCollapsed}
         onToggle={handleToggleSidebar}
@@ -1115,195 +904,149 @@ Assistant:`;
         isIlluminateEnabled={isIlluminateEnabled && isSidebarIlluminateEnabled}
       />
 
-      {/* Main Content Area (Chat + Conversation List) */}
+      {/* Main Content Area */}
       <div className={`flex flex-1 transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'ml-16 md:ml-20' : 'ml-0 md:ml-64'} overflow-hidden relative`}>
 
-        {/* Center Chat Area */}
+        {/* ---- Chat Area ---- */}
         <main className="flex-1 flex flex-col h-full overflow-hidden">
           {/* Header */}
           <div className={`p-2 sm:p-3 border-b ${illuminateBorder} flex justify-between items-center flex-shrink-0`}>
-             <div className="flex items-center gap-2">
-               {/* Mobile Conversation List Toggle Button */}
-               <button
-                 onClick={() => setIsConvListOpen(prev => !prev)}
-                 className={`p-1.5 rounded-md md:hidden ${illuminateBgHover} ${iconColor}`}
-                 title="Toggle Conversations"
-                 aria-label="Toggle Conversations List"
-               >
+             <div className="flex items-center gap-2 overflow-hidden"> {/* Added overflow-hidden */}
+               <button onClick={() => setIsConvListOpen(prev => !prev)} className={`p-1.5 rounded-md md:hidden ${illuminateBgHover} ${iconColor}`} title="Toggle Conversations">
                  <Menu className="w-5 h-5" />
                </button>
                <Bot className={`w-5 h-5 flex-shrink-0 ${illuminateTextBlue}`} />
-                <h1 className={`text-base sm:text-lg font-semibold ${headingClass} truncate`}>
-                  AI Assistant
-                </h1>
-                {/* Display current chat name if selected */}
-                {conversationId && (
-                    <span className={`text-xs sm:text-sm ml-2 ${subheadingClass} hidden sm:inline truncate`}>
-                        / {conversationList.find(c => c.id === conversationId)?.chatName || 'Chat'}
-                    </span>
-                )}
+                <div className="flex-grow overflow-hidden"> {/* Wrap text part */}
+                    <h1 className={`text-base sm:text-lg font-semibold ${headingClass} truncate`}>
+                        AI Assistant
+                    </h1>
+                     {conversationId && (
+                        <p className={`text-xs ${subheadingClass} truncate`}>
+                            {conversationList.find(c => c.id === conversationId)?.chatName || 'Chat'}
+                        </p>
+                    )}
+                </div>
             </div>
-            <div className="flex items-center gap-2">
-                {/* Context Button */}
-                <button
-                    type="button"
-                    onClick={() => setIsContextDialogOpen(true)}
-                    className={`p-1.5 rounded-full ${illuminateBgHover} ${iconColor}`}
-                    title="Set AI Context"
-                >
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+                <button type="button" onClick={() => setIsContextDialogOpen(true)} className={`p-1.5 rounded-full ${illuminateBgHover} ${iconColor}`} title="Set AI Context">
                     <Brain className="w-4 h-4" />
                 </button>
-                 {/* Chat Style Control */}
                 <ChatControls
                     onStyleSelect={handleStyleSelect}
                     onCustomStyleCreate={handleCustomStyleCreate}
                     isBlackoutEnabled={isBlackoutEnabled}
                     isIlluminateEnabled={isIlluminateEnabled}
                     activeStyle={activeStyle}
-                    compact={true} // Use compact version
+                    compact={true}
                  />
             </div>
           </div>
 
-          {/* Chat Messages Area */}
-          <div className="flex-1 overflow-y-auto p-3 space-y-2.5" ref={chatEndRef}>
-            {!conversationId ? (
-              // Welcome / Quick Actions Screen
-              <div className="flex flex-col items-center justify-center text-center h-full p-4">
-                 <Bot size={48} className={`${illuminateTextBlue} mb-4 opacity-80`} />
-                 <h2 className={`text-xl font-semibold mb-2 ${headingClass}`}>
-                   Hi {truncatedName}, how can I assist?
-                 </h2>
-                 <p className={`mb-6 text-sm ${subheadingClass}`}>
-                   Select a conversation, start a new one, or try a quick action.
-                 </p>
-                 <div className="w-full max-w-md grid grid-cols-2 sm:grid-cols-3 gap-2">
-                   {quickActions.map((action) => (
-                     <button
-                       key={action.name}
-                       onClick={() => handleQuickActionClick(action.name)}
-                       className={`${cardClass} p-2.5 rounded-lg flex flex-col items-center justify-center text-center ${illuminateBgHover} transition-all transform hover:scale-[1.03]`}
-                     >
-                       <div className={`${illuminateTextPurple} mb-1`}>{action.icon}</div>
-                       <span className="text-xs font-medium">{action.name}</span>
-                     </button>
-                   ))}
-                 </div>
-               </div>
-            ) : (
-              // Actual Chat History
-              <>
-                {chatHistory.map((message, index) => (
-                  <div
-                    key={`${conversationId}-${index}`} // Ensure key changes with conversation
-                    className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                  >
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto p-3 space-y-2.5 relative" ref={chatEndRef}>
+             <AnimatePresence initial={false}>
+                {!conversationId ? (
+                    // Welcome Screen
                     <motion.div
-                       initial={{ opacity: 0, y: 10 }}
-                       animate={{ opacity: 1, y: 0 }}
-                       transition={{ duration: 0.2, delay: 0.05 * Math.min(index, 10) }} // Stagger animation
-                       className={`max-w-[85%] sm:max-w-[80%] rounded-lg px-3 py-1.5 text-sm shadow-sm break-words ${
-                        message.role === 'user' ? userBubbleClass : assistantBubbleClass
-                      }`}
+                        key="welcome"
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        className="flex flex-col items-center justify-center text-center h-full p-4"
                     >
-                       {/* Markdown Rendering with smaller margins */}
-                        <ReactMarkdown
-                            remarkPlugins={[remarkMath, remarkGfm]}
-                            rehypePlugins={[rehypeKatex]}
-                            components={{
-                                p: ({node, ...props}) => <p className="mb-1 last:mb-0" {...props} />,
-                                ul: ({node, ...props}) => <ul className="list-disc list-outside ml-4 my-1 text-xs sm:text-sm" {...props} />,
-                                ol: ({node, ...props}) => <ol className="list-decimal list-outside ml-4 my-1 text-xs sm:text-sm" {...props} />,
-                                li: ({node, ...props}) => <li className="mb-0.5" {...props} />,
-                                code: ({ node, inline, className, children, ...props }) => {
-                                    const match = /language-(\w+)/.exec(className || '');
-                                    return !inline ? (
-                                    <pre className={`!bg-black/40 p-2 rounded-md overflow-x-auto my-1 text-[11px] leading-snug ${className}`} {...props}>
-                                        <code className={`language-${match?.[1] || 'plaintext'}`}>{children}</code>
-                                    </pre>
-                                    ) : (
-                                    <code className={`!bg-black/20 px-1 rounded text-xs ${className}`} {...props}>
-                                        {children}
-                                    </code>
-                                    );
-                                },
-                                a: ({node, ...props}) => <a className="text-blue-500 hover:underline" target="_blank" rel="noopener noreferrer" {...props} />,
-                            }}
-                       >
-                           {message.content || ""}
-                       </ReactMarkdown>
-
-                       {/* Timer Rendering */}
-                       {message.timer && (
-                         <div className="mt-1.5">
-                            <div className={`flex items-center space-x-2 rounded-md px-2 py-1 text-sm ${isIlluminateEnabled ? 'bg-blue-100/70 border border-blue-200/80' : 'bg-gray-800/60 border border-gray-600/50'}`}>
-                                <TimerIcon className={`w-4 h-4 flex-shrink-0 ${illuminateTextBlue}`} />
-                                <TimerComponent // Use renamed import
-                                    key={message.timer.id}
-                                    initialDuration={message.timer.duration}
-                                    onComplete={() => handleTimerComplete(message.timer!.id)}
-                                    compact={true} // Use compact mode
-                                    isIlluminateEnabled={isIlluminateEnabled}
-                                />
-                            </div>
-                         </div>
-                       )}
-
-                       {/* Flashcard/Question Rendering (Keep EXACTLY as requested) */}
-                       {message.flashcard && (
-                         <div className="mt-1.5">
-                           <FlashcardsQuestions
-                             type="flashcard"
-                             data={message.flashcard.data}
-                             onComplete={() => {}}
-                             isIlluminateEnabled={isIlluminateEnabled} // Pass theme prop if component uses it
-                           />
-                         </div>
-                       )}
-                       {message.question && (
-                         <div className="mt-1.5">
-                           <FlashcardsQuestions
-                             type="question"
-                             data={message.question.data}
-                             onComplete={() => {}}
-                             isIlluminateEnabled={isIlluminateEnabled} // Pass theme prop if component uses it
-                           />
-                         </div>
-                       )}
+                        <Bot size={40} className={`${illuminateTextBlue} mb-3 opacity-80`} />
+                        <h2 className={`text-lg font-semibold mb-1 ${headingClass}`}>Hi {truncatedName}!</h2>
+                        <p className={`mb-5 text-sm ${subheadingClass}`}>How can I help you today?</p>
+                        <div className="w-full max-w-lg grid grid-cols-2 sm:grid-cols-3 gap-2">
+                            {quickActions.map((action) => (
+                                <button
+                                key={action.name}
+                                onClick={() => handleQuickActionClick(action.name)}
+                                className={`${cardClass} p-2.5 rounded-lg flex flex-col items-center justify-center text-center ${illuminateBgHover} transition-all transform hover:scale-[1.03] border ${illuminateBorder}`}
+                                >
+                                <div className={`${illuminateTextPurple} mb-1`}>{action.icon}</div>
+                                <span className="text-xs font-medium">{action.name}</span>
+                                </button>
+                            ))}
+                        </div>
                     </motion.div>
-                  </div>
-                ))}
+                ) : (
+                    // Chat History
+                     chatHistory.map((message, index) => (
+                        <motion.div
+                            key={message.id} // Use message ID as key
+                            layout // Animate layout changes
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            transition={{ duration: 0.2, type: 'spring', stiffness: 100, damping: 15 }}
+                            className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                        >
+                            <div className={`relative group max-w-[85%] sm:max-w-[80%] rounded-lg px-3 py-1.5 text-sm shadow-sm break-words ${
+                                message.role === 'user' ? userBubbleClass : (message.error ? (isIlluminateEnabled ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-red-900/50 text-red-300 border border-red-700/50') : assistantBubbleClass)
+                            }`}>
+                                {/* Message Content */}
+                                {message.content === "..." && isChatLoading && message.id.startsWith('assistant-') ? (
+                                    <div className="flex space-x-1 p-1">
+                                        <div className="w-1.5 h-1.5 bg-current rounded-full animate-bounce opacity-60"></div>
+                                        <div className="w-1.5 h-1.5 bg-current rounded-full animate-bounce delay-100 opacity-60"></div>
+                                        <div className="w-1.5 h-1.5 bg-current rounded-full animate-bounce delay-200 opacity-60"></div>
+                                    </div>
+                                ) : (
+                                    <ReactMarkdown
+                                        remarkPlugins={[remarkMath, remarkGfm]}
+                                        rehypePlugins={[rehypeKatex]}
+                                        components={{ /* Use components from previous version */
+                                            p: ({node, ...props}) => <p className="mb-1 last:mb-0" {...props} />,
+                                            ul: ({node, ...props}) => <ul className="list-disc list-outside ml-4 my-1 text-xs sm:text-sm" {...props} />,
+                                            ol: ({node, ...props}) => <ol className="list-decimal list-outside ml-4 my-1 text-xs sm:text-sm" {...props} />,
+                                            li: ({node, ...props}) => <li className="mb-0.5" {...props} />,
+                                            code: ({ node, inline, className, children, ...props }) => { /* Code styling */
+                                                const match = /language-(\w+)/.exec(className || '');
+                                                const codeBg = isIlluminateEnabled ? 'bg-gray-200/50' : 'bg-black/30';
+                                                const preBg = isIlluminateEnabled ? 'bg-gray-200/30' : 'bg-black/20';
+                                                return !inline ? (
+                                                <pre className={`!${preBg} p-2 rounded-md overflow-x-auto my-1 text-[11px] leading-snug ${className}`} {...props}>
+                                                    <code className={`language-${match?.[1] || 'plaintext'}`}>{children}</code>
+                                                </pre>
+                                                ) : (
+                                                <code className={`!${codeBg} px-1 rounded text-xs ${className}`} {...props}>
+                                                    {children}
+                                                </code>
+                                                );
+                                            },
+                                            a: ({node, ...props}) => <a className={`${illuminateTextBlue} hover:underline`} target="_blank" rel="noopener noreferrer" {...props} />,
+                                        }}
+                                    >
+                                        {message.content || ""}
+                                    </ReactMarkdown>
+                                )}
 
-                 {/* Streaming/Loading Indicator */}
-                 {isChatLoading && (
-                     <div className="flex justify-start">
-                       <div className={`${assistantBubbleClass} rounded-lg px-3 py-1.5 max-w-[85%] shadow-sm`}>
-                           <div className="flex space-x-1 p-1">
-                               <div className="w-1.5 h-1.5 bg-current rounded-full animate-bounce opacity-60"></div>
-                               <div className="w-1.5 h-1.5 bg-current rounded-full animate-bounce delay-100 opacity-60"></div>
-                               <div className="w-1.5 h-1.5 bg-current rounded-full animate-bounce delay-200 opacity-60"></div>
-                           </div>
-                       </div>
-                    </div>
+                                {/* Timer */}
+                                {message.timer && <div className="mt-1.5"><TimerComponent key={message.timer.id} initialDuration={message.timer.duration} onComplete={() => handleTimerComplete(message.timer!.id)} compact={true} isIlluminateEnabled={isIlluminateEnabled} /></div>}
+                                {/* Flashcards/Questions */}
+                                {message.flashcard && <div className="mt-1.5"><FlashcardsQuestions type="flashcard" data={message.flashcard.data} onComplete={() => {}} isIlluminateEnabled={isIlluminateEnabled} /></div>}
+                                {message.question && <div className="mt-1.5"><FlashcardsQuestions type="question" data={message.question.data} onComplete={() => {}} isIlluminateEnabled={isIlluminateEnabled} /></div>}
+
+                                {/* Optional: Timestamp on hover? */}
+                                {/* <span className="absolute bottom-0 right-1 text-[9px] text-gray-500/50 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    {message.createdAt.toDate().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                                </span> */}
+                            </div>
+                        </motion.div>
+                    ))
                  )}
-
-                {/* Scroll Anchor */}
-                <div ref={chatEndRef} className="h-px" />
-              </>
-            )}
+             </AnimatePresence>
+              {/* Scroll Anchor */}
+              <div ref={chatEndRef} className="h-px" />
           </div>
 
-          {/* Chat Input Form */}
+          {/* Input Area */}
           <form onSubmit={handleChatSubmit} className={`p-2 border-t ${illuminateBorder} flex-shrink-0 ${isIlluminateEnabled ? 'bg-gray-100/80' : 'bg-gray-800/90'} backdrop-blur-sm`}>
-            {/* File Preview Area */}
             {selectedFile && (
                 <div className={`flex items-center justify-between p-1.5 mb-1.5 rounded-md text-xs ${isIlluminateEnabled ? 'bg-blue-100/80 border border-blue-200/80' : 'bg-blue-900/40 border border-blue-700/50'}`}>
                     <div className="flex items-center gap-1.5 overflow-hidden">
-                        {selectedFile.type.startsWith('image/') ? (
-                            <ImageIcon className={`w-4 h-4 flex-shrink-0 ${illuminateTextBlue}`} />
-                        ) : (
-                            <FileIcon className={`w-4 h-4 flex-shrink-0 ${illuminateTextBlue}`} />
-                        )}
+                        {selectedFile.type.startsWith('image/') ? <ImageIcon className={`w-4 h-4 flex-shrink-0 ${illuminateTextBlue}`} /> : <FileIcon className={`w-4 h-4 flex-shrink-0 ${illuminateTextBlue}`} />}
                         <span className="truncate" title={selectedFile.name}>{selectedFile.name}</span>
                         <span className={subheadingClass}>({(selectedFile.size / 1024).toFixed(1)} KB)</span>
                     </div>
@@ -1313,168 +1056,89 @@ Assistant:`;
                 </div>
             )}
             <div className="flex gap-1.5 items-center">
-              {/* File Upload Button */}
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileSelect}
-                className="hidden"
-                accept="application/pdf,image/*" // Specify accepted types
-              />
-              <button
-                type="button"
-                onClick={triggerFileSelect}
-                className={`p-2 rounded-full ${iconColor} ${illuminateBgHover} transition-colors`}
-                title="Attach File"
-                aria-label="Attach file"
-              >
+              <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" accept="application/pdf,image/*,.txt,.md,.csv" />
+              <button type="button" onClick={triggerFileSelect} className={`p-2 rounded-full ${iconColor} ${illuminateBgHover} transition-colors`} title="Attach File">
                 <Paperclip className="w-4 h-4" />
               </button>
-              {/* Text Input */}
-              <input
-                type="text"
-                value={chatMessage}
-                onChange={(e) => setChatMessage(e.target.value)}
-                placeholder="Ask TaskMaster..."
-                className={`flex-1 ${inputBg} border rounded-full px-3.5 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-150 shadow-sm placeholder-gray-400 dark:placeholder-gray-500 disabled:opacity-60`}
-                disabled={isChatLoading}
-                aria-label="Chat input"
-              />
-              {/* Send Button */}
-              <button
-                type="submit"
-                disabled={isChatLoading || (!chatMessage.trim() && !selectedFile)}
-                className="bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105 active:scale-100 shadow-sm flex-shrink-0"
-                title="Send Message"
-                aria-label="Send chat message"
-              >
-                {isChatLoading ? (
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                ) : (
-                    <Send className="w-4 h-4" />
-                )}
+              <input type="text" value={chatMessage} onChange={(e) => setChatMessage(e.target.value)} placeholder="Ask TaskMaster..."
+                 className={`flex-1 ${inputBg} border rounded-full px-3.5 py-1.5 text-sm focus:ring-1 focus:ring-offset-0 ${isIlluminateEnabled ? 'focus:ring-offset-white' : 'focus:ring-offset-black'} shadow-sm placeholder-gray-500 disabled:opacity-60`}
+                 disabled={isChatLoading} />
+              <button type="submit" disabled={isChatLoading || (!chatMessage && !selectedFile)}
+                 className={`p-2 rounded-full text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105 active:scale-100 shadow-sm flex-shrink-0 ${isChatLoading ? 'bg-gray-500' : 'bg-blue-600 hover:bg-blue-700'}`} >
+                {isChatLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
               </button>
             </div>
           </form>
         </main>
 
-        {/* Right Sidebar: Chat Conversations */}
+        {/* ---- Conversations Sidebar ---- */}
          <aside className={`
-            absolute top-0 right-0 h-full w-64 sm:w-72 md:w-80 lg:w-[350px] z-20 md:z-0 md:static
-            transform transition-transform duration-300 ease-in-out
-            ${isConvListOpen ? 'translate-x-0' : 'translate-x-full'} md:translate-x-0
-            border-l ${illuminateBorder} ${cardClass} flex flex-col
+            absolute top-0 right-0 h-full w-64 sm:w-72 md:w-80 lg:w-[350px] z-40 md:z-0 md:static
+            transform transition-transform duration-300 ease-in-out border-l ${illuminateBorder} ${cardClass} flex flex-col
+            ${isConvListOpen ? 'translate-x-0 shadow-xl' : 'translate-x-full'} md:translate-x-0 md:shadow-none
          `}>
-            {/* Sidebar Header */}
-             <div className="p-3 border-b ${illuminateBorder} flex items-center justify-between flex-shrink-0">
-                 <h2 className={`text-base font-semibold ${headingClass} flex items-center gap-1.5`}>
-                     <MessageSquare className="w-4 h-4" /> Conversations
-                 </h2>
+             <div className={`p-3 border-b ${illuminateBorder} flex items-center justify-between flex-shrink-0`}>
+                 <h2 className={`text-base font-semibold ${headingClass} flex items-center gap-1.5`}><MessageSquare className="w-4 h-4" /> Conversations</h2>
                  <div className="flex items-center gap-1">
-                     <button
-                        onClick={handleNewConversation}
-                        className={`p-1.5 rounded-full ${iconColor} ${illuminateBgHover} transition-colors`}
-                        title="New Conversation"
-                     >
-                        <Plus className="w-4 h-4" />
-                    </button>
-                    {/* Close button for mobile */}
-                    <button
-                        onClick={() => setIsConvListOpen(false)}
-                        className={`p-1.5 rounded-full md:hidden ${iconColor} ${illuminateBgHover} transition-colors`}
-                        title="Close Conversations"
-                    >
-                        <ChevronLeft className="w-4 h-4" />
-                    </button>
+                     <button onClick={handleNewConversation} className={`p-1.5 rounded-full ${iconColor} ${illuminateBgHover}`} title="New Conversation"><Plus className="w-4 h-4" /></button>
+                    <button onClick={() => setIsConvListOpen(false)} className={`p-1.5 rounded-full md:hidden ${iconColor} ${illuminateBgHover}`} title="Close Conversations"><ChevronLeft className="w-4 h-4" /></button>
                  </div>
             </div>
-
-            {/* Scrollable Conversation List */}
-            <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
-                {conversationList.length === 0 && (
-                    <p className={`text-center text-xs ${subheadingClass} mt-4`}>No conversations yet.</p>
-                )}
+            <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                {conversationList.length === 0 && <p className={`text-center text-xs ${subheadingClass} mt-4 italic`}>No conversations yet.</p>}
                 {conversationList
-                    .sort((a, b) => (b.updatedAt || b.createdAt)?.seconds - (a.updatedAt || a.createdAt)?.seconds) // Sort by most recent
+                    .sort((a, b) => (b.updatedAt || b.createdAt)?.toMillis() - (a.updatedAt || a.createdAt)?.toMillis()) // Sort by timestamp
                     .map((conv) => (
-                     <div
-                        key={conv.id}
-                        className={`group relative p-2 rounded-lg cursor-pointer transition-colors duration-150 flex items-center justify-between gap-2 ${
-                            conversationId === conv.id
-                                ? (isIlluminateEnabled ? 'bg-blue-100 text-blue-800' : 'bg-blue-600/30 text-blue-200')
-                                : (isIlluminateEnabled ? 'hover:bg-gray-100' : 'hover:bg-gray-700/50')
-                        }`}
-                        onClick={() => handleSelectConversation(conv.id)}
-                    >
-                        <div className="flex items-center gap-1.5 flex-grow overflow-hidden">
-                            <MessageSquare className={`w-3.5 h-3.5 flex-shrink-0 ${conversationId === conv.id ? (isIlluminateEnabled ? 'text-blue-700' : 'text-blue-300') : 'text-gray-400'}`} />
+                     <div key={conv.id} className="relative group">
+                         <button
+                            className={`w-full text-left p-2 rounded-lg transition-colors duration-150 flex items-center justify-between gap-2 ${
+                                conversationId === conv.id
+                                    ? (isIlluminateEnabled ? 'bg-blue-100 text-blue-800' : 'bg-blue-600/30 text-blue-200')
+                                    : (isIlluminateEnabled ? 'hover:bg-gray-100' : 'hover:bg-gray-700/50')
+                            }`}
+                            onClick={() => handleSelectConversation(conv.id)}
+                        >
                             <span className="text-xs font-medium truncate flex-grow" title={conv.chatName || 'Chat'}>
                                 {conv.chatName || 'Chat'}
                             </span>
-                        </div>
-                        {/* Actions Button */}
-                         <button
-                            onClick={(e) => toggleConvMenu(conv.id, e)}
-                             className={`p-1 rounded-full opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity ${iconColor} ${isIlluminateEnabled ? 'hover:bg-gray-200' : 'hover:bg-gray-600'} flex-shrink-0`}
-                            title="More options"
-                        >
-                            <MoreHorizontal className="w-4 h-4" />
+                             <div className="opacity-0 group-hover:opacity-100 focus-within:opacity-100 flex-shrink-0">
+                                 <button
+                                    onClick={(e) => toggleConvMenu(conv.id, e)}
+                                     className={`p-1 rounded-full ${iconColor} ${isIlluminateEnabled ? 'hover:bg-gray-200' : 'hover:bg-gray-600'}`}
+                                    title="More options" >
+                                    <MoreHorizontal className="w-4 h-4" />
+                                </button>
+                             </div>
                         </button>
-
-                        {/* Actions Menu (Popover) */}
-                        {activeConvMenu === conv.id && (
-                            <div
-                                className={`absolute top-full right-2 mt-1 w-36 ${cardClass} rounded-md shadow-lg z-30 overflow-hidden border ${illuminateBorder}`}
-                                onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside menu
+                         {/* Actions Menu */}
+                         {activeConvMenu === conv.id && (
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.95 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.95 }}
+                                transition={{ duration: 0.1 }}
+                                className={`absolute top-full right-2 mt-1 w-36 ${cardClass} rounded-md shadow-lg z-50 overflow-hidden border ${illuminateBorder}`}
+                                onClick={(e) => e.stopPropagation()}
                             >
-                                <button
-                                    className={`w-full text-left px-2.5 py-1.5 text-xs flex items-center gap-1.5 ${illuminateBgHover}`}
-                                    onClick={() => handleRenameConversation(conv)}
-                                >
-                                    <Edit2 className="w-3.5 h-3.5" /> Rename
-                                </button>
-                                <button
-                                    className={`w-full text-left px-2.5 py-1.5 text-xs flex items-center gap-1.5 ${illuminateBgHover}`}
-                                    onClick={() => handleShareConversation(conv)}
-                                >
-                                    <Share className="w-3.5 h-3.5" /> Share
-                                </button>
-                                <button
-                                    className={`w-full text-left px-2.5 py-1.5 text-xs flex items-center gap-1.5 text-red-500 ${isIlluminateEnabled ? 'hover:bg-red-100' : 'hover:bg-red-900/50'}`}
-                                    onClick={() => handleDeleteConversationClick(conv)}
-                                >
-                                    <Trash2 className="w-3.5 h-3.5" /> Delete
-                                </button>
-                            </div>
+                                <button className={`w-full text-left px-2.5 py-1.5 text-xs flex items-center gap-1.5 ${illuminateBgHover}`} onClick={() => handleRenameConversation(conv)}><Edit2 className="w-3.5 h-3.5" /> Rename</button>
+                                <button className={`w-full text-left px-2.5 py-1.5 text-xs flex items-center gap-1.5 ${illuminateBgHover}`} onClick={() => handleShareConversation(conv)}><Share className="w-3.5 h-3.5" /> Share</button>
+                                <button className={`w-full text-left px-2.5 py-1.5 text-xs flex items-center gap-1.5 text-red-500 ${isIlluminateEnabled ? 'hover:bg-red-100' : 'hover:bg-red-900/50'}`} onClick={() => handleDeleteConversationClick(conv)}><Trash2 className="w-3.5 h-3.5" /> Delete</button>
+                            </motion.div>
                         )}
                     </div>
                 ))}
             </div>
-
-             {/* Click outside detector for menu */}
-             {activeConvMenu && <div className="fixed inset-0 z-20" onClick={() => setActiveConvMenu(null)} />}
-
+              {/* Click outside detector for menu */}
+             {activeConvMenu && <div className="fixed inset-0 z-40" onClick={() => setActiveConvMenu(null)} />}
         </aside>
 
-         {/* Overlay for mobile conversation list */}
-         {isConvListOpen && (
-             <div
-                className="fixed inset-0 bg-black/30 z-10 md:hidden"
-                onClick={() => setIsConvListOpen(false)}
-             />
-         )}
+         {/* Mobile Overlay */}
+         {isConvListOpen && <div className="fixed inset-0 bg-black/30 z-30 md:hidden" onClick={() => setIsConvListOpen(false)} />}
 
       </div>
 
       {/* Context Dialog */}
-      <ContextDialog
-        isOpen={isContextDialogOpen}
-        onClose={() => setIsContextDialogOpen(false)}
-        onSave={handleSaveContext}
-        initialContext={userContext}
-        isBlackoutEnabled={isBlackoutEnabled} // Pass theme props
-        isIlluminateEnabled={isIlluminateEnabled}
-      />
+      <ContextDialog isOpen={isContextDialogOpen} onClose={() => setIsContextDialogOpen(false)} onSave={handleSaveContext} initialContext={userContext} isBlackoutEnabled={isBlackoutEnabled} isIlluminateEnabled={isIlluminateEnabled} />
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom'; // Added useNavigate
+import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
@@ -12,26 +12,24 @@ import {
     CalendarDays,    // Calendar
     Users,           // Friends
     Globe2,          // Community
-    FolderKanban,    // Folders (NEW)
+    FolderKanban,    // Folders
     Eye,             // Focus Mode
     BrainCircuit,    // AI Assistant / AI Chat Button
     Settings,        // Settings
     CheckCircle,     // Operational Status
-    AlertTriangle,   // Outage Status
+    AlertTriangle,   // Outage Status / Incident Icon
     X,               // Close icon
     Send,            // Send icon
-    Loader2          // Loading icon
+    Loader2,         // Loading icon
+    History          // Icon for Incident History
 } from 'lucide-react';
 
-// **** AI Integration - Assuming API Key is accessible ****
-// Replace with your actual key import or env variable handling
-import { geminiApiKey } from '../lib/dashboard-firebase'; // Or wherever your key is stored
+// Assuming API Key is accessible
+import { geminiApiKey } from '../lib/dashboard-firebase'; // Adjust path as needed
 
-// --- AI Helper Functions (Copied & Adapted) ---
+// --- AI Helper Functions (Include or import as needed) ---
 const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}&alt=sse`;
 
-// fetchWithTimeout, streamResponse, extractCandidateText remain the same as in Community.tsx
-// (Include them here or import from a shared utility file if preferred)
 const fetchWithTimeout = async (url: string, options: RequestInit, timeout = 30000) => {
   const controller = new AbortController();
   const { signal } = controller;
@@ -154,7 +152,6 @@ const extractCandidateText = (rawResponseText: string): string => {
 
 // --- Component Data & Constants ---
 
-// **** UPDATED: Logo component is now clickable ****
 const Logo = () => (
   <Link to="/" className="flex items-center space-x-2 group" aria-label="Go to Homepage">
     <svg
@@ -165,82 +162,39 @@ const Logo = () => (
     >
       <path d="M16.19 2H7.81C4.17 2 2 4.17 2 7.81V16.19C2 19.83 4.17 22 7.81 22H16.19C19.83 22 22 19.83 22 16.19V7.81C22 4.17 19.83 2 16.19 2ZM9.97 14.9L7.72 17.15C7.57 17.3 7.38 17.37 7.19 17.37C7 17.37 6.8 17.3 6.66 17.15L5.91 16.4C5.61 16.11 5.61 15.63 5.91 15.34C6.2 15.05 6.67 15.05 6.97 15.34L7.19 15.56L8.91 13.84C9.2 13.55 9.67 13.55 9.97 13.84C10.26 14.13 10.26 14.61 9.97 14.9ZM9.97 7.9L7.72 10.15C7.57 10.3 7.38 10.37 7.19 10.37C7 10.37 6.8 10.3 6.66 10.15L5.91 9.4C5.61 9.11 5.61 8.63 5.91 8.34C6.2 8.05 6.67 8.05 6.97 8.34L7.19 8.56L8.91 6.84C9.2 6.55 9.67 6.55 9.97 6.84C10.26 7.13 10.26 7.61 9.97 7.9ZM17.56 16.62H12.31C11.9 16.62 11.56 16.28 11.56 15.87C11.56 15.46 11.9 15.12 12.31 15.12H17.56C17.98 15.12 18.31 15.46 18.31 15.87C18.31 16.28 17.98 16.62 17.56 16.62ZM17.56 9.62H12.31C11.9 9.62 11.56 9.28 11.56 8.87C11.56 8.46 11.9 8.12 12.31 8.12H17.56C17.98 8.12 18.31 8.46 18.31 8.87C18.31 9.28 17.98 9.62 17.56 9.62Z" fill="currentColor"/>
     </svg>
-    {/* Status text remains, styled */}
     <span className="text-xl font-bold bg-gradient-to-r from-indigo-500 to-purple-500 bg-clip-text text-transparent group-hover:opacity-90 transition-opacity">
       Status
     </span>
   </Link>
 );
 
-
-// **** UPDATED Service Status Data ****
+// Service Status Data (Unchanged)
 const serviceStatus = [
-  {
-    name: "Dashboard",
-    icon: LayoutDashboard,
-    uptime: "99.99%",
-    majorIssue: null,
-    description: "Core application interface and widgets.",
-  },
-  {
-    name: "Notes",
-    icon: NotebookText,
-    uptime: "99.98%", // Set back to operational
-    majorIssue: null, // Set back to operational
-    description: "Note-taking, editing, and organization features.",
-  },
-  {
-    name: "Calendar",
-    icon: CalendarDays,
-    uptime: "99.95%",
-    majorIssue: null,
-    description: "Event scheduling and calendar synchronization.",
-  },
-  {
-    name: "Friends",
-    icon: Users,
-    uptime: "99.92%",
-    majorIssue: null,
-    description: "Social features, friend requests, and sharing.",
-  },
-  {
-    name: "Community",
-    icon: Globe2,
-    uptime: "99.88%",
-    majorIssue: null,
-    description: "File sharing, discovery, and community interactions.",
-  },
-  {
-    name: "Folders", // NEW SERVICE
-    icon: FolderKanban,
-    uptime: "100.00%",
-    majorIssue: null,
-    description: "File and note organization using folders.",
-  },
-  {
-    name: "Focus Mode",
-    icon: Eye,
-    uptime: "100.00%",
-    majorIssue: null,
-    description: "Distraction-free work environment.",
-  },
-  {
-    name: "AI Assistant",
-    icon: BrainCircuit,
-    uptime: "99.87%", // Example slightly adjusted
-    majorIssue: null,
-    description: "In-app AI chat, summarization, and generation.",
-  },
-  {
-    name: "Settings",
-    icon: Settings,
-    uptime: "99.96%", // Example slightly adjusted
-    majorIssue: null,
-    description: "User account and application preferences.",
-  },
+  { name: "Dashboard", icon: LayoutDashboard, uptime: "99.99%", majorIssue: null, description: "Core application interface and widgets." },
+  { name: "Notes", icon: NotebookText, uptime: "99.98%", majorIssue: null, description: "Note-taking, editing, and organization features." },
+  { name: "Calendar", icon: CalendarDays, uptime: "99.95%", majorIssue: null, description: "Event scheduling and calendar synchronization." },
+  { name: "Friends", icon: Users, uptime: "99.92%", majorIssue: null, description: "Social features, friend requests, and sharing." },
+  { name: "Community", icon: Globe2, uptime: "99.88%", majorIssue: null, description: "File sharing, discovery, and community interactions." },
+  { name: "Folders", icon: FolderKanban, uptime: "100.00%", majorIssue: null, description: "File and note organization using folders." },
+  { name: "Focus Mode", icon: Eye, uptime: "100.00%", majorIssue: null, description: "Distraction-free work environment." },
+  { name: "AI Assistant", icon: BrainCircuit, uptime: "99.87%", majorIssue: null, description: "In-app AI chat, summarization, and generation." },
+  { name: "Settings", icon: Settings, uptime: "99.96%", majorIssue: null, description: "User account and application preferences." },
 ];
 
-// Framer Motion Variants (No change needed)
+// **** NEW: Incident History Data ****
+const incidentHistory = [
+    {
+        date: "March 4, 2:59 PM EST",
+        title: "Major Outage - Notes Feature",
+        description: "We experienced a major outage affecting the Notes feature. Due to performance issues with underlying AI models, the system was unable to generate notes reliably during this time. Our team identified the root cause and implemented a fix to restore full functionality. We apologize for the inconvenience and appreciate your patience.",
+        resolvedDate: "April 13", // Can format this better later if needed
+        status: "Resolved"
+    },
+    // Add more past incidents here if needed
+    // { date: "Feb 10, 10:00 AM EST", title: "Minor Issue - Calendar Sync Delay", description: "...", resolvedDate: "Feb 10, 11:30 AM EST", status: "Resolved"}
+];
+
+// Framer Motion Variants (Unchanged)
 const containerVariants = {
   hidden: { opacity: 0 },
   visible: {
@@ -254,34 +208,33 @@ const itemVariants = {
   visible: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 100 } },
 };
 
+// Component Start
 const Status = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const navigate = useNavigate(); // Use navigate hook
+  const navigate = useNavigate();
 
-  // **** AI Chat State ****
+  // AI Chat State (Unchanged)
   const chatEndRef = useRef<HTMLDivElement>(null);
   const [isAiSidebarOpen, setIsAiSidebarOpen] = useState(false);
   const [chatMessage, setChatMessage] = useState('');
   const [chatHistory, setChatHistory] = useState<any[]>([
-     { id: 'ai-status-greet', role: 'assistant', content: "Hi! I'm the Status Page Assistant. Ask me about the current status of our services." }
+     { id: 'ai-status-greet', role: 'assistant', content: "Hi! I'm the Status Page Assistant. Ask me about the current status of our services or past incidents." } // Updated greeting
   ]);
   const [isChatLoading, setIsChatLoading] = useState(false);
 
 
   const toggleMobileMenu = () => setIsMobileMenuOpen(!isMobileMenuOpen);
 
-  // Determine overall status
+  // Determine overall status (Unchanged)
   const hasMajorOutage = serviceStatus.some(service => service.majorIssue);
   const overallStatusText = hasMajorOutage ? "Major Outage Reported" : "All Systems Operational";
   const overallStatusIcon = hasMajorOutage ? AlertTriangle : CheckCircle;
   const overallStatusColor = hasMajorOutage ? "text-red-400" : "text-green-400";
 
-  // Dynamic last updated time (replace with actual logic if needed)
-  const [lastUpdated] = useState(new Date().toLocaleString('en-US', {
-    month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short'
-  }));
+  // **** UPDATED: Hardcoded last updated time ****
+  const lastUpdated = "April 15; 2:30 pm EST";
 
-   // --- AI Chat Submit Handler (Status Page Specific) ---
+   // --- AI Chat Submit Handler (Status Page Specific - Updated Context) ---
    const handleChatSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatMessage.trim() || isChatLoading) return;
@@ -297,22 +250,31 @@ const Status = () => {
     const placeholderMsg: any = { id: assistantMsgId, role: 'assistant', content: "..." };
     setChatHistory(prev => [...prev, placeholderMsg]);
 
-    // Prepare context for the AI - only the service status data
+    // Prepare context for the AI - Current Status + Incident History
     const statusContext = serviceStatus.map(s =>
         `- ${s.name}: Status ${s.majorIssue ? 'Major Outage' : 'Operational'} (Uptime: ${s.uptime})${s.majorIssue ? `. Issue: ${s.majorIssue}` : ''}`
     ).join('\n');
 
+    // **** ADDED: Incident History Context ****
+    const historyContext = incidentHistory.map(inc =>
+        `- Date: ${inc.date}, Title: ${inc.title}, Status: ${inc.status}${inc.resolvedDate ? `, Resolved: ${inc.resolvedDate}` : ''}. Summary: ${inc.description.substring(0, 100)}...` // Include brief summary
+    ).join('\n');
+
     const prompt = `
-You are the TaskMaster Status Page AI Assistant. Your *only* knowledge is the current service status information provided below. You cannot access user data, dashboards, notes, community files, or any other part of the TaskMaster application.
+You are the TaskMaster Status Page AI Assistant. Your knowledge includes the current service status and past incident history provided below. You cannot access user data, dashboards, notes, community files, or any other part of the TaskMaster application.
 
 **Current Service Status:**
 ${statusContext}
 
+**Past Incident History:**
+${historyContext}
+
 **Your Task:**
-1.  Answer user questions *only* about the status of the services listed above (e.g., "Is the Dashboard down?", "What's the uptime for Community?", "Is there an issue with Notes?").
-2.  If asked about a service not listed, state that you don't have information on it.
-3.  If asked for help with specific account issues, login problems, or anything beyond the current service status, politely state that you cannot help with that and suggest contacting support or checking the main application.
-4.  Keep responses concise and based *strictly* on the provided status information. Do not speculate or provide information not present in the context.
+1.  Answer user questions about the **current status** of the services listed (e.g., "Is the Dashboard down?", "What's the uptime for Community?", "Is there an issue with Notes?").
+2.  Answer user questions about **past incidents** listed in the history (e.g., "What happened on March 4th?", "Tell me about the Notes outage.").
+3.  If asked about a service not listed or an incident not in the history, state that you don't have information on it.
+4.  If asked for help with specific account issues, login problems, or anything beyond the provided status and history, politely state that you cannot help with that and suggest contacting support or checking the main application.
+5.  Keep responses concise and based *strictly* on the provided status and history information. Do not speculate.
 
 **Conversation History (Last few turns):**
 ${chatHistory.slice(-4).map(m => `${m.role}: ${m.content}`).join('\n')}
@@ -332,8 +294,8 @@ Assistant:`;
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 contents: [{ parts: [{ text: prompt }] }],
-                generationConfig: { temperature: 0.5, maxOutputTokens: 500 }, // More factual temp
-                safetySettings: [ // Standard safety settings
+                generationConfig: { temperature: 0.5, maxOutputTokens: 500 },
+                safetySettings: [
                     { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
                     { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
                     { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
@@ -342,6 +304,7 @@ Assistant:`;
             })
         };
 
+        // Streaming logic (unchanged)
         await streamResponse(geminiEndpoint, geminiOptions, (rawChunkAccumulated) => {
             finalRawResponseText = rawChunkAccumulated;
             const currentExtractedText = extractCandidateText(rawChunkAccumulated);
@@ -354,7 +317,6 @@ Assistant:`;
             ));
         });
 
-        // Final update after stream ends
         const finalExtracted = extractCandidateText(finalRawResponseText);
         setChatHistory(prev => prev.map(msg =>
              msg.id === assistantMsgId
@@ -373,10 +335,10 @@ Assistant:`;
     } finally {
         setIsChatLoading(false);
     }
-   }, [chatMessage, isChatLoading, chatHistory]); // Dependencies for the AI submit handler
+   }, [chatMessage, isChatLoading, chatHistory]); // Dependencies include chat history now
 
 
-   // AI Chat Scroll Effect
+   // AI Chat Scroll Effect (Unchanged)
     useEffect(() => {
         if (chatEndRef.current && isAiSidebarOpen) {
             requestAnimationFrame(() => {
@@ -385,9 +347,10 @@ Assistant:`;
         }
     }, [chatHistory, isAiSidebarOpen]);
 
+  // --- Component Render ---
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-b from-gray-900 to-gray-950 font-sans text-gray-200">
-      {/* Animated Header */}
+      {/* Header (Unchanged) */}
       <motion.header
         className="fixed w-full bg-gray-900/70 backdrop-blur-md border-b border-gray-700/50 z-50 shadow-lg"
         initial={{ y: -100, opacity: 0 }}
@@ -396,10 +359,7 @@ Assistant:`;
       >
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-3">
           <nav className="flex items-center justify-between">
-            {/* Logo on the left */}
             <Logo />
-
-            {/* Hamburger Menu Button (mobile only) */}
             <button
               className="md:hidden text-gray-400 hover:text-indigo-400 focus:outline-none ml-4 p-1 rounded hover:bg-gray-700/50 transition-colors"
               onClick={toggleMobileMenu}
@@ -410,8 +370,6 @@ Assistant:`;
                 {isMobileMenuOpen ? <path d="M6 18L18 6M6 6l12 12" /> : <path d="M4 6h16M4 12h16M4 18h16" />}
               </svg>
             </button>
-
-            {/* Desktop Navigation */}
             <div className="hidden md:flex items-center space-x-6">
               <button
                 onClick={() => navigate('/dashboard')}
@@ -422,8 +380,6 @@ Assistant:`;
             </div>
           </nav>
         </div>
-
-        {/* Mobile Navigation Menu */}
          <AnimatePresence>
             {isMobileMenuOpen && (
                 <motion.div
@@ -448,7 +404,7 @@ Assistant:`;
 
       {/* Main Status Content */}
       <main className="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 pt-28 md:pt-32 pb-12">
-        {/* Overall Status Banner */}
+        {/* Overall Status Banner (Unchanged) */}
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -470,7 +426,7 @@ Assistant:`;
           </div>
         </motion.div>
 
-        {/* Service Status Grid */}
+        {/* Service Status Grid (Unchanged) */}
         <motion.div
           variants={containerVariants}
           initial="hidden"
@@ -489,27 +445,18 @@ Assistant:`;
                 variants={itemVariants}
                 className={`bg-gray-800/60 rounded-xl p-5 shadow-md border border-gray-700/60 hover:border-gray-600/80 hover:bg-gray-800/80 transition-all duration-200 flex flex-col`}
               >
-                {/* Card Header */}
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
                     <IconComponent className="w-6 h-6 text-indigo-400" />
                     <h3 className="text-lg font-semibold text-gray-100">{service.name}</h3>
                   </div>
-                   {/* Status Badge */}
                   <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full border ${statusColorClass}`}>
                     {statusText}
                   </span>
                 </div>
-
-                {/* Description */}
                 <p className="text-sm text-gray-400 mb-4 flex-grow">
                   {service.description}
                 </p>
-
-                {/* Uptime (Optional display) */}
-                 {/* <p className="text-xs text-gray-500 mb-3">90-Day Uptime: {service.uptime}</p> */}
-
-                {/* Major Issue Details */}
                 {isOutage && (
                   <div className="bg-red-900/30 border border-red-700/50 p-3 rounded-lg text-sm text-red-200 mt-auto">
                      <p className="font-semibold mb-1">Current Issue:</p>
@@ -520,9 +467,52 @@ Assistant:`;
             );
           })}
         </motion.div>
+
+        {/* **** NEW: Incident History Section **** */}
+        <motion.div
+            className="mt-16"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.5, duration: 0.5 }}
+        >
+            <h2 className="text-2xl font-semibold text-gray-200 mb-6 flex items-center gap-3">
+                <History className="w-6 h-6 text-indigo-400"/>
+                Past Incidents
+            </h2>
+            {incidentHistory.length === 0 ? (
+                <p className="text-gray-400 italic">No past incidents reported recently.</p>
+            ) : (
+                <div className="space-y-6">
+                    {incidentHistory.map((incident, index) => (
+                        <motion.div
+                            key={index}
+                            className="bg-gray-800/50 p-5 rounded-lg border border-gray-700/50 shadow-sm"
+                            variants={itemVariants} // Use the same item variant
+                            initial="hidden" // Apply variants individually if parent isn't staggered
+                            animate="visible"
+                            transition={{delay: 0.6 + index * 0.1}} // Stagger delay
+                        >
+                            <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-2">
+                                <h3 className="text-lg font-semibold text-indigo-300 mb-1 sm:mb-0">{incident.title}</h3>
+                                <span className={`text-xs font-medium px-2 py-0.5 rounded ${
+                                    incident.status === 'Resolved' ? 'bg-green-800/50 text-green-300 border border-green-700/50' : 'bg-yellow-800/50 text-yellow-300 border border-yellow-700/50' // Example for other statuses
+                                }`}>{incident.status}</span>
+                            </div>
+                            <p className="text-xs text-gray-500 mb-3">
+                                Reported: {incident.date} {incident.resolvedDate && `| Resolved: ${incident.resolvedDate}`}
+                            </p>
+                            <p className="text-sm text-gray-300 leading-relaxed">
+                                {incident.description}
+                            </p>
+                        </motion.div>
+                    ))}
+                </div>
+            )}
+        </motion.div>
+
       </main>
 
-       {/* AI Chat Trigger Button */}
+       {/* AI Chat Trigger Button (Unchanged) */}
        <button
          onClick={() => setIsAiSidebarOpen(true)}
          className={`fixed bottom-6 right-6 z-40 p-3 rounded-full shadow-xl transition-all duration-300 transform hover:scale-110 active:scale-100 bg-gradient-to-br from-purple-600 to-indigo-600 text-white hover:from-purple-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-950 focus:ring-indigo-500 ${isAiSidebarOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
@@ -532,7 +522,7 @@ Assistant:`;
          <BrainCircuit className="w-6 h-6" />
        </button>
 
-      {/* Footer */}
+      {/* Footer (Unchanged) */}
       <footer className="bg-gray-950 border-t border-gray-700/30 mt-auto">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-5">
           <div className="flex flex-col md:flex-row items-center justify-between">
@@ -553,7 +543,7 @@ Assistant:`;
       </footer>
 
 
-       {/* AI Chat Sidebar */}
+       {/* AI Chat Sidebar (Unchanged Structure/Styling) */}
         <div
             aria-hidden={!isAiSidebarOpen}
             className={`fixed top-0 right-0 h-full w-full max-w-sm md:max-w-md lg:max-w-[440px] z-[60] transform transition-transform duration-300 ease-in-out ${ isAiSidebarOpen ? 'translate-x-0' : 'translate-x-full' } bg-gray-800/90 backdrop-blur-lg border-l border-gray-700/50 flex flex-col shadow-2xl`}
@@ -584,11 +574,10 @@ Assistant:`;
                     <div className={`max-w-[85%] rounded-lg px-3 py-2 text-sm shadow-md break-words ${ message.role === 'user' ? 'bg-indigo-600 text-white' : message.error ? 'bg-red-800/50 text-red-200 border border-red-700/50' : 'bg-gray-700/80 text-gray-200 border border-gray-600/50' }`}>
                         {message.content && message.content !== "..." && (
                             <ReactMarkdown
-                                remarkPlugins={[remarkGfm]} // Keep it simple for status bot
+                                remarkPlugins={[remarkGfm]}
                                 components={{
                                     p: ({node, ...props}) => <p className="mb-1 last:mb-0" {...props} />,
                                     a: ({node, ...props}) => <a className="text-indigo-300 hover:underline" target="_blank" rel="noopener noreferrer" {...props} />,
-                                    // No complex markdown needed usually for status
                                 }}
                             >
                                 {message.content}
@@ -604,7 +593,6 @@ Assistant:`;
                     </div>
                     </motion.div>
                 ))}
-                {/* Extra loading indicator if response is still generating but last message isn't '...' */}
                 {isChatLoading && chatHistory[chatHistory.length - 1]?.role !== 'assistant' && (
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start">
                         <div className={`bg-gray-700/80 border border-gray-600/50 rounded-lg px-3 py-1.5 max-w-[85%] shadow-md`}>
@@ -638,7 +626,6 @@ Assistant:`;
             </div>
             </form>
         </div> {/* End AI Chat Sidebar */}
-
 
     </div> // End Page Container
   );

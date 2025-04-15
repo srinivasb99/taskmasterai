@@ -13,11 +13,12 @@ import {
   Heart, // Added for future like feature? (Using ThumbsUp/Down for now)
   ThumbsUp, ThumbsDown, Star, BrainCircuit, Send, TimerIcon, // Added icons
   Users, // For "helped students"
+  FileUp, // Import FileUp for multi-upload icon
 } from 'lucide-react';
 import { getCurrentUser } from '../lib/settings-firebase';
 import {
     uploadCommunityFile,
-    deleteUserFile,
+    // deleteUserFile, // REMOVED - Users can no longer delete their own files unless admin
     deleteAnyFileAsAdmin,
     handleFileDownload, // Backend handler trigger
     toggleLike,         // New
@@ -33,12 +34,31 @@ import {
 import { geminiApiKey } from '../lib/dashboard-firebase'; // Assuming API key is shared
 
 // --- AI Chat Helper Functions (Copied from Dashboard.tsx, adjust endpoint/models if needed) ---
+// NOTE: AI content access part requires significant backend changes, which are outside the scope
+//       of this frontend-only modification. The prompt is adjusted to reflect this limitation
+//       while trying to provide more helpful "generated" responses for unlocked files.
 const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}&alt=sse`; // Use 1.5 flash and enable SSE
 
 // --- Constants ---
 const TOKENS_PER_BONUS_THRESHOLD = 50;
 const FILES_PER_BONUS_THRESHOLD = 5;
 const TOKENS_PER_DOWNLOAD = 5;
+const MAX_FILE_SIZE_MB = 15;
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+
+// Define allowed file types (extensions) for upload validation
+const ALLOWED_FILE_EXTENSIONS = [
+    'pdf', 'png', 'jpg', 'jpeg', 'gif', 'webp', // Docs & Images
+    'mp3', 'wav', 'ogg', // Audio
+    'mp4', 'mov', 'avi', 'webm', // Video
+    'zip', 'rar', '7z', // Archives
+    'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', // Office Docs
+    'txt', 'csv', 'md', 'json', // Text & Data
+    // Add or remove extensions as needed
+];
+// Create corresponding MIME types string for the input accept attribute
+const ALLOWED_MIME_TYPES = ALLOWED_FILE_EXTENSIONS.map(ext => `.${ext}`).join(',');
+
 
 const fetchWithTimeout = async (url: string, options: RequestInit, timeout = 30000) => {
   const controller = new AbortController();
@@ -153,10 +173,6 @@ const DEV_EMAILS = [
   'srinibaj10@gmail.com',
   'fugegate@gmail.com'
 ];
-// Constants moved to community-firebase.ts
-// const TOKENS_PER_BONUS_THRESHOLD = 50;
-// const FILES_PER_BONUS_THRESHOLD = 5;
-// const TOKENS_PER_DOWNLOAD = 5;
 
 const getDisplayName = (fileName: string): string => {
     if (!fileName) return 'Untitled';
@@ -164,6 +180,14 @@ const getDisplayName = (fileName: string): string => {
     if (lastDotIndex === -1 || lastDotIndex === 0) return fileName;
     return fileName.substring(0, lastDotIndex);
 };
+
+const getFileExtension = (fileName: string): string => {
+    if (!fileName) return '';
+    const lastDotIndex = fileName.lastIndexOf('.');
+    if (lastDotIndex === -1 || lastDotIndex === 0 || lastDotIndex === fileName.length - 1) return '';
+    return fileName.substring(lastDotIndex + 1).toLowerCase();
+};
+
 
 const formatTimestamp = (timestamp: Timestamp | Date | undefined): string => {
   if (!timestamp) return 'Unknown date';
@@ -191,11 +215,12 @@ const getFileIcon = (extension: string): React.ReactElement => {
         case 'doc': case 'docx': return <FileText className="w-4 h-4 text-blue-600" />;
         case 'xls': case 'xlsx': return <FileText className="w-4 h-4 text-green-600" />;
         case 'ppt': case 'pptx': return <FileText className="w-4 h-4 text-red-600" />;
+        case 'txt': case 'csv': case 'md': case 'json': return <FileText className="w-4 h-4 text-gray-500" />;
         default: return <FileIcon className="w-4 h-4 text-gray-500" />;
     }
 };
 
-// Star Rating Component
+// Star Rating Component (No changes needed)
 const StarRating = ({
     rating,
     totalRatings,
@@ -267,10 +292,11 @@ export function Community() {
   const [userPhotoURL, setUserPhotoURL] = useState<string | null>(null);
   const [tokens, setTokens] = useState<number | null>(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
-  const [loadingData, setLoadingData] = useState(true);
+  const [loadingData, setLoadingData] = useState(true); // Combined loading state for files & profiles
   const [communityFiles, setCommunityFiles] = useState<any[]>([]);
   const [unlockedFileIds, setUnlockedFileIds] = useState<string[]>([]);
-  const [uploading, setUploading] = useState(false); // Generic loading
+  const [uploading, setUploading] = useState(false); // Used for uploads, deletes, edits
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null); // Optional: track upload progress for multiple files
   const [downloadingFileId, setDownloadingFileId] = useState<string | null>(null);
   const [likingFileId, setLikingFileId] = useState<string | null>(null); // For like/dislike loading
   const [ratingFileId, setRatingFileId] = useState<string | null>(null); // For rating loading
@@ -285,16 +311,16 @@ export function Community() {
   const [insufficientTokensInfo, setInsufficientTokensInfo] = useState<{ missing: number; cost: number } | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('All');
-  const fileTypes = ['pdf', 'png', 'jpg', 'jpeg', 'mp3', 'wav', 'mp4', 'mov', 'docx', 'zip', 'txt', 'csv', 'json', 'xls', 'ppt'];
+  // fileTypes constant moved near top
 
-  // Theme State
+  // Theme State (No changes needed)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => JSON.parse(localStorage.getItem('isSidebarCollapsed') || 'false'));
   const [isBlackoutEnabled, setIsBlackoutEnabled] = useState(() => JSON.parse(localStorage.getItem('isBlackoutEnabled') || 'false'));
   const [isSidebarBlackoutEnabled, setIsSidebarBlackoutEnabled] = useState(() => JSON.parse(localStorage.getItem('isSidebarBlackoutEnabled') || 'false'));
   const [isIlluminateEnabled, setIsIlluminateEnabled] = useState(() => JSON.parse(localStorage.getItem('isIlluminateEnabled') ?? 'true'));
   const [isSidebarIlluminateEnabled, setIsSidebarIlluminateEnabled] = useState(() => JSON.parse(localStorage.getItem('isSidebarIlluminateEnabled') || 'false'));
 
-  // AI Chat State
+  // AI Chat State (No changes needed)
   const [isAiSidebarOpen, setIsAiSidebarOpen] = useState(false);
   const [chatMessage, setChatMessage] = useState('');
   const [chatHistory, setChatHistory] = useState<any[]>([ // Using 'any' for simplicity, refine with ChatMessage interface if needed
@@ -310,7 +336,7 @@ export function Community() {
   // (Keep the same style variables as before)
   const containerClass = isIlluminateEnabled ? "bg-gray-50 text-gray-900" : isBlackoutEnabled ? "bg-black text-gray-200" : "bg-gray-900 text-gray-200";
   const cardClass = isIlluminateEnabled ? "bg-white text-gray-900 border border-gray-200/70 shadow-sm" : isBlackoutEnabled ? "bg-gray-900 text-gray-300 border border-gray-700/50 shadow-md shadow-black/20" : "bg-gray-800 text-gray-300 border border-gray-700/50 shadow-lg shadow-black/20";
-  const sectionCardClass = isIlluminateEnabled ? "bg-gray-100/60 border border-gray-200/80" : isBlackoutEnabled ? "bg-gray-900/70 border border-gray-700/40" : "bg-gray-800/60 border border-gray-700/50";
+  const sectionCardClass = isIlluminateEnabled ? "bg-white/80 backdrop-blur-sm border border-gray-200/80" : isBlackoutEnabled ? "bg-gray-900/70 backdrop-blur-sm border border-gray-700/40" : "bg-gray-800/70 backdrop-blur-sm border border-gray-700/50"; // Adjusted Community Files section bg slightly
   const listItemClass = isIlluminateEnabled ? "bg-white hover:bg-gray-50/80 border border-gray-200/90" : isBlackoutEnabled ? "bg-gray-800 hover:bg-gray-700/80 border border-gray-700/60" : "bg-gray-700/70 hover:bg-gray-700 border border-gray-600/70";
   const headingClass = isIlluminateEnabled ? "text-gray-800" : "text-gray-100";
   const subheadingClass = isIlluminateEnabled ? "text-gray-600" : "text-gray-400";
@@ -322,7 +348,7 @@ export function Community() {
   const illuminateBgHover = isIlluminateEnabled ? "hover:bg-gray-100" : "hover:bg-gray-700";
   const actionButtonClass = `p-1.5 rounded-full transition-colors duration-150 disabled:opacity-50`;
   const editButtonClass = `${actionButtonClass} ${isIlluminateEnabled ? 'hover:bg-blue-100 text-blue-600' : 'hover:bg-blue-900/50 text-blue-400'}`;
-  const deleteButtonClass = `${actionButtonClass} ${isIlluminateEnabled ? 'hover:bg-red-100 text-red-500' : 'hover:bg-red-900/50 text-red-500'}`;
+  // const deleteButtonClass = `${actionButtonClass} ${isIlluminateEnabled ? 'hover:bg-red-100 text-red-500' : 'hover:bg-red-900/50 text-red-500'}`; // No longer needed for user delete
   const adminDeleteButtonClass = `${actionButtonClass} ${isIlluminateEnabled ? 'hover:bg-red-100 text-red-600' : 'hover:bg-red-900/50 text-red-600'}`;
   const likeButtonClass = (isActive: boolean) => `${actionButtonClass} ${isActive ? (isIlluminateEnabled ? 'text-blue-600 bg-blue-100/70' : 'text-blue-400 bg-blue-900/40') : (isIlluminateEnabled ? 'text-gray-500 hover:bg-blue-100 hover:text-blue-600' : 'text-gray-400 hover:bg-blue-900/50 hover:text-blue-400')}`;
   const dislikeButtonClass = (isActive: boolean) => `${actionButtonClass} ${isActive ? (isIlluminateEnabled ? 'text-red-600 bg-red-100/70' : 'text-red-500 bg-red-900/40') : (isIlluminateEnabled ? 'text-gray-500 hover:bg-red-100 hover:text-red-500' : 'text-gray-400 hover:bg-red-900/50 hover:text-red-500')}`;
@@ -405,6 +431,7 @@ export function Community() {
           dislikes: docSnap.data().dislikes || [],
           totalRating: docSnap.data().totalRating || 0,
           ratingCount: docSnap.data().ratingCount || 0,
+          downloadCount: docSnap.data().downloadCount || 0, // Ensure download count exists
       }));
       setCommunityFiles(filesData);
 
@@ -414,15 +441,22 @@ export function Community() {
       // Fetch uploader profiles (chunking handled within the loop)
       if (uniqueUserIds.length > 0) {
          try {
-              const profilesQuery = query(collection(db, 'users'), where(documentId(), 'in', uniqueUserIds.slice(0, 30))); // Fetch in chunks if needed
-              const profileSnapshot = await getDocs(profilesQuery);
-              const tempUserMap: { [key: string]: any } = {};
-              profileSnapshot.forEach((docSnap) => {
-                  tempUserMap[docSnap.id] = docSnap.data();
-              });
-              if (isMounted) {
-                   // Merge new profiles with existing ones
-                   setUserProfiles(currentProfiles => ({ ...currentProfiles, ...tempUserMap }));
+              // Fetch profiles only for users not already loaded
+              const newUserIds = uniqueUserIds.filter(uid => !userProfiles[uid]);
+              if (newUserIds.length > 0) {
+                  // Fetch in chunks of 30 (Firestore 'in' query limit)
+                  for (let i = 0; i < newUserIds.length; i += 30) {
+                      const chunk = newUserIds.slice(i, i + 30);
+                      const profilesQuery = query(collection(db, 'users'), where(documentId(), 'in', chunk));
+                      const profileSnapshot = await getDocs(profilesQuery);
+                      const tempUserMap: { [key: string]: any } = {};
+                      profileSnapshot.forEach((docSnap) => {
+                          tempUserMap[docSnap.id] = docSnap.data();
+                      });
+                      if (isMounted) {
+                           setUserProfiles(currentProfiles => ({ ...currentProfiles, ...tempUserMap }));
+                      }
+                  }
               }
          } catch (error) {
               console.error("Error fetching user profiles:", error);
@@ -456,7 +490,7 @@ export function Community() {
         isMounted = false;
         unsubscribeFiles();
     };
-  }, [user]); // Re-run when user changes
+  }, [user]); // Re-run when user changes (to fetch ratings)
 
   // Unlocked Files Listener (No Changes)
   useEffect(() => {
@@ -480,8 +514,9 @@ export function Community() {
     // Only run check if bonus count state is loaded
     if (uploadBonusCount === null) return;
 
+    // Check only if bonus count seems incorrect (user cannot delete files now, so less likely)
     if (uploadBonusCount > expectedBonusGroups) {
-      console.warn(`Abuse Check: User ${user.uid} has ${currentFileCount} files, expected bonus groups ${expectedBonusGroups}, but recorded count is ${uploadBonusCount}.`);
+      console.warn(`Abuse Check: User ${user.uid} has ${currentFileCount} files, expected bonus groups ${expectedBonusGroups}, but recorded count is ${uploadBonusCount}. Correcting.`);
       const newWarningCount = abuseWarningCount + 1;
       setAbuseWarningCount(newWarningCount); // Update local state immediately
       updateDoc(userDocRef, {
@@ -489,7 +524,7 @@ export function Community() {
           abuseWarningCount: newWarningCount
       }).catch(err => console.error("Failed to update warning/bonus count:", err));
 
-      setWarningMessage(`Warning ${newWarningCount}/3: Discrepancy detected. Please avoid deleting files shortly after upload. Continued issues may affect your account.`);
+      setWarningMessage(`Warning ${newWarningCount}/3: Discrepancy detected. Please avoid suspicious activity. Continued issues may affect your account.`);
       setShowWarning(true);
 
       if (newWarningCount >= 3) {
@@ -499,7 +534,7 @@ export function Community() {
     }
   }, [communityFiles, user, uploadBonusCount, abuseWarningCount, loadingAuth, loadingData, navigate]);
 
-  // AI Chat Scroll Effect
+  // AI Chat Scroll Effect (No changes needed)
   useEffect(() => {
     if (chatEndRef.current && isAiSidebarOpen) {
         requestAnimationFrame(() => {
@@ -514,69 +549,128 @@ export function Community() {
   const handleSelectFile = () => { fileInputRef.current?.click(); };
 
   const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
-    if (!user) return;
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      if (file.size > 15 * 1024 * 1024) { // 15MB Limit
-        alert("File is too large (max 15MB).");
-        if (fileInputRef.current) fileInputRef.current.value = "";
-        return;
+      if (!user || !e.target.files || e.target.files.length === 0) return;
+
+      const files = Array.from(e.target.files);
+      const userFiles = communityFiles.filter((f) => f.userId === user.uid); // Use memoized yourSharedFiles? No, need fresh data here.
+      const validFilesToUpload: File[] = [];
+      const errors: string[] = [];
+
+      for (const file of files) {
+          const extension = getFileExtension(file.name);
+
+          // 1. Check Size
+          if (file.size > MAX_FILE_SIZE_BYTES) {
+              errors.push(`"${file.name}" is too large (max ${MAX_FILE_SIZE_MB}MB).`);
+              continue; // Skip this file
+          }
+
+          // 2. Check Type
+          if (!ALLOWED_FILE_EXTENSIONS.includes(extension)) {
+              errors.push(`"${file.name}" has an unsupported file type (.${extension}).`);
+              continue; // Skip this file
+          }
+
+          // 3. Check for Duplicate Name (within user's existing uploads)
+          if (userFiles.some((f) => f.fileName === file.name)) {
+              errors.push(`You already have a file named "${file.name}". Please rename or delete the existing one.`);
+              continue; // Skip this file
+          }
+
+          // 4. Check for Duplicate Name (within the current batch)
+          if (validFilesToUpload.some((f) => f.name === file.name)) {
+              errors.push(`Duplicate file name "${file.name}" detected in the selection. Please upload unique names.`);
+              // Skip this file to avoid conflicts later in the batch
+              continue;
+          }
+
+
+          validFilesToUpload.push(file);
       }
-      // Check for duplicate file name *within user's uploads*
-      const userFiles = communityFiles.filter((f) => f.userId === user.uid);
-      if (userFiles.some((f) => f.fileName === file.name)) {
-        alert('You have already uploaded a file with this exact name. Please rename it or delete the existing one.');
-        if (fileInputRef.current) fileInputRef.current.value = "";
-        return;
+
+      // Show errors if any files were skipped
+      if (errors.length > 0) {
+          alert(`Some files were not selected for upload:\n- ${errors.join('\n- ')}`);
+      }
+
+      // Proceed only if there are valid files
+      if (validFilesToUpload.length === 0) {
+          if (fileInputRef.current) fileInputRef.current.value = ""; // Clear input even if nothing valid
+          return;
       }
 
       setUploading(true);
-      try {
-        await uploadCommunityFile(user.uid, file);
-        // Success message? Maybe a temporary toast notification
-      } catch (error) {
-        console.error('Error uploading file:', error);
-        alert(`Upload Failed: ${error instanceof Error ? error.message : 'Please try again.'}`);
-      } finally {
-        setUploading(false);
-        if (fileInputRef.current) fileInputRef.current.value = "";
-      }
-    }
-  };
+      setUploadProgress(0); // Initialize progress for batch
 
-  const handleUserDeleteFile = async (file: any) => {
-      if (!user || user.uid !== file.userId) return;
-      if (!window.confirm(`Are you sure you want to delete "${file.fileName}"? This action cannot be undone.`)) return;
-
-      setUploading(true); // Use generic uploading state
       try {
-          await deleteUserFile(user.uid, file.id);
-          // Remove from local state immediately for better UX? Listener will catch up too.
-          setCommunityFiles(prev => prev.filter(f => f.id !== file.id));
+          // Upload valid files sequentially or in parallel (using Promise.all)
+          // Using Promise.all for potentially faster uploads
+          const uploadPromises = validFilesToUpload.map((file, index) =>
+              uploadCommunityFile(user.uid, file)
+                  .then(() => {
+                      // Update progress after each successful upload
+                      setUploadProgress(prev => prev !== null ? prev + (1 / validFilesToUpload.length) : null);
+                  })
+                  .catch(uploadError => {
+                      console.error(`Error uploading ${file.name}:`, uploadError);
+                      // Optionally collect individual errors to show at the end
+                      throw new Error(`Failed to upload "${file.name}": ${uploadError instanceof Error ? uploadError.message : 'Unknown error'}`);
+                  })
+          );
+
+          await Promise.all(uploadPromises);
+          // Optional: Show a success message for the batch
+          alert(`${validFilesToUpload.length} file(s) uploaded successfully!`);
+
       } catch (error) {
-          console.error('Error deleting own file:', error);
-          alert(`Delete Failed: ${error instanceof Error ? error.message : 'Please try again.'}`);
+          console.error('Error uploading files:', error);
+          alert(`Upload Failed: ${error instanceof Error ? error.message : 'One or more files failed to upload. Please try again.'}`);
       } finally {
           setUploading(false);
+          setUploadProgress(null);
+          if (fileInputRef.current) fileInputRef.current.value = ""; // Clear input after attempt
       }
   };
 
-  const handleAdminDeleteFile = async (file: any) => {
-     if (!user || !DEV_EMAILS.includes(user.email || '')) { alert("Unauthorized action."); return; }
-     if (!window.confirm(`ADMIN ACTION: Permanently delete "${file.fileName}" (ID: ${file.id}) uploaded by ${file.userId}? This is irreversible.`)) return;
 
-     setUploading(true);
+  // REMOVED: handleUserDeleteFile - Users (non-admin) can no longer delete their shared files.
+  // Admin deletion is handled by handleAdminDeleteFile
+
+  // Admin Delete Function (Used in both Community Files and Your Shared Files)
+  const handleAdminDeleteFile = async (file: any) => {
+     // Double-check admin status
+     if (!user || !DEV_EMAILS.includes(user.email || '')) {
+         alert("Unauthorized action.");
+         return;
+     }
+     // Use display name in confirmation
+     const displayName = getDisplayName(file.fileName);
+     const uploaderName = userProfiles[file.userId]?.name || file.userId; // Show name or ID
+
+     if (!window.confirm(`ADMIN ACTION: Permanently delete "${displayName}" (ID: ${file.id}) uploaded by ${uploaderName}? This is irreversible.`)) {
+         return;
+     }
+
+     setUploading(true); // Use generic uploading state
      try {
-       // Ensure we have the necessary data (might be from state which could be slightly stale)
-       const fileToDelete = communityFiles.find(f => f.id === file.id) || file;
+       const fileToDelete = communityFiles.find(f => f.id === file.id) || file; // Get potentially fresher data from state if available
        if (!fileToDelete.uniqueFileName || !fileToDelete.userId) {
-           console.error("Admin Delete Error: File data incomplete in state.", fileToDelete);
-           // Attempt to fetch fresh data? Or fail safely. Let's fail safely.
-           throw new Error("Required file data (uniqueFileName, userId) missing for admin deletion.");
+           console.error("Admin Delete Error: File data incomplete.", fileToDelete);
+           // Try to fetch if essential data missing? For now, fail safely.
+           const freshDoc = await getDoc(doc(db, 'communityFiles', file.id));
+           if (freshDoc.exists() && freshDoc.data()?.uniqueFileName && freshDoc.data()?.userId) {
+               await deleteAnyFileAsAdmin(user.uid, { id: file.id, ...freshDoc.data() });
+           } else {
+                throw new Error("Required file data (uniqueFileName, userId) missing for admin deletion, and couldn't refetch.");
+           }
+       } else {
+            await deleteAnyFileAsAdmin(user.uid, fileToDelete);
        }
-       await deleteAnyFileAsAdmin(user.uid, fileToDelete);
-        // Remove from local state
+
+       // Local state updates via listener, but can remove immediately for better UX
        setCommunityFiles(prev => prev.filter(f => f.id !== file.id));
+       alert(`File "${displayName}" deleted successfully.`);
+
      } catch (error) {
        console.error('Error deleting file as admin:', error);
        alert(`Admin Delete Failed: ${error instanceof Error ? error.message : 'Please try again.'}`);
@@ -593,10 +687,10 @@ export function Community() {
     const oldFile = communityFiles.find((f) => f.id === fileId);
     if (!oldFile || !user) return;
 
-    const oldExtensionMatch = oldFile.fileName.match(/\.([^.]+)$/);
-    const oldExtension = oldExtensionMatch ? oldExtensionMatch[1].toLowerCase() : '';
+    const oldExtension = getFileExtension(oldFile.fileName);
     const sanitizedNewName = editingFileName.trim();
-    const finalName = oldExtension ? `${sanitizedNewName}.${oldExtension}` : sanitizedNewName; // Keep extension
+    // Ensure the final name includes the original extension
+    const finalName = oldExtension ? `${sanitizedNewName}.${oldExtension}` : sanitizedNewName;
 
     if (finalName === oldFile.fileName) { handleCancelEdit(); return; } // No change
 
@@ -620,13 +714,13 @@ export function Community() {
     }
   };
 
+  // Unlock File (No significant changes needed)
   const unlockFile = async (file: any) => {
     if (!user || !user.uid) return;
     if (file.userId === user.uid) { alert("You cannot unlock your own file."); return; }
     if (unlockedFileIds.includes(file.id)) { alert("You have already unlocked this file."); return; }
 
-    const parts = file.fileName.split('.');
-    const ext = parts.length > 1 ? parts[parts.length - 1].toLowerCase() : '*';
+    const ext = getFileExtension(file.fileName) || '*';
     const cost = pricing.Basic[ext] || pricing.Basic['*']; // Use pricing config
 
     if (tokens === null) { alert("Token balance is still loading. Please wait."); return; }
@@ -680,6 +774,7 @@ export function Community() {
     }
   };
 
+  // Handle Download (No significant changes needed)
   const handleDownloadClick = async (file: any) => {
      if (!user || !file || downloadingFileId === file.id) return;
      if (file.userId !== user.uid && !unlockedFileIds.includes(file.id)) {
@@ -714,18 +809,18 @@ export function Community() {
      }
    };
 
-  // --- Like/Dislike/Rating Handlers ---
+  // --- Like/Dislike/Rating Handlers (No changes needed) ---
    const handleLikeClick = useCallback(async (file: any) => {
      if (!user || !user.uid || file.userId === user.uid || likingFileId === file.id) return;
      setLikingFileId(file.id);
      try {
        await toggleLike(file.id, user.uid);
-       // Optimistic UI update (optional but improves UX)
+       // Optimistic UI update handled by listener now, or can keep for faster feedback
        setCommunityFiles(prev => prev.map(f => {
            if (f.id === file.id) {
-               const alreadyLiked = f.likes.includes(user.uid);
-               const newLikes = alreadyLiked ? f.likes.filter((id: string) => id !== user.uid) : [...f.likes, user.uid];
-               const newDislikes = f.dislikes.filter((id: string) => id !== user.uid); // Remove from dislikes if liking
+               const alreadyLiked = f.likes?.includes(user.uid);
+               const newLikes = alreadyLiked ? f.likes?.filter((id: string) => id !== user.uid) : [...(f.likes || []), user.uid];
+               const newDislikes = f.dislikes?.filter((id: string) => id !== user.uid); // Remove from dislikes if liking
                return { ...f, likes: newLikes, dislikes: newDislikes };
            }
            return f;
@@ -743,12 +838,12 @@ export function Community() {
      setLikingFileId(file.id); // Use same loading state
      try {
        await toggleDislike(file.id, user.uid);
-        // Optimistic UI update
+        // Optimistic UI update handled by listener now, or can keep for faster feedback
         setCommunityFiles(prev => prev.map(f => {
            if (f.id === file.id) {
-               const alreadyDisliked = f.dislikes.includes(user.uid);
-               const newDislikes = alreadyDisliked ? f.dislikes.filter((id: string) => id !== user.uid) : [...f.dislikes, user.uid];
-               const newLikes = f.likes.filter((id: string) => id !== user.uid); // Remove from likes if disliking
+               const alreadyDisliked = f.dislikes?.includes(user.uid);
+               const newDislikes = alreadyDisliked ? f.dislikes?.filter((id: string) => id !== user.uid) : [...(f.dislikes || []), user.uid];
+               const newLikes = f.likes?.filter((id: string) => id !== user.uid); // Remove from likes if disliking
                return { ...f, likes: newLikes, dislikes: newDislikes };
            }
            return f;
@@ -791,9 +886,10 @@ export function Community() {
       .filter((file) => {
         if (file.userId === user.uid) return false; // Exclude user's own files
         const baseName = getDisplayName(file.fileName).toLowerCase();
-        const ext = file.fileName.split('.').pop()?.toLowerCase() || '';
+        const ext = getFileExtension(file.fileName);
         const searchMatch = searchTerm ? baseName.includes(searchTerm.toLowerCase()) : true;
-        const typeMatch = filterType === 'All' ? true : ext === filterType.toLowerCase();
+        // Filter Type Check: If 'All', pass. Otherwise, check if extension matches filter type.
+        const typeMatch = filterType === 'All' || (filterType !== '' && ext === filterType.toLowerCase());
         return searchMatch && typeMatch;
       })
       .sort((a, b) => (b.uploadedAt?.seconds ?? 0) - (a.uploadedAt?.seconds ?? 0));
@@ -805,24 +901,26 @@ export function Community() {
      return unlockedFileIds
          .map(id => fileMap.get(id))
          .filter((file): file is any => file && file.userId !== user.uid) // Ensure file exists and is not user's own
-         .sort((a, b) => (b?.uploadedAt?.seconds ?? 0) - (a?.uploadedAt?.seconds ?? 0));
+         .sort((a, b) => (b?.unlockedAt?.seconds ?? 0) - (a?.unlockedAt?.seconds ?? 0)); // Sort by unlock time? Or upload time? Let's use upload time for consistency.
+         // .sort((a, b) => (b?.uploadedAt?.seconds ?? 0) - (a?.uploadedAt?.seconds ?? 0));
   }, [communityFiles, unlockedFileIds, user]);
 
-  // User Stats Calculation - RELIES ON ACCURATE STATE UPDATES FROM LISTENERS
+  // User Stats Calculation - Adjusted slightly for clarity
   const userStats = useMemo(() => {
-    // Ensure uploadBonusCount state is loaded before calculating
     const bonusCount = uploadBonusCount ?? 0;
     // Calculate total downloads *by others* from the user's shared files
-    const downloadsByOthers = yourSharedFiles.reduce((sum, file) => sum + (file.downloadCount || 0), 0);
+    // Ensure downloadCount is treated as a number, default to 0 if undefined/null
+    const downloadsByOthers = yourSharedFiles.reduce((sum, file) => sum + (Number(file.downloadCount) || 0), 0);
     const tokensFromUploadBonus = bonusCount * TOKENS_PER_BONUS_THRESHOLD;
-    const tokensFromDownloads = downloadsByOthers * 5; // Using the constant from firebase file
+    const tokensFromDownloads = downloadsByOthers * TOKENS_PER_DOWNLOAD;
 
-    console.log("Calculating User Stats:", { yourSharedFiles: yourSharedFiles.length, bonusCount, downloadsByOthers, tokensFromUploadBonus, tokensFromDownloads });
+    // console.log("Calculating User Stats:", { yourSharedFiles: yourSharedFiles.length, bonusCount, downloadsByOthers, tokensFromUploadBonus, tokensFromDownloads });
 
     return {
       totalDownloadsByOthers: downloadsByOthers,
       uploadBonusTokens: tokensFromUploadBonus,
       downloadEarnedTokens: tokensFromDownloads,
+      filesSharedCount: yourSharedFiles.length, // Add count directly
     };
   }, [yourSharedFiles, uploadBonusCount]); // Depend on the derived list and bonus count state
 
@@ -830,50 +928,51 @@ export function Community() {
   // --- AI Chat Functionality ---
   const formatCommunityFilesForChat = useCallback(() => {
     const lines: string[] = [];
-    lines.push("Community Files Overview:");
+    lines.push("File Sharing Platform Overview:");
 
-    // Prioritize unlocked files
+    // Your Files
+    lines.push("\nYour Shared Files:");
+    if (yourSharedFiles.length > 0) {
+        yourSharedFiles.slice(0, 5).forEach(file => {
+            lines.push(`- "${getDisplayName(file.fileName)}" (.${getFileExtension(file.fileName)}) [YOURS - ${file.downloadCount || 0} downloads]`);
+        });
+        if (yourSharedFiles.length > 5) lines.push("... (more of your files)");
+    } else {
+        lines.push("You haven't shared any files yet.");
+    }
+
+    // Unlocked Files
     if (unlockedFilesData.length > 0) {
-        lines.push("\nUnlocked Files:");
+        lines.push("\nFiles You've Unlocked:");
         unlockedFilesData.slice(0, 5).forEach(file => { // Limit for brevity
             if (file) {
                 const uploaderName = userProfiles[file.userId]?.name || 'Unknown';
-                lines.push(`- "${getDisplayName(file.fileName)}" (.${file.fileName.split('.').pop()}) by ${uploaderName} [UNLOCKED]`);
+                lines.push(`- "${getDisplayName(file.fileName)}" (.${getFileExtension(file.fileName)}) by ${uploaderName} [UNLOCKED]`);
             }
         });
         if (unlockedFilesData.length > 5) lines.push("... (more unlocked files)");
     }
 
-    // Show some other community files
+    // Other Community Files (Locked)
     const otherFiles = filteredCommunityUploadedFiles.filter(f => !unlockedFileIds.includes(f.id));
     if (otherFiles.length > 0) {
         lines.push("\nOther Community Files (Locked):");
         otherFiles.slice(0, 8).forEach(file => { // Limit for brevity
             const uploaderName = userProfiles[file.userId]?.name || 'Unknown';
-            const ext = file.fileName.split('.').pop()?.toLowerCase() || '*';
+            const ext = getFileExtension(file.fileName) || '*';
             const cost = pricing.Basic[ext] || pricing.Basic['*'];
             lines.push(`- "${getDisplayName(file.fileName)}" (.${ext}) by ${uploaderName} [Cost: ${cost} Tokens]`);
         });
          if (otherFiles.length > 8) lines.push("... (more community files available)");
     }
 
-    if (unlockedFilesData.length === 0 && otherFiles.length === 0) {
-        lines.push("No community files found (excluding your own).");
+    if (unlockedFilesData.length === 0 && otherFiles.length === 0 && yourSharedFiles.length === 0) {
+        lines.push("\nNo files found on the platform currently.");
     }
-
-     lines.push("\nYour Shared Files:");
-     if (yourSharedFiles.length > 0) {
-         yourSharedFiles.slice(0,5).forEach(file => {
-             lines.push(`- "${getDisplayName(file.fileName)}" (.${file.fileName.split('.').pop()}) [YOURS]`);
-         });
-          if (yourSharedFiles.length > 5) lines.push("... (more of your files)");
-     } else {
-         lines.push("You haven't shared any files yet.");
-     }
 
 
     return lines.join('\n');
-  }, [unlockedFilesData, filteredCommunityUploadedFiles, yourSharedFiles, userProfiles, unlockedFileIds]);
+  }, [unlockedFilesData, filteredCommunityUploadedFiles, yourSharedFiles, userProfiles, unlockedFileIds]); // Added getFileExtension
 
   const handleChatSubmit = useCallback(async (e: React.FormEvent) => {
       e.preventDefault();
@@ -901,10 +1000,11 @@ export function Community() {
         .join('\n');
       const filesContext = formatCommunityFilesForChat();
 
-      const prompt = `
-You are TaskMaster, an AI agent helping the user "${userName}" navigate the Community file-sharing platform. Your goal is to assist with finding relevant files and discussing potential content based *only* on file metadata (name, type, uploader).
+       // --- MODIFIED PROMPT ---
+       const prompt = `
+You are TaskMaster, an AI assistant helping the user "${userName}" navigate the TaskMaster Community file-sharing platform. Your goal is to assist with finding files and discussing potential content.
 
-**Crucial Constraint:** You CANNOT access the actual content of any uploaded files. Do not claim to read or summarize file contents directly.
+**Important Limitation:** You CANNOT directly access or read the internal content of ANY uploaded files (PDFs, DOCX, videos, etc.). Your knowledge comes *only* from the file list provided below (names, types, uploaders, lock status) and the conversation history.
 
 **Context:**
 User's Name: ${userName}
@@ -918,14 +1018,18 @@ ${conversationHistory}
 ${userName}: ${currentMessage}
 
 **Your Task:**
-1.  **File Search:** If the user asks for files (e.g., "find study notes for biology", "any PowerPoints by 'Jane Doe'?"), analyze their request and suggest relevant files from the provided list based on name, type, or uploader. Clearly state if suggested files are locked (mention token cost) or already unlocked by the user.
-2.  **Content Discussion (Unlocked Files ONLY):** If the user asks about the content of a file *they have unlocked*, respond based *only* on the file's name and type. For example, for "Biology_Notes.pdf [UNLOCKED]", you could say: "Based on the name, 'Biology_Notes.pdf' likely contains study notes on biology topics. It might cover areas like cell biology, genetics, or ecology." You can offer to generate *hypothetical* content outlines or summaries based on common themes for that file type and topic, but clearly state you are *generating* it, not reading the file (e.g., "Would you like me to generate a possible outline for biology notes?").
-3.  **Locked Files:** If asked about the content of a locked file, state you cannot discuss its content and remind the user they need to unlock it first using tokens.
-4.  **General Chat:** Respond naturally and conversationally to other questions or comments.
-5.  **Tone:** Be friendly, helpful, and concise. Always respect the privacy constraint about file contents. Do not invent file details not present in the context.
+1.  **File Search:** If the user asks for files (e.g., "find study notes for biology", "any PowerPoints by 'Jane Doe'?"), analyze their request and suggest relevant files from the provided list based on name, type, or uploader. Clearly state if suggested files are locked (mention token cost) or already unlocked by the user. Mention if it's one of the user's own files.
+2.  **Content Discussion (Unlocked Files):** If the user asks about the content of a file *they have unlocked*, acknowledge it's unlocked. Based *only* on the file's name and type (e.g., "Biology_Notes.pdf"), ***generate a likely summary, outline, or answer questions based on common knowledge for that topic***. **Crucially, you MUST state clearly that you are *generating* this information based on the title/type and have *not* read the actual file content.**
+    *   *Example Response:* "Since you've unlocked 'Biology_Notes.pdf', it likely contains study notes. Based on the title, I can generate a possible outline: It might cover areas like 1. Cell Biology, 2. Genetics, 3. Ecology... Remember, I haven't read the actual file, this is just a potential structure."
+    *   *Example Response 2:* "You've unlocked 'Quantum_Physics_Lecture.mp4'. Based on the name, I can generate some information about quantum physics concepts like superposition or entanglement. What specific aspect are you interested in? Keep in mind, I'm generating this, not summarizing the video's specific content."
+3.  **Content Discussion (Locked Files):** If asked about the content of a locked file, state you cannot discuss its content because you cannot access files, and remind the user they need to unlock it first using tokens to download it themselves.
+4.  **Content Discussion (User's Own Files):** If asked about their own file, respond similarly to unlocked files (generate likely content based on title/type, stating the limitation).
+5.  **General Chat:** Respond naturally and conversationally to other questions or comments related to the platform.
+6.  **Tone:** Be friendly, helpful, and concise. Always respect the limitation about not accessing file contents directly. Do not invent file details (like exact page count, specific sections not implied by title) not present in the context.
 
 **Response:**
 Assistant:`; // Ready for the AI's response
+
 
       let accumulatedStreamedText = "";
       let finalRawResponseText = "";
@@ -936,7 +1040,7 @@ Assistant:`; // Ready for the AI's response
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.7, maxOutputTokens: 800 }, // Adjust tokens as needed
+            generationConfig: { temperature: 0.7, maxOutputTokens: 1000 }, // Increased tokens slightly
             safetySettings: [ // Standard safety settings
                 { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
                 { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
@@ -981,29 +1085,35 @@ Assistant:`; // Ready for the AI's response
   }, [chatMessage, isChatLoading, user, chatHistory, userName, tokens, formatCommunityFilesForChat]); // Added dependencies
 
 
-  // --- Skeleton Loader Component ---
+  // --- Skeleton Loader Component (Refined for better structure) ---
   const SkeletonLoader = ({ count = 3 } : { count?: number }) => (
     <div className={`space-y-2 sm:space-y-2.5 p-1 animate-pulse`}>
       {[...Array(count)].map((_, i) => (
-        <div key={i} className={`p-2.5 rounded-lg ${isIlluminateEnabled ? 'bg-gray-200/70' : 'bg-gray-700/50'}`}>
-          <div className="flex items-center justify-between mb-1.5">
-            <div className="flex items-center gap-1.5">
-              <div className={`w-5 h-5 rounded ${isIlluminateEnabled ? 'bg-gray-300' : 'bg-gray-600'}`}></div>
-              <div className={`h-3 w-20 rounded ${isIlluminateEnabled ? 'bg-gray-300' : 'bg-gray-600'}`}></div>
-            </div>
-            <div className={`h-4 w-8 rounded-full ${isIlluminateEnabled ? 'bg-gray-300' : 'bg-gray-600'}`}></div>
-          </div>
-          <div className={`h-4 w-3/4 rounded mb-2 ${isIlluminateEnabled ? 'bg-gray-300' : 'bg-gray-600'}`}></div>
-          <div className="flex justify-between">
-             <div className={`h-2 w-1/4 rounded ${isIlluminateEnabled ? 'bg-gray-300' : 'bg-gray-600'}`}></div>
-             <div className={`h-2 w-1/5 rounded ${isIlluminateEnabled ? 'bg-gray-300' : 'bg-gray-600'}`}></div>
-          </div>
-        </div>
+        <div key={i} className={`p-2.5 rounded-lg ${isIlluminateEnabled ? 'bg-gray-200/70' : 'bg-gray-700/50'} flex flex-col gap-2`}>
+           {/* Top Row */}
+           <div className="flex items-center justify-between">
+             <div className="flex items-center gap-1.5">
+               <div className={`w-5 h-5 rounded ${isIlluminateEnabled ? 'bg-gray-300' : 'bg-gray-600'}`}></div>
+               <div className={`h-3 w-24 rounded ${isIlluminateEnabled ? 'bg-gray-300' : 'bg-gray-600'}`}></div>
+             </div>
+             <div className={`h-3 w-8 rounded-full ${isIlluminateEnabled ? 'bg-gray-300' : 'bg-gray-600'}`}></div>
+           </div>
+           {/* Middle Row */}
+           <div className="flex items-center justify-between">
+              <div className={`h-3 w-1/3 rounded ${isIlluminateEnabled ? 'bg-gray-300' : 'bg-gray-600'}`}></div>
+              <div className={`h-3 w-1/4 rounded ${isIlluminateEnabled ? 'bg-gray-300' : 'bg-gray-600'}`}></div>
+           </div>
+           {/* Bottom Row */}
+           <div className="flex items-center justify-between">
+               <div className={`h-2 w-1/4 rounded ${isIlluminateEnabled ? 'bg-gray-300' : 'bg-gray-600'}`}></div>
+               <div className={`h-4 w-6 rounded ${isIlluminateEnabled ? 'bg-gray-300' : 'bg-gray-600'}`}></div>
+           </div>
+         </div>
       ))}
     </div>
   );
 
-  // --- Empty State Component ---
+  // --- Empty State Component (No changes needed) ---
   const EmptyState = ({ message, icon }: { message: string, icon: React.ReactNode }) => (
       <div className={`text-center py-10 px-4 ${subheadingClass}`}>
           <div className={`flex items-center justify-center w-12 h-12 rounded-full mx-auto mb-3 ${isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700/60'}`}>
@@ -1029,9 +1139,9 @@ Assistant:`; // Ready for the AI's response
         isIlluminateEnabled={isIlluminateEnabled && isSidebarIlluminateEnabled}
        />
 
-      {/* Popups & Banners */}
+      {/* Popups & Banners (No Changes Needed) */}
       <AnimatePresence>
-        {insufficientTokensInfo && ( /* (No Changes to popup) */
+        {insufficientTokensInfo && (
            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setInsufficientTokensInfo(null)}>
              <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} transition={{ type: 'spring', stiffness: 300, damping: 25 }} className={`${cardClass} rounded-xl p-5 sm:p-6 max-w-sm w-full text-center shadow-xl relative`} onClick={(e) => e.stopPropagation()}>
                 <button onClick={() => setInsufficientTokensInfo(null)} className={`absolute top-2 right-2 p-1 rounded-full ${iconColor} ${illuminateBgHover} transition-colors`} aria-label="Close insufficient tokens popup"><X className="w-4 h-4" /></button>
@@ -1043,7 +1153,7 @@ Assistant:`; // Ready for the AI's response
              </motion.div>
            </motion.div>
          )}
-         {showWarning && ( /* (No Changes to popup) */
+         {showWarning && (
             <motion.div initial={{ opacity: 0, y: -50 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -50 }} className={`fixed top-4 left-1/2 -translate-x-1/2 z-[70] w-11/12 max-w-lg p-3 rounded-lg shadow-lg flex items-center gap-3 border ${ isIlluminateEnabled ? 'bg-yellow-100 border-yellow-300 text-yellow-800' : 'bg-yellow-900/80 border-yellow-700 text-yellow-200 backdrop-blur-sm' }`} >
                <AlertTriangle className="w-5 h-5 flex-shrink-0 text-yellow-500" />
                <p className="text-xs sm:text-sm flex-grow">{warningMessage}</p>
@@ -1052,7 +1162,7 @@ Assistant:`; // Ready for the AI's response
           )}
       </AnimatePresence>
 
-       {/* AI Chat Trigger Button */}
+       {/* AI Chat Trigger Button (No changes needed) */}
        <button
          onClick={() => setIsAiSidebarOpen(true)}
          className={`fixed bottom-4 md:bottom-6 lg:bottom-8 ${ isSidebarCollapsed ? 'right-4 md:right-6' : 'right-4 md:right-6 lg:right-8' } z-40 p-2.5 rounded-full shadow-lg transition-all duration-300 transform hover:scale-110 active:scale-100 ${ isIlluminateEnabled ? 'bg-white border border-gray-300 text-blue-600 hover:bg-gray-100' : 'bg-gradient-to-br from-purple-600 to-indigo-600 text-white hover:from-purple-700 hover:to-indigo-700' } ${isAiSidebarOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
@@ -1086,40 +1196,74 @@ Assistant:`; // Ready for the AI's response
 
           {/* Grid for Upload/Stats */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 mb-4 sm:mb-6">
-            {/* Upload Area */}
+            {/* Upload Area - Updated for multiple files */}
             <div className={`${cardClass} rounded-xl p-4 flex flex-col justify-center items-center`}>
                <h3 className={`text-lg font-semibold mb-2 ${headingClass}`}>Share & Earn</h3>
                <button onClick={handleSelectFile} disabled={uploading} className={`w-full max-w-xs flex items-center justify-center gap-2 px-4 py-2 rounded-full text-sm font-medium text-white bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 transition-all transform hover:scale-[1.02] active:scale-100 disabled:opacity-60 disabled:cursor-not-allowed shadow-md hover:shadow-lg`}>
-                  {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <><UploadCloud className="w-4 h-4" /> Choose & Upload File</>}
+                  {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <><FileUp className="w-4 h-4" /> Choose File(s) to Upload</>}
                </button>
-               <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange} accept=".pdf,.png,.jpg,.jpeg,.mp3,.wav,.mp4,.mov,.docx,.zip,.txt,.csv,.json,.xls,.ppt"/>
-               <p className={`text-xs text-center mt-2 ${subheadingClass}`}>Max 15MB. Earn 5 tokens per download + 50 bonus every 5 uploads.</p>
+               <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange} multiple accept={ALLOWED_MIME_TYPES}/>
+               {/* Show progress bar during multi-upload */}
+               {uploading && uploadProgress !== null && (
+                    <div className="w-full max-w-xs mt-2">
+                        <div className={`h-2 rounded-full overflow-hidden ${isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700'}`}>
+                           <motion.div
+                              className="h-full bg-gradient-to-r from-indigo-500 to-purple-500"
+                              initial={{ width: '0%' }}
+                              animate={{ width: `${Math.round(uploadProgress * 100)}%` }}
+                              transition={{ duration: 0.5, ease: "linear" }}
+                           />
+                        </div>
+                        <p className={`text-xs text-center mt-1 ${subheadingClass}`}>Uploading... {Math.round(uploadProgress * 100)}%</p>
+                    </div>
+               )}
+               <p className={`text-xs text-center mt-2 ${subheadingClass}`}>Max {MAX_FILE_SIZE_MB}MB per file. Earn {TOKENS_PER_DOWNLOAD} tokens/download + {TOKENS_PER_BONUS_THRESHOLD} bonus every {FILES_PER_BONUS_THRESHOLD} uploads.</p>
+               <p className={`text-[10px] text-center mt-1 ${subheadingClass}`}>Allowed types: {ALLOWED_FILE_EXTENSIONS.slice(0, 5).join(', ')}... (see list)</p>
+
             </div>
 
-             {/* User Stats Card - Updated */}
-             <div className={`${cardClass} rounded-xl p-4`}>
-                <h3 className={`text-lg font-semibold mb-3 ${headingClass} flex items-center gap-2`}><BarChart2 className="w-5 h-5 text-green-500"/> Your Impact</h3>
-                {loadingData ? (
-                    <div className="space-y-3 animate-pulse">
-                       <div className={`h-4 rounded w-3/4 ${isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700'}`}></div>
-                       <div className={`h-4 rounded w-2/3 ${isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700'}`}></div>
-                       <div className={`h-4 rounded w-1/2 ${isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700'}`}></div>
+             {/* User Stats Card - Improved Layout */}
+             <div className={`${cardClass} rounded-xl p-4 flex flex-col`}>
+                <h3 className={`text-lg font-semibold mb-3 ${headingClass} flex items-center gap-2 flex-shrink-0`}><BarChart2 className="w-5 h-5 text-green-500"/> Your Impact</h3>
+                {loadingData || loadingAuth ? ( // Check both loadings
+                    <div className="space-y-4 animate-pulse flex-grow">
+                       <div className="flex justify-between items-center">
+                            <div className={`h-4 rounded w-2/5 ${isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700'}`}></div>
+                            <div className={`h-5 rounded w-1/5 ${isIlluminateEnabled ? 'bg-gray-300' : 'bg-gray-600'}`}></div>
+                       </div>
+                       <div className={`h-px ${isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700'}`}></div>
+                       <div className="flex justify-between items-center">
+                            <div className={`h-4 rounded w-1/2 ${isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700'}`}></div>
+                            <div className={`h-5 rounded w-1/6 ${isIlluminateEnabled ? 'bg-gray-300' : 'bg-gray-600'}`}></div>
+                       </div>
+                       <div className={`h-px ${isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700'}`}></div>
+                       <div className="flex justify-between items-center">
+                            <div className={`h-4 rounded w-2/5 ${isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700'}`}></div>
+                            <div className={`h-5 rounded w-1/6 ${isIlluminateEnabled ? 'bg-gray-300' : 'bg-gray-600'}`}></div>
+                       </div>
                     </div>
                 ) : (
-                    <div className="space-y-2">
+                    <div className="space-y-3 flex-grow flex flex-col">
+                        <div className="flex items-center justify-between text-sm">
+                           <span className={`flex items-center gap-1.5 ${subheadingClass}`}><FileIcon className="w-4 h-4"/> Files Shared:</span>
+                           <span className={`text-base font-semibold ${headingClass}`}>{userStats.filesSharedCount.toLocaleString()}</span>
+                        </div>
+                         <div className={`border-t my-1 ${illuminateBorder}`}></div>
                         <div className="flex items-center justify-between text-sm">
                            <span className={`flex items-center gap-1.5 ${subheadingClass}`}><Users className="w-4 h-4"/> Downloads by Others:</span>
-                           <span className={`font-semibold ${headingClass}`}>{userStats.totalDownloadsByOthers.toLocaleString()}</span>
+                           <span className={`text-base font-semibold ${headingClass}`}>{userStats.totalDownloadsByOthers.toLocaleString()}</span>
                         </div>
+                        <div className={`border-t my-1 ${illuminateBorder}`}></div>
                         <div className="flex items-center justify-between text-sm">
-                           <span className={`flex items-center gap-1.5 ${subheadingClass}`}><Coins className="w-4 h-4 text-yellow-400"/> Tokens from Upload Bonus:</span>
-                           <span className={`font-semibold ${headingClass}`}>{userStats.uploadBonusTokens.toLocaleString()}</span>
+                           <span className={`flex items-center gap-1.5 ${subheadingClass}`}><Coins className="w-4 h-4 text-yellow-400"/> Bonus Tokens Earned:</span>
+                           <span className={`text-base font-semibold ${headingClass}`}>{userStats.uploadBonusTokens.toLocaleString()}</span>
                         </div>
-                        <div className="flex items-center justify-between text-sm">
-                           <span className={`flex items-center gap-1.5 ${subheadingClass}`}><Coins className="w-4 h-4 text-yellow-400"/> Tokens from Downloads:</span>
-                           <span className={`font-semibold ${headingClass}`}>{userStats.downloadEarnedTokens.toLocaleString()}</span>
+                        <div className={`border-t my-1 ${illuminateBorder}`}></div>
+                         <div className="flex items-center justify-between text-sm">
+                           <span className={`flex items-center gap-1.5 ${subheadingClass}`}><Coins className="w-4 h-4 text-yellow-400"/> Download Tokens Earned:</span>
+                           <span className={`text-base font-semibold ${headingClass}`}>{userStats.downloadEarnedTokens.toLocaleString()}</span>
                         </div>
-                        <p className={`text-xs pt-1 text-center ${subheadingClass}`}>Keep sharing helpful resources!</p>
+                         <p className={`text-xs pt-3 mt-auto text-center ${subheadingClass}`}>Keep sharing helpful resources!</p>
                     </div>
                 )}
              </div>
@@ -1134,7 +1278,8 @@ Assistant:`; // Ready for the AI's response
             <div className={`relative flex-shrink-0`}>
                 <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className={`${inputBg} border ${illuminateBorder} rounded-full pl-3 pr-8 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-150 shadow-sm appearance-none w-full sm:w-auto`} aria-label="Filter type">
                   <option value="All">All Types</option>
-                  {fileTypes.map(type => <option key={type} value={type}>{type.toUpperCase()}</option>)}
+                  {/* Use ALLOWED_FILE_EXTENSIONS for consistency */}
+                  {ALLOWED_FILE_EXTENSIONS.sort().map(type => <option key={type} value={type}>{type.toUpperCase()}</option>)}
                 </select>
                 <ChevronDown className={`w-4 h-4 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none ${iconColor}`} />
             </div>
@@ -1143,17 +1288,18 @@ Assistant:`; // Ready for the AI's response
           {/* --- Content Sections Grid --- */}
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
 
-            {/* --- Community Uploaded Files Section --- */}
+            {/* --- Community Uploaded Files Section --- Fixed Height Added */}
             <section className={`${sectionCardClass} rounded-xl p-3 sm:p-4 flex flex-col`}>
               <h2 className={`text-base sm:text-lg font-semibold mb-3 ${headingClass} flex-shrink-0`}>
                 Community Files
               </h2>
-              <div className="flex-grow space-y-2 sm:space-y-2.5 overflow-y-auto pr-1 no-scrollbar min-h-[200px]">
+              {/* Added fixed height and ensured overflow */}
+              <div className="flex-grow space-y-2 sm:space-y-2.5 overflow-y-auto pr-1 no-scrollbar h-[400px] xl:h-[450px]">
                  {loadingData ? <SkeletonLoader count={5}/> : filteredCommunityUploadedFiles.length === 0 ? (
                     <EmptyState message={searchTerm || filterType !== 'All' ? 'No matching files found.' : 'No community files yet. Share yours!'} icon={<Globe2 className="w-6 h-6 text-blue-400"/>} />
                  ) : (
                    filteredCommunityUploadedFiles.map((file) => {
-                     const ext = (file.fileName?.split('.').pop() || '?').toLowerCase();
+                     const ext = getFileExtension(file.fileName);
                      const uploaderProfile = userProfiles[file.userId];
                      const cost = pricing.Basic[ext] || pricing.Basic['*'];
                      const isUnlocked = unlockedFileIds.includes(file.id);
@@ -1228,7 +1374,7 @@ Assistant:`; // Ready for the AI's response
                                       )}
                                 </div>
                            </div>
-                           {/* Admin Delete Button (Absolute Position) */}
+                           {/* Admin Delete Button (Absolute Position) - Only show if user is admin */}
                            {DEV_EMAILS.includes(user?.email || '') && (
                               <button onClick={() => handleAdminDeleteFile(file)} disabled={uploading} className={`absolute top-1.5 right-1.5 p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity ${adminDeleteButtonClass}`} title="Delete File (Admin)">
                                  <Trash className="w-3 h-3" />
@@ -1241,28 +1387,32 @@ Assistant:`; // Ready for the AI's response
               </div>
             </section>
 
-            {/* --- Your Shared Files Section --- */}
+            {/* --- Your Shared Files Section --- Edit button overlap fixed, User delete removed */}
             <section className={`${sectionCardClass} rounded-xl p-3 sm:p-4 flex flex-col`}>
               <h2 className={`text-base sm:text-lg font-semibold mb-3 ${headingClass} flex-shrink-0`}>
                 Your Shared Files ({yourSharedFiles.length})
               </h2>
-              <div className="flex-grow space-y-2 sm:space-y-2.5 overflow-y-auto pr-1 no-scrollbar min-h-[200px]">
-                {loadingData ? <SkeletonLoader /> : yourSharedFiles.length === 0 ? (
+              {/* Fixed height and scrolling consistency */}
+              <div className="flex-grow space-y-2 sm:space-y-2.5 overflow-y-auto pr-1 no-scrollbar h-[400px] xl:h-[450px]">
+                {loadingData ? <SkeletonLoader count={3}/> : yourSharedFiles.length === 0 ? (
                    <EmptyState message="You haven't shared any files yet. Upload one!" icon={<UploadCloud className="w-6 h-6 text-purple-400"/>} />
                 ) : (
                   yourSharedFiles.map((file) => {
-                    const ext = (file.fileName?.split('.').pop() || '?').toLowerCase();
+                    const ext = getFileExtension(file.fileName);
                     const isEditing = editingFileId === file.id;
                     const fileSize = formatFileSize(file.fileSize);
                     const downloadCount = file.downloadCount || 0;
                     const likeCount = file.likes?.length || 0;
                     const dislikeCount = file.dislikes?.length || 0;
+                    const isAdmin = DEV_EMAILS.includes(user?.email || '');
 
                     return (
+                      // Added pb-8 when not editing to provide space for absolute buttons
                       <motion.div key={file.id} layout initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}
-                        className={`group relative p-2 sm:p-2.5 rounded-lg shadow-sm transition-all duration-150 ${isEditing ? (isIlluminateEnabled ? 'bg-purple-50 ring-1 ring-purple-300' : 'bg-gray-700 ring-1 ring-purple-500') : listItemClass} flex flex-col gap-1.5`} // Added flex-col, gap
+                        className={`group relative p-2 sm:p-2.5 rounded-lg shadow-sm transition-all duration-150 ${isEditing ? (isIlluminateEnabled ? 'bg-purple-50 ring-1 ring-purple-300' : 'bg-gray-700 ring-1 ring-purple-500') : listItemClass} flex flex-col gap-1.5 ${!isEditing ? 'pb-8' : ''}`} // Add padding-bottom only when not editing
                       >
                         {isEditing ? (
+                            // Edit View (No change needed here)
                             <div className="space-y-1.5">
                                 <div className="flex gap-1.5 items-center">
                                      <input type="text" value={editingFileName} onChange={(e) => setEditingFileName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleSaveFileName(file.id); if (e.key === 'Escape') handleCancelEdit(); }} className={`flex-grow ${inputBg} border ${illuminateBorder} rounded-full px-3 py-1 text-sm focus:ring-1 focus:ring-purple-500 focus:border-purple-500`} autoFocus/>
@@ -1274,6 +1424,7 @@ Assistant:`; // Ready for the AI's response
                                 </div>
                             </div>
                         ) : (
+                             // Default View
                             <>
                              {/* Top Row */}
                              <div className="flex items-center justify-between">
@@ -1304,11 +1455,16 @@ Assistant:`; // Ready for the AI's response
                                        {fileSize && <span className="flex items-center gap-0.5"> <HardDrive className="w-2.5 h-2.5"/> {fileSize}</span>}
                                    </div>
                               </div>
-                              {/* Action Buttons */}
+                              {/* Action Buttons - Appear on hover at bottom right */}
+                              {/* Ensure these buttons don't overlap content due to parent pb-8 */}
                               <div className="absolute bottom-1.5 right-1.5 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
                                   <button onClick={() => handleEditClick(file)} className={editButtonClass} title="Edit Name"> <Edit className="w-3.5 h-3.5" /> </button>
-                                  <button onClick={() => handleUserDeleteFile(file)} disabled={uploading} className={deleteButtonClass} title="Delete File"> <Trash className="w-3.5 h-3.5" /> </button>
-                                  {/* No admin delete here, already covered */}
+                                  {/* Only show delete button if user is Admin */}
+                                  {isAdmin && (
+                                      <button onClick={() => handleAdminDeleteFile(file)} disabled={uploading} className={adminDeleteButtonClass} title="Delete File (Admin)">
+                                         <Trash className="w-3.5 h-3.5" />
+                                      </button>
+                                  )}
                               </div>
                             </>
                         )}
@@ -1319,18 +1475,19 @@ Assistant:`; // Ready for the AI's response
               </div>
             </section>
 
-            {/* --- Unlocked Files Section --- */}
+            {/* --- Unlocked Files Section --- Fixed Height Added */}
             <section className={`${sectionCardClass} rounded-xl p-3 sm:p-4 flex flex-col`}>
               <h2 className={`text-base sm:text-lg font-semibold mb-3 ${headingClass} flex-shrink-0`}>
                 Unlocked Files ({unlockedFilesData.length})
               </h2>
-              <div className="flex-grow space-y-2 sm:space-y-2.5 overflow-y-auto pr-1 no-scrollbar min-h-[200px]">
-                {loadingData ? <SkeletonLoader /> : unlockedFilesData.length === 0 ? (
+              {/* Fixed height and scrolling consistency */}
+              <div className="flex-grow space-y-2 sm:space-y-2.5 overflow-y-auto pr-1 no-scrollbar h-[400px] xl:h-[450px]">
+                {loadingData ? <SkeletonLoader count={3}/> : unlockedFilesData.length === 0 ? (
                    <EmptyState message="Files you unlock appear here for download." icon={<Unlock className="w-6 h-6 text-green-400"/>} />
                 ) : (
                   unlockedFilesData.map((file) => {
                      if (!file) return null; // Should be filtered by useMemo, but safety check
-                     const ext = (file.fileName?.split('.').pop() || '?').toLowerCase();
+                     const ext = getFileExtension(file.fileName);
                      const uploaderProfile = userProfiles[file.userId];
                      const fileSize = formatFileSize(file.fileSize);
                      const isLoading = downloadingFileId === file.id;
@@ -1392,7 +1549,7 @@ Assistant:`; // Ready for the AI's response
         </div> {/* End Scrollable Container */}
       </main>
 
-      {/* AI Chat Sidebar */}
+      {/* AI Chat Sidebar (No Changes Needed Here) */}
       <div
         aria-hidden={!isAiSidebarOpen}
         className={`fixed top-0 right-0 h-full w-full max-w-sm md:max-w-md lg:max-w-[440px] z-50 transform transition-transform duration-300 ease-in-out ${ isAiSidebarOpen ? 'translate-x-0' : 'translate-x-full' } ${cardClass} flex flex-col shadow-2xl border-l ${isIlluminateEnabled ? 'border-gray-200' : 'border-gray-700'}`}

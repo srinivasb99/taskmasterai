@@ -1,7 +1,7 @@
 // Settings.tsx code:
 
 import React, { useState, useEffect, useRef, ChangeEvent } from 'react';
-import { useNavigate, Link } from 'react-router-dom'; // Added Link
+import { useNavigate, Link } from 'react-router-dom';
 import {
   User,
   Settings as SettingsIcon,
@@ -18,7 +18,9 @@ import {
   Moon,
   Sun,
   PanelLeftDashed,
-  Loader2 // Added for loading states
+  Loader2, // Added for loading states
+  Info, // Added for AI Context section
+  BrainCircuit // Added for AI Context section
 } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import {
@@ -31,6 +33,12 @@ import {
   deleteProfilePicture,
   // Assume updateUserProfile returns the updated profile data or URL
 } from '../lib/settings-firebase';
+// Import AI Context functions and interface
+import {
+  saveUserContext,
+  getUserContext,
+  UserContext
+} from '../lib/ai-context-firebase'; // Adjusted path
 
 export function Settings() {
   const navigate = useNavigate();
@@ -50,6 +58,20 @@ export function Settings() {
     email: '',
     photoURL: ''
   });
+
+  // --- AI Context State ---
+  const [aiContextData, setAiContextData] = useState<Partial<UserContext>>({
+    workDescription: '',
+    shortTermFocus: '',
+    longTermGoals: '',
+    otherContext: '',
+  });
+  const [initialAiContextData, setInitialAiContextData] = useState<Partial<UserContext>>({}); // For cancel functionality
+  const [isLoadingAiContext, setIsLoadingAiContext] = useState(true);
+  const [isSavingAiContext, setIsSavingAiContext] = useState(false);
+  const [isEditingAiContext, setIsEditingAiContext] = useState(false);
+  const [aiContextError, setAiContextError] = useState<string | null>(null);
+
 
   // Sidebar state
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
@@ -122,11 +144,13 @@ export function Settings() {
 
 
   // ---------------------------
-  //    LOAD USER DATA
+  //    LOAD USER DATA & AI CONTEXT
   // ---------------------------
   useEffect(() => {
     setIsLoading(true);
-    const loadUserData = async () => {
+    setIsLoadingAiContext(true); // Start loading AI context too
+
+    const loadData = async () => {
       const currentUser = getCurrentUser();
       if (!currentUser) {
         navigate('/login');
@@ -137,13 +161,12 @@ export function Settings() {
       const googleFlag = currentUser.providerData?.some((p: any) => p.providerId === 'google.com');
       setIsGoogleUser(googleFlag);
 
+      // Load Profile Data
       try {
         const firestoreData = await getUserData(currentUser.uid);
         const loadedUserData = {
           name: firestoreData?.name || currentUser.displayName || '',
           email: currentUser.email || '',
-          // IMPORTANT: Use Firestore photoURL first, fallback to Auth photoURL
-          // This ensures consistency if Firestore is the source of truth for the avatar
           photoURL: firestoreData?.photoURL || currentUser.photoURL || '',
         };
         setUserData(loadedUserData);
@@ -157,11 +180,29 @@ export function Settings() {
         console.error('Error loading user data:', error);
         setError('Failed to load user data. Please refresh.');
       } finally {
-        setIsLoading(false);
+        setIsLoading(false); // Profile loading finished
+      }
+
+      // Load AI Context Data
+      try {
+          const context = await getUserContext(currentUser.uid);
+          const loadedContext = {
+              workDescription: context?.workDescription || '',
+              shortTermFocus: context?.shortTermFocus || '',
+              longTermGoals: context?.longTermGoals || '',
+              otherContext: context?.otherContext || '',
+          };
+          setAiContextData(loadedContext);
+          setInitialAiContextData(loadedContext); // Store initial state for cancel
+      } catch (err) {
+          console.error("Error loading AI context:", err);
+          setAiContextError("Failed to load AI context."); // Use specific error state
+      } finally {
+          setIsLoadingAiContext(false); // AI context loading finished
       }
     };
 
-    loadUserData();
+    loadData();
   }, [navigate]);
 
   // ---------------------------
@@ -181,21 +222,15 @@ export function Settings() {
   // ---------------------------
   const handleToggleIlluminate = (checked: boolean) => {
     setIsIlluminateEnabled(checked);
-    // If turning Illuminate ON, turn Blackout OFF
     if (checked) {
       setIsBlackoutEnabled(false);
-      // Maybe auto-toggle sidebar illuminate? Optional.
-      // setIsSidebarIlluminateEnabled(true);
     }
   };
 
   const handleToggleBlackout = (checked: boolean) => {
     setIsBlackoutEnabled(checked);
-    // If turning Blackout ON, turn Illuminate OFF
     if (checked) {
       setIsIlluminateEnabled(false);
-      // Maybe auto-toggle sidebar blackout? Optional.
-      // setIsSidebarBlackoutEnabled(true);
     }
   };
 
@@ -218,13 +253,12 @@ export function Settings() {
   const subheadingClass = isIlluminateEnabled ? "text-gray-600" : "text-gray-400";
   const inputBg = isIlluminateEnabled ? "bg-gray-100 hover:bg-gray-200/50 border-gray-300 focus:border-blue-500 focus:ring-blue-500" : "bg-gray-700 hover:bg-gray-600/50 border-gray-600 focus:border-blue-500 focus:ring-blue-500";
   const placeholderIconColor = isIlluminateEnabled ? 'text-gray-400' : 'text-gray-500';
+  const textareaBg = isIlluminateEnabled ? "bg-gray-100 border-gray-300 focus:border-blue-500 focus:ring-blue-500" : "bg-gray-700 border-gray-600 focus:border-blue-500 focus:ring-blue-500";
+
 
   // Added a subtle pulse animation on hover for the primary button
   const buttonPrimaryClass = `bg-gradient-to-r from-blue-500 to-purple-500 text-white hover:shadow-lg hover:shadow-purple-500/30 hover:from-blue-400 hover:to-purple-400 transition-all duration-300 transform hover:scale-105 active:scale-100 disabled:opacity-60 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none group relative overflow-hidden`;
-  // Define keyframes for subtle pulse/glow (requires Tailwind config or use inline style/CSS)
-  // Alternatively, use hover:brightness-110 or similar simple effects if pulse animation is too complex without config changes
-  // Added a subtle brightness increase on hover as a simpler alternative:
-  const buttonPrimaryHoverEffect = `hover:brightness-110`;
+  const buttonPrimaryHoverEffect = `hover:brightness-110`; // Simpler hover effect
 
   const buttonSecondaryClass = `${isIlluminateEnabled ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'} transition-colors duration-150 disabled:opacity-60 disabled:cursor-not-allowed`;
   const buttonDangerClass = `${isIlluminateEnabled ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-red-900/50 text-red-400 hover:bg-red-800/50'} transition-colors duration-150 disabled:opacity-60 disabled:cursor-not-allowed`;
@@ -232,6 +266,8 @@ export function Settings() {
 
   const errorBoxBg = isIlluminateEnabled ? 'bg-red-100' : 'bg-red-800/30';
   const errorTextColor = isIlluminateEnabled ? 'text-red-700' : 'text-red-400';
+  const aiContextErrorBoxBg = isIlluminateEnabled ? 'bg-yellow-100' : 'bg-yellow-800/30'; // Maybe yellow for context info/errors?
+  const aiContextErrorTextColor = isIlluminateEnabled ? 'text-yellow-800' : 'text-yellow-300';
 
   const deleteModalBg = isIlluminateEnabled ? 'bg-white border border-gray-200 shadow-xl' : 'bg-gray-800 border border-gray-700 shadow-2xl';
   const deleteModalText = isIlluminateEnabled ? 'text-gray-700' : 'text-gray-200';
@@ -246,6 +282,14 @@ export function Settings() {
   };
 
   // ---------------------------
+  //    AI CONTEXT INPUT CHANGES
+  // ---------------------------
+   const handleAiContextInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+     setAiContextError(null); // Clear error on input change
+     setAiContextData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+   };
+
+  // ---------------------------
   //    PROFILE PICTURE (FIXED UPDATE)
   // ---------------------------
   const handleProfilePictureClick = () => {
@@ -256,12 +300,11 @@ export function Settings() {
     const file = e.target.files?.[0];
     if (!file || !user) return;
 
-    // Basic client-side validation (consider adding more robust checks)
     if (!file.type.startsWith('image/')) {
       setError('Invalid file type. Please select an image.');
       return;
     }
-    if (file.size > 5 * 1024 * 1024) { // 5MB Limit
+    if (file.size > 5 * 1024 * 1024) {
       setError('Image is too large (max 5MB).');
       return;
     }
@@ -270,34 +313,26 @@ export function Settings() {
     setError(null);
 
     try {
-      // *** IMPORTANT ASSUMPTION ***:
-      // Assume updateUserProfile uploads, updates Firestore, updates Auth,
-      // and returns an object like { photoURL: 'new_url_from_storage' } on success.
       const updatedProfile = await updateUserProfile({ photoFile: file }, user.uid);
-
-      // *** Update local state immediately ***
       if (updatedProfile?.photoURL) {
         setUserData(prev => ({ ...prev, photoURL: updatedProfile.photoURL }));
       } else {
-         // Fallback if the function doesn't return the URL reliably,
-         // try reloading the user object (might cause a flicker)
-         await user.reload(); // Reload the current user data from Firebase Auth
-         setUser(getCurrentUser()); // Update the user state reference
+         await user.reload();
+         setUser(getCurrentUser());
          setUserData(prev => ({ ...prev, photoURL: getCurrentUser()?.photoURL || '' }));
          console.warn("Profile picture updated, but URL not returned directly. User reloaded.");
       }
-
     } catch (err) {
       console.error("Upload Error:", err);
       setError(err instanceof AuthError ? err.message : 'Failed to upload profile picture.');
     } finally {
       setIsUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = ""; // Reset file input
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
   const handleRemoveProfilePicture = async () => {
-    if (!user || !userData.photoURL) return; // Don't run if no picture exists
+    if (!user || !userData.photoURL) return;
     if (!window.confirm('Are you sure you want to remove your profile picture?')) {
       return;
     }
@@ -307,7 +342,6 @@ export function Settings() {
 
     try {
       await deleteProfilePicture(user.uid);
-      // Update local state immediately
       setUserData(prev => ({ ...prev, photoURL: '' }));
     } catch (err) {
       console.error("Remove Picture Error:", err);
@@ -326,18 +360,16 @@ export function Settings() {
     setIsSaving(true);
 
     try {
-      if (!user) throw new AuthError('Authentication session expired. Please log in again.');
+      if (!user) throw new AuthError('Authentication session expired.');
 
       const updateData: { name?: string; email?: string; currentPassword?: string; newPassword?: string } = {};
       let requiresPassword = false;
 
-      // Name Check
       if (formData.name.trim() !== userData.name) {
         if (!formData.name.trim()) throw new AuthError('Name cannot be empty.');
         updateData.name = formData.name.trim();
       }
 
-      // Email/Password Check (Non-Google Only)
       if (!isGoogleUser) {
         if (formData.email.trim() !== userData.email) {
           if (!formData.email.trim()) throw new AuthError('Email cannot be empty.');
@@ -358,22 +390,17 @@ export function Settings() {
         }
       }
 
-      // Perform Update if changes exist
       if (Object.keys(updateData).length > 0) {
         const updatedProfile = await updateUserProfile(updateData, user.uid);
-
-        // Update local state
         setUserData(prev => ({
           ...prev,
           name: updatedProfile?.name || prev.name,
           email: updatedProfile?.email || prev.email,
         }));
-
-        // Clear password fields & exit edit mode
         setFormData(prev => ({ ...prev, currentPassword: '', newPassword: '', confirmPassword: '' }));
         setIsEditing(false);
       } else {
-        setIsEditing(false); // No changes, just exit edit mode
+        setIsEditing(false);
       }
 
     } catch (err) {
@@ -383,6 +410,42 @@ export function Settings() {
       setIsSaving(false);
     }
   };
+
+  // ---------------------------
+  //    AI CONTEXT SAVE & CANCEL
+  // ---------------------------
+   const handleSaveAiContext = async () => {
+       if (!user?.uid) {
+           setAiContextError("User not authenticated.");
+           return;
+       }
+       setIsSavingAiContext(true);
+       setAiContextError(null);
+       try {
+           // Prepare data, ensuring empty strings are saved if fields are cleared
+           const dataToSave: Partial<UserContext> = {
+               workDescription: aiContextData.workDescription || '',
+               shortTermFocus: aiContextData.shortTermFocus || '',
+               longTermGoals: aiContextData.longTermGoals || '',
+               otherContext: aiContextData.otherContext || '',
+           };
+           await saveUserContext(user.uid, dataToSave);
+           setInitialAiContextData(aiContextData); // Update the 'cancel' state
+           setIsEditingAiContext(false); // Exit edit mode
+       } catch (err) {
+           console.error("Error saving AI context:", err);
+           setAiContextError("Failed to save AI context. Please try again.");
+       } finally {
+           setIsSavingAiContext(false);
+       }
+   };
+
+   const handleCancelAiContextEdit = () => {
+       setAiContextData(initialAiContextData); // Revert to original data
+       setIsEditingAiContext(false);
+       setAiContextError(null); // Clear any errors
+   };
+
 
   // ---------------------------
   //    SIGN OUT
@@ -402,23 +465,22 @@ export function Settings() {
   //    DELETE ACCOUNT
   // ---------------------------
   const handleDeleteAccount = async () => {
-    setError(null); // Clear previous errors shown in modal
+    setError(null);
     setIsDeleting(true);
 
     try {
-      if (!user) throw new AuthError('Authentication session expired. Please log in again.');
+      if (!user) throw new AuthError('Authentication session expired.');
 
       if (!isGoogleUser && !formData.currentPassword) {
         throw new AuthError('Current password is required to delete account.');
       }
 
       await deleteUserAccount(isGoogleUser ? undefined : formData.currentPassword);
-      navigate('/login'); // Redirect on success
+      navigate('/login');
 
     } catch (err) {
       console.error("Delete Account Error:", err);
       setError(err instanceof AuthError ? err.message : 'Failed to delete account.');
-      // Keep modal open by not setting setShowDeleteConfirm(false)
     } finally {
       setIsDeleting(false);
     }
@@ -427,7 +489,7 @@ export function Settings() {
   // ---------------------------
   //    RENDER
   // ---------------------------
-  if (isLoading && !user) {
+  if (isLoading && !user) { // Still show loader if profile is loading, even if AI context isn't finished
     return (
       <div className={`flex items-center justify-center min-h-screen ${containerClass}`}>
         <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
@@ -467,7 +529,7 @@ export function Settings() {
                 />
               </div>
             )}
-            {error && showDeleteConfirm && (
+            {error && showDeleteConfirm && ( // Only show general errors in this modal if they occur during delete
               <div className={`mb-4 p-2 rounded-md flex items-start gap-2 text-xs ${errorBoxBg} ${errorTextColor}`}>
                 <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-px" />
                 <span>{error}</span>
@@ -494,7 +556,6 @@ export function Settings() {
       )}
 
       <main className={`flex-1 overflow-y-auto transition-all duration-300 pt-14 md:pt-0 ${isSidebarCollapsed ? 'md:ml-20' : 'md:ml-64'}`}>
-        {/* Use lg:px-8 for slightly more padding on large screens */}
         <div className="container mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-5 sm:py-7">
           <div className="mb-6 sm:mb-8">
             <h1 className={`text-xl sm:text-2xl font-bold flex items-center gap-2 ${headingClass}`}>
@@ -506,7 +567,7 @@ export function Settings() {
             </p>
           </div>
 
-          {/* Main Error Message Area */}
+          {/* Main Error Message Area (for general profile/delete errors) */}
           {error && !showDeleteConfirm && (
             <div className={`mb-4 p-3 rounded-lg flex items-start gap-2 ${errorBoxBg}`}>
               <AlertCircle className={`w-4 h-4 flex-shrink-0 mt-px ${errorTextColor}`} />
@@ -515,23 +576,22 @@ export function Settings() {
           )}
 
           {/* --- Main Content Grid --- */}
-          {/* Added grid layout for desktop */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
 
-            {/* === Column 1 === */}
+            {/* === Column 1: Profile Picture, Details, Actions === */}
             <div className="flex flex-col gap-4 lg:gap-6">
 
               {/* Profile Picture Section */}
-              {/* Removed order-* class */}
               <div className={`${cardClass} rounded-xl p-4 sm:p-5`}>
                 <h2 className={`text-base sm:text-lg font-semibold mb-4 ${headingClass}`}>Profile Picture</h2>
                 <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-5">
+                  {/* Image/Placeholder */}
                   <div className="relative group flex-shrink-0">
                     <div className={`w-20 h-20 rounded-full overflow-hidden flex items-center justify-center border-2 ${isIlluminateEnabled ? 'border-gray-200 bg-gray-100' : 'border-gray-700 bg-gray-800'}`}>
                       {isUploading ? (
-                         <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full">
-                            <Loader2 className="w-5 h-5 animate-spin text-white" />
-                         </div>
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full">
+                          <Loader2 className="w-5 h-5 animate-spin text-white" />
+                        </div>
                       ) : userData.photoURL ? (
                         <img src={userData.photoURL} alt="Profile" className="w-full h-full object-cover" />
                       ) : (
@@ -539,33 +599,20 @@ export function Settings() {
                       )}
                     </div>
                     {!isUploading && (
-                      <button
-                        onClick={handleProfilePictureClick}
-                        className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-full cursor-pointer"
-                        title="Change picture" aria-label="Change profile picture"
-                      >
+                      <button onClick={handleProfilePictureClick} className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-full cursor-pointer" title="Change picture" aria-label="Change profile picture">
                         <Camera className="w-5 h-5 text-white" />
                       </button>
                     )}
                     <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" disabled={isUploading} />
                   </div>
+                  {/* Buttons */}
                   <div className="flex flex-row sm:flex-col gap-2 w-full sm:w-auto justify-center sm:justify-start">
-                    <button
-                      onClick={handleProfilePictureClick}
-                      disabled={isUploading}
-                      className={`flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md ${buttonSecondaryClass}`}
-                    >
-                      <Upload className="w-4 h-4" />
-                      {isUploading ? 'Uploading...' : 'Upload'}
+                    <button onClick={handleProfilePictureClick} disabled={isUploading} className={`flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md ${buttonSecondaryClass}`}>
+                      <Upload className="w-4 h-4" /> {isUploading ? 'Uploading...' : 'Upload'}
                     </button>
                     {userData.photoURL && !isUploading && (
-                      <button
-                        onClick={handleRemoveProfilePicture}
-                        disabled={isUploading}
-                        className={`flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md ${buttonDangerClass}`}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                        Remove
+                      <button onClick={handleRemoveProfilePicture} disabled={isUploading} className={`flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md ${buttonDangerClass}`}>
+                        <Trash2 className="w-4 h-4" /> Remove
                       </button>
                     )}
                   </div>
@@ -573,15 +620,11 @@ export function Settings() {
               </div>
 
               {/* Profile Settings Card */}
-              {/* Removed order-* class */}
               <div className={`${cardClass} rounded-xl p-4 sm:p-5`}>
                 <div className="flex items-center justify-between mb-4">
                   <h2 className={`text-base sm:text-lg font-semibold ${headingClass}`}>Profile Details</h2>
                   {!isEditing && (
-                    <button
-                      type="button" onClick={() => setIsEditing(true)} disabled={isLoading}
-                      className={`px-3 py-1 text-xs sm:text-sm font-medium rounded-md ${buttonSecondaryClass}`}
-                    > Edit </button>
+                    <button type="button" onClick={() => setIsEditing(true)} disabled={isLoading} className={`px-3 py-1 text-xs sm:text-sm font-medium rounded-md ${buttonSecondaryClass}`}> Edit </button>
                   )}
                 </div>
                 <form onSubmit={handleSave}>
@@ -589,24 +632,12 @@ export function Settings() {
                     {/* Name Field */}
                     <div>
                       <label htmlFor="name" className={`block text-xs font-medium mb-1 ${subheadingClass}`}>Name</label>
-                      <input
-                        id="name" type="text" name="name" value={formData.name} onChange={handleInputChange}
-                        disabled={!isEditing || isSaving}
-                        className={`w-full ${inputBg} rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 disabled:opacity-60 disabled:cursor-not-allowed`}
-                        required
-                      />
+                      <input id="name" type="text" name="name" value={formData.name} onChange={handleInputChange} disabled={!isEditing || isSaving} className={`w-full ${inputBg} rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 disabled:opacity-60 disabled:cursor-not-allowed`} required />
                     </div>
                     {/* Email Field */}
                     <div>
-                      <label htmlFor="email" className={`flex items-center text-xs font-medium mb-1 ${subheadingClass}`}>
-                        Email {isGoogleUser && <span className="ml-1.5 text-[10px] text-gray-500">(Managed by Google)</span>}
-                      </label>
-                      <input
-                        id="email" type="email" name="email" value={formData.email} onChange={handleInputChange}
-                        disabled={!isEditing || isSaving || isGoogleUser}
-                        className={`w-full ${inputBg} rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 disabled:opacity-60 disabled:cursor-not-allowed`}
-                        required
-                      />
+                      <label htmlFor="email" className={`flex items-center text-xs font-medium mb-1 ${subheadingClass}`}> Email {isGoogleUser && <span className="ml-1.5 text-[10px] text-gray-500">(Managed by Google)</span>} </label>
+                      <input id="email" type="email" name="email" value={formData.email} onChange={handleInputChange} disabled={!isEditing || isSaving || isGoogleUser} className={`w-full ${inputBg} rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 disabled:opacity-60 disabled:cursor-not-allowed`} required />
                     </div>
                     {/* Password Fields */}
                     {isEditing && !isGoogleUser && (
@@ -615,27 +646,15 @@ export function Settings() {
                         <p className={`text-sm font-medium -mb-1 ${headingClass}`}>Change Password</p>
                         <div>
                           <label htmlFor="currentPassword" className={`block text-xs font-medium mb-1 ${subheadingClass}`}>Current Password</label>
-                          <input
-                            id="currentPassword" type="password" name="currentPassword" value={formData.currentPassword} onChange={handleInputChange}
-                            disabled={isSaving} placeholder="Required to change email or password"
-                            className={`w-full ${inputBg} rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 disabled:opacity-60`}
-                          />
+                          <input id="currentPassword" type="password" name="currentPassword" value={formData.currentPassword} onChange={handleInputChange} disabled={isSaving} placeholder="Required to change email or password" className={`w-full ${inputBg} rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 disabled:opacity-60`} />
                         </div>
                         <div>
                           <label htmlFor="newPassword" className={`block text-xs font-medium mb-1 ${subheadingClass}`}>New Password</label>
-                          <input
-                            id="newPassword" type="password" name="newPassword" value={formData.newPassword} onChange={handleInputChange}
-                            disabled={isSaving} placeholder="Leave blank to keep current (min 6 chars)"
-                            className={`w-full ${inputBg} rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 disabled:opacity-60`}
-                          />
+                          <input id="newPassword" type="password" name="newPassword" value={formData.newPassword} onChange={handleInputChange} disabled={isSaving} placeholder="Leave blank to keep current (min 6 chars)" className={`w-full ${inputBg} rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 disabled:opacity-60`} />
                         </div>
                         <div>
                           <label htmlFor="confirmPassword" className={`block text-xs font-medium mb-1 ${subheadingClass}`}>Confirm New Password</label>
-                          <input
-                            id="confirmPassword" type="password" name="confirmPassword" value={formData.confirmPassword} onChange={handleInputChange}
-                            disabled={isSaving} placeholder="Confirm if changing"
-                            className={`w-full ${inputBg} rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 disabled:opacity-60`}
-                          />
+                          <input id="confirmPassword" type="password" name="confirmPassword" value={formData.confirmPassword} onChange={handleInputChange} disabled={isSaving} placeholder="Confirm if changing" className={`w-full ${inputBg} rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 disabled:opacity-60`} />
                         </div>
                       </>
                     )}
@@ -643,22 +662,8 @@ export function Settings() {
                   {/* Action Buttons */}
                   {isEditing && (
                     <div className="flex justify-end gap-2 mt-5">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsEditing(false); setError(null);
-                          setFormData({
-                            name: userData.name, email: userData.email,
-                            currentPassword: '', newPassword: '', confirmPassword: ''
-                          });
-                        }}
-                        disabled={isSaving}
-                        className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md ${buttonSecondaryClass}`}
-                      > Cancel </button>
-                      <button
-                        type="submit" disabled={isSaving}
-                        className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md ${buttonPrimaryClass} ${buttonPrimaryHoverEffect} flex items-center justify-center min-w-[80px]`}
-                      >
+                      <button type="button" onClick={() => { setIsEditing(false); setError(null); setFormData({ name: userData.name, email: userData.email, currentPassword: '', newPassword: '', confirmPassword: '' }); }} disabled={isSaving} className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md ${buttonSecondaryClass}`}> Cancel </button>
+                      <button type="submit" disabled={isSaving} className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md ${buttonPrimaryClass} ${buttonPrimaryHoverEffect} flex items-center justify-center min-w-[80px]`}>
                         {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Save className="w-4 h-4 mr-1.5" /> Save</>}
                       </button>
                     </div>
@@ -667,29 +672,21 @@ export function Settings() {
               </div>
 
               {/* Account Actions Card */}
-              {/* Removed order-* class */}
               <div className={`${cardClass} rounded-xl p-4 sm:p-5`}>
                 <h2 className={`text-base sm:text-lg font-semibold mb-4 ${headingClass}`}>Account Actions</h2>
                 <div className="space-y-3">
-                  <button
-                    onClick={handleSignOut}
-                    className={`w-full flex items-center justify-start gap-2.5 px-3 py-2.5 text-sm font-medium rounded-md ${buttonSecondaryClass}`}
-                  > <LogOut className="w-4 h-4" /> Sign Out </button>
-                  <button
-                    onClick={() => { setShowDeleteConfirm(true); setFormData(prev => ({ ...prev, currentPassword: '' })); setError(null); }}
-                    className={`w-full flex items-center justify-start gap-2.5 px-3 py-2.5 text-sm font-medium rounded-md ${buttonDangerClass}`}
-                  > <Trash2 className="w-4 h-4" /> Delete Account... </button>
+                  <button onClick={handleSignOut} className={`w-full flex items-center justify-start gap-2.5 px-3 py-2.5 text-sm font-medium rounded-md ${buttonSecondaryClass}`}> <LogOut className="w-4 h-4" /> Sign Out </button>
+                  <button onClick={() => { setShowDeleteConfirm(true); setFormData(prev => ({ ...prev, currentPassword: '' })); setError(null); }} className={`w-full flex items-center justify-start gap-2.5 px-3 py-2.5 text-sm font-medium rounded-md ${buttonDangerClass}`}> <Trash2 className="w-4 h-4" /> Delete Account... </button>
                 </div>
               </div>
 
             </div> {/* === End Column 1 === */}
 
 
-            {/* === Column 2 === */}
+            {/* === Column 2: Appearance, AI Context, Subscription === */}
             <div className="flex flex-col gap-4 lg:gap-6">
 
-               {/* Appearance Settings Card */}
-               {/* Removed order-* class */}
+              {/* Appearance Settings Card */}
               <div className={`${cardClass} rounded-xl p-4 sm:p-5`}>
                 <h2 className={`text-base sm:text-lg font-semibold mb-4 ${headingClass}`}>Appearance</h2>
                 <div className="space-y-4">
@@ -707,7 +704,6 @@ export function Settings() {
                       <div className={`w-9 h-5 rounded-full peer transition-colors ${isIlluminateEnabled ? 'bg-blue-600' : (isIlluminateEnabled ? 'bg-gray-300' : 'bg-gray-600')} peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all`}></div>
                     </label>
                   </div>
-
                   {/* Blackout Toggle */}
                   <div className="flex items-center justify-between">
                     <label htmlFor="blackout-toggle" className="flex items-center cursor-pointer gap-3">
@@ -722,17 +718,13 @@ export function Settings() {
                       <div className={`w-9 h-5 rounded-full peer transition-colors ${isBlackoutEnabled ? 'bg-indigo-600' : (isIlluminateEnabled ? 'bg-gray-300' : 'bg-gray-600')} peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all`}></div>
                     </label>
                   </div>
-
-                  {/* Conditional Sidebar Toggles */}
-                  <div className="pl-8 space-y-4"> {/* Indent sidebar options */}
+                  {/* Sidebar Toggles */}
+                  <div className="pl-8 space-y-4">
                      {isIlluminateEnabled && (
                         <div className="flex items-center justify-between">
                            <label htmlFor="sidebar-illuminate-toggle" className="flex items-center cursor-pointer gap-3">
                                <PanelLeftDashed className={`w-5 h-5 flex-shrink-0 ${placeholderIconColor}`} />
-                               <div>
-                                   <span className={`font-medium text-sm ${headingClass}`}>Sidebar Illuminate</span>
-                                   <p className={`${subheadingClass} text-xs mt-0.5`}>Apply light mode to sidebar.</p>
-                               </div>
+                               <div> <span className={`font-medium text-sm ${headingClass}`}>Sidebar Illuminate</span> <p className={`${subheadingClass} text-xs mt-0.5`}>Apply light mode to sidebar.</p> </div>
                            </label>
                            <label className="relative inline-flex items-center cursor-pointer">
                            <input id="sidebar-illuminate-toggle" type="checkbox" checked={isSidebarIlluminateEnabled} onChange={(e) => setIsSidebarIlluminateEnabled(e.target.checked)} className="sr-only peer" />
@@ -744,10 +736,7 @@ export function Settings() {
                         <div className="flex items-center justify-between">
                            <label htmlFor="sidebar-blackout-toggle" className="flex items-center cursor-pointer gap-3">
                                <PanelLeftDashed className={`w-5 h-5 flex-shrink-0 ${placeholderIconColor}`} />
-                               <div>
-                                   <span className={`font-medium text-sm ${headingClass}`}>Sidebar Blackout</span>
-                                   <p className={`${subheadingClass} text-xs mt-0.5`}>Apply dark mode to sidebar.</p>
-                               </div>
+                               <div> <span className={`font-medium text-sm ${headingClass}`}>Sidebar Blackout</span> <p className={`${subheadingClass} text-xs mt-0.5`}>Apply dark mode to sidebar.</p> </div>
                            </label>
                            <label className="relative inline-flex items-center cursor-pointer">
                            <input id="sidebar-blackout-toggle" type="checkbox" checked={isSidebarBlackoutEnabled} onChange={(e) => setIsSidebarBlackoutEnabled(e.target.checked)} className="sr-only peer" />
@@ -759,20 +748,102 @@ export function Settings() {
                 </div>
               </div>
 
+              {/* Universal AI Context Card */}
+              <div className={`${cardClass} rounded-xl p-4 sm:p-5`}>
+                 <div className="flex items-center justify-between mb-3">
+                    <h2 className={`text-base sm:text-lg font-semibold flex items-center gap-2 ${headingClass}`}>
+                       <BrainCircuit className="w-5 h-5 text-purple-400" />
+                       Universal AI Context
+                    </h2>
+                    {!isEditingAiContext && (
+                       <button type="button" onClick={() => setIsEditingAiContext(true)} disabled={isLoadingAiContext || isSavingAiContext} className={`px-3 py-1 text-xs sm:text-sm font-medium rounded-md ${buttonSecondaryClass}`}> Edit </button>
+                    )}
+                 </div>
+                 <p className={`${subheadingClass} text-xs sm:text-sm mb-4`}>
+                    Provide background information the AI can always access to personalize its responses and suggestions for you. Keep it concise.
+                 </p>
+
+                 {/* AI Context Error Message */}
+                 {aiContextError && (
+                    <div className={`mb-4 p-3 rounded-lg flex items-start gap-2 ${aiContextErrorBoxBg}`}>
+                      <AlertCircle className={`w-4 h-4 flex-shrink-0 mt-px ${aiContextErrorTextColor}`} />
+                      <p className={`${aiContextErrorTextColor} text-xs sm:text-sm`}>{aiContextError}</p>
+                    </div>
+                  )}
+
+                 {isLoadingAiContext ? (
+                    <div className="flex justify-center items-center h-40">
+                       <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
+                    </div>
+                 ) : (
+                    <div className="space-y-4">
+                       {/* Work Description Field */}
+                       <div>
+                          <label htmlFor="workDescription" className={`block text-xs font-medium mb-1 ${subheadingClass}`}>Role / Work Description</label>
+                          <textarea
+                             id="workDescription" name="workDescription" rows={3}
+                             value={aiContextData.workDescription} onChange={handleAiContextInputChange}
+                             disabled={!isEditingAiContext || isSavingAiContext}
+                             placeholder="e.g., Software Engineer at Acme Corp, focusing on frontend development."
+                             className={`w-full ${textareaBg} rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 disabled:opacity-60 disabled:cursor-not-allowed resize-y`}
+                          />
+                       </div>
+                       {/* Short Term Focus Field */}
+                       <div>
+                          <label htmlFor="shortTermFocus" className={`block text-xs font-medium mb-1 ${subheadingClass}`}>Current Focus / Short-Term Goals</label>
+                          <textarea
+                             id="shortTermFocus" name="shortTermFocus" rows={3}
+                             value={aiContextData.shortTermFocus} onChange={handleAiContextInputChange}
+                             disabled={!isEditingAiContext || isSavingAiContext}
+                             placeholder="e.g., Completing the Project Phoenix UI refactor by end of month."
+                             className={`w-full ${textareaBg} rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 disabled:opacity-60 disabled:cursor-not-allowed resize-y`}
+                          />
+                       </div>
+                       {/* Long Term Goals Field */}
+                       <div>
+                          <label htmlFor="longTermGoals" className={`block text-xs font-medium mb-1 ${subheadingClass}`}>Long-Term Goals / Aspirations</label>
+                          <textarea
+                             id="longTermGoals" name="longTermGoals" rows={3}
+                             value={aiContextData.longTermGoals} onChange={handleAiContextInputChange}
+                             disabled={!isEditingAiContext || isSavingAiContext}
+                             placeholder="e.g., Transition to a Tech Lead role within 2 years. Improve public speaking skills."
+                             className={`w-full ${textareaBg} rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 disabled:opacity-60 disabled:cursor-not-allowed resize-y`}
+                          />
+                       </div>
+                       {/* Other Context Field */}
+                       <div>
+                          <label htmlFor="otherContext" className={`block text-xs font-medium mb-1 ${subheadingClass}`}>Other Relevant Context</label>
+                          <textarea
+                             id="otherContext" name="otherContext" rows={3}
+                             value={aiContextData.otherContext} onChange={handleAiContextInputChange}
+                             disabled={!isEditingAiContext || isSavingAiContext}
+                             placeholder="e.g., Preferred communication style: direct and concise. Interested in learning about AI ethics."
+                             className={`w-full ${textareaBg} rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 disabled:opacity-60 disabled:cursor-not-allowed resize-y`}
+                          />
+                       </div>
+
+                       {/* AI Context Action Buttons */}
+                       {isEditingAiContext && (
+                          <div className="flex justify-end gap-2 mt-5">
+                             <button type="button" onClick={handleCancelAiContextEdit} disabled={isSavingAiContext} className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md ${buttonSecondaryClass}`}> Cancel </button>
+                             <button type="button" onClick={handleSaveAiContext} disabled={isSavingAiContext} className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md ${buttonPrimaryClass} ${buttonPrimaryHoverEffect} flex items-center justify-center min-w-[80px]`}>
+                                {isSavingAiContext ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Save className="w-4 h-4 mr-1.5" /> Save Context</>}
+                             </button>
+                          </div>
+                       )}
+                    </div>
+                 )}
+              </div>
+
+
               {/* Subscription Status Card */}
-              {/* Removed order-* class */}
               <div className={`${cardClass} rounded-xl p-4 sm:p-5`}>
                   <div className="flex items-center justify-between mb-4">
-                      <h2 className={`text-base sm:text-lg font-semibold flex items-center gap-1.5 ${headingClass}`}>
-                          Subscription
-                      </h2>
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-semibold uppercase tracking-wider ${isIlluminateEnabled ? 'bg-blue-100 text-blue-800' : 'bg-blue-900/70 text-blue-200'}`}>
-                          Basic
-                      </span>
+                      <h2 className={`text-base sm:text-lg font-semibold flex items-center gap-1.5 ${headingClass}`}> Subscription </h2>
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-semibold uppercase tracking-wider ${isIlluminateEnabled ? 'bg-blue-100 text-blue-800' : 'bg-blue-900/70 text-blue-200'}`}> Basic </span>
                   </div>
                   <div className="space-y-3">
                        <p className={`text-sm ${subheadingClass} mb-2`}>Your free plan includes:</p>
-                        {/* Restored Details */}
                         <ul className={`list-disc list-outside pl-5 space-y-1.5 text-xs sm:text-sm ${subheadingClass}`}>
                           <li>2 PDF and Text Notes per month</li>
                           <li>1 Youtube Notes per month</li>
@@ -780,12 +851,8 @@ export function Settings() {
                           <li>500 Tokens Included</li>
                           <li>Add Up to 3 Friends</li>
                         </ul>
-                      {/* Wrap button in Link and add improved animation */}
                       <Link to="/pricing" className={`block mt-2 w-full ${buttonPrimaryClass} ${buttonPrimaryHoverEffect} rounded-md shadow-lg shadow-indigo-500/10`}>
-                          <span className="flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium">
-                             <Crown className="w-4 h-4" strokeWidth={2.5} />
-                             Upgrade to Premium
-                          </span>
+                          <span className="flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium"> <Crown className="w-4 h-4" strokeWidth={2.5} /> Upgrade to Premium </span>
                       </Link>
                   </div>
               </div>

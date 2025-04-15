@@ -1575,7 +1575,6 @@ Assistant:`;
                     <option value="All">All Types</option>
                     {ALLOWED_FILE_EXTENSIONS.sort().map(type => <option key={type} value={type}>{type.toUpperCase()}</option>)}
                   </select>
-                  <FileIcon className={`w-3 h-3 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none ${iconColor}`} />
                   <ChevronDown className={`w-4 h-4 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none ${iconColor}`} />
               </div>
               {/* Filter by Department */}

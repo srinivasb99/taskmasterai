@@ -2303,7 +2303,7 @@ Another Example: Looks clear for today. Consider planning your next project step
 
              {/* Upcoming Deadlines Card */}
              <div className={`${cardClass} rounded-xl p-4 sm:p-5 transition-all duration-300`}>
-               <h2 className={`text-lg sm:text-xl font-semibold mb-3 ${illuminateTextBlue} flex items-center`}>
+               <h2 className={`text-base sm:text-lg  font-semibold mb-3 ${illuminateTextBlue} flex items-center`}>
                  <Calendar className="w-5 h-5 mr-1.5" />
                  Upcoming
                </h2>

@@ -1356,16 +1356,6 @@ Assistant:`;
   }
 
 
-  // Show loading screen if auth or initial data isn't ready
-  if (loadingAuth || !user) {
-      return (
-         <div className={`flex h-screen ${containerClass} items-center justify-center`}>
-             <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-         </div>
-      );
-     // Or return null; - Auth effect should redirect anyway
-  }
-
   // --- Default Render ---
   return (
     <div className={`flex h-screen ${containerClass} font-sans`}>

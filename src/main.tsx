@@ -27,6 +27,7 @@ import SchoolPage from './components/SchoolPage';
 import './index.css';
 import NotesOutage from './outage-pages/NotesOutage';
 import Status from './status/Status'; // Import the new Status page
+import { PublicNoteView } from './components/PublicNoteView'; // Adjust path if needed
 
 // Global Helmet component to include favicon and related tags
 const DefaultHelmet = () => (
@@ -199,6 +200,8 @@ createRoot(document.getElementById('root')!).render(
             <Route path="/" element={<RootTitle><App /></RootTitle>} />
             <Route path="/status" element={<PageTitle title="Status"><Status /></PageTitle>} />
             <Route path="/api/*" element={null} />
+            <Route path="/public-note/:noteId" element={<PageTitle title="Public Note"><PublicNoteView /></PageTitle>} />
+            
             {/* Catch-all route for 404 */}
             <Route path="*" element={<PageTitle title="404 Not Found"><NotFound /></PageTitle>} />
           </Routes>

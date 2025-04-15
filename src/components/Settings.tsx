@@ -578,7 +578,7 @@ export function Settings() {
           {/* --- Main Content Grid --- */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
 
-            {/* === Column 1: Profile Picture, Details, Actions === */}
+            {/* === Column 1: Profile Picture, Details, Actions, AI Context === */}
             <div className="flex flex-col gap-4 lg:gap-6">
 
               {/* Profile Picture Section */}
@@ -680,75 +680,7 @@ export function Settings() {
                 </div>
               </div>
 
-            </div> {/* === End Column 1 === */}
-
-
-            {/* === Column 2: Appearance, AI Context, Subscription === */}
-            <div className="flex flex-col gap-4 lg:gap-6">
-
-              {/* Appearance Settings Card */}
-              <div className={`${cardClass} rounded-xl p-4 sm:p-5`}>
-                <h2 className={`text-base sm:text-lg font-semibold mb-4 ${headingClass}`}>Appearance</h2>
-                <div className="space-y-4">
-                  {/* Illuminate Toggle */}
-                  <div className="flex items-center justify-between">
-                    <label htmlFor="illuminate-toggle" className="flex items-center cursor-pointer gap-3">
-                      <Sun className={`w-5 h-5 flex-shrink-0 ${isIlluminateEnabled ? 'text-yellow-500' : placeholderIconColor}`} />
-                      <div>
-                        <span className={`font-medium text-sm ${headingClass}`}>Illuminate</span>
-                        <p className={`${subheadingClass} text-xs mt-0.5`}>Light mode for sharp focus.</p>
-                      </div>
-                    </label>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input id="illuminate-toggle" type="checkbox" checked={isIlluminateEnabled} onChange={(e) => handleToggleIlluminate(e.target.checked)} className="sr-only peer" />
-                      <div className={`w-9 h-5 rounded-full peer transition-colors ${isIlluminateEnabled ? 'bg-blue-600' : (isIlluminateEnabled ? 'bg-gray-300' : 'bg-gray-600')} peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all`}></div>
-                    </label>
-                  </div>
-                  {/* Blackout Toggle */}
-                  <div className="flex items-center justify-between">
-                    <label htmlFor="blackout-toggle" className="flex items-center cursor-pointer gap-3">
-                      <Moon className={`w-5 h-5 flex-shrink-0 ${isBlackoutEnabled ? 'text-indigo-400' : placeholderIconColor}`} />
-                      <div>
-                        <span className={`font-medium text-sm ${headingClass}`}>Blackout</span>
-                        <p className={`${subheadingClass} text-xs mt-0.5`}>Dark mode for eased eyes.</p>
-                      </div>
-                    </label>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input id="blackout-toggle" type="checkbox" checked={isBlackoutEnabled} onChange={(e) => handleToggleBlackout(e.target.checked)} className="sr-only peer" />
-                      <div className={`w-9 h-5 rounded-full peer transition-colors ${isBlackoutEnabled ? 'bg-indigo-600' : (isIlluminateEnabled ? 'bg-gray-300' : 'bg-gray-600')} peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all`}></div>
-                    </label>
-                  </div>
-                  {/* Sidebar Toggles */}
-                  <div className="pl-8 space-y-4">
-                     {isIlluminateEnabled && (
-                        <div className="flex items-center justify-between">
-                           <label htmlFor="sidebar-illuminate-toggle" className="flex items-center cursor-pointer gap-3">
-                               <PanelLeftDashed className={`w-5 h-5 flex-shrink-0 ${placeholderIconColor}`} />
-                               <div> <span className={`font-medium text-sm ${headingClass}`}>Sidebar Illuminate</span> <p className={`${subheadingClass} text-xs mt-0.5`}>Apply light mode to sidebar.</p> </div>
-                           </label>
-                           <label className="relative inline-flex items-center cursor-pointer">
-                           <input id="sidebar-illuminate-toggle" type="checkbox" checked={isSidebarIlluminateEnabled} onChange={(e) => setIsSidebarIlluminateEnabled(e.target.checked)} className="sr-only peer" />
-                           <div className={`w-9 h-5 rounded-full peer transition-colors bg-gray-300 peer-checked:bg-blue-600 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all`}></div>
-                           </label>
-                        </div>
-                     )}
-                     {isBlackoutEnabled && (
-                        <div className="flex items-center justify-between">
-                           <label htmlFor="sidebar-blackout-toggle" className="flex items-center cursor-pointer gap-3">
-                               <PanelLeftDashed className={`w-5 h-5 flex-shrink-0 ${placeholderIconColor}`} />
-                               <div> <span className={`font-medium text-sm ${headingClass}`}>Sidebar Blackout</span> <p className={`${subheadingClass} text-xs mt-0.5`}>Apply dark mode to sidebar.</p> </div>
-                           </label>
-                           <label className="relative inline-flex items-center cursor-pointer">
-                           <input id="sidebar-blackout-toggle" type="checkbox" checked={isSidebarBlackoutEnabled} onChange={(e) => setIsSidebarBlackoutEnabled(e.target.checked)} className="sr-only peer" />
-                           <div className={`w-9 h-5 rounded-full peer transition-colors bg-gray-600 peer-checked:bg-indigo-600 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all`}></div>
-                           </label>
-                        </div>
-                     )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Universal AI Context Card */}
+              {/* Universal AI Context Card -- MOVED HERE */}
               <div className={`${cardClass} rounded-xl p-4 sm:p-5`}>
                  <div className="flex items-center justify-between mb-3">
                     <h2 className={`text-base sm:text-lg font-semibold flex items-center gap-2 ${headingClass}`}>
@@ -835,6 +767,74 @@ export function Settings() {
                  )}
               </div>
 
+
+            </div> {/* === End Column 1 === */}
+
+
+            {/* === Column 2: Appearance, Subscription === */}
+            <div className="flex flex-col gap-4 lg:gap-6">
+
+              {/* Appearance Settings Card */}
+              <div className={`${cardClass} rounded-xl p-4 sm:p-5`}>
+                <h2 className={`text-base sm:text-lg font-semibold mb-4 ${headingClass}`}>Appearance</h2>
+                <div className="space-y-4">
+                  {/* Illuminate Toggle */}
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="illuminate-toggle" className="flex items-center cursor-pointer gap-3">
+                      <Sun className={`w-5 h-5 flex-shrink-0 ${isIlluminateEnabled ? 'text-yellow-500' : placeholderIconColor}`} />
+                      <div>
+                        <span className={`font-medium text-sm ${headingClass}`}>Illuminate</span>
+                        <p className={`${subheadingClass} text-xs mt-0.5`}>Light mode for sharp focus.</p>
+                      </div>
+                    </label>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input id="illuminate-toggle" type="checkbox" checked={isIlluminateEnabled} onChange={(e) => handleToggleIlluminate(e.target.checked)} className="sr-only peer" />
+                      <div className={`w-9 h-5 rounded-full peer transition-colors ${isIlluminateEnabled ? 'bg-blue-600' : (isIlluminateEnabled ? 'bg-gray-300' : 'bg-gray-600')} peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all`}></div>
+                    </label>
+                  </div>
+                  {/* Blackout Toggle */}
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="blackout-toggle" className="flex items-center cursor-pointer gap-3">
+                      <Moon className={`w-5 h-5 flex-shrink-0 ${isBlackoutEnabled ? 'text-indigo-400' : placeholderIconColor}`} />
+                      <div>
+                        <span className={`font-medium text-sm ${headingClass}`}>Blackout</span>
+                        <p className={`${subheadingClass} text-xs mt-0.5`}>Dark mode for eased eyes.</p>
+                      </div>
+                    </label>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input id="blackout-toggle" type="checkbox" checked={isBlackoutEnabled} onChange={(e) => handleToggleBlackout(e.target.checked)} className="sr-only peer" />
+                      <div className={`w-9 h-5 rounded-full peer transition-colors ${isBlackoutEnabled ? 'bg-indigo-600' : (isIlluminateEnabled ? 'bg-gray-300' : 'bg-gray-600')} peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all`}></div>
+                    </label>
+                  </div>
+                  {/* Sidebar Toggles */}
+                  <div className="pl-8 space-y-4">
+                     {isIlluminateEnabled && (
+                        <div className="flex items-center justify-between">
+                           <label htmlFor="sidebar-illuminate-toggle" className="flex items-center cursor-pointer gap-3">
+                               <PanelLeftDashed className={`w-5 h-5 flex-shrink-0 ${placeholderIconColor}`} />
+                               <div> <span className={`font-medium text-sm ${headingClass}`}>Sidebar Illuminate</span> <p className={`${subheadingClass} text-xs mt-0.5`}>Apply light mode to sidebar.</p> </div>
+                           </label>
+                           <label className="relative inline-flex items-center cursor-pointer">
+                           <input id="sidebar-illuminate-toggle" type="checkbox" checked={isSidebarIlluminateEnabled} onChange={(e) => setIsSidebarIlluminateEnabled(e.target.checked)} className="sr-only peer" />
+                           <div className={`w-9 h-5 rounded-full peer transition-colors bg-gray-300 peer-checked:bg-blue-600 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all`}></div>
+                           </label>
+                        </div>
+                     )}
+                     {isBlackoutEnabled && (
+                        <div className="flex items-center justify-between">
+                           <label htmlFor="sidebar-blackout-toggle" className="flex items-center cursor-pointer gap-3">
+                               <PanelLeftDashed className={`w-5 h-5 flex-shrink-0 ${placeholderIconColor}`} />
+                               <div> <span className={`font-medium text-sm ${headingClass}`}>Sidebar Blackout</span> <p className={`${subheadingClass} text-xs mt-0.5`}>Apply dark mode to sidebar.</p> </div>
+                           </label>
+                           <label className="relative inline-flex items-center cursor-pointer">
+                           <input id="sidebar-blackout-toggle" type="checkbox" checked={isSidebarBlackoutEnabled} onChange={(e) => setIsSidebarBlackoutEnabled(e.target.checked)} className="sr-only peer" />
+                           <div className={`w-9 h-5 rounded-full peer transition-colors bg-gray-600 peer-checked:bg-indigo-600 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all`}></div>
+                           </label>
+                        </div>
+                     )}
+                  </div>
+                </div>
+              </div>
 
               {/* Subscription Status Card */}
               <div className={`${cardClass} rounded-xl p-4 sm:p-5`}>

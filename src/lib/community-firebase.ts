@@ -17,7 +17,7 @@ import {
   increment,
   arrayUnion,   // <-- Import arrayUnion
   arrayRemove,  // <-- Import arrayRemove
-  documentId,   // <-- Import documentId (was missing in previous thought process)
+  documentId,   // <-- Import documentId
 } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -27,8 +27,14 @@ const FILES_PER_BONUS_THRESHOLD = 5;
 const TOKENS_PER_DOWNLOAD = 5;
 
 // Upload a file to Firebase Storage and record its metadata in Firestore
-export async function uploadCommunityFile(userId: string, file: File): Promise<string> {
-  console.log(`Uploading file: ${file.name} for user: ${userId}`);
+// **** MODIFIED: Added department and courseNumber parameters ****
+export async function uploadCommunityFile(
+    userId: string,
+    file: File,
+    department: string,
+    courseNumber: string
+): Promise<string> {
+  console.log(`Uploading file: ${file.name} for user: ${userId}, Dept: ${department}, Course: ${courseNumber}`);
   const uniqueFileName = `${uuidv4()}_${file.name}`;
   const fileRef = ref(storage, `community/${userId}/${uniqueFileName}`);
 
@@ -38,6 +44,7 @@ export async function uploadCommunityFile(userId: string, file: File): Promise<s
     const downloadURL = await getDownloadURL(fileRef);
     console.log("Download URL obtained:", downloadURL);
 
+    // **** MODIFIED: Added department and courseNumber to the document ****
     await addDoc(collection(db, 'communityFiles'), {
       userId,
       fileName: file.name,
@@ -47,12 +54,14 @@ export async function uploadCommunityFile(userId: string, file: File): Promise<s
       fileSize: file.size,
       uploadedAt: Timestamp.now(),
       downloadCount: 0,
-      likes: [], // Initialize likes array
-      dislikes: [], // Initialize dislikes array
-      totalRating: 0, // Initialize total rating
-      ratingCount: 0, // Initialize rating count
+      likes: [],
+      dislikes: [],
+      totalRating: 0,
+      ratingCount: 0,
+      department: department || 'Other', // Add department, default if empty
+      courseNumber: courseNumber || 'N/A', // Add course number, default if empty
     });
-    console.log("File metadata added to Firestore.");
+    console.log("File metadata (incl. dept/course) added to Firestore.");
 
     await awardTokensForUpload(userId); // Check for upload bonus
 
@@ -63,7 +72,7 @@ export async function uploadCommunityFile(userId: string, file: File): Promise<s
   }
 }
 
-// Award tokens based on file count thresholds.
+// Award tokens based on file count thresholds. (No changes needed)
 export async function awardTokensForUpload(userId: string): Promise<void> {
     console.log(`Checking token award for user: ${userId}`);
     const q = query(collection(db, 'communityFiles'), where('userId', '==', userId));
@@ -92,20 +101,18 @@ export async function awardTokensForUpload(userId: string): Promise<void> {
                     tokens: 500,
                     uploadBonusCount: 0,
                     createdAt: Timestamp.now(),
-                    // Add other default fields if necessary
+                    // Add other default fields if necessary (name, photoURL might be set elsewhere)
                 });
             }
 
             if (expectedBonusGroups > currentBonusCount) {
                 const groupsToAward = expectedBonusGroups - currentBonusCount;
                 const bonusTokens = groupsToAward * TOKENS_PER_BONUS_THRESHOLD;
-                // Use increment within transaction if possible, otherwise calculate new total
-                const newTokens = currentTokens + bonusTokens;
+                const newTokens = currentTokens + bonusTokens; // Calculate for logging
                 console.log(`Awarding upload bonus for ${groupsToAward} group(s). Bonus Tokens: ${bonusTokens}. New Total Tokens: ${newTokens}`);
 
-                // Update or set the document within the transaction
                 transaction.update(userDocRef, {
-                    tokens: increment(bonusTokens), // Increment is safer for concurrency
+                    tokens: increment(bonusTokens),
                     uploadBonusCount: expectedBonusGroups
                 });
                 console.log(`User ${userId} tokens and upload bonus count updated.`);
@@ -120,7 +127,7 @@ export async function awardTokensForUpload(userId: string): Promise<void> {
     }
 }
 
-// --- Handle download count and award tokens ---
+// --- Handle download count and award tokens --- (No changes needed)
 export async function handleFileDownload(fileId: string, uploaderId: string, downloaderId: string): Promise<void> {
     if (uploaderId === downloaderId) {
         console.log(`User ${downloaderId} downloaded their own file ${fileId}. No tokens awarded.`);
@@ -159,7 +166,7 @@ export async function handleFileDownload(fileId: string, uploaderId: string, dow
     }
 }
 
-// --- Like/Dislike ---
+// --- Like/Dislike --- (No changes needed)
 export async function toggleLike(fileId: string, userId: string): Promise<void> {
     const fileDocRef = doc(db, 'communityFiles', fileId);
     try {
@@ -220,7 +227,7 @@ export async function toggleDislike(fileId: string, userId: string): Promise<voi
     }
 }
 
-// --- Rating ---
+// --- Rating --- (No changes needed)
 export async function submitRating(fileId: string, userId: string, rating: number): Promise<void> {
     if (rating < 1 || rating > 5) throw new Error("Rating must be between 1 and 5.");
 
@@ -276,7 +283,7 @@ export async function submitRating(fileId: string, userId: string, rating: numbe
     }
 }
 
-// Get a specific user's rating for a file (if needed)
+// Get a specific user's rating for a file (if needed) (No changes needed)
 export async function getUserRatingForFile(fileId: string, userId: string): Promise<number | null> {
     const ratingDocRef = doc(db, 'communityFiles', fileId, 'ratings', userId);
     try {
@@ -292,7 +299,10 @@ export async function getUserRatingForFile(fileId: string, userId: string): Prom
 }
 
 
-// --- Function for USER to delete their OWN file ---
+// --- Function for USER to delete their OWN file --- (No changes needed, but note users CANNOT delete now per original code comments)
+// *** IMPORTANT: The Community.tsx code REMOVED the user's ability to delete their own files.
+// This function is kept here for reference but isn't called from the updated Community.tsx unless an Admin uses the other function.
+// If user deletion is re-enabled, this function would be used.
 export async function deleteUserFile(userId: string, fileId: string): Promise<void> {
      const fileDocRef = doc(db, 'communityFiles', fileId);
      try {
@@ -337,9 +347,15 @@ export async function deleteUserFile(userId: string, fileId: string): Promise<vo
      }
 }
 
-// --- Function for ADMIN (Dev) to delete ANY file ---
+// --- Function for ADMIN (Dev) to delete ANY file --- (No changes needed)
 export async function deleteAnyFileAsAdmin(adminUserId: string, fileToDelete: any): Promise<void> {
     console.log(`Admin ${adminUserId} attempting to delete file ${fileToDelete.id} by user ${fileToDelete.userId}`);
+    // ** Security Enhancement: Add a check here to verify adminUserId actually IS an admin if not already done elsewhere **
+    // const adminUserDoc = await getDoc(doc(db, 'users', adminUserId));
+    // if (!adminUserDoc.exists() || !adminUserDoc.data()?.isAdmin) { // Assuming an 'isAdmin' field
+    //    throw new Error("Unauthorized admin action.");
+    // }
+
     const fileDocRef = doc(db, 'communityFiles', fileToDelete.id);
     try {
         const batch = writeBatch(db);
@@ -381,16 +397,18 @@ export async function deleteAnyFileAsAdmin(adminUserId: string, fileToDelete: an
 
 // Retrieve all community files (consider adding pagination later)
 export async function getCommunityFiles(): Promise<any[]> {
+  // *** PERFORMANCE NOTE: For large datasets, implement server-side pagination here ***
+  // Example: Add parameters like `lastVisibleDoc` and use `startAfter(lastVisibleDoc).limit(pageSize)`
   const q = query(collection(db, 'communityFiles')); // Add orderBy('uploadedAt', 'desc') if desired
   const querySnapshot = await getDocs(q);
   let files: any[] = [];
   querySnapshot.forEach((docSnap) => {
     files.push({ id: docSnap.id, ...docSnap.data() });
   });
-  return files;
+  return files; // This currently fetches ALL files
 }
 
-// Retrieve community files uploaded by a specific user
+// Retrieve community files uploaded by a specific user (No changes needed)
 export async function getUserCommunityFiles(userId: string): Promise<any[]> {
   const q = query(collection(db, 'communityFiles'), where('userId', '==', userId));
   const querySnapshot = await getDocs(q);
@@ -401,34 +419,28 @@ export async function getUserCommunityFiles(userId: string): Promise<any[]> {
   return files;
 }
 
-// --- Helper function to fetch multiple user ratings efficiently ---
-// Can be used in Community.tsx if needed to display current user's rating on load
+// --- Helper function to fetch multiple user ratings efficiently --- (No changes needed)
 export async function getUserRatingsForMultipleFiles(fileIds: string[], userId: string): Promise<{ [fileId: string]: number }> {
     const ratings: { [fileId: string]: number } = {};
     if (!userId || fileIds.length === 0) return ratings;
 
-    // Firestore limits 'in' queries to 30 items. Chunk if necessary.
-    const MAX_IN_QUERY_SIZE = 30;
-    const chunks = [];
-    for (let i = 0; i < fileIds.length; i += MAX_IN_QUERY_SIZE) {
-        chunks.push(fileIds.slice(i, i + MAX_IN_QUERY_SIZE));
+    const MAX_INDIVIDUAL_READS = 50; // Arbitrary limit to prevent accidental large fetches
+    if (fileIds.length > MAX_INDIVIDUAL_READS) {
+        console.warn(`Attempting to fetch ratings for ${fileIds.length} files individually. Consider optimizing if this happens frequently.`);
+        // Optionally slice the array or throw an error
+        // fileIds = fileIds.slice(0, MAX_INDIVIDUAL_READS);
     }
 
     try {
-        for (const chunk of chunks) {
-             // Construct refs for this chunk
-            const ratingRefs = chunk.map(fileId => doc(db, 'communityFiles', fileId, 'ratings', userId));
-             // Note: Firestore SDK doesn't have a getMultipleDocs equivalent like Node.js Admin SDK's getAll.
-             // We have to fetch them individually or structure data differently for bulk reads.
-             // Let's fetch individually for now, acknowledging potential performance cost for huge lists.
-             // A better approach for *many* files might be a separate 'userRatings' collection indexed by userId.
-             for (const ratingRef of ratingRefs) {
-                 const docSnap = await getDoc(ratingRef);
-                 const fileId = ratingRef.parent.parent?.id; // Get fileId from ref path
-                 if (docSnap.exists() && fileId) {
-                     ratings[fileId] = docSnap.data().rating;
-                 }
-             }
+        // Fetch individually - Firestore doesn't support multi-doc reads across different subcollections paths easily client-side.
+        // A better approach for very large scale might involve denormalizing the user's rating onto the file doc (complex updates)
+        // or using a separate collection `userFileRatings/{userId}_{fileId}` (different query pattern).
+        for (const fileId of fileIds) {
+            const ratingRef = doc(db, 'communityFiles', fileId, 'ratings', userId);
+            const docSnap = await getDoc(ratingRef);
+            if (docSnap.exists()) {
+                ratings[fileId] = docSnap.data().rating;
+            }
         }
     } catch (error) {
         console.error("Error fetching multiple user ratings:", error);

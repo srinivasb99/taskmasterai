@@ -192,7 +192,6 @@ const getFileExtension = (fileName: string): string => {
 const formatTimestamp = (timestamp: Timestamp | Date | undefined): string => {
   if (!timestamp) return 'Unknown date';
   const date = timestamp instanceof Date ? timestamp : timestamp.toDate();
-  // Use a shorter format for mobile if needed, but short/numeric is usually fine
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 };
 
@@ -207,18 +206,17 @@ const formatFileSize = (bytes: number | undefined): string => {
 
 const getFileIcon = (extension: string): React.ReactElement => {
     const ext = extension.toLowerCase();
-    const iconBaseClass = "w-4 h-4"; // Consistent size
     switch (ext) {
-        case 'pdf': return <FileText className={`${iconBaseClass} text-red-500`} />;
-        case 'png': case 'jpg': case 'jpeg': case 'gif': case 'webp': return <ImageIcon className={`${iconBaseClass} text-purple-500`} />;
-        case 'mp3': case 'wav': case 'ogg': return <Music className={`${iconBaseClass} text-yellow-500`} />;
-        case 'mp4': case 'mov': case 'avi': case 'webm': return <Video className={`${iconBaseClass} text-blue-500`} />;
-        case 'zip': case 'rar': case '7z': return <FileArchive className={`${iconBaseClass} text-orange-500`} />;
-        case 'doc': case 'docx': return <FileText className={`${iconBaseClass} text-blue-600`} />;
-        case 'xls': case 'xlsx': return <FileText className={`${iconBaseClass} text-green-600`} />;
-        case 'ppt': case 'pptx': return <FileText className={`${iconBaseClass} text-red-600`} />;
-        case 'txt': case 'csv': case 'md': case 'json': return <FileText className={`${iconBaseClass} text-gray-500`} />;
-        default: return <FileIcon className={`${iconBaseClass} text-gray-500`} />;
+        case 'pdf': return <FileText className="w-4 h-4 text-red-500" />;
+        case 'png': case 'jpg': case 'jpeg': case 'gif': case 'webp': return <ImageIcon className="w-4 h-4 text-purple-500" />;
+        case 'mp3': case 'wav': case 'ogg': return <Music className="w-4 h-4 text-yellow-500" />;
+        case 'mp4': case 'mov': case 'avi': case 'webm': return <Video className="w-4 h-4 text-blue-500" />;
+        case 'zip': case 'rar': case '7z': return <FileArchive className="w-4 h-4 text-orange-500" />;
+        case 'doc': case 'docx': return <FileText className="w-4 h-4 text-blue-600" />;
+        case 'xls': case 'xlsx': return <FileText className="w-4 h-4 text-green-600" />;
+        case 'ppt': case 'pptx': return <FileText className="w-4 h-4 text-red-600" />;
+        case 'txt': case 'csv': case 'md': case 'json': return <FileText className="w-4 h-4 text-gray-500" />;
+        default: return <FileIcon className="w-4 h-4 text-gray-500" />;
     }
 };
 
@@ -244,7 +242,7 @@ const StarRating = ({
     const averageRating = totalRatings > 0 ? rating / totalRatings : 0;
     const displayRating = hoverRating > 0 ? hoverRating : userRating ?? averageRating; // Show user's rating if available, else average
 
-    const starSize = size === 'sm' ? 'w-3 h-3' : 'w-4 h-4'; // Use Tailwind classes
+    const starSize = size === 'sm' ? 'w-3 h-3' : 'w-4 h-4';
     const filledColor = isIlluminateEnabled ? "text-yellow-500" : "text-yellow-400";
     const emptyColor = isIlluminateEnabled ? "text-gray-300" : "text-gray-600";
     const hoverColor = isIlluminateEnabled ? "text-yellow-400" : "text-yellow-300";
@@ -272,7 +270,6 @@ const StarRating = ({
                     />
                 </button>
             ))}
-            {/* Adjusted total ratings display size */}
             {totalRatings > 0 && size === 'md' && (
                  <span className={`ml-1.5 text-[10px] ${isIlluminateEnabled ? 'text-gray-500' : 'text-gray-400'}`}>
                      ({totalRatings})
@@ -289,7 +286,7 @@ export function Community() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null); // For AI Chat
 
-  // --- State (No changes needed) ---
+  // --- State ---
   const [user, setUser] = useState<any>(null);
   const [userName, setUserName] = useState<string>('');
   const [userPhotoURL, setUserPhotoURL] = useState<string | null>(null);
@@ -317,12 +314,7 @@ export function Community() {
   // fileTypes constant moved near top
 
   // Theme State (No changes needed)
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
-     // Default to collapsed on mobile, expanded on desktop
-     const storedValue = localStorage.getItem('isSidebarCollapsed');
-     if (storedValue !== null) return JSON.parse(storedValue);
-     return window.innerWidth < 768; // md breakpoint
-   });
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => JSON.parse(localStorage.getItem('isSidebarCollapsed') || 'false'));
   const [isBlackoutEnabled, setIsBlackoutEnabled] = useState(() => JSON.parse(localStorage.getItem('isBlackoutEnabled') || 'false'));
   const [isSidebarBlackoutEnabled, setIsSidebarBlackoutEnabled] = useState(() => JSON.parse(localStorage.getItem('isSidebarBlackoutEnabled') || 'false'));
   const [isIlluminateEnabled, setIsIlluminateEnabled] = useState(() => JSON.parse(localStorage.getItem('isIlluminateEnabled') ?? 'true'));
@@ -340,7 +332,8 @@ export function Community() {
   ]);
   const [isChatLoading, setIsChatLoading] = useState(false);
 
-  // --- Style Variables (No changes needed) ---
+  // --- Style Variables ---
+  // (Keep the same style variables as before)
   const containerClass = isIlluminateEnabled ? "bg-gray-50 text-gray-900" : isBlackoutEnabled ? "bg-black text-gray-200" : "bg-gray-900 text-gray-200";
   const cardClass = isIlluminateEnabled ? "bg-white text-gray-900 border border-gray-200/70 shadow-sm" : isBlackoutEnabled ? "bg-gray-900 text-gray-300 border border-gray-700/50 shadow-md shadow-black/20" : "bg-gray-800 text-gray-300 border border-gray-700/50 shadow-lg shadow-black/20";
   const sectionCardClass = isIlluminateEnabled ? "bg-white/80 backdrop-blur-sm border border-gray-200/80" : isBlackoutEnabled ? "bg-gray-900/70 backdrop-blur-sm border border-gray-700/40" : "bg-gray-800/70 backdrop-blur-sm border border-gray-700/50"; // Adjusted Community Files section bg slightly
@@ -421,7 +414,7 @@ export function Community() {
     }
   }, [navigate]); // Removed userName, userPhotoURL dependencies
 
-  // Community Files & Profiles Listener (No Changes Needed)
+  // Community Files & Profiles Listener (Fetch user ratings here too)
   useEffect(() => {
     setLoadingData(true);
     let isMounted = true;
@@ -555,7 +548,6 @@ export function Community() {
 
   const handleSelectFile = () => { fileInputRef.current?.click(); };
 
-  // handleFileChange - Updated for multiple files, validation (No other changes needed)
   const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
       if (!user || !e.target.files || e.target.files.length === 0) return;
 
@@ -643,7 +635,7 @@ export function Community() {
   // REMOVED: handleUserDeleteFile - Users (non-admin) can no longer delete their shared files.
   // Admin deletion is handled by handleAdminDeleteFile
 
-  // Admin Delete Function (Used in both Community Files and Your Shared Files) - No changes needed
+  // Admin Delete Function (Used in both Community Files and Your Shared Files)
   const handleAdminDeleteFile = async (file: any) => {
      // Double-check admin status
      if (!user || !DEV_EMAILS.includes(user.email || '')) {
@@ -688,7 +680,6 @@ export function Community() {
   const handleEditClick = (file: any) => { setEditingFileId(file.id); setEditingFileName(getDisplayName(file.fileName)); };
   const handleCancelEdit = () => { setEditingFileId(null); setEditingFileName(''); };
 
-  // handleSaveFileName - No changes needed
   const handleSaveFileName = async (fileId: string) => {
     if (!editingFileName.trim()) { alert("File name cannot be empty."); return; }
     const oldFile = communityFiles.find((f) => f.id === fileId);
@@ -880,7 +871,7 @@ export function Community() {
    }, [user, ratingFileId]);
 
 
-  // --- Memoized Derived Data (No changes needed) ---
+  // --- Memoized Derived Data ---
   const yourSharedFiles = useMemo(() => {
     if (!user) return [];
     return communityFiles.filter((file) => file.userId === user.uid)
@@ -912,7 +903,7 @@ export function Community() {
          // .sort((a, b) => (b?.uploadedAt?.seconds ?? 0) - (a?.uploadedAt?.seconds ?? 0));
   }, [communityFiles, unlockedFileIds, user]);
 
-  // User Stats Calculation - Adjusted slightly for clarity (No changes needed)
+  // User Stats Calculation - Adjusted slightly for clarity
   const userStats = useMemo(() => {
     const bonusCount = uploadBonusCount ?? 0;
     // Calculate total downloads *by others* from the user's shared files
@@ -933,7 +924,6 @@ export function Community() {
 
 
   // --- AI Chat Functionality ---
-  // formatCommunityFilesForChat - No changes needed
   const formatCommunityFilesForChat = useCallback(() => {
     const lines: string[] = [];
     lines.push("File Sharing Platform Overview:");
@@ -982,7 +972,6 @@ export function Community() {
     return lines.join('\n');
   }, [unlockedFilesData, filteredCommunityUploadedFiles, yourSharedFiles, userProfiles, unlockedFileIds]); // Added getFileExtension
 
-  // handleChatSubmit - Updated prompt (No other changes needed)
   const handleChatSubmit = useCallback(async (e: React.FormEvent) => {
       e.preventDefault();
       if (!chatMessage.trim() || isChatLoading || !user) return;
@@ -1094,7 +1083,7 @@ Assistant:`; // Ready for the AI's response
   }, [chatMessage, isChatLoading, user, chatHistory, userName, tokens, formatCommunityFilesForChat]); // Added dependencies
 
 
-  // --- Skeleton Loader Component (Refined for better structure) - No changes needed ---
+  // --- Skeleton Loader Component (Refined for better structure) ---
   const SkeletonLoader = ({ count = 3 } : { count?: number }) => (
     <div className={`space-y-2 sm:space-y-2.5 p-1 animate-pulse`}>
       {[...Array(count)].map((_, i) => (
@@ -1137,11 +1126,8 @@ Assistant:`; // Ready for the AI's response
 
 
   return (
-    // Added overflow-x-hidden to prevent horizontal scroll issues
-    <div className={`flex h-screen ${containerClass} font-sans overflow-x-hidden`}>
-      {/* Sidebar - Rendered conditionally based on screen size for overlay effect */}
-      {/* On md+, it's always present and controlled by isCollapsed */}
-      {/* On smaller screens, it overlays and is controlled by isSidebarCollapsed state but might need a separate toggle */}
+    <div className={`flex h-screen ${containerClass} font-sans`}>
+      {/* Sidebar */}
       <Sidebar
         isCollapsed={isSidebarCollapsed}
         onToggle={() => setIsSidebarCollapsed(prev => !prev)}
@@ -1174,31 +1160,30 @@ Assistant:`; // Ready for the AI's response
           )}
       </AnimatePresence>
 
-       {/* AI Chat Trigger Button - Adjusted right positioning */}
+       {/* AI Chat Trigger Button (No changes needed) */}
        <button
          onClick={() => setIsAiSidebarOpen(true)}
-         className={`fixed bottom-4 right-4 md:bottom-6 ${ isSidebarCollapsed ? 'md:right-6' : 'md:right-6 lg:right-8' } z-40 p-2.5 rounded-full shadow-lg transition-all duration-300 transform hover:scale-110 active:scale-100 ${ isIlluminateEnabled ? 'bg-white border border-gray-300 text-blue-600 hover:bg-gray-100' : 'bg-gradient-to-br from-purple-600 to-indigo-600 text-white hover:from-purple-700 hover:to-indigo-700' } ${isAiSidebarOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+         className={`fixed bottom-4 md:bottom-6 lg:bottom-8 ${ isSidebarCollapsed ? 'right-4 md:right-6' : 'right-4 md:right-6 lg:right-8' } z-40 p-2.5 rounded-full shadow-lg transition-all duration-300 transform hover:scale-110 active:scale-100 ${ isIlluminateEnabled ? 'bg-white border border-gray-300 text-blue-600 hover:bg-gray-100' : 'bg-gradient-to-br from-purple-600 to-indigo-600 text-white hover:from-purple-700 hover:to-indigo-700' } ${isAiSidebarOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
          title="Open AI Chat"
          aria-label="Open AI Chat"
        >
          <BrainCircuit className="w-5 h-5" />
        </button>
 
-      {/* Main Content - Adjusted margin-left for mobile/desktop sidebar states */}
-      <main className={`flex-1 overflow-hidden transition-all duration-300 ${ isSidebarCollapsed ? 'md:ml-20' : 'md:ml-64'} p-3 md:p-4 lg:p-5`}> {/* Removed fixed ml on small screens, adjusted padding */}
-        {/* Added max-w-7xl and mx-auto for better centering on large screens */}
-        <div className="overflow-y-auto h-full no-scrollbar max-w-7xl mx-auto">
-          {/* Header - Adjusted flex wrap and alignment */}
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-4 sm:mb-6">
-            <div className="flex items-center gap-2 flex-grow">
-              <Globe2 className={`w-5 h-5 sm:w-6 sm:h-6 ${illuminateTextBlue}`} />
-              <h1 className={`text-lg sm:text-xl md:text-2xl font-bold ${headingClass}`}>
+      {/* Main Content */}
+      <main className={`flex-1 overflow-hidden transition-all duration-300 ${ isSidebarCollapsed ? 'ml-16 md:ml-20' : 'ml-64'} p-3 md:p-4 lg:p-5 xl:p-6`}>
+        <div className="overflow-y-auto h-full no-scrollbar">
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 sm:mb-6">
+            <div className="flex items-center gap-2">
+              <Globe2 className={`w-6 h-6 ${illuminateTextBlue}`} />
+              <h1 className={`text-xl md:text-2xl font-bold ${headingClass}`}>
                 Community
               </h1>
             </div>
             {tokens !== null && (
-              <div className={`flex-shrink-0 flex items-center gap-1.5 p-1.5 px-2 sm:px-3 rounded-full text-xs sm:text-sm shadow-sm ${isIlluminateEnabled ? 'bg-gray-100 border border-gray-200' : 'bg-gray-800 border border-gray-700'}`}>
-                <Coins className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-yellow-400" />
+              <div className={`flex items-center gap-1.5 p-1.5 px-3 rounded-full text-sm shadow-sm ${isIlluminateEnabled ? 'bg-gray-100 border border-gray-200' : 'bg-gray-800 border border-gray-700'}`}>
+                <Coins className="w-4 h-4 text-yellow-400" />
                 <motion.span key={tokens} initial={{ y: -5, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.3 }} className={`font-semibold ${isIlluminateEnabled ? 'text-gray-700' : 'text-gray-200'}`}>
                   {tokens.toLocaleString()}
                 </motion.span>
@@ -1207,16 +1192,16 @@ Assistant:`; // Ready for the AI's response
             )}
           </div>
 
-          {/* Grid for Upload/Stats - Stacks vertically by default */}
+          {/* Grid for Upload/Stats */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 mb-4 sm:mb-6">
-            {/* Upload Area - Adjusted text size */}
+            {/* Upload Area - Updated for multiple files */}
             <div className={`${cardClass} rounded-xl p-4 flex flex-col justify-center items-center`}>
-               <h3 className={`text-base sm:text-lg font-semibold mb-2 ${headingClass}`}>Share & Earn</h3>
+               <h3 className={`text-lg font-semibold mb-2 ${headingClass}`}>Share & Earn</h3>
                <button onClick={handleSelectFile} disabled={uploading} className={`w-full max-w-xs flex items-center justify-center gap-2 px-4 py-2 rounded-full text-sm font-medium text-white bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 transition-all transform hover:scale-[1.02] active:scale-100 disabled:opacity-60 disabled:cursor-not-allowed shadow-md hover:shadow-lg`}>
                   {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <><FileUp className="w-4 h-4" /> Choose File(s) to Upload</>}
                </button>
                <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange} multiple accept={ALLOWED_MIME_TYPES}/>
-               {/* Progress bar - no change needed */}
+               {/* Show progress bar during multi-upload */}
                {uploading && uploadProgress !== null && (
                     <div className="w-full max-w-xs mt-2">
                         <div className={`h-2 rounded-full overflow-hidden ${isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700'}`}>
@@ -1230,14 +1215,14 @@ Assistant:`; // Ready for the AI's response
                         <p className={`text-xs text-center mt-1 ${subheadingClass}`}>Uploading... {Math.round(uploadProgress * 100)}%</p>
                     </div>
                )}
-               <p className={`text-xs text-center mt-2 ${subheadingClass}`}>Max {MAX_FILE_SIZE_MB}MB/file. Earn {TOKENS_PER_DOWNLOAD} tokens/dl + {TOKENS_PER_BONUS_THRESHOLD} bonus every {FILES_PER_BONUS_THRESHOLD} uploads.</p>
-               <p className={`text-[10px] text-center mt-1 px-2 ${subheadingClass}`}>Allowed: {ALLOWED_FILE_EXTENSIONS.slice(0, 4).join(', ')}... (see list)</p>
+               <p className={`text-xs text-center mt-2 ${subheadingClass}`}>Max {MAX_FILE_SIZE_MB}MB per file. Earn {TOKENS_PER_DOWNLOAD} tokens/download + {TOKENS_PER_BONUS_THRESHOLD} bonus every {FILES_PER_BONUS_THRESHOLD} uploads.</p>
+               <p className={`text-[10px] text-center mt-1 ${subheadingClass}`}>Allowed types: {ALLOWED_FILE_EXTENSIONS.slice(0, 5).join(', ')}... (see list)</p>
 
             </div>
 
-             {/* User Stats Card - Improved Layout (Responsive text size) */}
+             {/* User Stats Card - Improved Layout */}
              <div className={`${cardClass} rounded-xl p-4 flex flex-col`}>
-                <h3 className={`text-base sm:text-lg font-semibold mb-3 ${headingClass} flex items-center gap-2 flex-shrink-0`}><BarChart2 className="w-5 h-5 text-green-500"/> Your Impact</h3>
+                <h3 className={`text-lg font-semibold mb-3 ${headingClass} flex items-center gap-2 flex-shrink-0`}><BarChart2 className="w-5 h-5 text-green-500"/> Your Impact</h3>
                 {loadingData || loadingAuth ? ( // Check both loadings
                     <div className="space-y-4 animate-pulse flex-grow">
                        <div className="flex justify-between items-center">
@@ -1256,59 +1241,58 @@ Assistant:`; // Ready for the AI's response
                        </div>
                     </div>
                 ) : (
-                    <div className="space-y-2 sm:space-y-3 flex-grow flex flex-col">
-                        <div className="flex items-center justify-between text-xs sm:text-sm">
-                           <span className={`flex items-center gap-1.5 ${subheadingClass}`}><FileIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4"/> Files Shared:</span>
-                           <span className={`text-sm sm:text-base font-semibold ${headingClass}`}>{userStats.filesSharedCount.toLocaleString()}</span>
+                    <div className="space-y-3 flex-grow flex flex-col">
+                        <div className="flex items-center justify-between text-sm">
+                           <span className={`flex items-center gap-1.5 ${subheadingClass}`}><FileIcon className="w-4 h-4"/> Files Shared:</span>
+                           <span className={`text-base font-semibold ${headingClass}`}>{userStats.filesSharedCount.toLocaleString()}</span>
                         </div>
-                         <div className={`border-t my-1 sm:my-1.5 ${illuminateBorder}`}></div>
-                        <div className="flex items-center justify-between text-xs sm:text-sm">
-                           <span className={`flex items-center gap-1.5 ${subheadingClass}`}><Users className="w-3.5 h-3.5 sm:w-4 sm:h-4"/> Downloads by Others:</span>
-                           <span className={`text-sm sm:text-base font-semibold ${headingClass}`}>{userStats.totalDownloadsByOthers.toLocaleString()}</span>
+                         <div className={`border-t my-1 ${illuminateBorder}`}></div>
+                        <div className="flex items-center justify-between text-sm">
+                           <span className={`flex items-center gap-1.5 ${subheadingClass}`}><Users className="w-4 h-4"/> Downloads by Others:</span>
+                           <span className={`text-base font-semibold ${headingClass}`}>{userStats.totalDownloadsByOthers.toLocaleString()}</span>
                         </div>
-                        <div className={`border-t my-1 sm:my-1.5 ${illuminateBorder}`}></div>
-                        <div className="flex items-center justify-between text-xs sm:text-sm">
-                           <span className={`flex items-center gap-1.5 ${subheadingClass}`}><Coins className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-yellow-400"/> Bonus Tokens Earned:</span>
-                           <span className={`text-sm sm:text-base font-semibold ${headingClass}`}>{userStats.uploadBonusTokens.toLocaleString()}</span>
+                        <div className={`border-t my-1 ${illuminateBorder}`}></div>
+                        <div className="flex items-center justify-between text-sm">
+                           <span className={`flex items-center gap-1.5 ${subheadingClass}`}><Coins className="w-4 h-4 text-yellow-400"/> Bonus Tokens Earned:</span>
+                           <span className={`text-base font-semibold ${headingClass}`}>{userStats.uploadBonusTokens.toLocaleString()}</span>
                         </div>
-                        <div className={`border-t my-1 sm:my-1.5 ${illuminateBorder}`}></div>
-                         <div className="flex items-center justify-between text-xs sm:text-sm">
-                           <span className={`flex items-center gap-1.5 ${subheadingClass}`}><Coins className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-yellow-400"/> Download Tokens Earned:</span>
-                           <span className={`text-sm sm:text-base font-semibold ${headingClass}`}>{userStats.downloadEarnedTokens.toLocaleString()}</span>
+                        <div className={`border-t my-1 ${illuminateBorder}`}></div>
+                         <div className="flex items-center justify-between text-sm">
+                           <span className={`flex items-center gap-1.5 ${subheadingClass}`}><Coins className="w-4 h-4 text-yellow-400"/> Download Tokens Earned:</span>
+                           <span className={`text-base font-semibold ${headingClass}`}>{userStats.downloadEarnedTokens.toLocaleString()}</span>
                         </div>
-                         <p className={`text-xs pt-2 sm:pt-3 mt-auto text-center ${subheadingClass}`}>Keep sharing helpful resources!</p>
+                         <p className={`text-xs pt-3 mt-auto text-center ${subheadingClass}`}>Keep sharing helpful resources!</p>
                     </div>
                 )}
              </div>
           </div>
 
-          {/* Search & Filter Bar - Stacks vertically on mobile */}
+          {/* Search & Filter Bar */}
           <div className="mb-5 sm:mb-6 flex flex-col sm:flex-row gap-2 sm:gap-3">
-            <div className={`flex-grow flex items-center rounded-full px-3 sm:px-3.5 py-1 sm:py-1.5 ${inputBg} border ${illuminateBorder} shadow-sm`}>
-                <Search className={`w-3.5 h-3.5 sm:w-4 sm:h-4 mr-2 ${iconColor}`} />
-                <input type="text" placeholder="Search community files..." className="bg-transparent focus:outline-none w-full text-sm" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} aria-label="Search files"/>
+            <div className={`flex-grow flex items-center rounded-full px-3.5 py-1.5 ${inputBg} border ${illuminateBorder} shadow-sm`}>
+                <Search className={`w-4 h-4 mr-2 ${iconColor}`} />
+                <input type="text" placeholder="Search community files by name..." className="bg-transparent focus:outline-none w-full text-sm" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} aria-label="Search files"/>
             </div>
             <div className={`relative flex-shrink-0`}>
-                <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className={`${inputBg} border ${illuminateBorder} rounded-full pl-3 pr-8 py-1 sm:py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-150 shadow-sm appearance-none w-full`} aria-label="Filter type">
+                <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className={`${inputBg} border ${illuminateBorder} rounded-full pl-3 pr-8 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-150 shadow-sm appearance-none w-full sm:w-auto`} aria-label="Filter type">
                   <option value="All">All Types</option>
                   {/* Use ALLOWED_FILE_EXTENSIONS for consistency */}
                   {ALLOWED_FILE_EXTENSIONS.sort().map(type => <option key={type} value={type}>{type.toUpperCase()}</option>)}
                 </select>
-                <ChevronDown className={`w-3.5 h-3.5 sm:w-4 sm:h-4 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none ${iconColor}`} />
+                <ChevronDown className={`w-4 h-4 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none ${iconColor}`} />
             </div>
           </div>
 
-          {/* --- Content Sections Grid --- Stacks vertically by default */}
-          {/* Use min-h on sections instead of fixed height for more flexibility */}
+          {/* --- Content Sections Grid --- */}
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
 
-            {/* --- Community Uploaded Files Section --- */}
+            {/* --- Community Uploaded Files Section --- Fixed Height Added */}
             <section className={`${sectionCardClass} rounded-xl p-3 sm:p-4 flex flex-col`}>
               <h2 className={`text-base sm:text-lg font-semibold mb-3 ${headingClass} flex-shrink-0`}>
                 Community Files
               </h2>
-              {/* Using min-h instead of fixed h, adjusted height */}
-              <div className="flex-grow space-y-2 sm:space-y-2.5 overflow-y-auto pr-1 no-scrollbar min-h-[300px] md:min-h-[400px]">
+              {/* Added fixed height and ensured overflow */}
+              <div className="flex-grow space-y-2 sm:space-y-2.5 overflow-y-auto pr-1 no-scrollbar h-[400px] xl:h-[450px]">
                  {loadingData ? <SkeletonLoader count={5}/> : filteredCommunityUploadedFiles.length === 0 ? (
                     <EmptyState message={searchTerm || filterType !== 'All' ? 'No matching files found.' : 'No community files yet. Share yours!'} icon={<Globe2 className="w-6 h-6 text-blue-400"/>} />
                  ) : (
@@ -1326,57 +1310,57 @@ Assistant:`; // Ready for the AI's response
                        <motion.div key={file.id} layout initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}
                          className={`group relative ${listItemClass} p-2 sm:p-2.5 rounded-lg shadow-sm transition-colors duration-150 flex flex-col gap-1.5`}
                        >
-                          {/* Top Row: Icon, Name, Ext - Ensure truncation */}
-                          <div className="flex items-start justify-between gap-2">
-                              <div className="flex items-center gap-1.5 overflow-hidden mr-1 flex-grow min-w-0"> {/* Added min-w-0 */}
+                          {/* Top Row: Icon, Name, Ext */}
+                          <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-1.5 overflow-hidden mr-2">
                                   {getFileIcon(ext)}
-                                  <p className={`text-xs sm:text-sm font-medium truncate ${headingClass}`} title={getDisplayName(file.fileName)}>
+                                  <p className={`text-sm font-medium truncate ${headingClass}`} title={getDisplayName(file.fileName)}>
                                       {getDisplayName(file.fileName)}
                                   </p>
                               </div>
-                              <span className={`flex-shrink-0 px-1.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-semibold ${isIlluminateEnabled ? 'bg-gray-200 text-gray-600' : 'bg-gray-600 text-gray-300'}`}>
+                              <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-semibold flex-shrink-0 ${isIlluminateEnabled ? 'bg-gray-200 text-gray-600' : 'bg-gray-600 text-gray-300'}`}>
                                   {ext.toUpperCase()}
                               </span>
                           </div>
                           {/* Middle Row: Uploader, Rating */}
                           <div className="flex items-center justify-between gap-2">
-                               <div className="flex items-center gap-1 overflow-hidden flex-grow min-w-0" title={`Uploaded by ${uploaderProfile?.name || 'Unknown'}`}> {/* Added min-w-0 */}
-                                   <div className={`w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0 ${isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-600'}`}>
-                                       {uploaderProfile?.photoURL ? (<img src={uploaderProfile.photoURL} alt="" className="w-full h-full object-cover" />) : (<CircleUserRound className={`w-2 h-2 sm:w-2.5 sm:h-2.5 ${subheadingClass}`} />)}
+                               <div className="flex items-center gap-1 overflow-hidden flex-grow" title={`Uploaded by ${uploaderProfile?.name || 'Unknown'}`}>
+                                   <div className={`w-4 h-4 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0 ${isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-600'}`}>
+                                       {uploaderProfile?.photoURL ? (<img src={uploaderProfile.photoURL} alt="" className="w-full h-full object-cover" />) : (<CircleUserRound className={`w-2.5 h-2.5 ${subheadingClass}`} />)}
                                    </div>
-                                   <span className={`text-[10px] sm:text-[11px] font-medium truncate ${subheadingClass}`}>{uploaderProfile?.name || 'Unknown User'}</span>
+                                   <span className={`text-[11px] font-medium truncate ${subheadingClass}`}>{uploaderProfile?.name || 'Unknown User'}</span>
                                </div>
                                <StarRating
                                    rating={file.totalRating}
                                    totalRatings={file.ratingCount}
                                    onRate={(newRating) => handleRateClick(file, newRating)}
                                    disabled={!user || ratingFileId === file.id || file.userId === user?.uid}
-                                   size="sm" // Keep size small for lists
+                                   size="sm"
                                    isIlluminateEnabled={isIlluminateEnabled}
                                    userRating={userRating}
                                />
                           </div>
-                           {/* Bottom Row: Date, Size, Actions - Use flex-wrap */}
-                           <div className={`flex flex-wrap justify-between items-center gap-x-2 gap-y-1`}>
-                                <div className={`flex items-center flex-wrap gap-x-1.5 gap-y-0.5 text-[9px] sm:text-[10px] ${subheadingClass}`}>
-                                   <span className="flex items-center gap-0.5 whitespace-nowrap" title={new Date(file.uploadedAt?.seconds * 1000).toLocaleString()}> <Calendar className="w-2.5 h-2.5"/> {formatTimestamp(file.uploadedAt)}</span>
-                                   {fileSize && <span className="flex items-center gap-0.5 whitespace-nowrap"> <HardDrive className="w-2.5 h-2.5"/> {fileSize}</span>}
+                           {/* Bottom Row: Date, Size, Like/Dislike, Unlock/Download */}
+                           <div className={`flex justify-between items-center gap-2`}>
+                                <div className={`flex items-center gap-1.5 text-[10px] ${subheadingClass}`}>
+                                   <span className="flex items-center gap-0.5" title={new Date(file.uploadedAt?.seconds * 1000).toLocaleString()}> <Calendar className="w-2.5 h-2.5"/> {formatTimestamp(file.uploadedAt)}</span>
+                                   {fileSize && <span className="flex items-center gap-0.5"> <HardDrive className="w-2.5 h-2.5"/> {fileSize}</span>}
                                 </div>
                                 <div className="flex items-center gap-1 flex-shrink-0">
                                      {/* Like/Dislike Buttons */}
                                       <button onClick={() => handleLikeClick(file)} disabled={!user || likingFileId === file.id || file.userId === user?.uid} className={likeButtonClass(userHasLiked)} title="Like">
                                          <ThumbsUp className="w-3 h-3" />
                                       </button>
-                                      <span className={`text-[9px] sm:text-[10px] min-w-[10px] text-center ${isIlluminateEnabled ? 'text-blue-700' : 'text-blue-400'}`}>{file.likes?.length || 0}</span>
+                                      <span className={`text-[10px] min-w-[10px] text-center ${isIlluminateEnabled ? 'text-blue-700' : 'text-blue-400'}`}>{file.likes?.length || 0}</span>
 
                                       <button onClick={() => handleDislikeClick(file)} disabled={!user || likingFileId === file.id || file.userId === user?.uid} className={dislikeButtonClass(userHasDisliked)} title="Dislike">
                                           <ThumbsDown className="w-3 h-3" />
                                       </button>
-                                       <span className={`text-[9px] sm:text-[10px] min-w-[10px] text-center ${isIlluminateEnabled ? 'text-red-600' : 'text-red-500'}`}>{file.dislikes?.length || 0}</span>
+                                       <span className={`text-[10px] min-w-[10px] text-center ${isIlluminateEnabled ? 'text-red-600' : 'text-red-500'}`}>{file.dislikes?.length || 0}</span>
 
                                       {/* Unlock/Download Button */}
                                       {!isUnlocked ? (
-                                          <button onClick={() => unlockFile(file)} disabled={!user || uploading || tokens === null || tokens < cost} className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-medium text-white bg-gradient-to-r from-indigo-500 to-purple-500 hover:brightness-110 transition-all transform hover:scale-105 active:scale-100 disabled:opacity-60`} title={`Unlock for ${cost} tokens`}>
+                                          <button onClick={() => unlockFile(file)} disabled={!user || uploading || tokens === null || tokens < cost} className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium text-white bg-gradient-to-r from-indigo-500 to-purple-500 hover:brightness-110 transition-all transform hover:scale-105 active:scale-100 disabled:opacity-60`} title={`Unlock for ${cost} tokens`}>
                                              <Lock className="w-2.5 h-2.5" />
                                              <Coins className="w-2.5 h-2.5 text-yellow-300" />
                                              <span>{cost}</span>
@@ -1401,13 +1385,13 @@ Assistant:`; // Ready for the AI's response
               </div>
             </section>
 
-            {/* --- Your Shared Files Section --- */}
+            {/* --- Your Shared Files Section --- Edit button overlap fixed, User delete removed */}
             <section className={`${sectionCardClass} rounded-xl p-3 sm:p-4 flex flex-col`}>
               <h2 className={`text-base sm:text-lg font-semibold mb-3 ${headingClass} flex-shrink-0`}>
                 Your Shared Files ({yourSharedFiles.length})
               </h2>
-              {/* Using min-h instead of fixed h, adjusted height */}
-              <div className="flex-grow space-y-2 sm:space-y-2.5 overflow-y-auto pr-1 no-scrollbar min-h-[300px] md:min-h-[400px]">
+              {/* Fixed height and scrolling consistency */}
+              <div className="flex-grow space-y-2 sm:space-y-2.5 overflow-y-auto pr-1 no-scrollbar h-[400px] xl:h-[450px]">
                 {loadingData ? <SkeletonLoader count={3}/> : yourSharedFiles.length === 0 ? (
                    <EmptyState message="You haven't shared any files yet. Upload one!" icon={<UploadCloud className="w-6 h-6 text-purple-400"/>} />
                 ) : (
@@ -1421,16 +1405,16 @@ Assistant:`; // Ready for the AI's response
                     const isAdmin = DEV_EMAILS.includes(user?.email || '');
 
                     return (
-                      // Added pb-10 when not editing to provide space for absolute buttons
+                      // Added pb-8 when not editing to provide space for absolute buttons
                       <motion.div key={file.id} layout initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}
-                        className={`group relative p-2 sm:p-2.5 rounded-lg shadow-sm transition-all duration-150 ${isEditing ? (isIlluminateEnabled ? 'bg-purple-50 ring-1 ring-purple-300' : 'bg-gray-700 ring-1 ring-purple-500') : listItemClass} flex flex-col gap-1.5 ${!isEditing ? 'pb-10' : ''}`} // Increased padding-bottom when not editing
+                        className={`group relative p-2 sm:p-2.5 rounded-lg shadow-sm transition-all duration-150 ${isEditing ? (isIlluminateEnabled ? 'bg-purple-50 ring-1 ring-purple-300' : 'bg-gray-700 ring-1 ring-purple-500') : listItemClass} flex flex-col gap-1.5 ${!isEditing ? 'pb-8' : ''}`} // Add padding-bottom only when not editing
                       >
                         {isEditing ? (
-                            // Edit View (Responsive input size)
+                            // Edit View (No change needed here)
                             <div className="space-y-1.5">
-                                <div className="flex flex-col sm:flex-row gap-1.5 items-start sm:items-center">
-                                     <input type="text" value={editingFileName} onChange={(e) => setEditingFileName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleSaveFileName(file.id); if (e.key === 'Escape') handleCancelEdit(); }} className={`flex-grow w-full ${inputBg} border ${illuminateBorder} rounded-md sm:rounded-full px-3 py-1 text-xs sm:text-sm focus:ring-1 focus:ring-purple-500 focus:border-purple-500`} autoFocus/>
-                                    <span className={`flex-shrink-0 px-1.5 py-1 rounded-full text-[9px] sm:text-[10px] font-medium self-start sm:self-center mt-1 sm:mt-0 ${isIlluminateEnabled ? 'bg-gray-200 text-gray-600' : 'bg-gray-600 text-gray-300'}`}>.{ext}</span>
+                                <div className="flex gap-1.5 items-center">
+                                     <input type="text" value={editingFileName} onChange={(e) => setEditingFileName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleSaveFileName(file.id); if (e.key === 'Escape') handleCancelEdit(); }} className={`flex-grow ${inputBg} border ${illuminateBorder} rounded-full px-3 py-1 text-sm focus:ring-1 focus:ring-purple-500 focus:border-purple-500`} autoFocus/>
+                                    <span className={`flex-shrink-0 px-1.5 py-1 rounded-full text-[10px] font-medium self-center ${isIlluminateEnabled ? 'bg-gray-200 text-gray-600' : 'bg-gray-600 text-gray-300'}`}>.{ext}</span>
                                 </div>
                                 <div className="flex justify-end gap-1.5">
                                      <button onClick={() => handleSaveFileName(file.id)} disabled={uploading} className="px-2.5 py-1 bg-green-500 hover:bg-green-600 text-white rounded-full text-xs font-medium transition-colors disabled:opacity-60">{uploading ? <Loader2 className="w-3 h-3 animate-spin"/> : 'Save'}</button>
@@ -1440,23 +1424,23 @@ Assistant:`; // Ready for the AI's response
                         ) : (
                              // Default View
                             <>
-                             {/* Top Row - Ensure truncation */}
-                             <div className="flex items-start justify-between gap-2">
-                                 <div className="flex items-center gap-1.5 overflow-hidden mr-1 flex-grow min-w-0"> {/* Added min-w-0 */}
+                             {/* Top Row */}
+                             <div className="flex items-center justify-between">
+                                 <div className="flex items-center gap-1.5 overflow-hidden mr-2">
                                      {getFileIcon(ext)}
-                                     <p className={`text-xs sm:text-sm font-medium truncate ${headingClass}`} title={getDisplayName(file.fileName)}>
+                                     <p className={`text-sm font-medium truncate ${headingClass}`} title={getDisplayName(file.fileName)}>
                                          {getDisplayName(file.fileName)}
                                      </p>
                                  </div>
-                                  {/* Combined Stats Area - Use flex-wrap */}
-                                  <div className={`flex items-center flex-wrap justify-end gap-x-1.5 gap-y-0.5 text-[9px] sm:text-[10px] flex-shrink-0 ${subheadingClass}`}>
-                                      <span className="flex items-center gap-0.5 text-blue-500 whitespace-nowrap" title={`${likeCount} Likes`}><ThumbsUp className="w-2.5 h-2.5"/> {likeCount}</span>
-                                      <span className="flex items-center gap-0.5 text-red-500 whitespace-nowrap" title={`${dislikeCount} Dislikes`}><ThumbsDown className="w-2.5 h-2.5"/> {dislikeCount}</span>
-                                      <span className="flex items-center gap-0.5 whitespace-nowrap" title={`${downloadCount} Downloads`}><Download className="w-2.5 h-2.5"/> {downloadCount}</span>
+                                  {/* Combined Stats Area */}
+                                  <div className={`flex items-center gap-1.5 text-[10px] flex-shrink-0 ${subheadingClass}`}>
+                                      <span className="flex items-center gap-0.5 text-blue-500" title={`${likeCount} Likes`}><ThumbsUp className="w-2.5 h-2.5"/> {likeCount}</span>
+                                      <span className="flex items-center gap-0.5 text-red-500" title={`${dislikeCount} Dislikes`}><ThumbsDown className="w-2.5 h-2.5"/> {dislikeCount}</span>
+                                      <span className="flex items-center gap-0.5" title={`${downloadCount} Downloads`}><Download className="w-2.5 h-2.5"/> {downloadCount}</span>
                                   </div>
                              </div>
-                              {/* Bottom Row: Rating and Date/Size - Use flex-wrap */}
-                              <div className={`flex flex-wrap justify-between items-center gap-x-2 gap-y-1`}>
+                              {/* Bottom Row: Rating and Date/Size */}
+                              <div className={`flex justify-between items-center`}>
                                    <StarRating
                                        rating={file.totalRating}
                                        totalRatings={file.ratingCount}
@@ -1464,19 +1448,19 @@ Assistant:`; // Ready for the AI's response
                                        size="sm"
                                        isIlluminateEnabled={isIlluminateEnabled}
                                    />
-                                   <div className={`flex items-center flex-wrap gap-x-1.5 gap-y-0.5 text-[9px] sm:text-[10px] ${subheadingClass}`}>
-                                       <span className="flex items-center gap-0.5 whitespace-nowrap" title={new Date(file.uploadedAt?.seconds * 1000).toLocaleString()}> <Calendar className="w-2.5 h-2.5"/> {formatTimestamp(file.uploadedAt)}</span>
-                                       {fileSize && <span className="flex items-center gap-0.5 whitespace-nowrap"> <HardDrive className="w-2.5 h-2.5"/> {fileSize}</span>}
+                                   <div className={`flex items-center gap-1.5 text-[10px] ${subheadingClass}`}>
+                                       <span className="flex items-center gap-0.5" title={new Date(file.uploadedAt?.seconds * 1000).toLocaleString()}> <Calendar className="w-2.5 h-2.5"/> {formatTimestamp(file.uploadedAt)}</span>
+                                       {fileSize && <span className="flex items-center gap-0.5"> <HardDrive className="w-2.5 h-2.5"/> {fileSize}</span>}
                                    </div>
                               </div>
-                              {/* Action Buttons */}
-                              {/* Positioned absolutely bottom-right */}
+                              {/* Action Buttons - Appear on hover at bottom right */}
+                              {/* Ensure these buttons don't overlap content due to parent pb-8 */}
                               <div className="absolute bottom-1.5 right-1.5 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-                                  <button onClick={() => handleEditClick(file)} className={editButtonClass} title="Edit Name"> <Edit className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> </button>
+                                  <button onClick={() => handleEditClick(file)} className={editButtonClass} title="Edit Name"> <Edit className="w-3.5 h-3.5" /> </button>
                                   {/* Only show delete button if user is Admin */}
                                   {isAdmin && (
                                       <button onClick={() => handleAdminDeleteFile(file)} disabled={uploading} className={adminDeleteButtonClass} title="Delete File (Admin)">
-                                         <Trash className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                                         <Trash className="w-3.5 h-3.5" />
                                       </button>
                                   )}
                               </div>
@@ -1489,13 +1473,13 @@ Assistant:`; // Ready for the AI's response
               </div>
             </section>
 
-            {/* --- Unlocked Files Section --- */}
+            {/* --- Unlocked Files Section --- Fixed Height Added */}
             <section className={`${sectionCardClass} rounded-xl p-3 sm:p-4 flex flex-col`}>
               <h2 className={`text-base sm:text-lg font-semibold mb-3 ${headingClass} flex-shrink-0`}>
                 Unlocked Files ({unlockedFilesData.length})
               </h2>
-               {/* Using min-h instead of fixed h, adjusted height */}
-              <div className="flex-grow space-y-2 sm:space-y-2.5 overflow-y-auto pr-1 no-scrollbar min-h-[300px] md:min-h-[400px]">
+              {/* Fixed height and scrolling consistency */}
+              <div className="flex-grow space-y-2 sm:space-y-2.5 overflow-y-auto pr-1 no-scrollbar h-[400px] xl:h-[450px]">
                 {loadingData ? <SkeletonLoader count={3}/> : unlockedFilesData.length === 0 ? (
                    <EmptyState message="Files you unlock appear here for download." icon={<Unlock className="w-6 h-6 text-green-400"/>} />
                 ) : (
@@ -1511,25 +1495,25 @@ Assistant:`; // Ready for the AI's response
                       <motion.div key={file.id} layout initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}
                         className={`group relative ${listItemClass} p-2 sm:p-2.5 rounded-lg shadow-sm transition-colors duration-150 flex flex-col gap-1.5`} // Added flex-col, gap
                       >
-                           {/* Top Row - Ensure truncation */}
-                           <div className="flex items-start justify-between gap-2">
-                               <div className="flex items-center gap-1.5 overflow-hidden mr-1 flex-grow min-w-0"> {/* Added min-w-0 */}
+                           {/* Top Row */}
+                           <div className="flex items-center justify-between">
+                               <div className="flex items-center gap-1.5 overflow-hidden mr-2">
                                    {getFileIcon(ext)}
-                                   <p className={`text-xs sm:text-sm font-medium truncate ${headingClass}`} title={getDisplayName(file.fileName)}>
+                                   <p className={`text-sm font-medium truncate ${headingClass}`} title={getDisplayName(file.fileName)}>
                                        {getDisplayName(file.fileName)}
                                    </p>
                                </div>
-                               <span className={`flex-shrink-0 px-1.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-semibold ${isIlluminateEnabled ? 'bg-gray-200 text-gray-600' : 'bg-gray-600 text-gray-300'}`}>
+                               <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-semibold flex-shrink-0 ${isIlluminateEnabled ? 'bg-gray-200 text-gray-600' : 'bg-gray-600 text-gray-300'}`}>
                                    {ext.toUpperCase()}
                                </span>
                            </div>
                            {/* Middle Row */}
                            <div className="flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-1 overflow-hidden flex-grow min-w-0" title={`Uploaded by ${uploaderProfile?.name || 'Unknown'}`}> {/* Added min-w-0 */}
-                                     <div className={`w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0 ${isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-600'}`}>
-                                         {uploaderProfile?.photoURL ? (<img src={uploaderProfile.photoURL} alt="" className="w-full h-full object-cover" />) : (<CircleUserRound className={`w-2 h-2 sm:w-2.5 sm:h-2.5 ${subheadingClass}`} />)}
+                                <div className="flex items-center gap-1 overflow-hidden flex-grow" title={`Uploaded by ${uploaderProfile?.name || 'Unknown'}`}>
+                                     <div className={`w-4 h-4 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0 ${isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-600'}`}>
+                                         {uploaderProfile?.photoURL ? (<img src={uploaderProfile.photoURL} alt="" className="w-full h-full object-cover" />) : (<CircleUserRound className={`w-2.5 h-2.5 ${subheadingClass}`} />)}
                                      </div>
-                                     <span className={`text-[10px] sm:text-[11px] font-medium truncate ${subheadingClass}`}>{uploaderProfile?.name || 'Unknown User'}</span>
+                                     <span className={`text-[11px] font-medium truncate ${subheadingClass}`}>{uploaderProfile?.name || 'Unknown User'}</span>
                                 </div>
                                 <StarRating
                                     rating={file.totalRating}
@@ -1541,14 +1525,14 @@ Assistant:`; // Ready for the AI's response
                                     userRating={userRating}
                                 />
                            </div>
-                           {/* Bottom Row - Use flex-wrap */}
-                           <div className={`flex flex-wrap justify-between items-center gap-x-2 gap-y-1`}>
-                                <div className={`flex items-center flex-wrap gap-x-1.5 gap-y-0.5 text-[9px] sm:text-[10px] ${subheadingClass}`}>
-                                    <span className="flex items-center gap-0.5 whitespace-nowrap" title={new Date(file.uploadedAt?.seconds * 1000).toLocaleString()}> <Calendar className="w-2.5 h-2.5"/> {formatTimestamp(file.uploadedAt)}</span>
-                                    {fileSize && <span className="flex items-center gap-0.5 whitespace-nowrap"> <HardDrive className="w-2.5 h-2.5"/> {fileSize}</span>}
+                           {/* Bottom Row */}
+                           <div className={`flex justify-between items-center`}>
+                                <div className={`flex items-center gap-1.5 text-[10px] ${subheadingClass}`}>
+                                    <span className="flex items-center gap-0.5" title={new Date(file.uploadedAt?.seconds * 1000).toLocaleString()}> <Calendar className="w-2.5 h-2.5"/> {formatTimestamp(file.uploadedAt)}</span>
+                                    {fileSize && <span className="flex items-center gap-0.5"> <HardDrive className="w-2.5 h-2.5"/> {fileSize}</span>}
                                 </div>
                                 <button onClick={() => handleDownloadClick(file)} disabled={isLoading} className={`flex items-center justify-center p-1 rounded-full text-white transition-colors ${isLoading ? 'bg-gray-500 cursor-wait' : 'bg-green-500 hover:bg-green-600'}`} title="Download File">
-                                   {isLoading ? <Loader2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 animate-spin"/> : <Download className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
+                                   {isLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin"/> : <Download className="w-3.5 h-3.5" />}
                                 </button>
                            </div>
                       </motion.div>
@@ -1563,43 +1547,42 @@ Assistant:`; // Ready for the AI's response
         </div> {/* End Scrollable Container */}
       </main>
 
-      {/* AI Chat Sidebar - Adjusted width for mobile */}
+      {/* AI Chat Sidebar (No Changes Needed Here) */}
       <div
         aria-hidden={!isAiSidebarOpen}
-        className={`fixed top-0 right-0 h-full w-full sm:w-auto sm:max-w-sm md:max-w-md lg:max-w-[440px] z-50 transform transition-transform duration-300 ease-in-out ${ isAiSidebarOpen ? 'translate-x-0' : 'translate-x-full' } ${cardClass} flex flex-col shadow-2xl border-l ${isIlluminateEnabled ? 'border-gray-200' : 'border-gray-700'}`} // Full width on smallest screens
+        className={`fixed top-0 right-0 h-full w-full max-w-sm md:max-w-md lg:max-w-[440px] z-50 transform transition-transform duration-300 ease-in-out ${ isAiSidebarOpen ? 'translate-x-0' : 'translate-x-full' } ${cardClass} flex flex-col shadow-2xl border-l ${isIlluminateEnabled ? 'border-gray-200' : 'border-gray-700'}`}
         role="complementary"
         aria-labelledby="ai-sidebar-title-comm"
       >
-        {/* Sidebar Header - Adjusted padding/text size */}
+        {/* Sidebar Header */}
         <div className={`p-3 sm:p-4 border-b ${ isIlluminateEnabled ? 'border-gray-200 bg-gray-100/80' : 'border-gray-700 bg-gray-800/90' } flex justify-between items-center flex-shrink-0 sticky top-0 backdrop-blur-sm z-10`}>
           <h3 id="ai-sidebar-title-comm" className={`text-base sm:text-lg font-semibold flex items-center gap-2 ${illuminateTextBlue}`}>
-            <BrainCircuit className="w-4 h-4 sm:w-5 sm:h-5" />
+            <BrainCircuit className="w-5 h-5" />
             Chat with TaskMaster
           </h3>
           <button onClick={() => setIsAiSidebarOpen(false)} className={`${ isIlluminateEnabled ? 'text-gray-500 hover:text-gray-800 hover:bg-gray-200' : 'text-gray-400 hover:text-gray-100 hover:bg-gray-700' } p-1 rounded-full transition-colors transform hover:scale-110 active:scale-100`} title="Close Chat" aria-label="Close AI Chat Sidebar">
-            <X className="w-4 h-4 sm:w-5 sm:h-5" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Chat History Area - Adjusted padding */}
+        {/* Chat History Area */}
         <div ref={chatEndRef} className="flex-1 overflow-y-auto p-3 space-y-3">
           {chatHistory.map((message, index) => (
             <div key={message.id || index} className={`flex ${ message.role === 'user' ? 'justify-end' : 'justify-start' } animate-fadeIn`} style={{ animationDelay: `${index * 30}ms`, animationDuration: '300ms' }}>
-              {/* Message bubble styling adjustments for smaller text */}
-              <div className={`max-w-[85%] rounded-lg px-2.5 py-1 sm:px-3 sm:py-1.5 text-xs sm:text-sm shadow-sm break-words ${ message.role === 'user' ? (isIlluminateEnabled ? 'bg-blue-500 text-white' : 'bg-blue-600 text-white') : message.error ? (isIlluminateEnabled ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-red-900/30 text-red-300 border border-red-700/50') : (isIlluminateEnabled ? 'bg-gray-100 text-gray-800 border border-gray-200/80' : 'bg-gray-700/80 text-gray-200 border border-gray-600/50') }`}>
+              <div className={`max-w-[85%] rounded-lg px-3 py-1.5 text-sm shadow-sm break-words ${ message.role === 'user' ? (isIlluminateEnabled ? 'bg-blue-500 text-white' : 'bg-blue-600 text-white') : message.error ? (isIlluminateEnabled ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-red-900/30 text-red-300 border border-red-700/50') : (isIlluminateEnabled ? 'bg-gray-100 text-gray-800 border border-gray-200/80' : 'bg-gray-700/80 text-gray-200 border border-gray-600/50') }`}>
                  {message.content && message.content !== "..." && (
                      <ReactMarkdown
                         remarkPlugins={[remarkMath, remarkGfm]}
                         rehypePlugins={[rehypeKatex]}
-                        components={{ // Use smaller markdown elements
-                           p: ({node, ...props}) => <p className="mb-1 last:mb-0 text-xs sm:text-sm" {...props} />,
-                           ul: ({node, ...props}) => <ul className="list-disc list-outside ml-3 sm:ml-4 mb-1 text-xs sm:text-sm" {...props} />,
-                           ol: ({node, ...props}) => <ol className="list-decimal list-outside ml-3 sm:ml-4 mb-1 text-xs sm:text-sm" {...props} />,
+                        components={{
+                           p: ({node, ...props}) => <p className="mb-1 last:mb-0" {...props} />,
+                           ul: ({node, ...props}) => <ul className="list-disc list-outside ml-4 mb-1 text-xs sm:text-sm" {...props} />,
+                           ol: ({node, ...props}) => <ol className="list-decimal list-outside ml-4 mb-1 text-xs sm:text-sm" {...props} />,
                            li: ({node, ...props}) => <li className="mb-0.5" {...props} />,
                            a: ({node, ...props}) => <a className="text-blue-500 hover:underline" target="_blank" rel="noopener noreferrer" {...props} />,
                            code: ({ node, inline, className, children, ...props }) => {
                                 const match = /language-(\w+)/.exec(className || '');
-                                return !inline ? ( <pre className={`!bg-black/40 p-1.5 sm:p-2 rounded-md overflow-x-auto my-1 text-[10px] sm:text-[11px] leading-snug ${className}`} {...props}><code>{children}</code></pre> ) : ( <code className={`!bg-black/20 px-1 rounded text-[10px] sm:text-xs ${className}`} {...props}>{children}</code> );
+                                return !inline ? ( <pre className={`!bg-black/40 p-2 rounded-md overflow-x-auto my-1 text-[11px] leading-snug ${className}`} {...props}><code>{children}</code></pre> ) : ( <code className={`!bg-black/20 px-1 rounded text-xs ${className}`} {...props}>{children}</code> );
                            },
                         }}
                     >
@@ -1626,12 +1609,12 @@ Assistant:`; // Ready for the AI's response
            )}
         </div>
 
-        {/* Chat Input Form - Adjusted padding/button size */}
+        {/* Chat Input Form */}
          <form onSubmit={handleChatSubmit} className={`p-2 sm:p-3 border-t ${isIlluminateEnabled ? 'border-gray-200 bg-gray-100/80' : 'border-gray-700 bg-gray-800/90'} flex-shrink-0 sticky bottom-0 backdrop-blur-sm`}>
           <div className="flex gap-1.5 items-center">
-            <input type="text" value={chatMessage} onChange={(e) => setChatMessage(e.target.value)} placeholder="Find files or ask..." className={`flex-1 ${inputBg} border ${isIlluminateEnabled ? 'border-gray-300' : 'border-gray-600'} rounded-full px-3 sm:px-4 py-1 sm:py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-150 shadow-sm placeholder-gray-400 dark:placeholder-gray-500 disabled:opacity-60`} disabled={isChatLoading} aria-label="Chat input"/>
-            <button type="submit" disabled={isChatLoading || !chatMessage.trim()} className="bg-blue-600 text-white p-1.5 sm:p-2 rounded-full hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105 active:scale-100 shadow-sm flex-shrink-0" title="Send Message" aria-label="Send chat message">
-              {isChatLoading ? (<div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>) : (<Send className="w-3.5 h-3.5 sm:w-4 sm:h-4" />)}
+            <input type="text" value={chatMessage} onChange={(e) => setChatMessage(e.target.value)} placeholder="Find files or ask about them..." className={`flex-1 ${inputBg} border ${isIlluminateEnabled ? 'border-gray-300' : 'border-gray-600'} rounded-full px-4 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-150 shadow-sm placeholder-gray-400 dark:placeholder-gray-500 disabled:opacity-60`} disabled={isChatLoading} aria-label="Chat input"/>
+            <button type="submit" disabled={isChatLoading || !chatMessage.trim()} className="bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105 active:scale-100 shadow-sm flex-shrink-0" title="Send Message" aria-label="Send chat message">
+              {isChatLoading ? (<div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>) : (<Send className="w-4 h-4" />)}
             </button>
           </div>
         </form>

@@ -231,33 +231,40 @@ export const NoteChat = forwardRef<NoteChatHandle, NoteChatProps>(
             setIsChatLoading(true); const loadingMsgId = `load-${Date.now()}`; setChatHistory(prev => [...prev, { id: loadingMsgId, role: 'assistant', content: '...' }]);
             const recentHistory = chatHistory.slice(-8);
 
-            // --- Updated System Prompt - Removed slice ---
+            // --- Updated System Prompt - Emphasize Answering vs Editing ---
              const systemInstruction = `You are TaskMaster, a helpful AI agent integrated into Notes. You are chatting with "${userName}" about their note titled "${note.title}".
-Your primary functions are:
-1.  **Answer Questions:** Respond based on the **entire** "Current Note Content" provided below and the "Key Points". Use general knowledge if info isn't present. Avoid saying "That information is not in the note."
-2.  **Modify Note (Choose the RIGHT Method):**
-    *   **Method A: Targeted Edits (PREFERRED for SPECIFIC changes):** If the user asks for a *specific, localized* modification (e.g., "add a section about X", "remove the third paragraph", "change Y to Z", "insert a table here", "correct the spelling of W"), use the \`propose_targeted_edit\` action. You MUST provide:
-        \`\`\`json
-        {
-          "action": "propose_targeted_edit",
-          "explanation": "[Your brief explanation of the specific change.]",
-          "edit_type": "[Type: 'insert_after_context', 'replace_context', 'delete_context', 'insert_at_start', 'append_at_end']",
-          "target_context": "[A short (~10-20 words), unique snippet of text EXACTLY from the note, identifying the location. Use null for 'insert_at_start'/'append_at_end'.]",
-          "content_fragment": "[The EXACT markdown fragment to insert/replace with. Empty string "" for delete.]"
-        }
-        \`\`\`
-        *   CRITICAL: \`target_context\` must be precise. \`content_fragment\` must be ONLY the change, not the whole note.
-    *   **Method B: Full Content Replacement (ONLY for MAJOR changes):** If the user asks to **delete all content**, **replace the entire note**, or perform a **major rewrite** of the whole note (e.g., "delete everything", "replace the note with: ...", "rewrite the whole note to be more formal"), use the \`propose_full_content_replacement\` action. You MUST provide:
-        \`\`\`json
-        {
-          "action": "propose_full_content_replacement",
-          "explanation": "[Your brief explanation, e.g., 'Okay, I've cleared the note content.' or 'Here is the completely rewritten note.']",
-          "new_full_content": "[The COMPLETE new markdown content for the ENTIRE note. Use an empty string "" if deleting all content.]"
-        }
-        \`\`\`
-        *   CRITICAL: Use this method *sparingly*, only when a targeted edit is clearly inappropriate for the scale of the request. The \`new_full_content\` field must contain the entire proposed note content (or empty string).
-    *   **ALWAYS choose ONE method and provide the corresponding valid JSON structure.** Do NOT provide both. Do NOT add any text after the JSON block.
-3.  **General Chat:** Engage in helpful conversation related to the note or note-taking. DO NOT process requests like "set timer" or "<number> min" as note edits; those are handled separately.
+
+Your primary goal is to be helpful and accurate based on the user's request and the provided note content. Follow these functions in order of priority:
+
+1.  **Answer Questions Directly:**
+    *   **PRIORITY:** If the user asks a question about the note's content (e.g., "What does it say about X?", "Can you find Y?", "Do you see the 'War and Society' section?", "Summarize this part"), provide a direct textual answer based on the "Current Note Content".
+    *   **DO NOT propose an edit (JSON response) if the user is just asking a question.** Use your knowledge of the note content to respond informatively.
+    *   If the information isn't in the note, state that clearly or use the Key Points for context if relevant. Avoid making up information.
+
+2.  **Modify Note (ONLY if EXPLICITLY asked):**
+    *   Propose an edit **ONLY** if the user explicitly uses action verbs asking to *change* the note (e.g., "add...", "remove...", "delete...", "change...", "rewrite...", "update...", "replace...", "insert...").
+    *   **Choose the RIGHT Method:**
+        *   **Method A: Targeted Edits (PREFERRED for SPECIFIC changes):** For localized changes, use \`propose_targeted_edit\`. Provide:
+            \`\`\`json
+            {
+              "action": "propose_targeted_edit",
+              "explanation": "[Brief explanation of the specific change.]",
+              "edit_type": "[Type: 'insert_after_context', 'replace_context', 'delete_context', 'insert_at_start', 'append_at_end']",
+              "target_context": "[Short, unique text snippet EXACTLY from the note identifying the location. null for start/end edits.]",
+              "content_fragment": "[EXACT markdown fragment for the change. Empty string "" for delete.]"
+            }
+            \`\`\`
+        *   **Method B: Full Content Replacement (ONLY for MAJOR changes):** For deleting all content, replacing the entire note, or major holistic rewrites, use \`propose_full_content_replacement\`. Provide:
+            \`\`\`json
+            {
+              "action": "propose_full_content_replacement",
+              "explanation": "[Brief explanation, e.g., 'Okay, I've cleared the note.' or 'Here is the rewritten note.']",
+              "new_full_content": "[COMPLETE new markdown content for the note. Empty string "" for delete all.]"
+            }
+            \`\`\`
+        *   **CRITICAL:** Use Method B sparingly. Always choose only ONE method. Ensure JSON is valid and nothing follows the JSON block.
+
+3.  **General Chat:** Engage in helpful conversation related to the note or note-taking if the request isn't a question about content or an explicit edit command. DO NOT process timer requests (e.g., "set timer 5 min"); they are handled separately.
 
 **Current Note Content (Full):**
 """
@@ -285,7 +292,7 @@ ${recentHistory
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                     contents: [{ parts: [{ text: systemInstruction }] }],
-                    generationConfig: { temperature: 0.6, maxOutputTokens: 8192, topP: 0.95, responseMimeType: "text/plain" },
+                    generationConfig: { temperature: 0.5, maxOutputTokens: 8192, topP: 0.95, responseMimeType: "text/plain" }, // Slightly lowered temperature
                     safetySettings: [ { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" }, { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_MEDIUM_AND_ABOVE" }, { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_MEDIUM_AND_ABOVE" }, { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" }, ],
                     })
                 };

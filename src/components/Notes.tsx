@@ -281,7 +281,7 @@ export function Notes() {
                         value={editContent}
                         onChange={setEditContent} // Updates state directly
                         height="100%" // Fill available space
-                        preview="live" // Show live preview alongside editor
+                        preview="edit" // Show live preview alongside editor
                         textareaProps={{
                           placeholder: "Start writing your note in Markdown...",
                           className: `${inputBg} ${inputTextColor} ${placeholderColor}` // Apply basic theme

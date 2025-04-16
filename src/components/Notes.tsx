@@ -34,8 +34,7 @@ import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
 import 'react-pdf/dist/esm/Page/TextLayer.css';
 
 // --- Markdown Editor Import ---
-import MDEditor from '@uiw/react-md-editor';
-
+import MDEditor, { commands } from '@uiw/react-md-editor'; // Import both default and named 'commands'
 
 // Types
 interface Note {
@@ -281,30 +280,28 @@ export function Notes() {
                         value={editContent}
                         onChange={setEditContent}
                         height="100%"
-                        // *** UPDATED: Set preview to 'edit' AND customize commands ***
                         preview="edit" // Default to write mode
-                        commands={[ // Explicitly define commands, omitting 'live'
-                            MDEditor.commands.bold,
-                            MDEditor.commands.italic,
-                            MDEditor.commands.strikethrough,
-                            MDEditor.commands.hr,
-                            MDEditor.commands.title, // Keep title/heading dropdown
-                            MDEditor.commands.divider, // Keep dividers
-                            MDEditor.commands.link,
-                            MDEditor.commands.quote,
-                            MDEditor.commands.code,
-                            MDEditor.commands.codeBlock, // Keep code block
-                            MDEditor.commands.image,
-                            MDEditor.commands.divider,
-                            MDEditor.commands.unorderedListCommand,
-                            MDEditor.commands.orderedListCommand,
-                            MDEditor.commands.checkedListCommand,
-                            MDEditor.commands.divider,
-                            MDEditor.commands.fullscreen,
-                             // This group normally contains write, preview, live. We only include write and preview.
-                             // Note: The actual buttons might still appear grouped visually depending on the library's styling,
-                             // but the 'live' function/button itself is excluded.
-                            MDEditor.commands.group([MDEditor.commands.write, MDEditor.commands.preview], {
+                        // *** Use the correctly imported 'commands' object ***
+                        commands={[
+                            commands.bold,
+                            commands.italic,
+                            commands.strikethrough,
+                            commands.hr,
+                            commands.title,
+                            commands.divider,
+                            commands.link,
+                            commands.quote,
+                            commands.code,
+                            commands.codeBlock,
+                            commands.image,
+                            commands.divider,
+                            commands.unorderedListCommand,
+                            commands.orderedListCommand,
+                            commands.checkedListCommand,
+                            commands.divider,
+                            commands.fullscreen,
+                            // Group only write and preview
+                            commands.group([commands.write, commands.preview], {
                                 name: 'preview',
                                 groupName: 'preview',
                                 buttonProps: { 'aria-label': 'Preview', title: 'Preview' },

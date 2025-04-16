@@ -47,19 +47,36 @@ async function fetchWithRetry(url: string, options: RequestInit, retries = 3, de
     for (let attempt = 0; attempt < retries; attempt++) {
         try {
             const response = await fetch(url, options);
+            // Check for specific rate limit or server errors for retry
             if (!response.ok && (response.status === 429 || response.status >= 500)) {
                 console.warn(`Attempt ${attempt + 1} failed: ${response.status}. Retrying...`);
-                if (attempt === retries - 1) throw new Error(`API Error (${response.status}) after ${retries} attempts.`);
+                if (attempt === retries - 1) {
+                    // Try to get more specific error before throwing generic one
+                    let errorText = `API Error (${response.status}) after ${retries} attempts.`;
+                    try { const errJson = await response.json(); errorText = errJson?.error?.message || errorText; } catch { /* ignore json parse error */ }
+                    throw new Error(errorText);
+                }
                 await new Promise(resolve => setTimeout(resolve, delayMs * (attempt + 1)));
                 continue;
             }
-            return response;
+            // If response is not ok, but not a retryable error, throw immediately
+            if (!response.ok) {
+                let errorText = `API Error (${response.status})`;
+                 try { const errJson = await response.json(); errorText = errJson?.error?.message || errorText; } catch { /* ignore json parse error */ }
+                 // Check for context length errors specifically if possible (might be in message)
+                 if (errorText.toLowerCase().includes("context length") || errorText.toLowerCase().includes("request payload size")) {
+                    throw new Error("Error: The note content is too long for the AI to process fully.");
+                 }
+                throw new Error(errorText);
+            }
+            return response; // Return successful or non-retryable error response
         } catch (error) {
             console.error(`Attempt ${attempt + 1} fetch error:`, error);
-            if (attempt === retries - 1) throw error;
+            if (attempt === retries - 1) throw error; // Rethrow the caught error if max retries reached
             await new Promise(resolve => setTimeout(resolve, delayMs * (attempt + 1)));
         }
     }
+    // This line should theoretically be unreachable if fetch throws or returns
     throw new Error(`Max retries reached for: ${url}`);
 }
 
@@ -73,6 +90,10 @@ const extractCandidateText = (responseText: string): string => {
             return "My response was blocked due to safety filters.";
         }
         if (jsonResponse?.error?.message) {
+            // Make context length error more user-friendly
+            if (jsonResponse.error.message.toLowerCase().includes("context length") || jsonResponse.error.message.toLowerCase().includes("request payload size")) {
+                return "Error: The note content is too long for the AI to process fully.";
+            }
             return `Error: ${jsonResponse.error.message}`;
         }
         if (jsonResponse?.candidates?.[0]?.content && !jsonResponse.candidates[0].content.parts) {
@@ -85,6 +106,8 @@ const extractCandidateText = (responseText: string): string => {
             if (responseText.toLowerCase().includes("api key not valid")) return "Error: Invalid API Key.";
             if (responseText.toLowerCase().includes("quota exceeded")) return "Error: API Quota Exceeded.";
             if (responseText.toLowerCase().includes("internal server error") || responseText.toLowerCase().includes("service unavailable")) return "Error: AI service is temporarily unavailable. Please try again later.";
+            // Check for raw text context errors too
+            if (responseText.toLowerCase().includes("context length") || responseText.toLowerCase().includes("request payload size")) return "Error: The note content is too long for the AI to process fully.";
             if (responseText.includes('```json')) return responseText;
             return responseText;
         }
@@ -94,48 +117,25 @@ const extractCandidateText = (responseText: string): string => {
 };
 
 
-const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=`;
+const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=`;
 
-// --- Updated Timer Parsing Function ---
 const parseTimerRequest = (message: string): number | null => {
     const cleanedMessage = message.trim().toLowerCase();
     const keywords = ['set timer', 'start timer', 'timer for', 'remind me in'];
-    // Regex for the time format like "10 min", "5s", "1 hour"
-    const timeRegex = /(\d+)\s*(m|min|minute|h|hr|hour|s|sec|second)s?\b/i; // Added \b word boundary
-
+    const timeRegex = /(\d+)\s*(m|min|minute|h|hr|hour|s|sec|second)s?\b/i;
     let M: RegExpMatchArray | null = null;
-
-    // 1. Check for keywords + time format anywhere
     const hasKeywords = keywords.some(keyword => cleanedMessage.includes(keyword));
-    if (hasKeywords) {
-        M = cleanedMessage.match(timeRegex);
-    }
-
-    // 2. If no keywords, check if the message *starts* with the time format
-    if (!M) {
-        M = cleanedMessage.match(/^\s*(\d+)\s*(m|min|minute|h|hr|hour|s|sec|second)s?\b/i); // Anchor to start ^\s*
-    }
-
-    // 3. If still no match, check if the *entire message* is just the time format
-    if (!M) {
-        M = cleanedMessage.match(/^\s*(\d+)\s*(m|min|minute|h|hr|hour|s|sec|second)s?\s*$/i); // Anchor start ^\s* and end \s*$
-    }
-
-
-    // If no match found through any method
+    if (hasKeywords) { M = cleanedMessage.match(timeRegex); }
+    if (!M) { M = cleanedMessage.match(/^\s*(\d+)\s*(m|min|minute|h|hr|hour|s|sec|second)s?\b/i); }
+    if (!M) { M = cleanedMessage.match(/^\s*(\d+)\s*(m|min|minute|h|hr|hour|s|sec|second)s?\s*$/i); }
     if (!M) return null;
-
-    const A = parseInt(M[1]); // The number part
-    const U = M[2].toLowerCase(); // The unit part matched
-
-    if (isNaN(A) || A <= 0) return null; // Invalid number
-
-    // Convert to seconds
+    const A = parseInt(M[1]);
+    const U = M[2].toLowerCase();
+    if (isNaN(A) || A <= 0) return null;
     if (U.startsWith('h')) return A * 3600;
     if (U.startsWith('m')) return A * 60;
     if (U.startsWith('s')) return A;
-
-    return null; // Fallback if unit wasn't matched correctly (shouldn't happen with regex)
+    return null;
 };
 
 // Forward Ref component definition
@@ -176,83 +176,41 @@ export const NoteChat = forwardRef<NoteChatHandle, NoteChatProps>(
         // Scroll effect
         useEffect(() => { if (!isMinimized || displayMode === 'inline') { setTimeout(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }); }, 100); } }, [chatHistory, isMinimized, displayMode]);
 
-        // Timer handlers - Use the globally defined parseTimerRequest now
+        // Timer handlers
         const handleTimerComplete = (timerId: string) => setChatHistory(prev => [...prev, { id: `timer-comp-${timerId}`, role: 'assistant', content: "⏰ Time's up!" }]);
-        // parseTimerRequest is now defined outside the component
 
-        // Accept Edit Handler
+        // Accept Edit Handler (Functionality unchanged)
         const handleAcceptEdit = async (message: ChatMessage) => {
             if (!note || isChatLoading || !message.isEditSuggestion || !message.editAction) {
                 console.error("Invalid edit proposal:", message);
                 setChatHistory(prev => [...prev, { id: `edit-app-err-${Date.now()}`, role: 'assistant', content: `❌ Error: Could not apply edit. Invalid proposal data.`, error: true }]);
                 return;
             }
-
             setIsChatLoading(true);
             let finalContent: string | null = null;
-
             try {
                 if (message.editAction === 'propose_targeted_edit') {
-                    if (!message.editType) throw new Error("Missing edit type for targeted edit.");
-                    let currentContent = note.content;
-                    let applied = false;
+                    if (!message.editType) throw new Error("Missing edit type.");
+                    let currentContent = note.content; let applied = false;
                     const { editType, targetContext, contentFragment = "" } = message;
                     console.log("Applying targeted edit:", { editType, targetContext: targetContext?.substring(0, 30)+"...", contentFragment: contentFragment.substring(0, 50) + "..." });
-
                     switch (editType) {
-                        case 'insert_at_start':
-                            currentContent = contentFragment + (currentContent ? "\n" + currentContent : ""); applied = true; break;
-                        case 'append_at_end':
-                            currentContent = (currentContent ? currentContent + "\n" : "") + contentFragment; applied = true; break;
+                        case 'insert_at_start': currentContent = contentFragment + (currentContent ? "\n" + currentContent : ""); applied = true; break;
+                        case 'append_at_end': currentContent = (currentContent ? currentContent + "\n" : "") + contentFragment; applied = true; break;
                         case 'insert_after_context':
-                            if (targetContext) {
-                                const index = currentContent.indexOf(targetContext);
-                                if (index !== -1) {
-                                    const insertPos = index + targetContext.length;
-                                    const prefix = currentContent.endsWith('\n') || currentContent.slice(insertPos).startsWith('\n') || insertPos === 0 ? "" : "\n";
-                                    currentContent = currentContent.slice(0, insertPos) + prefix + contentFragment + currentContent.slice(insertPos);
-                                    applied = true;
-                                } else throw new Error("Target context for insertion not found.");
-                            } else throw new Error("Missing target context for 'insert_after_context'.");
-                            break;
+                            if (targetContext) { const i = currentContent.indexOf(targetContext); if (i !== -1) { const p = i + targetContext.length; const x = currentContent.endsWith('\n') || currentContent.slice(p).startsWith('\n') || p === 0 ? "" : "\n"; currentContent = currentContent.slice(0, p) + x + contentFragment + currentContent.slice(p); applied = true; } else throw new Error("Target context for insertion not found."); } else throw new Error("Missing target context for insert."); break;
                         case 'replace_context':
-                            if (targetContext) {
-                                const index = currentContent.indexOf(targetContext);
-                                if (index !== -1) {
-                                    currentContent = currentContent.slice(0, index) + contentFragment + currentContent.slice(index + targetContext.length);
-                                    applied = true;
-                                } else throw new Error("Target context for replacement not found.");
-                            } else throw new Error("Missing target context for 'replace_context'.");
-                            break;
+                            if (targetContext) { const i = currentContent.indexOf(targetContext); if (i !== -1) { currentContent = currentContent.slice(0, i) + contentFragment + currentContent.slice(i + targetContext.length); applied = true; } else throw new Error("Target context for replacement not found."); } else throw new Error("Missing target context for replace."); break;
                         case 'delete_context':
-                            if (targetContext) {
-                                const index = currentContent.indexOf(targetContext);
-                                if (index !== -1) {
-                                    currentContent = currentContent.slice(0, index) + currentContent.slice(index + targetContext.length);
-                                    currentContent = currentContent.replace(/\n\n+/g, '\n').trim(); // Clean up extra newlines and trim whitespace
-                                    applied = true;
-                                } else throw new Error("Target context for deletion not found.");
-                            } else throw new Error("Missing target context for 'delete_context'.");
-                            break;
-                        default: throw new Error(`Unsupported targeted edit type: ${editType}`);
+                            if (targetContext) { const i = currentContent.indexOf(targetContext); if (i !== -1) { currentContent = currentContent.slice(0, i) + currentContent.slice(i + targetContext.length); currentContent = currentContent.replace(/\n\n+/g, '\n').trim(); applied = true; } else throw new Error("Target context for deletion not found."); } else throw new Error("Missing target context for delete."); break;
+                        default: throw new Error(`Unsupported edit type: ${editType}`);
                     }
-                    if (applied) finalContent = currentContent; else throw new Error("Targeted edit application failed.");
-
+                    if (applied) finalContent = currentContent; else throw new Error("Targeted edit failed.");
                 } else if (message.editAction === 'propose_full_content_replacement') {
-                    if (typeof message.newFullContent === 'string') {
-                        console.log("Applying full content replacement.");
-                        finalContent = message.newFullContent;
-                    } else throw new Error("Missing new full content for replacement edit.");
+                    if (typeof message.newFullContent === 'string') { console.log("Applying full content replacement."); finalContent = message.newFullContent; } else throw new Error("Missing new full content.");
                 } else throw new Error(`Unknown edit action: ${message.editAction}`);
-
-                if (finalContent !== null) {
-                    await onUpdateNoteContent(note.id, finalContent);
-                    setChatHistory(prev => [...prev, { id: `edit-ok-${Date.now()}`, role: 'assistant', content: "✅ Note updated!" }]);
-                }
-            } catch (error) {
-                console.error("Error applying edit:", error);
-                const errorMessage = error instanceof Error ? error.message : 'Unknown error applying edit.';
-                setChatHistory(prev => [...prev, { id: `edit-err-${Date.now()}`, role: 'assistant', content: `❌ Update failed: ${errorMessage}`, error: true }]);
+                if (finalContent !== null) { await onUpdateNoteContent(note.id, finalContent); setChatHistory(prev => [...prev, { id: `edit-ok-${Date.now()}`, role: 'assistant', content: "✅ Note updated!" }]); }
+            } catch (error) { console.error("Error applying edit:", error); const eMsg = error instanceof Error ? error.message : 'Unknown error.'; setChatHistory(prev => [...prev, { id: `edit-err-${Date.now()}`, role: 'assistant', content: `❌ Update failed: ${eMsg}`, error: true }]);
             } finally { setIsChatLoading(false); }
         };
 
@@ -260,39 +218,23 @@ export const NoteChat = forwardRef<NoteChatHandle, NoteChatProps>(
         const submitMessageToAI = async (messageContent: string) => {
             if (!messageContent || isChatLoading || !geminiApiKey || !note) return;
 
-            // *** Check for Timer FIRST using the improved function ***
             const timerDuration = parseTimerRequest(messageContent);
             const userMsg: ChatMessage = { id: `user-${Date.now()}`, role: 'user', content: messageContent };
-            setChatHistory(prev => [...prev, userMsg]); // Add user message regardless
+            setChatHistory(prev => [...prev, userMsg]);
 
-            // If it's a valid timer request, set the timer and STOP further processing
             if (timerDuration) {
-                const tId = `t-${Date.now()}`;
-                const durationText = timerDuration >= 3600 ? `${Math.round(timerDuration / 3600)}h` :
-                                    timerDuration >= 60 ? `${Math.round(timerDuration / 60)}m` :
-                                    `${timerDuration}s`;
-                setChatHistory(prev => [
-                    ...prev, // Keep user message already added
-                    {
-                        id: `tstart-${tId}`,
-                        role: 'assistant',
-                        content: `Timer set: ${durationText}.`,
-                        timer: { type: 'timer', duration: timerDuration, id: tId }
-                    }
-                ]);
-                return; // Don't proceed to AI call if it was a timer command
+                const tId = `t-${Date.now()}`; const dTxt = timerDuration >= 3600 ? `${Math.round(timerDuration / 3600)}h` : timerDuration >= 60 ? `${Math.round(timerDuration / 60)}m` : `${timerDuration}s`;
+                setChatHistory(prev => [ ...prev, { id: `tstart-${tId}`, role: 'assistant', content: `Timer set: ${dTxt}.`, timer: { type: 'timer', duration: timerDuration, id: tId } } ]);
+                return; // Stop if it was a timer command
             }
 
-            // If not a timer, proceed with AI call
-            setIsChatLoading(true);
-            const loadingMsgId = `load-${Date.now()}`;
-            setChatHistory(prev => [...prev, { id: loadingMsgId, role: 'assistant', content: '...' }]);
+            setIsChatLoading(true); const loadingMsgId = `load-${Date.now()}`; setChatHistory(prev => [...prev, { id: loadingMsgId, role: 'assistant', content: '...' }]);
             const recentHistory = chatHistory.slice(-8);
 
-            // System Prompt
+            // --- Updated System Prompt - Removed slice ---
              const systemInstruction = `You are TaskMaster, a helpful AI agent integrated into Notes. You are chatting with "${userName}" about their note titled "${note.title}".
 Your primary functions are:
-1.  **Answer Questions:** Respond based on "Current Note Content" and "Key Points". Use general knowledge if info isn't present. Avoid saying "That information is not in the note."
+1.  **Answer Questions:** Respond based on the **entire** "Current Note Content" provided below and the "Key Points". Use general knowledge if info isn't present. Avoid saying "That information is not in the note."
 2.  **Modify Note (Choose the RIGHT Method):**
     *   **Method A: Targeted Edits (PREFERRED for SPECIFIC changes):** If the user asks for a *specific, localized* modification (e.g., "add a section about X", "remove the third paragraph", "change Y to Z", "insert a table here", "correct the spelling of W"), use the \`propose_targeted_edit\` action. You MUST provide:
         \`\`\`json
@@ -317,11 +259,10 @@ Your primary functions are:
     *   **ALWAYS choose ONE method and provide the corresponding valid JSON structure.** Do NOT provide both. Do NOT add any text after the JSON block.
 3.  **General Chat:** Engage in helpful conversation related to the note or note-taking. DO NOT process requests like "set timer" or "<number> min" as note edits; those are handled separately.
 
-**Current Note Content (Use this for context and finding target_context):**
+**Current Note Content (Full):**
 """
-${note.content.slice(0, 8000)}
+${note.content}
 """
-${note.content.length > 8000 ? '\n...(Note content truncated for context)' : ''}
 
 **Key Points (Reference Only):**
 ${note.keyPoints?.map(p => `- ${p}`).join('\n') || 'N/A'}
@@ -329,7 +270,6 @@ ${note.keyPoints?.map(p => `- ${p}`).join('\n') || 'N/A'}
 ---
 **Chat History (Recent):**
 ${recentHistory
-    // Filter out timer confirmation messages from history sent to AI
     .filter(m => !m.content?.startsWith("Timer set:"))
     .map(m => `${m.role === 'user' ? userName : 'Assistant'}: ${m.content.replace(/```json[\s\S]*?```/g, '[Edit Proposed]')}`)
     .join('\n')}
@@ -345,68 +285,47 @@ ${recentHistory
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                     contents: [{ parts: [{ text: systemInstruction }] }],
-                    generationConfig: { temperature: 0.6, maxOutputTokens: 8192, topP: 0.95, responseMimeType: "text/plain" }, // Ensure plain text
+                    generationConfig: { temperature: 0.6, maxOutputTokens: 8192, topP: 0.95, responseMimeType: "text/plain" },
                     safetySettings: [ { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" }, { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_MEDIUM_AND_ABOVE" }, { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_MEDIUM_AND_ABOVE" }, { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" }, ],
                     })
                 };
-                const response = await fetchWithRetry(fullGeminiEndpoint, geminiOptions);
-                const responseText = await response.text(); // Get raw text
+                const response = await fetchWithRetry(fullGeminiEndpoint, geminiOptions); // fetchWithRetry now handles context errors better
+                const responseText = await response.text();
 
-                if (!response.ok) {
-                    let eMsg = `API Error (${response.status})`;
-                     try { const eJson = JSON.parse(responseText); if (eJson?.error?.message) eMsg = `Error: ${eJson.error.message}`; } catch (_) {}
-                    throw new Error(eMsg);
-                 }
+                // We don't need to check response.ok here again because fetchWithRetry throws on non-ok status
 
-                let assistantContent = extractCandidateText(responseText);
+                let assistantContent = extractCandidateText(responseText); // extractCandidateText also handles context errors now
                 let textToSearchJson = assistantContent || responseText;
 
                 let assistantFinalMessage: ChatMessage = {
                     id: loadingMsgId, role: 'assistant', content: assistantContent || "...", error: assistantContent.startsWith("Error:")
                 };
 
+                // JSON Parsing Logic (Robust version - unchanged functionally)
                 const jsonMatch = textToSearchJson.match(/```json\s*([\s\S]*?)\s*```/);
                 let potentialJsonString: string | null = null;
-
                 if (jsonMatch && jsonMatch[1]) {
                     potentialJsonString = jsonMatch[1].trim();
                     try {
                         console.log("Attempting to parse JSON string:", potentialJsonString);
                         const parsedJson = JSON.parse(potentialJsonString);
                         assistantFinalMessage.isEditSuggestion = false; assistantFinalMessage.error = false;
-
                         if (parsedJson.action === "propose_targeted_edit" && typeof parsedJson.explanation === 'string' && typeof parsedJson.edit_type === 'string' && typeof parsedJson.content_fragment === 'string' && (typeof parsedJson.target_context === 'string' || parsedJson.target_context === null)) {
-                             assistantFinalMessage = { ...assistantFinalMessage, content: parsedJson.explanation, isEditSuggestion: true, editAction: "propose_targeted_edit", editExplanation: parsedJson.explanation, editType: parsedJson.edit_type as ChatMessage['editType'], targetContext: parsedJson.target_context, contentFragment: parsedJson.content_fragment, };
-                            console.log("Parsed targeted edit proposal successfully.");
+                             assistantFinalMessage = { ...assistantFinalMessage, content: parsedJson.explanation, isEditSuggestion: true, editAction: "propose_targeted_edit", editExplanation: parsedJson.explanation, editType: parsedJson.edit_type as ChatMessage['editType'], targetContext: parsedJson.target_context, contentFragment: parsedJson.content_fragment, }; console.log("Parsed targeted edit proposal successfully.");
                         } else if (parsedJson.action === "propose_full_content_replacement" && typeof parsedJson.explanation === 'string' && typeof parsedJson.new_full_content === 'string') {
-                             assistantFinalMessage = { ...assistantFinalMessage, content: parsedJson.explanation, isEditSuggestion: true, editAction: "propose_full_content_replacement", editExplanation: parsedJson.explanation, newFullContent: parsedJson.new_full_content, editType: undefined, targetContext: undefined, contentFragment: undefined, };
-                            console.log("Parsed full content replacement proposal successfully.");
-                        } else {
-                            console.warn("JSON structure invalid:", parsedJson);
-                             assistantFinalMessage.content = `Warning: AI proposed an edit, but the structure was invalid.\n\n---\n${assistantContent || responseText}`;
-                            assistantFinalMessage.error = true;
-                        }
-                        if (!assistantContent && assistantFinalMessage.content) { /* Explanation set, good */ }
-                        else if (!assistantFinalMessage.content && assistantFinalMessage.isEditSuggestion) { assistantFinalMessage.content = "(Edit proposed without explanation)"; }
-
-                    } catch (parseError: any) {
-                        console.error("Failed to parse JSON proposal. Error:", parseError.message, "Raw JSON string attempted:", potentialJsonString);
-                        assistantFinalMessage.content = `Error: Failed to process the edit proposal (JSON Parse Error: ${parseError.message}). Please try rephrasing.\n\n---\nRaw attempt:\n${potentialJsonString.substring(0, 200)}...`;
-                        assistantFinalMessage.error = true;
-                    }
-                } else if (assistantContent.startsWith("Error:")) {
-                     assistantFinalMessage.error = true; assistantFinalMessage.content = assistantContent;
-                } else if (!assistantContent && responseText.includes('```json')) {
-                    console.warn("Candidate text empty, but raw response contains JSON markers. Likely formatting error from AI.");
-                    assistantFinalMessage.content = `Warning: AI attempted an edit, but the response format was slightly broken. Could not parse.\n\n---\n${responseText.substring(0,300)}...`;
-                    assistantFinalMessage.error = true;
-                }
+                             assistantFinalMessage = { ...assistantFinalMessage, content: parsedJson.explanation, isEditSuggestion: true, editAction: "propose_full_content_replacement", editExplanation: parsedJson.explanation, newFullContent: parsedJson.new_full_content, editType: undefined, targetContext: undefined, contentFragment: undefined, }; console.log("Parsed full content replacement proposal successfully.");
+                        } else { console.warn("JSON structure invalid:", parsedJson); assistantFinalMessage.content = `Warning: AI proposed an edit, but structure was invalid.\n\n---\n${assistantContent || responseText}`; assistantFinalMessage.error = true; }
+                        if (!assistantContent && assistantFinalMessage.content) { /* ok */ } else if (!assistantFinalMessage.content && assistantFinalMessage.isEditSuggestion) { assistantFinalMessage.content = "(Edit proposed without explanation)"; }
+                    } catch (parseError: any) { console.error("Failed to parse JSON. Error:", parseError.message, "Raw JSON:", potentialJsonString); assistantFinalMessage.content = `Error: Failed to process edit (JSON Parse Error: ${parseError.message}). Try again.\n\n---\nRaw:\n${potentialJsonString.substring(0, 200)}...`; assistantFinalMessage.error = true; }
+                } else if (assistantContent.startsWith("Error:")) { assistantFinalMessage.error = true; assistantFinalMessage.content = assistantContent;
+                } else if (!assistantContent && responseText.includes('```json')) { console.warn("Candidate text empty, but raw response has JSON markers."); assistantFinalMessage.content = `Warning: AI edit format broken.\n\n---\n${responseText.substring(0,300)}...`; assistantFinalMessage.error = true; }
 
                 setChatHistory(prev => prev.map(msg => msg.id === loadingMsgId ? { ...assistantFinalMessage, id: loadingMsgId } : msg ));
 
             } catch (err: any) {
-                console.error('Chat submit error:', err);
-                setChatHistory(prev => prev.map(msg => msg.id === loadingMsgId ? { id: loadingMsgId, role: 'assistant', content: `Error: ${err.message || 'Unknown'}. Try again.`, error: true } : msg ));
+                console.error('Chat submit fetch/process error:', err);
+                // Display the specific error message caught (e.g., from fetchWithRetry or context length)
+                setChatHistory(prev => prev.map(msg => msg.id === loadingMsgId ? { id: loadingMsgId, role: 'assistant', content: `${err.message || 'Unknown error processing request.'}. Try again.`, error: true } : msg ));
             } finally { setIsChatLoading(false); }
         };
 
@@ -416,7 +335,6 @@ ${recentHistory
             const currentMessage = chatMessage.trim();
             if (!currentMessage) return;
             setChatMessage('');
-            // submitMessageToAI will now handle timer check internally
             await submitMessageToAI(currentMessage);
         };
 
@@ -462,17 +380,7 @@ ${recentHistory
                                                 }}
                                             >{message.content}</ReactMarkdown>
                                         ) : null}
-                                        {/* Display Timer if present */}
-                                        {message.timer && (
-                                             <div className="mt-1.5">
-                                                  <div className={`flex items-center space-x-2 rounded-md px-2 py-1 text-xs border ${isIlluminateEnabled ? 'bg-blue-50 border-blue-200 text-blue-800' : 'bg-gray-800/60 border-gray-600 text-blue-300'}`}>
-                                                       <TimerIcon className="w-3.5 h-3.5"/>
-                                                       <Timer key={message.timer.id} initialDuration={message.timer.duration} onComplete={() => handleTimerComplete(message.timer.id)} compact={true} isIlluminateEnabled={isIlluminateEnabled}/>
-                                                  </div>
-                                             </div>
-                                        )}
-
-                                        {/* Accept Edit Button */}
+                                        {message.timer && ( <div className="mt-1.5"><div className={`flex items-center space-x-2 rounded-md px-2 py-1 text-xs border ${isIlluminateEnabled ? 'bg-blue-50 border-blue-200 text-blue-800' : 'bg-gray-800/60 border-gray-600 text-blue-300'}`}><TimerIcon className="w-3.5 h-3.5"/> <Timer key={message.timer.id} initialDuration={message.timer.duration} onComplete={() => handleTimerComplete(message.timer.id)} compact={true} isIlluminateEnabled={isIlluminateEnabled}/></div></div> )}
                                         {message.isEditSuggestion && message.editAction && !isChatLoading && !message.error && (
                                             <div className="mt-2 border-t pt-1.5 flex justify-end">
                                                 <button onClick={() => handleAcceptEdit(message)} className={`${buttonSecondaryClass} px-2.5 py-1 rounded-md text-xs flex items-center gap-1 hover:brightness-110`} disabled={isChatLoading} >

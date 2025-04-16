@@ -34,7 +34,8 @@ import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
 import 'react-pdf/dist/esm/Page/TextLayer.css';
 
 // --- Markdown Editor Import ---
-import MDEditor, { commands } from '@uiw/react-md-editor'; // Import both default and named 'commands'
+import MDEditor from '@uiw/react-md-editor';
+
 
 // Types
 interface Note {
@@ -278,39 +279,15 @@ export function Notes() {
                     <div className="flex-1 mt-3 overflow-hidden" data-color-mode={isIlluminateEnabled ? 'light' : 'dark'}>
                       <MDEditor
                         value={editContent}
-                        onChange={setEditContent}
-                        height="100%"
-                        preview="edit" // Default to write mode
-                        // *** Use the correctly imported 'commands' object ***
-                        commands={[
-                            commands.bold,
-                            commands.italic,
-                            commands.strikethrough,
-                            commands.hr,
-                            commands.title,
-                            commands.divider,
-                            commands.link,
-                            commands.quote,
-                            commands.code,
-                            commands.codeBlock,
-                            commands.image,
-                            commands.divider,
-                            commands.unorderedListCommand,
-                            commands.orderedListCommand,
-                            commands.checkedListCommand,
-                            commands.divider,
-                            commands.fullscreen,
-                            // Group only write and preview
-                            commands.group([commands.write, commands.preview], {
-                                name: 'preview',
-                                groupName: 'preview',
-                                buttonProps: { 'aria-label': 'Preview', title: 'Preview' },
-                            }),
-                        ]}
+                        onChange={setEditContent} // Updates state directly
+                        height="100%" // Fill available space
+                        preview="edit" // Show live preview alongside editor
                         textareaProps={{
                           placeholder: "Start writing your note in Markdown...",
+                          className: `${inputBg} ${inputTextColor} ${placeholderColor}` // Apply basic theme
                         }}
-                        className="markdown-editor-container"
+                        // Customize toolbar or hide elements if needed
+                        // hideToolbar={true}
                       />
                     </div>
                     {/* Action Buttons */}

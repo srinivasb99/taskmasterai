@@ -1,21 +1,24 @@
-import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist';
+// *** REMOVED GlobalWorkerOptions from import ***
+import { getDocument } from 'pdfjs-dist';
 import { createWorker } from 'tesseract.js';
 import { v4 as uuidv4 } from 'uuid';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from './firebase';
 
+// Interface definitions remain the same
 interface ProcessingProgress { progress: number; status: string; error: string | null; }
 interface ProcessedPDF { title: string; content: string; keyPoints: string[]; questions: { question: string; options: string[]; correctAnswer: number; explanation: string; }[]; sourceUrl: string; extractedText?: string; }
 
-// Helper functions (sleep, fetchWithRetry, extractCandidateText - assumed same)
+// Helper functions (sleep, fetchWithRetry, extractCandidateText - remain the same)
 function sleep(ms: number): Promise<void> { return new Promise(resolve => setTimeout(resolve, ms)); }
 async function fetchWithRetry(url: string, options: RequestInit, retries = 3, delayMs = 3000): Promise<Response> { for (let attempt = 0; attempt < retries; attempt++) { try { const response = await fetch(url, options); if (!response.ok && (response.status === 429 || response.status >= 500)) { console.warn(`Attempt ${attempt + 1} failed: ${response.status}. Retrying...`); await sleep(delayMs * (attempt + 1)); continue; } return response; } catch (error) { console.error(`Attempt ${attempt + 1} fetch error:`, error); if (attempt === retries - 1) throw error; await sleep(delayMs * (attempt + 1)); } } throw new Error(`Max retries reached: ${url}`); }
 const extractCandidateText = (responseText: string): string => { try { const jsonResponse = JSON.parse(responseText); if (jsonResponse?.candidates?.[0]?.content?.parts?.[0]?.text) { return jsonResponse.candidates[0].content.parts[0].text; } if (jsonResponse?.error?.message) { console.error("Gemini API Error:", jsonResponse.error.message); return `Error: ${jsonResponse.error.message}`; } if (jsonResponse?.candidates?.[0]?.finishReason && jsonResponse.candidates[0].finishReason !== 'STOP') { console.warn(`Gemini finish reason: ${jsonResponse.candidates[0].finishReason}`); return `Error: Generation stopped (${jsonResponse.candidates[0].finishReason})`; } return "Error: No text found."; } catch (err) { console.error('Error parsing Gemini response:', err); return "Error: Cannot parse AI response."; } };
 
+// processPDF function starts here...
 export async function processPDF( file: File, userId: string, geminiApiKey: string, onProgress: (progress: ProcessingProgress) => void ): Promise<ProcessedPDF> {
   const safeProgress = typeof onProgress === 'function' ? onProgress : () => {};
   if (!geminiApiKey) { safeProgress({ progress: 0, status: 'Error', error: 'Gemini API Key missing.' }); throw new Error('Gemini API Key missing.'); }
-  const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`;
+  const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${geminiApiKey}`; // Changed model back to flash as requested previously
   let extractedText = '';
 
   try {
@@ -23,7 +26,11 @@ export async function processPDF( file: File, userId: string, geminiApiKey: stri
     const fileId = uuidv4(); const fileRef = ref(storage, `pdfs/${userId}/${fileId}-${file.name}`); await uploadBytes(fileRef, file); const pdfUrl = await getDownloadURL(fileRef);
     safeProgress({ progress: 10, status: 'PDF uploaded, loading...', error: null });
 
-    const arrayBuffer = await file.arrayBuffer(); const loadingTask = getDocument({ data: new Uint8Array(arrayBuffer) }); const pdf = await loadingTask.promise;
+    const arrayBuffer = await file.arrayBuffer();
+    // *** NOTE: We call getDocument directly. It will use the globally set worker path ***
+    const loadingTask = getDocument({ data: new Uint8Array(arrayBuffer) });
+    const pdf = await loadingTask.promise;
+
     safeProgress({ progress: 15, status: 'Extracting text...', error: null }); const numPages = pdf.numPages;
     for (let pageNum = 1; pageNum <= numPages; pageNum++) { try { const page = await pdf.getPage(pageNum); const content = await page.getTextContent(); extractedText += content.items.map(item => ('str' in item ? item.str : '')).join(' ') + '\n\n'; } catch (e) { console.warn(`Error extracting text page ${pageNum}:`, e); extractedText += `[Text extraction failed page ${pageNum}]\n\n`; } safeProgress({ progress: 15 + Math.round((pageNum / numPages) * 25), status: `Extracting text: Page ${pageNum}/${numPages}`, error: null }); }
     extractedText = extractedText.replace(/\s{3,}/g, ' ').trim();
@@ -57,6 +64,10 @@ export async function processPDF( file: File, userId: string, geminiApiKey: stri
     safeProgress({ progress: 100, status: 'Processing complete!', error: null });
     return { title: file.name.replace(/\.pdf$/i, ''), content: detailedNoteContent, keyPoints, questions, sourceUrl: pdfUrl, };
   } catch (error) {
-    console.error('Overall PDF processing failed:', error); const errorMessage = error instanceof Error ? error.message : 'Unknown PDF processing error.'; safeProgress({ progress: 0, status: 'Error', error: errorMessage }); throw new Error(errorMessage);
+    // Ensure the error message is specific
+    const errorMessage = error instanceof Error ? error.message : 'Unknown PDF processing error.';
+    console.error('Overall PDF processing failed:', error); // Log the full error object
+    safeProgress({ progress: 0, status: 'Error', error: errorMessage });
+    throw new Error(errorMessage); // Re-throw with the specific message
   }
 }

@@ -2,6 +2,17 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
 import { HelmetProvider, Helmet } from 'react-helmet-async';
+
+// --- PDF.js Worker Configuration ---
+// Import pdfjs from react-pdf (it re-exports pdfjs-dist)
+import { pdfjs } from 'react-pdf';
+
+// Set the worker source globally BEFORE any component uses it
+// Ensure 'pdf.worker.min.js' is in your /public folder
+pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
+// --- End PDF.js Worker Configuration ---
+
+
 import { motion } from 'framer-motion';
 import App from './App';
 import { useBlackoutMode } from './hooks/useBlackoutMode';

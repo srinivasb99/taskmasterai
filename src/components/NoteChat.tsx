@@ -111,7 +111,7 @@ export const NoteChat = forwardRef<NoteChatHandle, NoteChatProps>(
 
 
             // Updated System Prompt
-            const systemInstruction = `You are TaskMaster, a helpful AI assistant integrated into Notes. You are chatting with "${userName}" about their note titled "${note.title}".
+            const systemInstruction = `You are TaskMaster, a helpful AI agent integrated into Notes. You are chatting with "${userName}" about their note titled "${note.title}".
 Your primary functions are:
 1.  **Answer Questions:** Respond to questions based primarily on the provided "Current Note Content" and the "Key Points". If the information isn't directly available, use the "Key Points" to provide a helpful answer. If the information is not present in either, attempt to provide a general, helpful response based on your knowledge. Avoid stating "That information is not in the current note." directly.
 2.  **Modify Note:** If the user explicitly asks to modify the note (e.g., "add...", "remove...", "rewrite this part...", "change...", "update..."), you MUST:

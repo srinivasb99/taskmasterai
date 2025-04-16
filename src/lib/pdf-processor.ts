@@ -1,9 +1,20 @@
 // *** Import getDocument AND pdfjs from pdfjs-dist ***
-import { getDocument} from 'pdfjs-dist'; // Keep this import for local worker config
+// NOTE: pdfjs-dist/build/pdf includes the workerSrc setup needed for environments like web browsers.
+// If running in Node.js or similar where workerSrc isn't automatically handled, you might need manual config.
+// import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist/build/pdf'; // Use this for explicit worker path
+// import * as pdfjsWorker from 'pdfjs-dist/build/pdf.worker.entry'; // Use this for explicit worker path
+import { getDocument } from 'pdfjs-dist'; // Keep this simple import if your bundler/environment handles worker loading
 import { createWorker } from 'tesseract.js';
 import { v4 as uuidv4 } from 'uuid';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from './firebase';
+
+// *** Uncomment and configure if needed (e.g., Vite, Webpack, Node.js) ***
+// Sets up the worker source for PDF.js. Adjust the path based on your build setup.
+// If using a CDN:
+// GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+// If using local build:
+// GlobalWorkerOptions.workerSrc = pdfjsWorker; // Requires the pdfjsWorker import above
 
 // Interface definitions remain the same
 interface ProcessingProgress { progress: number; status: string; error: string | null; }
@@ -12,14 +23,19 @@ interface ProcessedPDF { title: string; content: string; keyPoints: string[]; qu
 // Helper functions (sleep, fetchWithRetry, extractCandidateText - remain the same)
 function sleep(ms: number): Promise<void> { return new Promise(resolve => setTimeout(resolve, ms)); }
 async function fetchWithRetry(url: string, options: RequestInit, retries = 3, delayMs = 3000): Promise<Response> { for (let attempt = 0; attempt < retries; attempt++) { try { const response = await fetch(url, options); if (!response.ok && (response.status === 429 || response.status >= 500)) { console.warn(`Attempt ${attempt + 1} failed: ${response.status}. Retrying...`); await sleep(delayMs * (attempt + 1)); continue; } return response; } catch (error) { console.error(`Attempt ${attempt + 1} fetch error:`, error); if (attempt === retries - 1) throw error; await sleep(delayMs * (attempt + 1)); } } throw new Error(`Max retries reached: ${url}`); }
-const extractCandidateText = (responseText: string): string => { try { const jsonResponse = JSON.parse(responseText); if (jsonResponse?.candidates?.[0]?.content?.parts?.[0]?.text) { return jsonResponse.candidates[0].content.parts[0].text; } if (jsonResponse?.error?.message) { console.error("Gemini API Error:", jsonResponse.error.message); return `Error: ${jsonResponse.error.message}`; } if (jsonResponse?.candidates?.[0]?.finishReason && jsonResponse.candidates[0].finishReason !== 'STOP') { console.warn(`Gemini finish reason: ${jsonResponse.candidates[0].finishReason}`); return `Error: Generation stopped (${jsonResponse.candidates[0].finishReason})`; } return "Error: No text found."; } catch (err) { console.error('Error parsing Gemini response:', err); return "Error: Cannot parse AI response."; } };
+const extractCandidateText = (responseText: string): string => { try { const jsonResponse = JSON.parse(responseText); if (jsonResponse?.candidates?.[0]?.content?.parts?.[0]?.text) { return jsonResponse.candidates[0].content.parts[0].text; } if (jsonResponse?.error?.message) { console.error("Gemini API Error:", jsonResponse.error.message); return `Error: ${jsonResponse.error.message}`; } if (jsonResponse?.candidates?.[0]?.finishReason && jsonResponse.candidates[0].finishReason !== 'STOP') { console.warn(`Gemini finish reason: ${jsonResponse.candidates[0].finishReason}`); // Handle potential truncation or other non-stop reasons
+        if (jsonResponse.candidates[0].finishReason === 'MAX_TOKENS') { return (jsonResponse.candidates[0]?.content?.parts?.[0]?.text || '') + "\n\n[Error: Output truncated due to maximum token limit]"; } return `Error: Generation stopped (${jsonResponse.candidates[0].finishReason})`; } return "Error: No text found."; } catch (err) { console.error('Error parsing Gemini response:', err); return "Error: Cannot parse AI response."; } };
 
 // processPDF function starts here...
 export async function processPDF( file: File, userId: string, geminiApiKey: string, onProgress: (progress: ProcessingProgress) => void ): Promise<ProcessedPDF> {
   const safeProgress = typeof onProgress === 'function' ? onProgress : () => {};
   if (!geminiApiKey) { safeProgress({ progress: 0, status: 'Error', error: 'Gemini API Key missing.' }); throw new Error('Gemini API Key missing.'); }
-  // Use flash for potentially faster/cheaper processing, adjust if needed
-  const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`;
+
+  // Use a Gemini 1.5 model for larger context and potentially better long-form generation.
+  // Use flash for speed/cost, or consider 'gemini-1.5-pro-latest' for potentially higher quality at higher cost.
+  const GEMINI_MODEL = 'gemini-2.0-flash';
+  const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${geminiApiKey}`;
+
   let extractedText = '';
 
   try {
@@ -29,6 +45,7 @@ export async function processPDF( file: File, userId: string, geminiApiKey: stri
 
 
     const arrayBuffer = await file.arrayBuffer();
+    // Ensure PDF worker is configured if necessary (see comments at top)
     const loadingTask = getDocument({ data: new Uint8Array(arrayBuffer) });
     const pdf = await loadingTask.promise;
 
@@ -36,43 +53,166 @@ export async function processPDF( file: File, userId: string, geminiApiKey: stri
     for (let pageNum = 1; pageNum <= numPages; pageNum++) { try { const page = await pdf.getPage(pageNum); const content = await page.getTextContent(); extractedText += content.items.map(item => ('str' in item ? item.str : '')).join(' ') + '\n\n'; } catch (e) { console.warn(`Error extracting text page ${pageNum}:`, e); extractedText += `[Text extraction failed page ${pageNum}]\n\n`; } safeProgress({ progress: 15 + Math.round((pageNum / numPages) * 25), status: `Extracting text: Page ${pageNum}/${numPages}`, error: null }); }
     extractedText = extractedText.replace(/\s{3,}/g, ' ').trim();
 
-    if (extractedText.length < 100 * numPages && numPages > 0) {
-      safeProgress({ progress: 40, status: 'Low text, trying OCR...', error: null }); let ocrText = ''; const worker = await createWorker('eng');
-      try { for (let pageNum = 1; pageNum <= numPages; pageNum++) { const page = await pdf.getPage(pageNum); const viewport = page.getViewport({ scale: 2.0 }); const canvas = document.createElement('canvas'); const context = canvas.getContext('2d'); if (!context) throw new Error('Canvas context fail'); canvas.height = viewport.height; canvas.width = viewport.width; await page.render({ canvasContext: context, viewport }).promise; const { data: { text } } = await worker.recognize(canvas); ocrText += text + '\n\n'; safeProgress({ progress: 40 + Math.round((pageNum / numPages) * 20), status: `OCR Page ${pageNum}/${numPages}`, error: null }); } extractedText = ocrText.replace(/\s{3,}/g, ' ').trim(); } catch (ocrError) { console.error('OCR error:', ocrError); safeProgress({ progress: 60, status: 'OCR failed, using extracted text.', error: null }); } finally { await worker.terminate(); }
+    // Consider increasing the OCR threshold if standard text extraction often yields poor results
+    const MIN_CHARS_PER_PAGE_BEFORE_OCR = 50; // Adjusted lower
+    if (extractedText.length < MIN_CHARS_PER_PAGE_BEFORE_OCR * numPages && numPages > 0) {
+      safeProgress({ progress: 40, status: 'Low text quality detected, attempting OCR...', error: null }); let ocrText = ''; const worker = await createWorker('eng');
+      try { for (let pageNum = 1; pageNum <= numPages; pageNum++) { const page = await pdf.getPage(pageNum); const viewport = page.getViewport({ scale: 2.0 }); // Scale 2.0 is good for OCR
+                 const canvas = document.createElement('canvas'); const context = canvas.getContext('2d'); if (!context) throw new Error('Canvas context creation failed'); canvas.height = viewport.height; canvas.width = viewport.width; await page.render({ canvasContext: context, viewport }).promise; const { data: { text } } = await worker.recognize(canvas); ocrText += text + '\n\n'; safeProgress({ progress: 40 + Math.round((pageNum / numPages) * 20), status: `Performing OCR: Page ${pageNum}/${numPages}`, error: null }); } extractedText = ocrText.replace(/\s{3,}/g, ' ').trim(); } catch (ocrError) { console.error('OCR processing failed:', ocrError); safeProgress({ progress: 60, status: 'OCR failed. Using initially extracted text (if any).', error: `OCR Error: ${ocrError instanceof Error ? ocrError.message : 'Unknown OCR error'}` }); // Report OCR error
+            } finally { await worker.terminate(); }
     } else { safeProgress({ progress: 40, status: 'Text extraction complete.', error: null }); }
-    if (!extractedText.trim()) { throw new Error("Could not extract any text from PDF."); }
 
+    if (!extractedText.trim()) {
+        // Even after potential OCR, if there's no text, fail gracefully.
+        safeProgress({ progress: 100, status: 'Error', error: 'No text could be extracted from the PDF, even after attempting OCR.' });
+        throw new Error("Could not extract any text from PDF.");
+    }
+
+    // --- Detailed Note Generation ---
     safeProgress({ progress: 60, status: 'Generating detailed note...', error: null });
-    // Keep the detailed note generation from the current version
-    const detailedNotePrompt = `Analyze text from PDF "${file.name}". Generate detailed, structured note (Markdown: # ## ###, *, -, tables, **bold**, LaTeX $ $/$$ $$). Be comprehensive, not just summary. Text:\n---\n${extractedText.slice(0, 30000)}\n---\nOutput:\nProvide only the generated Markdown note content.`;
-    let detailedNoteContent = 'AI detailed note generation failed.'; // This is the main content now
-    try { const noteOptions = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: detailedNotePrompt }] }], generationConfig: { temperature: 0.5, maxOutputTokens: 4096 } }) }; const noteResponse = await fetchWithRetry(GEMINI_ENDPOINT, noteOptions); const noteRawText = extractCandidateText(await noteResponse.text()); if (noteRawText.startsWith("Error:")) throw new Error(noteRawText); detailedNoteContent = noteRawText.trim(); }
-    catch (noteError) { console.error('Detailed note gen error (PDF):', noteError); safeProgress({ progress: 75, status: 'Note gen failed. Generating points...', error: noteError instanceof Error ? noteError.message : 'Unknown note error' }); /* Fallback content used */ }
 
+    // INCREASED INPUT SLICE: Use a larger portion (or potentially all) of the text for the main note.
+    // Gemini 1.5 models have very large context windows (1M tokens for flash/pro).
+    // Be mindful of potential API costs and processing time with very large inputs.
+    // 150,000 chars is roughly ~37.5k tokens, well within 1.5's capability. Adjust as needed.
+    const MAX_INPUT_CHARS_NOTE = 150000;
+    const noteInputText = extractedText.slice(0, MAX_INPUT_CHARS_NOTE);
+    if (extractedText.length > MAX_INPUT_CHARS_NOTE) {
+        console.warn(`Note generation using first ${MAX_INPUT_CHARS_NOTE} characters due to input limit.`);
+        // Optionally inform the user via progress update
+        safeProgress({ progress: 61, status: `Generating detailed note (using first ${MAX_INPUT_CHARS_NOTE} chars)...`, error: null });
+    }
+
+    // REVISED PROMPT for exceptionally detailed and long notes, mirroring the example structure.
+    const detailedNotePrompt = `Analyze the following text extracted from the PDF "${file.name}". Your task is to generate an exceptionally detailed, comprehensive, and well-structured set of notes in Markdown format. Aim for significant length and depth, reproducing the level of detail found in a study guide or textbook chapter summary.
+
+**Instructions:**
+1.  **Structure:** Use Markdown extensively (# Main Headings, ## Subheadings, ### Sub-subheadings, * or - for bullet points, **bold** for key terms/concepts). Organize the information logically based on the text's flow and topics. Mimic the structure often seen in detailed educational notes.
+2.  **Comprehensiveness:** Do NOT just summarize briefly. Extract and present key facts, concepts, definitions, arguments, events, historical figures, dates, and supporting details mentioned in the text. Go into substantial detail for each point.
+3.  **Length & Detail:** Generate a lengthy output. Your primary goal is to be thorough and capture as much specific information from the source text as possible. Err on the side of including more detail rather than less. Aim to produce notes that are significantly long and cover the material exhaustively.
+4.  **Formatting:** Use standard Markdown. Ensure clear separation between sections and points. LaTeX ($ $/$$ $$) can be used if relevant for mathematical or scientific notation, but prioritize clear textual explanation and structure.
+5.  **Output:** Provide *only* the generated Markdown note content. Do not include introductory phrases like "Here are the detailed notes:" or concluding remarks. Start directly with the first heading or point.
+
+**Text Content:**
+---
+${noteInputText}
+---
+
+**Generated Markdown Notes:**
+`; // No trailing characters after the prompt marker
+
+    let detailedNoteContent = 'AI detailed note generation failed.'; // Fallback content
+    try {
+        const noteOptions = {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: detailedNotePrompt }] }],
+                generationConfig: {
+                    temperature: 0.6, // Slightly higher temp might encourage more elaborate generation
+                    // INCREASED MAX OUTPUT TOKENS: Set to a high value for the model.
+                    // Gemini 1.5 models often support up to 8192 output tokens in a single turn.
+                    // This allows for the very long notes requested.
+                    maxOutputTokens: 8192
+                }
+            })
+        };
+        const noteResponse = await fetchWithRetry(GEMINI_ENDPOINT, noteOptions);
+        const noteRawText = extractCandidateText(await noteResponse.text());
+
+        if (noteRawText.startsWith("Error:")) {
+             // Specific handling for errors from extractCandidateText
+             if (noteRawText.includes("Output truncated due to maximum token limit")) {
+                 detailedNoteContent = noteRawText; // Keep the truncated content and the error message
+                 safeProgress({ progress: 75, status: 'Note generation partially complete (truncated).', error: 'Output may be incomplete due to token limit.' });
+             } else {
+                 throw new Error(noteRawText); // Throw other errors
+             }
+        } else if (noteRawText.trim().length < 50) { // Check if the response is suspiciously short
+            console.warn("Generated note seems very short:", noteRawText);
+            throw new Error("AI generated an unexpectedly short or empty note.");
+        } else {
+            detailedNoteContent = noteRawText.trim(); // Use the successfully generated long note
+        }
+
+    } catch (noteError) {
+        console.error('Detailed note generation failed:', noteError);
+        // Update progress but keep the fallback content
+        safeProgress({
+            progress: 75, // Still advance progress state
+            status: 'Detailed note generation failed. Proceeding...',
+            error: noteError instanceof Error ? noteError.message : 'Unknown detailed note generation error'
+        });
+        // Keep detailedNoteContent = 'AI detailed note generation failed.';
+    }
+
+
+    // --- Key Points Generation ---
     safeProgress({ progress: 75, status: 'Generating key points...', error: null });
-    // Keep the key points generation from the current version
-    const keyPointsPrompt = `Extract 10 distinct key points from text (PDF: "${file.name}"). List only points, one per line.\nText:\n---\n${extractedText.slice(0, 15000)}\n---\nKey Points:\n1. ...`;
-    let keyPoints: string[] = ['Key points generation failed.'];
-    try { const kpOptions = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: keyPointsPrompt }] }], generationConfig: { temperature: 0.3, maxOutputTokens: 800 } }) }; const kpResponse = await fetchWithRetry(GEMINI_ENDPOINT, kpOptions); const kpText = extractCandidateText(await kpResponse.text()); if (kpText.startsWith("Error:")) { console.error("KP Error:", kpText); } else { const parsed = kpText.split('\n').map(l => l.trim().replace(/^\d+\.\s*/, '')).filter(p => p.length > 5).slice(0, 10); if (parsed.length > 0) keyPoints = parsed; else keyPoints = ['No points parsed.']; } }
-    catch (kpError) { console.error('KP fetch error (PDF):', kpError); /* Fallback content used */ }
+    // Use a smaller slice for key points - focus on overall themes
+    const MAX_INPUT_CHARS_KP = 20000; // ~5k tokens
+    const keyPointsPrompt = `From the following text (extracted from PDF "${file.name}"), identify and list exactly 10 distinct and significant key points or main takeaways. Focus on the most crucial concepts, findings, or conclusions. List only the points, one per line, starting each line with '* '.
 
-    // ==============================================================
-    // === Start: Reverted Question Generation from Working Version ===
-    // ==============================================================
+Text Excerpt:
+---
+${extractedText.slice(0, MAX_INPUT_CHARS_KP)}
+---
+
+Key Points:
+* ...`;
+    let keyPoints: string[] = ['Key points generation failed.']; // Fallback
+    try {
+        const kpOptions = {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: keyPointsPrompt }] }],
+                generationConfig: { temperature: 0.4, maxOutputTokens: 1000 } // More tokens for potentially longer points
+            })
+        };
+        const kpResponse = await fetchWithRetry(GEMINI_ENDPOINT, kpOptions);
+        const kpText = extractCandidateText(await kpResponse.text());
+        if (kpText.startsWith("Error:")) {
+            console.error("Key Points Generation Error:", kpText);
+            // Keep fallback
+        } else {
+            // Improved parsing: look for lines starting with common list markers, remove them, filter empty/short lines
+            const parsed = kpText.split('\n')
+                                .map(l => l.trim().replace(/^(\*|-|\d+\.)\s*/, '').trim()) // Remove markers *, -, 1. etc.
+                                .filter(p => p.length > 10); // Filter out very short lines/artifacts
+            if (parsed.length > 0) {
+                 keyPoints = parsed.slice(0, 10); // Take up to 10 valid points
+                 if (keyPoints.length < 5) { // Warn if significantly fewer than 10 points were generated/parsed
+                     console.warn(`Generated only ${keyPoints.length} key points.`);
+                 }
+            } else {
+                 keyPoints = ['Could not parse valid key points from AI response.']; // More informative fallback
+                 console.warn("No valid key points parsed from response:", kpText);
+            }
+        }
+    } catch (kpError) {
+        console.error('Key points fetch/processing error:', kpError);
+        safeProgress({ progress: 85, status: 'Key points generation failed.', error: kpError instanceof Error ? kpError.message : 'Unknown key points error' });
+        // Keep fallback: keyPoints = ['Key points generation failed.'];
+    }
+
+
+    // --- Question Generation (Using Reverted Logic) ---
     safeProgress({ progress: 85, status: 'Generating study questions...', error: null });
+    // Use a moderate slice for questions - enough context but not overwhelming
+    const MAX_INPUT_CHARS_QUESTIONS = 25000; // ~6k tokens
 
-    // Use the prompt structure from the previously working code
-    const questionsPrompt = `Based on the following text content (and key points if available), generate exactly 10 multiple-choice study questions with 4 options (A, B, C, D), the correct answer letter, and a brief explanation.
+    const questionsPrompt = `Based on the following text content (and key points if available), generate exactly 10 multiple-choice study questions with 4 options (A, B, C, D), the correct answer letter, and a brief explanation for the correct answer.
 
-Key Points (for context):
+Key Points (for context only):
 ${keyPoints.join('\n')}
 
-Full Text (excerpt for context):
+Full Text (excerpt for question generation):
 ---
-${extractedText.slice(0, 15000)}
+${extractedText.slice(0, MAX_INPUT_CHARS_QUESTIONS)}
 ---
 
-Format each question strictly as follows:
+Format each question strictly as follows, separating each complete question block with '---DIVIDER---':
 
 Question: [Your question here]
 A) [Option A]
@@ -80,13 +220,12 @@ B) [Option B]
 C) [Option C]
 D) [Option D]
 Correct: [Correct Answer Letter (A, B, C, or D)]
-Explanation: [Brief explanation why it's correct]
+Explanation: [Brief explanation why the chosen answer is correct]
 
 ---DIVIDER---
 
-Generate 10 questions in this exact format, separated by '---DIVIDER---'. Ensure all 10 questions are complete and follow the format.`;
+Generate exactly 10 distinct questions in this precise format. Ensure all parts (Question, A, B, C, D, Correct, Explanation) are present for every question.`;
 
-    // Use the API call options from the previously working code
     const questionsOptions = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -94,7 +233,7 @@ Generate 10 questions in this exact format, separated by '---DIVIDER---'. Ensure
         contents: [{ parts: [{ text: questionsPrompt }] }],
         generationConfig: {
             temperature: 0.5,
-            maxOutputTokens: 2500 // Use the token limit from the working version
+            maxOutputTokens: 3000 // Increased slightly for potentially more complex explanations/questions
         }
       })
     };
@@ -106,30 +245,46 @@ Generate 10 questions in this exact format, separated by '---DIVIDER---'. Ensure
       const questionsRawText = extractCandidateText(questionsResponseText);
 
        if (questionsRawText.startsWith("Error:")) {
-          // Throw error if generation/parsing fails, as in the working version
-          throw new Error(questionsRawText);
+          throw new Error(questionsRawText); // Let the catch block handle it
       }
 
-      // Use the parsing logic from the working version
+      // Parsing logic (kept from provided 'working version')
       const questionBlocks = questionsRawText.split(/---DIVIDER---/i);
+      console.log(`Attempting to parse ${questionBlocks.length} question blocks.`); // Debugging
+
       for (const block of questionBlocks) {
-        if (questions.length >= 10) break; // Limit to 10
+        if (questions.length >= 10) break; // Stop after finding 10 valid questions
 
         const trimmedBlock = block.trim();
-        if (!trimmedBlock) continue; // Skip empty blocks
+        if (!trimmedBlock) continue; // Skip empty blocks resulting from split
 
+        // Refined Regex for more robust parsing, handling potential extra whitespace and case variations
         const questionMatch = trimmedBlock.match(/^Question:\s*([\s\S]*?)\s*A\)/i);
-        const optionsMatch = trimmedBlock.match(/A\)\s*(.*?)\s*B\)\s*(.*?)\s*C\)\s*(.*?)\s*D\)\s*(.*?)\s*Correct:/is);
-        const correctMatch = trimmedBlock.match(/Correct:\s*([A-D])/i);
-        const explanationMatch = trimmedBlock.match(/Explanation:\s*([\s\S]*?)(?:---DIVIDER---|$)/i);
+        // Match options more carefully, stopping before the next letter or 'Correct:'
+        const optionsMatch = trimmedBlock.match(/A\)\s*([\s\S]*?)\s*B\)\s*([\s\S]*?)\s*C\)\s*([\s\S]*?)\s*D\)\s*([\s\S]*?)\s*Correct:/is);
+        const correctMatch = trimmedBlock.match(/Correct:\s*([A-D])\b/i); // \b ensures it's a single letter
+        const explanationMatch = trimmedBlock.match(/Explanation:\s*([\s\S]*?)(?:---DIVIDER---|$)/i); // Match until next divider or end
 
         if (questionMatch && optionsMatch && correctMatch && explanationMatch) {
             const questionText = questionMatch[1].trim();
-            const optionsList = [optionsMatch[1], optionsMatch[2], optionsMatch[3], optionsMatch[4]].map(opt => opt.trim().replace(/\s*B\)$|\s*C\)$|\s*D\)$|\s*Correct:$/is, '').trim());
+            // Clean up options more thoroughly
+            const optionsList = [
+                optionsMatch[1],
+                optionsMatch[2],
+                optionsMatch[3],
+                optionsMatch[4]
+            ].map(opt => opt.replace(/\s*(B\)|C\)|D\)|Correct:).*$/is, '').trim()); // Remove trailing labels/text
+
             const correctLetter = correctMatch[1].toUpperCase();
             const explanationText = explanationMatch[1].trim();
 
-             if (questionText && optionsList.length === 4 && optionsList.every(o => o) && ['A', 'B', 'C', 'D'].includes(correctLetter) && explanationText) {
+             // Add stronger validation before pushing
+            if (questionText &&
+                optionsList.length === 4 &&
+                optionsList.every(o => o && o.length > 0) && // Ensure options are not empty
+                ['A', 'B', 'C', 'D'].includes(correctLetter) &&
+                explanationText && explanationText.length > 5) // Ensure explanation has some substance
+            {
                 questions.push({
                   question: questionText,
                   options: optionsList,
@@ -137,59 +292,68 @@ Generate 10 questions in this exact format, separated by '---DIVIDER---'. Ensure
                   explanation: explanationText,
                 });
             } else {
-                 console.warn("Partially parsed question block (missing data):", { questionText, optionsList, correctLetter, explanationText, block: trimmedBlock });
+                 console.warn("Partially parsed/invalid question block data:", { questionText, optionsList, correctLetter, explanationText, block: trimmedBlock.substring(0, 200) + '...' }); // Log truncated block
             }
         } else {
-             console.warn("Could not parse question block structure:", trimmedBlock);
+             // Log specific parsing failures if possible
+             if (!questionMatch) console.warn("Could not parse 'Question:' part.", trimmedBlock.substring(0, 100));
+             else if (!optionsMatch) console.warn("Could not parse Options A-D.", trimmedBlock.substring(0, 200));
+             else if (!correctMatch) console.warn("Could not parse 'Correct:' part.", trimmedBlock);
+             else if (!explanationMatch) console.warn("Could not parse 'Explanation:' part.", trimmedBlock);
+             else console.warn("General structure mismatch in question block:", trimmedBlock.substring(0, 200) + '...');
         }
       } // End parsing loop
 
-      // Use error handling from the working version
+      console.log(`Successfully parsed ${questions.length} valid questions.`); // Debugging
+
       if (questions.length === 0) {
-           throw new Error("No valid questions parsed from AI response.");
+           // If parsing yielded nothing valid, treat it as an error
+           throw new Error("No valid questions could be parsed from the AI response. Check response format.");
       } else if (questions.length < 10) {
-          console.warn(`Successfully parsed only ${questions.length} out of 10 requested questions.`);
-          // Proceed with the questions that were parsed
+          // Log a warning but proceed with the questions obtained
+          console.warn(`Successfully parsed only ${questions.length} out of 10 requested questions. The AI might not have generated all 10, or some failed parsing.`);
+          safeProgress({ progress: 95, status: `Generated ${questions.length}/10 questions. Finalizing...`, error: `Only ${questions.length} questions generated/parsed.` }); // Inform user
       }
 
     } catch (questionsError) {
-      console.error('Questions generation error:', questionsError);
+      console.error('Questions generation or parsing error:', questionsError);
       safeProgress({
-        progress: 95, // Still move to finalize but indicate error
-        status: 'Questions generation failed.',
+        progress: 95, // Still move to finalize
+        status: 'Questions generation/parsing failed.',
         error: questionsError instanceof Error ? questionsError.message : 'Unknown questions error'
       });
-      // Use the fallback from the working version
+      // Provide a fallback question only if the array is completely empty
       if (questions.length === 0) {
           questions = [{
-            question: 'Study questions could not be generated for this document.',
+            question: 'Study questions could not be generated or parsed for this document.',
             options: ['Ok', 'Understood', 'Review Manually', 'N/A'],
             correctAnswer: 0,
-            explanation: 'The AI failed to generate questions based on the content or the response could not be parsed.'
+            explanation: 'The AI failed to generate questions in the expected format, or another error occurred during generation.'
           }];
       }
     }
-    // ============================================================
-    // === End: Reverted Question Generation from Working Version ===
-    // ============================================================
+    // --- End Question Generation ---
 
-    safeProgress({ progress: 95, status: 'Finalizing note...', error: null }); // Kept this line
+
+    safeProgress({ progress: 98, status: 'Finalizing results...', error: null }); // Adjusted progress
 
     // 7. Return Processed Data
     safeProgress({ progress: 100, status: 'Processing complete!', error: null });
     return {
       title: file.name.replace(/\.pdf$/i, ''),
-      content: detailedNoteContent, // Use the generated DETAILED note as the main content
+      content: detailedNoteContent, // Use the potentially very long, detailed note
       keyPoints,
       questions, // Contains questions generated by the reverted logic
       sourceUrl: pdfUrl,
-      // extractedText: extractedText // Optionally return
+      // extractedText: extractedText // Optionally return the full extracted text for debugging or other uses
     };
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown PDF processing error.';
     console.error('Overall PDF processing failed:', error); // Log the full error object
-    safeProgress({ progress: 0, status: 'Error', error: errorMessage });
-    throw new Error(errorMessage); // Re-throw with the specific message
+    // Ensure progress indicates failure clearly
+    safeProgress({ progress: 100, status: 'Processing Failed', error: errorMessage });
+    // Re-throw a new error to ensure the promise rejects correctly
+    throw new Error(`PDF Processing Failed: ${errorMessage}`);
   }
 }

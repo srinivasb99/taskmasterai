@@ -1,4 +1,6 @@
 // NoteChat.tsx
+// No changes needed from the previous version provided in the first response.
+// It already handles the `displayMode` prop correctly.
 import React, { useState, useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import { MessageCircle, Send, Timer as TimerIcon, Bot, X, AlertTriangle, Loader2, Sparkles, ChevronDown, Maximize, Minimize, Edit, Check } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -36,7 +38,7 @@ export interface NoteChatHandle {
 // Helper Functions (fetchWithRetry, extractCandidateText - remain the same)
 async function fetchWithRetry(url: string, options: RequestInit, retries = 3, delayMs = 3000): Promise<Response> { for (let attempt = 0; attempt < retries; attempt++) { try { const response = await fetch(url, options); if (!response.ok && (response.status === 429 || response.status >= 500)) { console.warn(`Attempt ${attempt + 1} failed: ${response.status}. Retrying...`); if (attempt === retries - 1) throw new Error(`API Error (${response.status}) after ${retries} attempts.`); await new Promise(resolve => setTimeout(resolve, delayMs * (attempt + 1))); continue; } return response; } catch (error) { console.error(`Attempt ${attempt + 1} fetch error:`, error); if (attempt === retries - 1) throw error; await new Promise(resolve => setTimeout(resolve, delayMs * (attempt + 1))); } } throw new Error(`Max retries reached for: ${url}`); }
 const extractCandidateText = (responseText: string): string => { try { const jsonResponse = JSON.parse(responseText); if (jsonResponse?.candidates?.[0]?.content?.parts?.[0]?.text) { return jsonResponse.candidates[0].content.parts[0].text; } if (jsonResponse?.candidates?.[0]?.finishReason === 'SAFETY') { return "My response was blocked due to safety filters."; } if (jsonResponse?.error?.message) { return `Error: ${jsonResponse.error.message}`; } if (!jsonResponse?.candidates?.[0]?.content?.parts?.[0]?.text) { return "Sorry, I received an empty or non-text response."; } return "Error: Unknown issue extracting text."; } catch (err) { if (responseText.toLowerCase().includes("api error")) { return `Error: ${responseText}`; } console.error('Error parsing Gemini response:', err, 'Raw:', responseText); return "Error: Could not parse AI response."; } };
-const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=`; // Updated model
+const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=`; // Updated model
 
 // Forward Ref component definition
 export const NoteChat = forwardRef<NoteChatHandle, NoteChatProps>(
@@ -232,8 +234,8 @@ ${recentHistory.map(m => `${m.role === 'user' ? userName : 'Assistant'}: ${m.con
                             </button>
                         </div>
                     )}
-                     {displayMode === 'inline' && ( // Optional: Show a different close/hide button for inline mode?
-                        <button onClick={onClose} className={`${iconColor} rounded-full p-1`} title="Hide PDF View">
+                     {displayMode === 'inline' && ( // Show close button in inline mode (to close side-by-side view)
+                        <button onClick={onClose} className={`${iconColor} rounded-full p-1`} title="Close Chat & PDF View">
                             <X className="w-4 h-4" />
                         </button>
                     )}

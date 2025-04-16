@@ -1,13 +1,8 @@
-import { getDocument} from 'pdfjs-dist';
+import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist';
 import { createWorker } from 'tesseract.js';
 import { v4 as uuidv4 } from 'uuid';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from './firebase';
-
-// *** IMPORTANT: Configure PDF.js worker ***
-// Load from the public folder. Ensure pdf.worker.min.js is copied there!
-
-// --- End PDF Worker Config ---
 
 interface ProcessingProgress { progress: number; status: string; error: string | null; }
 interface ProcessedPDF { title: string; content: string; keyPoints: string[]; questions: { question: string; options: string[]; correctAnswer: number; explanation: string; }[]; sourceUrl: string; extractedText?: string; }

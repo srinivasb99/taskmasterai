@@ -65,55 +65,78 @@ async function fetchWithRetry(url: string, options: RequestInit, retries = 3, de
 
 const extractCandidateText = (responseText: string): string => {
     try {
-        // First, try parsing the entire response as the standard Gemini format
         const jsonResponse = JSON.parse(responseText);
         if (jsonResponse?.candidates?.[0]?.content?.parts?.[0]?.text) {
             return jsonResponse.candidates[0].content.parts[0].text;
         }
-        // Handle safety blocks and explicit errors from the API structure
         if (jsonResponse?.candidates?.[0]?.finishReason === 'SAFETY') {
             return "My response was blocked due to safety filters.";
         }
         if (jsonResponse?.error?.message) {
             return `Error: ${jsonResponse.error.message}`;
         }
-        // Handle cases where the structure is valid but the text part might be missing
-        // (e.g., AI only output JSON for an edit action)
         if (jsonResponse?.candidates?.[0]?.content && !jsonResponse.candidates[0].content.parts) {
-             return ""; // Indicate no *additional* text content, but the response might still contain JSON
+             return "";
         }
-        // Generic fallback if structure is unexpected but parsed as JSON
         return "Sorry, I received an empty or non-standard response.";
 
     } catch (err) {
-        // If parsing the *entire* response as JSON fails, treat the responseText as potentially raw text
-        // Check for common error strings within the raw text
          if (typeof responseText === 'string') {
-            if (responseText.toLowerCase().includes("api key not valid")) {
-                 return "Error: Invalid API Key.";
-            }
-             if (responseText.toLowerCase().includes("quota exceeded")) {
-                 return "Error: API Quota Exceeded.";
-             }
-            if (responseText.toLowerCase().includes("internal server error") || responseText.toLowerCase().includes("service unavailable")) {
-                return "Error: AI service is temporarily unavailable. Please try again later.";
-            }
-            // If it wasn't JSON but contains ```json, it's likely the AI intended an edit but format was broken
-            if (responseText.includes('```json')) {
-                 // Return the raw text so the main parser can still try to extract the JSON block
-                 return responseText;
-            }
-            // Otherwise, assume it's just plain text or an unknown error format
-            return responseText; // Return the raw string
+            if (responseText.toLowerCase().includes("api key not valid")) return "Error: Invalid API Key.";
+            if (responseText.toLowerCase().includes("quota exceeded")) return "Error: API Quota Exceeded.";
+            if (responseText.toLowerCase().includes("internal server error") || responseText.toLowerCase().includes("service unavailable")) return "Error: AI service is temporarily unavailable. Please try again later.";
+            if (responseText.includes('```json')) return responseText;
+            return responseText;
         }
-        // If responseText wasn't even a string somehow
         console.error('Error parsing/handling Gemini response: Input was not a string.', 'Raw Input:', responseText);
         return "Error: Could not process AI response (Invalid format).";
     }
 };
 
 
-const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=`;
+const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=`;
+
+// --- Updated Timer Parsing Function ---
+const parseTimerRequest = (message: string): number | null => {
+    const cleanedMessage = message.trim().toLowerCase();
+    const keywords = ['set timer', 'start timer', 'timer for', 'remind me in'];
+    // Regex for the time format like "10 min", "5s", "1 hour"
+    const timeRegex = /(\d+)\s*(m|min|minute|h|hr|hour|s|sec|second)s?\b/i; // Added \b word boundary
+
+    let M: RegExpMatchArray | null = null;
+
+    // 1. Check for keywords + time format anywhere
+    const hasKeywords = keywords.some(keyword => cleanedMessage.includes(keyword));
+    if (hasKeywords) {
+        M = cleanedMessage.match(timeRegex);
+    }
+
+    // 2. If no keywords, check if the message *starts* with the time format
+    if (!M) {
+        M = cleanedMessage.match(/^\s*(\d+)\s*(m|min|minute|h|hr|hour|s|sec|second)s?\b/i); // Anchor to start ^\s*
+    }
+
+    // 3. If still no match, check if the *entire message* is just the time format
+    if (!M) {
+        M = cleanedMessage.match(/^\s*(\d+)\s*(m|min|minute|h|hr|hour|s|sec|second)s?\s*$/i); // Anchor start ^\s* and end \s*$
+    }
+
+
+    // If no match found through any method
+    if (!M) return null;
+
+    const A = parseInt(M[1]); // The number part
+    const U = M[2].toLowerCase(); // The unit part matched
+
+    if (isNaN(A) || A <= 0) return null; // Invalid number
+
+    // Convert to seconds
+    if (U.startsWith('h')) return A * 3600;
+    if (U.startsWith('m')) return A * 60;
+    if (U.startsWith('s')) return A;
+
+    return null; // Fallback if unit wasn't matched correctly (shouldn't happen with regex)
+};
 
 // Forward Ref component definition
 export const NoteChat = forwardRef<NoteChatHandle, NoteChatProps>(
@@ -153,9 +176,9 @@ export const NoteChat = forwardRef<NoteChatHandle, NoteChatProps>(
         // Scroll effect
         useEffect(() => { if (!isMinimized || displayMode === 'inline') { setTimeout(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }); }, 100); } }, [chatHistory, isMinimized, displayMode]);
 
-        // Timer handlers
+        // Timer handlers - Use the globally defined parseTimerRequest now
         const handleTimerComplete = (timerId: string) => setChatHistory(prev => [...prev, { id: `timer-comp-${timerId}`, role: 'assistant', content: "⏰ Time's up!" }]);
-        const parseTimerRequest = (message: string): number | null => { const M=message.match(/(\d+)\s*(m|min|minute|h|hr|hour|s|sec|second)s?/i); if(!M) return null; const A=parseInt(M[1]); const U=M[2].toLowerCase(); if(isNaN(A)||A<=0) return null; if(U.startsWith('h')) return A*3600; if(U.startsWith('m')) return A*60; if(U.startsWith('s')) return A; return null; };
+        // parseTimerRequest is now defined outside the component
 
         // Accept Edit Handler
         const handleAcceptEdit = async (message: ChatMessage) => {
@@ -237,16 +260,36 @@ export const NoteChat = forwardRef<NoteChatHandle, NoteChatProps>(
         const submitMessageToAI = async (messageContent: string) => {
             if (!messageContent || isChatLoading || !geminiApiKey || !note) return;
 
+            // *** Check for Timer FIRST using the improved function ***
             const timerDuration = parseTimerRequest(messageContent);
             const userMsg: ChatMessage = { id: `user-${Date.now()}`, role: 'user', content: messageContent };
-            setChatHistory(prev => [...prev, userMsg]);
+            setChatHistory(prev => [...prev, userMsg]); // Add user message regardless
 
-            if (timerDuration) { const tId = `t-${Date.now()}`; setChatHistory(prev => [ ...prev, { id: `tstart-${tId}`, role: 'assistant', content: `Timer set: ${timerDuration >= 60 ? Math.round(timerDuration / 60) + 'm' : timerDuration + 's'}.`, timer: { type: 'timer', duration: timerDuration, id: tId } } ]); return; }
+            // If it's a valid timer request, set the timer and STOP further processing
+            if (timerDuration) {
+                const tId = `t-${Date.now()}`;
+                const durationText = timerDuration >= 3600 ? `${Math.round(timerDuration / 3600)}h` :
+                                    timerDuration >= 60 ? `${Math.round(timerDuration / 60)}m` :
+                                    `${timerDuration}s`;
+                setChatHistory(prev => [
+                    ...prev, // Keep user message already added
+                    {
+                        id: `tstart-${tId}`,
+                        role: 'assistant',
+                        content: `Timer set: ${durationText}.`,
+                        timer: { type: 'timer', duration: timerDuration, id: tId }
+                    }
+                ]);
+                return; // Don't proceed to AI call if it was a timer command
+            }
 
-            setIsChatLoading(true); const loadingMsgId = `load-${Date.now()}`; setChatHistory(prev => [...prev, { id: loadingMsgId, role: 'assistant', content: '...' }]);
+            // If not a timer, proceed with AI call
+            setIsChatLoading(true);
+            const loadingMsgId = `load-${Date.now()}`;
+            setChatHistory(prev => [...prev, { id: loadingMsgId, role: 'assistant', content: '...' }]);
             const recentHistory = chatHistory.slice(-8);
 
-            // System Prompt (Unchanged from previous version with hybrid approach)
+            // System Prompt
              const systemInstruction = `You are TaskMaster, a helpful AI agent integrated into Notes. You are chatting with "${userName}" about their note titled "${note.title}".
 Your primary functions are:
 1.  **Answer Questions:** Respond based on "Current Note Content" and "Key Points". Use general knowledge if info isn't present. Avoid saying "That information is not in the note."
@@ -272,7 +315,7 @@ Your primary functions are:
         \`\`\`
         *   CRITICAL: Use this method *sparingly*, only when a targeted edit is clearly inappropriate for the scale of the request. The \`new_full_content\` field must contain the entire proposed note content (or empty string).
     *   **ALWAYS choose ONE method and provide the corresponding valid JSON structure.** Do NOT provide both. Do NOT add any text after the JSON block.
-3.  **General Chat:** Engage in helpful conversation related to the note or note-taking.
+3.  **General Chat:** Engage in helpful conversation related to the note or note-taking. DO NOT process requests like "set timer" or "<number> min" as note edits; those are handled separately.
 
 **Current Note Content (Use this for context and finding target_context):**
 """
@@ -285,7 +328,11 @@ ${note.keyPoints?.map(p => `- ${p}`).join('\n') || 'N/A'}
 
 ---
 **Chat History (Recent):**
-${recentHistory.map(m => `${m.role === 'user' ? userName : 'Assistant'}: ${m.content.replace(/```json[\s\S]*?```/g, '[Edit Proposed]')}`).join('\n')}
+${recentHistory
+    // Filter out timer confirmation messages from history sent to AI
+    .filter(m => !m.content?.startsWith("Timer set:"))
+    .map(m => `${m.role === 'user' ? userName : 'Assistant'}: ${m.content.replace(/```json[\s\S]*?```/g, '[Edit Proposed]')}`)
+    .join('\n')}
 ---
 
 **${userName}: ${messageContent}**
@@ -311,95 +358,50 @@ ${recentHistory.map(m => `${m.role === 'user' ? userName : 'Assistant'}: ${m.con
                     throw new Error(eMsg);
                  }
 
-                // Extract candidate text OR use raw text if extraction fails but contains potential JSON
                 let assistantContent = extractCandidateText(responseText);
-                let textToSearchJson = assistantContent || responseText; // Use raw response if extraction yielded nothing
+                let textToSearchJson = assistantContent || responseText;
 
-                // Default message state
                 let assistantFinalMessage: ChatMessage = {
-                    id: loadingMsgId,
-                    role: 'assistant',
-                    content: assistantContent || "...", // Display extracted text or placeholder
-                    error: assistantContent.startsWith("Error:")
+                    id: loadingMsgId, role: 'assistant', content: assistantContent || "...", error: assistantContent.startsWith("Error:")
                 };
 
-                // --- Robust JSON Parsing Logic ---
                 const jsonMatch = textToSearchJson.match(/```json\s*([\s\S]*?)\s*```/);
                 let potentialJsonString: string | null = null;
 
                 if (jsonMatch && jsonMatch[1]) {
-                    potentialJsonString = jsonMatch[1].trim(); // TRIM before parsing!
-
+                    potentialJsonString = jsonMatch[1].trim();
                     try {
-                        // --- Log the exact string being parsed ---
                         console.log("Attempting to parse JSON string:", potentialJsonString);
-                        const parsedJson = JSON.parse(potentialJsonString); // Parse the trimmed string
+                        const parsedJson = JSON.parse(potentialJsonString);
+                        assistantFinalMessage.isEditSuggestion = false; assistantFinalMessage.error = false;
 
-                        // Reset defaults assuming parsing succeeds initially
-                        assistantFinalMessage.isEditSuggestion = false;
-                        assistantFinalMessage.error = false;
-
-                        // Validate parsed structure (Targeted Edit)
                         if (parsedJson.action === "propose_targeted_edit" && typeof parsedJson.explanation === 'string' && typeof parsedJson.edit_type === 'string' && typeof parsedJson.content_fragment === 'string' && (typeof parsedJson.target_context === 'string' || parsedJson.target_context === null)) {
-                             assistantFinalMessage = {
-                                ...assistantFinalMessage,
-                                content: parsedJson.explanation, // Show explanation to user
-                                isEditSuggestion: true,
-                                editAction: "propose_targeted_edit",
-                                editExplanation: parsedJson.explanation,
-                                editType: parsedJson.edit_type as ChatMessage['editType'],
-                                targetContext: parsedJson.target_context,
-                                contentFragment: parsedJson.content_fragment,
-                            };
+                             assistantFinalMessage = { ...assistantFinalMessage, content: parsedJson.explanation, isEditSuggestion: true, editAction: "propose_targeted_edit", editExplanation: parsedJson.explanation, editType: parsedJson.edit_type as ChatMessage['editType'], targetContext: parsedJson.target_context, contentFragment: parsedJson.content_fragment, };
                             console.log("Parsed targeted edit proposal successfully.");
-
-                        // Validate parsed structure (Full Replacement)
                         } else if (parsedJson.action === "propose_full_content_replacement" && typeof parsedJson.explanation === 'string' && typeof parsedJson.new_full_content === 'string') {
-                             assistantFinalMessage = {
-                                ...assistantFinalMessage,
-                                content: parsedJson.explanation, // Show explanation
-                                isEditSuggestion: true,
-                                editAction: "propose_full_content_replacement",
-                                editExplanation: parsedJson.explanation,
-                                newFullContent: parsedJson.new_full_content,
-                                editType: undefined, targetContext: undefined, contentFragment: undefined, // Clear conflicting fields
-                            };
+                             assistantFinalMessage = { ...assistantFinalMessage, content: parsedJson.explanation, isEditSuggestion: true, editAction: "propose_full_content_replacement", editExplanation: parsedJson.explanation, newFullContent: parsedJson.new_full_content, editType: undefined, targetContext: undefined, contentFragment: undefined, };
                             console.log("Parsed full content replacement proposal successfully.");
-
-                        // Invalid structure
                         } else {
                             console.warn("JSON structure invalid:", parsedJson);
                              assistantFinalMessage.content = `Warning: AI proposed an edit, but the structure was invalid.\n\n---\n${assistantContent || responseText}`;
-                            assistantFinalMessage.error = true; // Treat as an error
+                            assistantFinalMessage.error = true;
                         }
+                        if (!assistantContent && assistantFinalMessage.content) { /* Explanation set, good */ }
+                        else if (!assistantFinalMessage.content && assistantFinalMessage.isEditSuggestion) { assistantFinalMessage.content = "(Edit proposed without explanation)"; }
 
-                         // Ensure content field has *something* if AI only returned JSON
-                        if (!assistantContent && assistantFinalMessage.content) {
-                           // Explanation is set, good.
-                        } else if (!assistantFinalMessage.content && assistantFinalMessage.isEditSuggestion) {
-                           assistantFinalMessage.content = "(Edit proposed without explanation)"; // Fallback content
-                        }
-
-
-                    } catch (parseError: any) { // Catch specific error
+                    } catch (parseError: any) {
                         console.error("Failed to parse JSON proposal. Error:", parseError.message, "Raw JSON string attempted:", potentialJsonString);
-                        // --- More Specific User Error ---
-                        assistantFinalMessage.content = `Error: Failed to process the edit proposal (JSON Parse Error: ${parseError.message}). Please try rephrasing.\n\n---\nRaw attempt:\n${potentialJsonString.substring(0, 200)}...`; // Show snippet of what failed
+                        assistantFinalMessage.content = `Error: Failed to process the edit proposal (JSON Parse Error: ${parseError.message}). Please try rephrasing.\n\n---\nRaw attempt:\n${potentialJsonString.substring(0, 200)}...`;
                         assistantFinalMessage.error = true;
                     }
                 } else if (assistantContent.startsWith("Error:")) {
-                     // If extractCandidateText returned a specific error, ensure it's marked
-                     assistantFinalMessage.error = true;
-                     assistantFinalMessage.content = assistantContent;
+                     assistantFinalMessage.error = true; assistantFinalMessage.content = assistantContent;
                 } else if (!assistantContent && responseText.includes('```json')) {
-                    // Handle case where extractCandidateText failed but raw response has JSON markers
                     console.warn("Candidate text empty, but raw response contains JSON markers. Likely formatting error from AI.");
                     assistantFinalMessage.content = `Warning: AI attempted an edit, but the response format was slightly broken. Could not parse.\n\n---\n${responseText.substring(0,300)}...`;
                     assistantFinalMessage.error = true;
                 }
-                // If no JSON match and no error, assistantFinalMessage remains as the default extracted text
 
-                // Update chat history
                 setChatHistory(prev => prev.map(msg => msg.id === loadingMsgId ? { ...assistantFinalMessage, id: loadingMsgId } : msg ));
 
             } catch (err: any) {
@@ -414,6 +416,7 @@ ${recentHistory.map(m => `${m.role === 'user' ? userName : 'Assistant'}: ${m.con
             const currentMessage = chatMessage.trim();
             if (!currentMessage) return;
             setChatMessage('');
+            // submitMessageToAI will now handle timer check internally
             await submitMessageToAI(currentMessage);
         };
 
@@ -459,7 +462,15 @@ ${recentHistory.map(m => `${m.role === 'user' ? userName : 'Assistant'}: ${m.con
                                                 }}
                                             >{message.content}</ReactMarkdown>
                                         ) : null}
-                                        {message.timer && ( <div className="mt-1.5"><div className={`flex items-center space-x-2 rounded-md px-2 py-1 text-xs border ${isIlluminateEnabled ? 'bg-blue-50 border-blue-200 text-blue-800' : 'bg-gray-800/60 border-gray-600 text-blue-300'}`}><TimerIcon className="w-3.5 h-3.5"/> <Timer key={message.timer.id} initialDuration={message.timer.duration} onComplete={() => handleTimerComplete(message.timer.id)} compact={true} isIlluminateEnabled={isIlluminateEnabled}/></div></div> )}
+                                        {/* Display Timer if present */}
+                                        {message.timer && (
+                                             <div className="mt-1.5">
+                                                  <div className={`flex items-center space-x-2 rounded-md px-2 py-1 text-xs border ${isIlluminateEnabled ? 'bg-blue-50 border-blue-200 text-blue-800' : 'bg-gray-800/60 border-gray-600 text-blue-300'}`}>
+                                                       <TimerIcon className="w-3.5 h-3.5"/>
+                                                       <Timer key={message.timer.id} initialDuration={message.timer.duration} onComplete={() => handleTimerComplete(message.timer.id)} compact={true} isIlluminateEnabled={isIlluminateEnabled}/>
+                                                  </div>
+                                             </div>
+                                        )}
 
                                         {/* Accept Edit Button */}
                                         {message.isEditSuggestion && message.editAction && !isChatLoading && !message.error && (

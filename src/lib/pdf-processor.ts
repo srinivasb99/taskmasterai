@@ -1,5 +1,5 @@
 // *** Import getDocument AND pdfjs from pdfjs-dist ***
-import { getDocument, pdfjs } from 'pdfjs-dist'; // Keep this import for local worker config
+import { getDocument} from 'pdfjs-dist'; // Keep this import for local worker config
 import { createWorker } from 'tesseract.js';
 import { v4 as uuidv4 } from 'uuid';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -27,9 +27,6 @@ export async function processPDF( file: File, userId: string, geminiApiKey: stri
     const fileId = uuidv4(); const fileRef = ref(storage, `pdfs/${userId}/${fileId}-${file.name}`); await uploadBytes(fileRef, file); const pdfUrl = await getDownloadURL(fileRef);
     safeProgress({ progress: 10, status: 'PDF uploaded, loading...', error: null });
 
-    // *** Configure worker source LOCALLY before getDocument ***
-    // Ensure pdf.worker.min.js v3.11.174 is in /public
-    pdfjs.GlobalWorkerOptions.workerSrc = `/pdf.worker.min.js`;
 
     const arrayBuffer = await file.arrayBuffer();
     const loadingTask = getDocument({ data: new Uint8Array(arrayBuffer) });

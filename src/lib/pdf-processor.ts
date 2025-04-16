@@ -83,15 +83,47 @@ export async function processPDF( file: File, userId: string, geminiApiKey: stri
         safeProgress({ progress: 61, status: `Generating detailed note (using first ${MAX_INPUT_CHARS_NOTE} chars)...`, error: null });
     }
 
-    // REVISED PROMPT for exceptionally detailed and long notes, mirroring the example structure.
-    const detailedNotePrompt = `Analyze the following text extracted from the PDF "${file.name}". Your task is to generate an exceptionally detailed, comprehensive, and well-structured set of notes in Markdown format. Aim for significant length and depth, reproducing the level of detail found in a study guide or textbook chapter summary.
+   // REVISED PROMPT for exceptionally detailed and long notes, mirroring the example structure,
+    // explicitly instructing on various Markdown formats including extended features, tables, and checking for diagram/graph support.
+    const detailedNotePrompt = `Analyze the following text extracted from the PDF "${file.name}". Your task is to generate an exceptionally detailed, comprehensive, and well-structured set of notes in Markdown format. Aim for significant length and depth, reproducing the level of detail found in a study guide or textbook chapter summary.
 
 **Instructions:**
-1.  **Structure:** Use Markdown extensively (# Main Headings, ## Subheadings, ### Sub-subheadings, * or - for bullet points, **bold** for key terms/concepts). Organize the information logically based on the text's flow and topics. Mimic the structure often seen in detailed educational notes.
-2.  **Comprehensiveness:** Do NOT just summarize briefly. Extract and present key facts, concepts, definitions, arguments, events, historical figures, dates, and supporting details mentioned in the text. Go into substantial detail for each point.
-3.  **Length & Detail:** Generate a lengthy output. Your primary goal is to be thorough and capture as much specific information from the source text as possible. Err on the side of including more detail rather than less. Aim to produce notes that are significantly long and cover the material exhaustively.
-4.  **Formatting:** Use standard Markdown. Ensure clear separation between sections and points. LaTeX ($ $/$$ $$) can be used if relevant for mathematical or scientific notation, but prioritize clear textual explanation and structure.
-5.  **Output:** Provide *only* the generated Markdown note content. Do not include introductory phrases like "Here are the detailed notes:" or concluding remarks. Start directly with the first heading or point.
+1.  **Structure:** Use Markdown extensively to organize the information logically based on the text's flow and topics. Employ the following Markdown elements:
+    * **Headings:** Use \`# Main Headings\`, \`## Subheadings\`, and \`### Sub-subheadings\` to create a clear hierarchical structure.
+    * **Lists:** Utilize \`*\`, \`-\`, or \`+\` for bullet points and numbered lists (\`1.\`, \`2.\`, etc.) where appropriate to present items, steps, or sequences.
+    * **Emphasis:** Use \`**bold**\` for key terms, concepts, and important figures, \`*italics*\` for emphasis or definitions, \`***bold italics***\` for strong emphasis, and \`\`\`inline code\`\`\` for short code snippets or technical terms. Use \`~~strikethrough~~\` to indicate deleted or superseded information.
+    * **Tables:** If the source text contains data that can be effectively presented in a tabular format, use Markdown tables. Ensure clear headers and well-organized rows and columns. Use colons (:) in the separator row to indicate column alignment (e.g., \`:--\`: left, \`--:\`: right, \`:-:\`: center). Example:
+        \`\`\`markdown
+        | Header 1 | Header 2 | Header 3 |
+        |:---|:---:|---:|
+        | Left     | Center | Right  |
+        | Data A   | Data B | Data C |
+        | More data| Even more| ...    |
+        \`\`\`
+    * **Code Blocks:** Use fenced code blocks with triple backticks (\`\`\`) for multi-line code or examples. Specify the language for syntax highlighting if applicable (e.g., \`\`\`python\`).
+    * **Blockquotes:** Use \`>\` for quoted text or important excerpts. Multiple \`>\` can create nested blockquotes.
+    * **Horizontal Rules:** Use \`---\`, \`***\`, or \`___\` on a separate line to visually separate different sections of the notes.
+    * **Footnotes:** If the text contains references or requires additional explanations, use footnotes with the syntax \`[^label]\` for the reference in the text and \`[^label]: detailed explanation\` elsewhere in the notes.
+    * **Definition Lists:** If the text presents terms and their definitions, use definition lists:
+        \`\`\`markdown
+        Term 1
+        : Definition of Term 1.
+        Term 2
+        : A more detailed explanation of Term 2.
+        \`\`\`
+    * **Task Lists (Checkboxes):** If the text includes actions or items that can be checked off, use task lists:
+        \`\`\`markdown
+        - [ ] Item that needs to be done.
+        - [x] Item that is completed.
+        \`\`\`
+    * **Emoji:** If relevant and if the AI can reliably render them, use standard emoji shortcodes (e.g., \`:information_source:\`). However, prioritize clarity and avoid excessive use.
+    * **Subscript and Superscript:** If the text contains mathematical or chemical formulas, use HTML tags \`<sub>\` for subscript (e.g., \`H<sub>2</sub>O\`) and \`<sup>\` for superscript (e.g., \`E=mc<sup>2</sup>\`). If a specific Markdown extension syntax is commonly used and reliably rendered, you may use that (e.g., sometimes \`H~2~O\` and \`E=mc^2\`).
+    * **Highlighting:** If the text emphasizes specific parts that would benefit from highlighting, use the \`==highlighted text==\` syntax if supported by common Markdown processors.
+2.  **Comprehensiveness:** Do NOT just summarize briefly. Extract and present key facts, concepts, definitions, arguments, events, historical figures, dates, and supporting details mentioned in the text. Go into substantial detail for each point, utilizing the various Markdown formatting options to structure and emphasize the information.
+3.  **Length & Detail:** Generate a lengthy output. Your primary goal is to be thorough and capture as much specific information from the source text as possible. Err on the side of including more detail rather than less. Aim to produce notes that are significantly long and cover the material exhaustively.
+4.  **Formatting:** Ensure clear separation between sections and points. LaTeX (\`$\` \`$\`/\`$$\` \`$$\`) can be used if relevant for mathematical or scientific notation, but prioritize clear textual explanation and structure using the Markdown elements listed above.
+5.  **Diagrams and Graphs:** Determine if the AI can directly render diagrams or graphs using extensions like Mermaid or PlantUML within Markdown code blocks (e.g., \`\`\`mermaid\`\`\`, \`\`\`plantuml\`\`\`). If direct rendering is not reliably supported, describe any diagrams or graphs mentioned in the text in detail, including their title, labels, axes (if applicable), and the key relationships or data they present. If the text provides data suitable for a simple textual representation of a graph (e.g., trends, comparisons), you may attempt to create a basic textual representation within a table or using lists.
+6.  **Output:** Provide *only* the generated Markdown note content. Do not include introductory phrases like "Here are the detailed notes:" or concluding remarks. Start directly with the first heading or point.
 
 **Text Content:**
 ---
@@ -99,7 +131,7 @@ ${noteInputText}
 ---
 
 **Generated Markdown Notes:**
-`; // No trailing characters after the prompt marker
+`; // No trailing characters
 
     let detailedNoteContent = 'AI detailed note generation failed.'; // Fallback content
     try {

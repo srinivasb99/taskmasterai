@@ -35,9 +35,7 @@ import 'react-pdf/dist/esm/Page/TextLayer.css';
 
 // --- Markdown Editor Import ---
 import MDEditor from '@uiw/react-md-editor';
-// *** CORRECTED CSS IMPORT PATHS ***
-import '@uiw/react-md-editor/dist/markdown-editor.css'; // Base CSS
-import '@uiw/react-md-editor/dist/react-markdown-preview.css'; // Preview CSS
+
 
 // Configure PDF.js worker
 pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js'; // Load from public folder

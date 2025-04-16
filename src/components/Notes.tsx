@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -36,8 +35,8 @@ import 'react-pdf/dist/esm/Page/TextLayer.css';
 
 // --- Markdown Editor Import ---
 import MDEditor from '@uiw/react-md-editor';
-import '@uiw/react-md-editor/markdown-editor.css'; // Base CSS
-import '@uiw/react-md-editor/react-markdown-preview.css'; // Preview CSS
+import '@uiw/react-md-editor/dist/markdown-editor.css'; // Correct Path
+import '@uiw/react-md-editor/dist/react-markdown-preview.css'; // Correct Path
 
 // *** IMPORTANT: Configure PDF.js worker ***
 // Load from the public folder. Ensure pdf.worker.min.js is copied there!

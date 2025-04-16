@@ -279,15 +279,41 @@ export function Notes() {
                     <div className="flex-1 mt-3 overflow-hidden" data-color-mode={isIlluminateEnabled ? 'light' : 'dark'}>
                       <MDEditor
                         value={editContent}
-                        onChange={setEditContent} // Updates state directly
-                        height="100%" // Fill available space
-                        preview="edit" // Show live preview alongside editor
+                        onChange={setEditContent}
+                        height="100%"
+                        // *** UPDATED: Set preview to 'edit' AND customize commands ***
+                        preview="edit" // Default to write mode
+                        commands={[ // Explicitly define commands, omitting 'live'
+                            MDEditor.commands.bold,
+                            MDEditor.commands.italic,
+                            MDEditor.commands.strikethrough,
+                            MDEditor.commands.hr,
+                            MDEditor.commands.title, // Keep title/heading dropdown
+                            MDEditor.commands.divider, // Keep dividers
+                            MDEditor.commands.link,
+                            MDEditor.commands.quote,
+                            MDEditor.commands.code,
+                            MDEditor.commands.codeBlock, // Keep code block
+                            MDEditor.commands.image,
+                            MDEditor.commands.divider,
+                            MDEditor.commands.unorderedListCommand,
+                            MDEditor.commands.orderedListCommand,
+                            MDEditor.commands.checkedListCommand,
+                            MDEditor.commands.divider,
+                            MDEditor.commands.fullscreen,
+                             // This group normally contains write, preview, live. We only include write and preview.
+                             // Note: The actual buttons might still appear grouped visually depending on the library's styling,
+                             // but the 'live' function/button itself is excluded.
+                            MDEditor.commands.group([MDEditor.commands.write, MDEditor.commands.preview], {
+                                name: 'preview',
+                                groupName: 'preview',
+                                buttonProps: { 'aria-label': 'Preview', title: 'Preview' },
+                            }),
+                        ]}
                         textareaProps={{
                           placeholder: "Start writing your note in Markdown...",
-                          className: `${inputBg} ${inputTextColor} ${placeholderColor}` // Apply basic theme
                         }}
-                        // Customize toolbar or hide elements if needed
-                        // hideToolbar={true}
+                        className="markdown-editor-container"
                       />
                     </div>
                     {/* Action Buttons */}

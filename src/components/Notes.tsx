@@ -35,15 +35,14 @@ import 'react-pdf/dist/esm/Page/TextLayer.css';
 
 // --- Markdown Editor Import ---
 import MDEditor from '@uiw/react-md-editor';
-import '@uiw/react-md-editor/dist/markdown-editor.css'; // Correct Path
-import '@uiw/react-md-editor/dist/react-markdown-preview.css'; // Correct Path
+// *** CORRECTED CSS IMPORT PATHS ***
+import '@uiw/react-md-editor/dist/markdown-editor.css'; // Base CSS
+import '@uiw/react-md-editor/dist/react-markdown-preview.css'; // Preview CSS
 
-// *** IMPORTANT: Configure PDF.js worker ***
-// Load from the public folder. Ensure pdf.worker.min.js is copied there!
-pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
-// --- End PDF/Editor Imports ---
+// Configure PDF.js worker
+pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js'; // Load from public folder
 
-// Types (Note interface remains the same)
+// Types
 interface Note {
   id: string; title: string; content: string; type: 'personal' | 'pdf' | 'youtube' | 'audio';
   createdAt: Timestamp; updatedAt: Timestamp; userId: string; sourceUrl?: string;

@@ -36,8 +36,6 @@ import 'react-pdf/dist/esm/Page/TextLayer.css';
 // --- Markdown Editor Import ---
 import MDEditor from '@uiw/react-md-editor';
 
-pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
-
 
 // Types
 interface Note {

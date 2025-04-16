@@ -48,7 +48,7 @@
     "better-react-mathjax": "^2.0.1",
     "zwitch": "^1.0.0",
     "@uiw/react-md-editor": "^4.0.4",
-    "html2pdf.js": "^0.10.1" // Added dependency
+    "html2pdf.js": "^0.10.1" 
   },
   "devDependencies": {
     "@eslint/js": "^9.9.1",

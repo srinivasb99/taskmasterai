@@ -1,106 +1,33 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageCircle, Send, Timer as TimerIcon, Bot, X, AlertTriangle, Loader2, Sparkles, Check, ChevronDown, Maximize, Minimize, Edit } from 'lucide-react'; // Added Edit icon maybe
+import { MessageCircle, Send, Timer as TimerIcon, Bot, X, AlertTriangle, Loader2, Sparkles, ChevronDown, Maximize, Minimize, Edit, Check } from 'lucide-react'; // Added Check
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import remarkGfm from 'remark-gfm';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
 import { Timer } from './Timer';
-// Removed FlashcardsQuestions import as it wasn't used in the original code provided
 
-// --- Types ---
+// Types
 interface TimerMessage { type: 'timer'; duration: number; id: string; }
 interface ChatMessage {
-  id?: string;
-  role: 'user' | 'assistant';
-  content: string;
-  timer?: TimerMessage;
-  // Removed flashcard/question types as they weren't used
-  error?: boolean;
+  id?: string; role: 'user' | 'assistant'; content: string;
+  timer?: TimerMessage; error?: boolean;
   isEditSuggestion?: boolean; // Flag for AI edit suggestions
+  proposedContent?: string; // Store proposed content if it's an edit
 }
-
-interface Note {
-  id: string; // Need ID for updates
-  title: string;
-  content: string; // Current note content
-  keyPoints?: string[];
-  questions?: { question: string }[]; // Simplified questions type based on original
-}
-
+interface Note { id: string; title: string; content: string; keyPoints?: string[]; questions?: { question: string }[]; }
 interface NoteChatProps {
-  note: Note;
-  onClose: () => void;
-  geminiApiKey: string;
-  userName: string;
-  isIlluminateEnabled: boolean;
-  isBlackoutEnabled: boolean;
-  isVisible: boolean;
-  // --- Add handler for updating note content ---
+  note: Note; onClose: () => void; geminiApiKey: string; userName: string;
+  isIlluminateEnabled: boolean; isBlackoutEnabled: boolean; isVisible: boolean;
   onUpdateNoteContent: (noteId: string, newContent: string) => Promise<void>;
 }
 
-// --- Helper Functions (Assume fetchWithRetry, extractCandidateText are present and correct) ---
-async function fetchWithRetry(url: string, options: RequestInit, retries = 3, delayMs = 3000): Promise<Response> {
-    for (let attempt = 0; attempt < retries; attempt++) {
-        try {
-            const response = await fetch(url, options);
-            if (!response.ok && (response.status === 429 || response.status >= 500)) {
-                console.warn(`Attempt ${attempt + 1} failed with status ${response.status}. Retrying...`);
-                if (attempt === retries - 1) throw new Error(`API Error (${response.status}) after ${retries} attempts.`);
-                await new Promise(resolve => setTimeout(resolve, delayMs * (attempt + 1)));
-                continue;
-            }
-            return response;
-        } catch (error) {
-            console.error(`Attempt ${attempt + 1} fetch error:`, error);
-            if (attempt === retries - 1) throw error;
-            await new Promise(resolve => setTimeout(resolve, delayMs * (attempt + 1)));
-        }
-    }
-    throw new Error(`Max retries reached for: ${url}`);
-}
-
-const extractCandidateText = (responseText: string): string => {
-    try {
-        const jsonResponse = JSON.parse(responseText);
-        if (jsonResponse?.candidates?.[0]?.content?.parts?.[0]?.text) {
-            return jsonResponse.candidates[0].content.parts[0].text;
-        }
-        if (jsonResponse?.candidates?.[0]?.finishReason === 'SAFETY') {
-            console.warn("Gemini response blocked due to safety settings.");
-            return "My response was blocked due to safety filters. Could you please rephrase your request?";
-        }
-        if (jsonResponse?.error?.message) {
-            console.error("Gemini API Error:", jsonResponse.error.message);
-            return `Error: ${jsonResponse.error.message}`;
-        }
-        if (!jsonResponse?.candidates?.[0]?.content?.parts?.[0]?.text) {
-            console.warn("Gemini response structure unexpected or empty text:", responseText);
-            return "Sorry, I received an empty or non-text response. Please try again.";
-        }
-        return "Error: Unknown issue extracting text."; // Fallback
-    } catch (err) {
-        if (responseText.toLowerCase().includes("api error")) { return `Error: ${responseText}`; }
-        console.error('Error parsing Gemini response:', err, 'Raw response:', responseText);
-        return "Error: Could not parse AI response.";
-    }
-};
-
+// Helper Functions (fetchWithRetry, extractCandidateText - assumed same)
+async function fetchWithRetry(url: string, options: RequestInit, retries = 3, delayMs = 3000): Promise<Response> { for (let attempt = 0; attempt < retries; attempt++) { try { const response = await fetch(url, options); if (!response.ok && (response.status === 429 || response.status >= 500)) { console.warn(`Attempt ${attempt + 1} failed: ${response.status}. Retrying...`); if (attempt === retries - 1) throw new Error(`API Error (${response.status}) after ${retries} attempts.`); await new Promise(resolve => setTimeout(resolve, delayMs * (attempt + 1))); continue; } return response; } catch (error) { console.error(`Attempt ${attempt + 1} fetch error:`, error); if (attempt === retries - 1) throw error; await new Promise(resolve => setTimeout(resolve, delayMs * (attempt + 1))); } } throw new Error(`Max retries reached for: ${url}`); }
+const extractCandidateText = (responseText: string): string => { try { const jsonResponse = JSON.parse(responseText); if (jsonResponse?.candidates?.[0]?.content?.parts?.[0]?.text) { return jsonResponse.candidates[0].content.parts[0].text; } if (jsonResponse?.candidates?.[0]?.finishReason === 'SAFETY') { return "My response was blocked due to safety filters."; } if (jsonResponse?.error?.message) { return `Error: ${jsonResponse.error.message}`; } if (!jsonResponse?.candidates?.[0]?.content?.parts?.[0]?.text) { return "Sorry, I received an empty or non-text response."; } return "Error: Unknown issue extracting text."; } catch (err) { if (responseText.toLowerCase().includes("api error")) { return `Error: ${responseText}`; } console.error('Error parsing Gemini response:', err, 'Raw:', responseText); return "Error: Could not parse AI response."; } };
 const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=`; // Append key later
-// --- End Helper Functions ---
 
-
-export function NoteChat({
-    note,
-    onClose,
-    geminiApiKey,
-    userName,
-    isIlluminateEnabled,
-    isBlackoutEnabled,
-    isVisible,
-    onUpdateNoteContent // Get the update handler
-}: NoteChatProps) {
+export function NoteChat({ note, onClose, geminiApiKey, userName, isIlluminateEnabled, isBlackoutEnabled, isVisible, onUpdateNoteContent }: NoteChatProps) {
   const [chatMessage, setChatMessage] = useState('');
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [isChatLoading, setIsChatLoading] = useState(false);
@@ -108,7 +35,7 @@ export function NoteChat({
   const chatEndRef = useRef<HTMLDivElement>(null);
   const initialMessageSent = useRef(false);
 
-  // --- Theme Styles (remain the same) ---
+  // Theme Styles (remain the same)
   const overlayBg = isIlluminateEnabled ? "bg-white" : isBlackoutEnabled ? "bg-black border border-gray-700/60" : "bg-gray-800";
   const headerBg = isIlluminateEnabled ? "bg-gray-50/90 border-gray-200" : "bg-gray-900/80 border-gray-700";
   const headingColor = isIlluminateEnabled ? "text-gray-800" : "text-white";
@@ -116,7 +43,7 @@ export function NoteChat({
   const inputTextColor = isIlluminateEnabled ? "text-gray-900" : "text-gray-200";
   const placeholderColor = isIlluminateEnabled ? "placeholder-gray-400" : "placeholder-gray-500";
   const buttonPrimaryClass = "bg-blue-600 hover:bg-blue-700 text-white";
-  const buttonSecondaryClass = isIlluminateEnabled ? "bg-gray-200 hover:bg-gray-300 text-gray-700" : "bg-gray-600 hover:bg-gray-500 text-gray-300"; // For edit button
+  const buttonSecondaryClass = isIlluminateEnabled ? "bg-gray-200 hover:bg-gray-300 text-gray-700" : "bg-gray-600 hover:bg-gray-500 text-gray-300";
   const buttonDisabledClass = "opacity-50 cursor-not-allowed";
   const userBubbleClass = isIlluminateEnabled ? 'bg-blue-500 text-white' : 'bg-blue-600 text-white';
   const assistantBubbleClass = isIlluminateEnabled ? 'bg-gray-100 text-gray-800 border border-gray-200/80' : 'bg-gray-700/80 text-gray-200 border border-gray-600/50';
@@ -124,104 +51,34 @@ export function NoteChat({
   const editSuggestionBubbleClass = isIlluminateEnabled ? 'bg-yellow-50 border border-yellow-200 text-yellow-800' : 'bg-yellow-900/30 border border-yellow-700/50 text-yellow-300';
   const iconColor = isIlluminateEnabled ? "text-gray-500 hover:text-gray-700" : "text-gray-400 hover:text-gray-200";
 
-  // Reset chat on visibility/note change
-  useEffect(() => {
-      if (isVisible && note && !initialMessageSent.current) {
-          setChatHistory([ { id: `initial-greet-${Date.now()}`, role: 'assistant', content: `👋 Hi ${userName}! Ask me anything about **"${note.title}"** or ask me to modify it.` } ]);
-          setChatMessage(''); setIsChatLoading(false);
-          initialMessageSent.current = true;
-      } else if (!isVisible) {
-          initialMessageSent.current = false;
-      }
-  }, [note, isVisible, userName]);
-
+  // Reset chat
+  useEffect(() => { if (isVisible && note && !initialMessageSent.current) { setChatHistory([{ id: `init-${Date.now()}`, role: 'assistant', content: `Hi ${userName}! Ask about **"${note.title}"** or ask me to change it.` }]); setChatMessage(''); setIsChatLoading(false); initialMessageSent.current = true; } else if (!isVisible) { initialMessageSent.current = false; } }, [note, isVisible, userName]);
   // Scroll effect
-  useEffect(() => {
-      if (!isMinimized) {
-          setTimeout(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }); }, 50);
-      }
-  }, [chatHistory, isMinimized]);
+  useEffect(() => { if (!isMinimized) { setTimeout(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }); }, 50); } }, [chatHistory, isMinimized]);
+  // Timer handlers (remain the same)
+  const handleTimerComplete = (timerId: string) => setChatHistory(prev => [...prev, { id: `timer-comp-${timerId}`, role: 'assistant', content: "⏰ Time's up!" }]);
+  const parseTimerRequest = (message: string): number | null => { const M=message.match(/(\d+)\s*(m|min|minute|h|hr|hour|s|sec|second)s?/i); if(!M) return null; const A=parseInt(M[1]); const U=M[2].toLowerCase(); if(isNaN(A)||A<=0) return null; if(U.startsWith('h')) return A*3600; if(U.startsWith('m')) return A*60; if(U.startsWith('s')) return A; return null; };
 
-  // Timer handling (remains the same)
-  const handleTimerComplete = (timerId: string) => setChatHistory(prev => [...prev, { id: `timer-complete-${timerId}`, role: 'assistant', content: "⏰ Time's up!" }]);
-  const parseTimerRequest = (message: string): number | null => { /* ... (implementation same as before) ... */
-    const timeRegex = /(\d+)\s*(minutes?|mins?|hours?|hrs?|seconds?|secs?)/i; const match = message.match(timeRegex); if (!match) return null; const amount = parseInt(match[1]); const unit = match[2].toLowerCase(); if (isNaN(amount) || amount <= 0) return null; if (unit.startsWith('hour') || unit.startsWith('hr')) return amount * 3600; if (unit.startsWith('min')) return amount * 60; if (unit.startsWith('sec')) return amount; return null;
+  // Accept AI Edit
+  const handleAcceptEdit = async (suggestedContent: string | undefined) => {
+      if (!note || isChatLoading || !suggestedContent) return; setIsChatLoading(true);
+      try { await onUpdateNoteContent(note.id, suggestedContent); setChatHistory(prev => [...prev, { id: `edit-ok-${Date.now()}`, role: 'assistant', content: "✅ Note updated!" }]); }
+      catch (error) { console.error("Error accepting edit:", error); setChatHistory(prev => [...prev, { id: `edit-err-${Date.now()}`, role: 'assistant', content: `❌ Update failed: ${error instanceof Error ? error.message : 'Unknown'}`, error: true }]); }
+      finally { setIsChatLoading(false); }
   };
 
-  // --- Handle Accepting AI Edit Suggestion ---
-  const handleAcceptEdit = async (suggestedContent: string) => {
-      if (!note || isChatLoading) return;
-       setIsChatLoading(true); // Show loading while saving
-      try {
-          await onUpdateNoteContent(note.id, suggestedContent);
-          // Add a confirmation message to chat history
-          setChatHistory(prev => [...prev, { id: `edit-confirm-${Date.now()}`, role: 'assistant', content: "✅ Note updated successfully!" }]);
-      } catch (error) {
-          console.error("Error accepting edit:", error);
-          setChatHistory(prev => [...prev, { id: `edit-error-${Date.now()}`, role: 'assistant', content: `❌ Failed to update note: ${error instanceof Error ? error.message : 'Unknown error'}`, error: true }]);
-      } finally {
-           setIsChatLoading(false);
-      }
-  };
-
-
-  // Chat Submit Handler (MODIFIED FOR EDITING)
+  // Chat Submit
   const handleChatSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const currentMessage = chatMessage.trim();
-    if (!currentMessage || isChatLoading || !geminiApiKey || !note) return;
+    e.preventDefault(); const currentMessage = chatMessage.trim(); if (!currentMessage || isChatLoading || !geminiApiKey || !note) return; setChatMessage('');
+    const timerDuration = parseTimerRequest(currentMessage); const userMsg: ChatMessage = { id: `user-${Date.now()}`, role: 'user', content: currentMessage }; setChatHistory(prev => [...prev, userMsg]);
+    if (timerDuration) { const tId = `t-${Date.now()}`; setChatHistory(prev => [ ...prev, { id: `tstart-${tId}`, role: 'assistant', content: `Timer set: ${timerDuration >= 60 ? Math.round(timerDuration / 60) + 'm' : timerDuration + 's'}.`, timer: { type: 'timer', duration: timerDuration, id: tId } } ]); return; }
 
-    setChatMessage('');
+    setIsChatLoading(true); const loadingMsgId = `load-${Date.now()}`; setChatHistory(prev => [...prev, { id: loadingMsgId, role: 'assistant', content: '...' }]);
+    const recentHistory = chatHistory.slice(-8);
 
-    const timerDuration = parseTimerRequest(currentMessage);
-    const userMsg: ChatMessage = { id: `user-${Date.now()}`, role: 'user', content: currentMessage };
-    setChatHistory(prev => [...prev, userMsg]);
-
-    if (timerDuration) {
-      const timerId = `timer-${Date.now()}`;
-      setChatHistory(prev => [ ...prev, { id: `timer-start-${timerId}`, role: 'assistant', content: `Okay, starting a timer for ${timerDuration >= 60 ? Math.round(timerDuration / 60) + ' minute(s)' : timerDuration + ' second(s)'}.`, timer: { type: 'timer', duration: timerDuration, id: timerId } } ]);
-      return;
-    }
-
-    setIsChatLoading(true);
-    const loadingMsgId = `assistant-loading-${Date.now()}`;
-    setChatHistory(prev => [...prev, { id: loadingMsgId, role: 'assistant', content: '...' }]);
-
-    const recentHistory = chatHistory.slice(-8); // Keep history size manageable
-
-    // --- MODIFIED SYSTEM PROMPT FOR EDITING ---
-    const systemInstruction = `You are NoteChat, an AI assistant for the note-taking app StudyKit. You help "${userName}" with their note titled "${note.title}".
-
-**Core Task:** Answer questions based **ONLY** on the provided note content/key points. State clearly if information is unavailable in the note.
-
-**NEW Editing Task:**
-*   If the user asks you to modify the note (add, remove, rewrite, reformat, etc.), **FIRST** generate the **COMPLETE, NEW** version of the note content incorporating their request.
-*   **THEN**, present this new content clearly to the user, enclosed within a specific JSON structure like this:
-    \`\`\`json
-    {
-      "action": "propose_edit",
-      "explanation": "Okay, I've updated the note as requested. Here is the new version:",
-      "new_content": "[The complete new markdown content of the note goes here...]"
-    }
-    \`\`\`
-*   **CRITICAL:** The \`new_content\` field **MUST** contain the entire proposed note content in valid Markdown, not just the changed part. Use the current note content below as the base for modification.
-*   Do **NOT** output the JSON structure for simple questions or discussions. Only use it when proposing a modification to the note content itself.
-*   Ensure \`new_content\` is valid JSON string (e.g., escape backticks, newlines \`\\n\`, quotes \`\\"\`).
-
-**Current Note Title:** ${note.title}
-
-**Current Note Content (Markdown):**
-"""
-${note.content.slice(0, 5000)}
-"""
-
-**Key Points (Reference Only):**
-${note.keyPoints && note.keyPoints.length > 0 ? note.keyPoints.map(p => `- ${p}`).join('\n') : 'N/A'}
-`;
-    // --- END MODIFIED SYSTEM PROMPT ---
-
-    // Construct payload (using simplified prompt structure for Flash model)
-     const promptForModel = `${systemInstruction}\n\n**Chat History:**\n${recentHistory.map(m => `${m.role === 'user' ? userName : 'NoteChat'}: ${m.content.replace(/```json[\s\S]*?```/g, '[Edit Proposed]')}`).join('\n')}\n\n**${userName}: ${currentMessage}**\n**NoteChat:**`; // Simplified history view
+    // Updated System Prompt
+    const systemInstruction = `You are NoteChat, assisting "${userName}" with note "${note.title}". Answer questions based **ONLY** on provided content. If info is missing, state that. If asked to modify the note (add, remove, rewrite), generate the **COMPLETE, NEW** note content and present it in this JSON structure: \`\`\`json\n{\n  "action": "propose_edit",\n  "explanation": "[Your explanation, e.g., Okay, I've updated the note...]",\n  "new_content": "[The FULL new markdown content, escaped as a JSON string.]"\n}\n\`\`\`\n**CRITICAL:** The \`new_content\` MUST be the entire proposed note. Use the Current Note Content below as the base. Ensure the JSON is valid. Do **NOT** use JSON for simple questions. Current Note Content:\n"""\n${note.content.slice(0, 5000)}\n"""\nKey Points (Reference Only):\n${note.keyPoints?.map(p => `- ${p}`).join('\n') || 'N/A'}`;
+    const promptForModel = `${systemInstruction}\n\n**Chat History:**\n${recentHistory.map(m => `${m.role === 'user' ? userName : 'NoteChat'}: ${m.content.replace(/```json[\s\S]*?```/g, '[Edit Proposed]')}`).join('\n')}\n\n**${userName}: ${currentMessage}**\n**NoteChat:**`;
 
     try {
       const fullGeminiEndpoint = `${GEMINI_ENDPOINT}${geminiApiKey}`;
@@ -229,144 +86,65 @@ ${note.keyPoints && note.keyPoints.length > 0 ? note.keyPoints.map(p => `- ${p}`
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: promptForModel }] }],
-          generationConfig: { temperature: 0.6, maxOutputTokens: 4096, topP: 0.95, /* topK: 40 */ }, // Increased tokens for potential edits
-          safetySettings: [ /* ... (safety settings remain the same) ... */
-            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" }, { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_MEDIUM_AND_ABOVE" }, { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_MEDIUM_AND_ABOVE" }, { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-          ],
+          // *** INCREASED TOKEN LIMIT FOR EDITS ***
+          generationConfig: { temperature: 0.6, maxOutputTokens: 8192, topP: 0.95 },
+          safetySettings: [ /* ... (safety settings) ... */ { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" }, { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_MEDIUM_AND_ABOVE" }, { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_MEDIUM_AND_ABOVE" }, { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" }, ],
         })
       };
-
-      const response = await fetchWithRetry(fullGeminiEndpoint, geminiOptions);
-      const responseText = await response.text();
-
-      if (!response.ok) {
-          let errorMsg = `Chat API request failed (${response.status})`; try { const errorJson = JSON.parse(responseText); if (errorJson?.error?.message) { errorMsg = `Error: ${errorJson.error.message}`; } } catch (_) { /* ignore */ } throw new Error(errorMsg);
-      }
+      const response = await fetchWithRetry(fullGeminiEndpoint, geminiOptions); const responseText = await response.text();
+      if (!response.ok) { let eMsg = `API Error (${response.status})`; try { const eJson = JSON.parse(responseText); if (eJson?.error?.message) eMsg = `Error: ${eJson.error.message}`; } catch (_) {} throw new Error(eMsg); }
 
       const assistantRawReply = extractCandidateText(responseText);
+      let finalContent = assistantRawReply; let isEdit = false; let proposedContent: string | undefined = undefined;
 
-      // --- Check for Edit Proposal JSON ---
-      let finalContent = assistantRawReply;
-      let isEdit = false;
-      let proposedContent = ""; // Store the proposed content separately
-
-       // Try to find and parse the JSON block
+      // --- More Robust JSON Parsing ---
        const jsonMatch = assistantRawReply.match(/```json\s*([\s\S]*?)\s*```/);
+       let parseErrorOccurred = false;
        if (jsonMatch && jsonMatch[1]) {
            try {
-               const parsedJson = JSON.parse(jsonMatch[1]);
-               if (parsedJson.action === "propose_edit" && parsedJson.new_content) {
+               const parsedJson = JSON.parse(jsonMatch[1]); // Try parsing
+               if (parsedJson.action === "propose_edit" && typeof parsedJson.new_content === 'string') {
                    isEdit = true;
-                   // Use the explanation part for the chat bubble, store new_content
                    finalContent = parsedJson.explanation || "Here's the proposed update:";
-                   proposedContent = parsedJson.new_content;
+                   proposedContent = parsedJson.new_content; // Store the raw proposed markdown
                    console.log("Parsed edit proposal successfully.");
                } else {
-                    console.warn("JSON found, but structure is not a valid edit proposal:", parsedJson);
-                    // Fallback to showing the raw reply if JSON structure is wrong
-                    finalContent = assistantRawReply;
+                   console.warn("JSON found, but invalid structure:", parsedJson);
+                   finalContent = assistantRawReply; // Show raw if structure mismatch
                }
            } catch (parseError) {
-               console.error("Failed to parse JSON proposal:", parseError, "Raw JSON block:", jsonMatch[1]);
-               // Fallback to showing the raw reply if JSON is invalid
-               finalContent = `Error: Failed to parse the edit proposal. Raw response: ${assistantRawReply}`;
+               parseErrorOccurred = true;
+               console.error("Failed to parse JSON proposal:", parseError, "Raw JSON:", jsonMatch[1]);
+               finalContent = `Error: Failed to process the edit proposal. The AI's response structure was invalid. Please try rephrasing. (Raw response shown below)\n\n---\n${assistantRawReply}`; // Show raw on parse fail
            }
        }
-      // --- End Check for Edit Proposal JSON ---
-
+       // --- End JSON Parsing ---
 
        // Update loading message
-       setChatHistory(prev => prev.map(msg =>
-           msg.id === loadingMsgId
-               ? {
-                     ...msg,
-                     content: finalContent || "Sorry, I couldn't generate a response.",
-                     error: finalContent.startsWith("Error:") || responseText.includes("blocked due to safety filters"),
-                     // Add the proposed content if it's an edit, mark the message type
-                     ...(isEdit && { isEditSuggestion: true, proposedContent: proposedContent })
-                 }
-               : msg
-       ));
-
+       setChatHistory(prev => prev.map(msg => msg.id === loadingMsgId ? { ...msg, content: finalContent || "...", error: finalContent.startsWith("Error:") || parseErrorOccurred, isEditSuggestion: isEdit, proposedContent: proposedContent } : msg ));
 
     } catch (err) {
-      console.error('Chat submission error:', err);
-      setChatHistory(prev => prev.map(msg => msg.id === loadingMsgId ? { ...msg, content: `Sorry, an error occurred: ${err instanceof Error ? err.message : 'Unknown error'}. Please try again.`, error: true } : msg ));
-    } finally {
-      setIsChatLoading(false);
-    }
+      console.error('Chat submit error:', err);
+      setChatHistory(prev => prev.map(msg => msg.id === loadingMsgId ? { ...msg, content: `Error: ${err instanceof Error ? err.message : 'Unknown'}. Try again.`, error: true } : msg ));
+    } finally { setIsChatLoading(false); }
   };
 
-
-  // --- Render Logic ---
+  // Render Logic
   if (!isVisible || !note) return null;
-
   return (
-    // Main overlay container (Minimized/Maximized)
     <div className={`fixed bottom-4 right-4 z-50 ${overlayBg} rounded-lg w-full max-w-sm flex flex-col shadow-xl transition-all duration-300 ease-in-out ${ isMinimized ? 'h-12 overflow-hidden' : 'h-[65vh] max-h-[550px]' }`}>
-      {/* Header */}
-       <div className={`p-2 border-b ${headerBg} flex justify-between items-center flex-shrink-0 sticky top-0 cursor-pointer`} onClick={() => setIsMinimized(!isMinimized)} title={isMinimized ? "Expand Chat" : "Minimize Chat"}>
-         <h3 className={`text-sm font-semibold ${headingColor} flex items-center gap-1.5 truncate pr-2`}>
-           <MessageCircle className={`w-4 h-4 flex-shrink-0 ${isIlluminateEnabled ? 'text-blue-600' : 'text-blue-400'}`} />
-           <span className="truncate" title={`Chat: ${note.title}`}>Chat: {note.title}</span>
-         </h3>
-        <div className="flex items-center">
-            <button onClick={(e) => { e.stopPropagation(); setIsMinimized(!isMinimized); }} className={`${iconColor} transition-opacity rounded-full p-1 mr-1`} title={isMinimized ? "Expand" : "Minimize"}> {isMinimized ? <Maximize className="w-3 h-3" /> : <Minimize className="w-3 h-3" />} </button>
-            <button onClick={(e) => { e.stopPropagation(); onClose(); }} className={`${iconColor} transition-opacity rounded-full p-1`} title="Close Chat"> <X className="w-4 h-4" /> </button>
-        </div>
-      </div>
-
-       {/* Chat Body (Hidden when minimized) */}
-        {!isMinimized && ( <>
-            {/* Chat History */}
+      {/* Header */} <div className={`p-2 border-b ${headerBg} flex justify-between items-center shrink-0 sticky top-0 cursor-pointer`} onClick={() => setIsMinimized(!isMinimized)} title={isMinimized ? "Expand" : "Minimize"}> <h3 className={`text-sm font-semibold ${headingColor} flex items-center gap-1.5 truncate pr-2`}> <MessageCircle className={`w-4 h-4 shrink-0 ${isIlluminateEnabled ? 'text-blue-600' : 'text-blue-400'}`} /> <span className="truncate" title={`Chat: ${note.title}`}>Chat: {note.title}</span> </h3> <div className="flex items-center"> <button onClick={(e) => { e.stopPropagation(); setIsMinimized(!isMinimized); }} className={`${iconColor} rounded-full p-1 mr-1`} title={isMinimized ? "Expand" : "Minimize"}> {isMinimized ? <Maximize className="w-3 h-3" /> : <Minimize className="w-3 h-3" />} </button> <button onClick={(e) => { e.stopPropagation(); onClose(); }} className={`${iconColor} rounded-full p-1`} title="Close"> <X className="w-4 h-4" /> </button> </div> </div>
+      {/* Chat Body */} {!isMinimized && ( <>
             <div className="flex-1 overflow-y-auto p-3 space-y-3 scrollbar-thin scrollbar-thumb-gray-400 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent">
-            {chatHistory.map((message, index) => (
-                <div key={message.id || index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div
-                    className={`max-w-[85%] rounded-lg px-2.5 py-1.5 text-sm shadow-sm break-words ${
-                        message.role === 'user' ? userBubbleClass :
-                        message.error ? errorBubbleClass :
-                        message.isEditSuggestion ? editSuggestionBubbleClass : // Style for edit suggestions
-                        assistantBubbleClass
-                    }`}
-                >
-                    {/* Loading Indicator */}
-                    {message.content === "..." && isChatLoading ? ( <div className="flex space-x-1 p-1"> <div className={`w-1.5 h-1.5 rounded-full animate-bounce ${isIlluminateEnabled ? 'bg-gray-500' : 'bg-gray-400'}`}></div> <div className={`w-1.5 h-1.5 rounded-full animate-bounce delay-100 ${isIlluminateEnabled ? 'bg-gray-500' : 'bg-gray-400'}`}></div> <div className={`w-1.5 h-1.5 rounded-full animate-bounce delay-200 ${isIlluminateEnabled ? 'bg-gray-500' : 'bg-gray-400'}`}></div> </div> )
-                    : message.content ? ( /* Render actual content */
-                        <ReactMarkdown remarkPlugins={[remarkMath, remarkGfm]} rehypePlugins={[rehypeKatex]} className={`prose prose-sm max-w-none ${ isIlluminateEnabled ? (message.isEditSuggestion ? 'prose-yellow' : 'prose-gray text-gray-800') : (message.isEditSuggestion ? 'prose-invert text-yellow-200' : 'prose-invert text-gray-200') } prose-p:text-xs prose-p:my-1 prose-ul:text-xs prose-ol:text-xs prose-li:my-0`} components={{ a: ({node, ...props}) => <a target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-600" {...props} />, code: ({node, inline, className, children, ...props}) => { return !inline ? ( <pre className={`text-[10px] leading-snug ${isIlluminateEnabled ? '!bg-gray-200/70 !text-gray-800' : '!bg-gray-600/70 !text-gray-100'} p-1.5 rounded my-1 overflow-x-auto`} {...props}><code>{children}</code></pre> ) : ( <code className={`text-xs ${isIlluminateEnabled ? 'bg-gray-200/70 text-gray-800' : 'bg-gray-600/70 text-gray-100'} px-1 rounded`} {...props}>{children}</code> ); }, }}>
-                            {message.content}
-                        </ReactMarkdown>
-                     ) : null}
-
-                    {/* Timer Component */}
-                    {message.timer && ( <div className="mt-1.5"><div className={`flex items-center space-x-2 rounded-md px-2 py-1 text-xs border ${isIlluminateEnabled ? 'bg-blue-50 border-blue-200 text-blue-800' : 'bg-gray-800/60 border-gray-600 text-blue-300'}`}><TimerIcon className="w-3.5 h-3.5"/> <Timer key={message.timer.id} initialDuration={message.timer.duration} onComplete={() => handleTimerComplete(message.timer.id)} compact={true} isIlluminateEnabled={isIlluminateEnabled}/></div></div> )}
-
-                    {/* Accept Edit Button */}
-                    {message.isEditSuggestion && (message as any).proposedContent && !isChatLoading && (
-                         <div className="mt-2 border-t pt-1.5 flex justify-end">
-                             <button
-                                 onClick={() => handleAcceptEdit((message as any).proposedContent)}
-                                 className={`${buttonSecondaryClass} px-2.5 py-1 rounded-md text-xs flex items-center gap-1 hover:brightness-110`}
-                                 disabled={isChatLoading}
-                             >
-                                 <Check className="w-3.5 h-3.5" /> Apply Update
-                             </button>
-                         </div>
-                     )}
-                </div>
-                </div>
-            ))}
-            <div ref={chatEndRef} className="h-0"></div>
-            </div>
-
-            {/* Input Form */}
-            <form onSubmit={handleChatSubmit} className={`p-2 border-t ${headerBg} flex-shrink-0 sticky bottom-0`}>
-            <div className="flex gap-1.5 items-center">
-                <input type="text" value={chatMessage} onChange={(e) => setChatMessage(e.target.value)} placeholder="Ask or request changes..." className={`flex-1 ${inputBg} ${inputTextColor} ${placeholderColor} rounded-full px-3 py-1.5 text-sm focus:ring-1 focus:outline-none ${isChatLoading ? 'opacity-60' : ''}`} disabled={isChatLoading} />
-                <button type="submit" disabled={isChatLoading || !chatMessage.trim()} className={`${buttonPrimaryClass} p-2 rounded-full transition-all duration-150 ${isChatLoading || !chatMessage.trim() ? buttonDisabledClass : 'hover:scale-105 active:scale-100'}`}> {isChatLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} </button>
-            </div>
-            </form>
-        </> )} {/* End conditional rendering for !isMinimized */}
-    </div> // End overlay container
+            {chatHistory.map((message, index) => ( <div key={message.id || index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}> <div className={`max-w-[85%] rounded-lg px-2.5 py-1.5 text-sm shadow-sm break-words ${ message.role === 'user' ? userBubbleClass : message.error ? errorBubbleClass : message.isEditSuggestion ? editSuggestionBubbleClass : assistantBubbleClass }`}>
+                {message.content === "..." && isChatLoading ? ( <div className="flex space-x-1 p-1"><div className={`w-1.5 h-1.5 rounded-full animate-bounce ${isIlluminateEnabled ? 'bg-gray-500' : 'bg-gray-400'}`}></div><div className={`w-1.5 h-1.5 rounded-full animate-bounce delay-100 ${isIlluminateEnabled ? 'bg-gray-500' : 'bg-gray-400'}`}></div><div className={`w-1.5 h-1.5 rounded-full animate-bounce delay-200 ${isIlluminateEnabled ? 'bg-gray-500' : 'bg-gray-400'}`}></div></div> )
+                 : message.content ? ( <ReactMarkdown remarkPlugins={[remarkMath, remarkGfm]} rehypePlugins={[rehypeKatex]} className={`prose prose-sm max-w-none ${ isIlluminateEnabled ? (message.isEditSuggestion ? 'prose-yellow' : 'prose-gray text-gray-800') : (message.isEditSuggestion ? 'prose-invert text-yellow-200' : 'prose-invert text-gray-200') } prose-p:text-xs prose-p:my-1 prose-ul:text-xs prose-ol:text-xs prose-li:my-0`} components={{ a: ({node, ...props}) => <a target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-600" {...props} />, code: ({node, inline, className, children, ...props}) => { return !inline ? ( <pre className={`text-[10px] leading-snug ${isIlluminateEnabled ? '!bg-gray-200/70 !text-gray-800' : '!bg-gray-600/70 !text-gray-100'} p-1.5 rounded my-1 overflow-x-auto`} {...props}><code>{children}</code></pre> ) : ( <code className={`text-xs ${isIlluminateEnabled ? 'bg-gray-200/70 text-gray-800' : 'bg-gray-600/70 text-gray-100'} px-1 rounded`} {...props}>{children}</code> ); }, }}>{message.content}</ReactMarkdown> ) : null}
+                {message.timer && ( <div className="mt-1.5"><div className={`flex items-center space-x-2 rounded-md px-2 py-1 text-xs border ${isIlluminateEnabled ? 'bg-blue-50 border-blue-200 text-blue-800' : 'bg-gray-800/60 border-gray-600 text-blue-300'}`}><TimerIcon className="w-3.5 h-3.5"/> <Timer key={message.timer.id} initialDuration={message.timer.duration} onComplete={() => handleTimerComplete(message.timer.id)} compact={true} isIlluminateEnabled={isIlluminateEnabled}/></div></div> )}
+                {/* Accept Edit Button */} {message.isEditSuggestion && message.proposedContent && !isChatLoading && !message.error && ( <div className="mt-2 border-t pt-1.5 flex justify-end"> <button onClick={() => handleAcceptEdit(message.proposedContent)} className={`${buttonSecondaryClass} px-2.5 py-1 rounded-md text-xs flex items-center gap-1 hover:brightness-110`} disabled={isChatLoading} > <Check className="w-3.5 h-3.5" /> Apply Update </button> </div> )}
+            </div> </div> ))} <div ref={chatEndRef} className="h-0"></div> </div>
+            {/* Input Form */} <form onSubmit={handleChatSubmit} className={`p-2 border-t ${headerBg} shrink-0 sticky bottom-0`}> <div className="flex gap-1.5 items-center"> <input type="text" value={chatMessage} onChange={(e) => setChatMessage(e.target.value)} placeholder="Ask or request changes..." className={`flex-1 ${inputBg} ${inputTextColor} ${placeholderColor} rounded-full px-3 py-1.5 text-sm focus:ring-1 focus:outline-none ${isChatLoading ? 'opacity-60' : ''}`} disabled={isChatLoading} /> <button type="submit" disabled={isChatLoading || !chatMessage.trim()} className={`${buttonPrimaryClass} p-2 rounded-full transition-all duration-150 ${isChatLoading || !chatMessage.trim() ? buttonDisabledClass : 'hover:scale-105 active:scale-100'}`}> {isChatLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} </button> </div> </form>
+        </> )}
+    </div>
   );
 }
+

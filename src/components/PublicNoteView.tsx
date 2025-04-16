@@ -8,6 +8,7 @@ import remarkGfm from 'remark-gfm'; // Needed for tables, etc.
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
 import { Loader2, Lock, Share2, Download, Sun, Moon } from 'lucide-react';
+import html2pdf from 'html2pdf.js'; // Import PDF generation library
 
 // Interface matching the Note structure in Notes.tsx
 interface Note {
@@ -260,7 +261,7 @@ export function PublicNoteView() {
         ) : null}
       </div>
         <footer className={`text-center text-xs ${footerTextColor} mt-6 pb-6`}>
-            Note shared via StudyKit | <a href="/notes" className={`hover:underline ${footerLinkColor}`}>Create your own</a>
+            Note shared via TaskMaster AI | <a href="/notes" className={`hover:underline ${footerLinkColor}`}>Create your own</a>
         </footer>
      </div>
     </>

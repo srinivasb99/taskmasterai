@@ -256,7 +256,9 @@ Explanation: [Brief explanation why the chosen answer is correct]
 
 ---DIVIDER---
 
-Generate exactly 10 distinct questions in this precise format. Ensure all parts (Question, A, B, C, D, Correct, Explanation) are present for every question.`;
+Generate exactly 10 distinct questions in this precise format. Ensure all parts (Question, A, B, C, D, Correct, Explanation) are present for every question.
+In your output, NEVER SAY: "Here are 10 distinct and significant key points from the provided text:"
+`;
 
     const questionsOptions = {
       method: 'POST',

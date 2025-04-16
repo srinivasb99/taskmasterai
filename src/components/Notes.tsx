@@ -104,6 +104,7 @@ export function Notes() {
     const pdfViewerContainerRef = useRef<HTMLDivElement>(null);
     const [pdfScale, setPdfScale] = useState(1.0);
     const [pdfRotation, setPdfRotation] = useState(0);
+    // Removed currentPage state
 
     // PDF Highlighting State
     const [selectedPdfText, setSelectedPdfText] = useState<string | null>(null);
@@ -159,33 +160,27 @@ export function Notes() {
              if (showSplitView) {
                  const uLeft = notesList.find(n => n.id === splitViewNotes.left?.id);
                  const uRight = notesList.find(n => n.id === splitViewNotes.right?.id);
-                 // Only update if the references actually change to prevent re-renders
-                 if (uLeft !== splitViewNotes.left || uRight !== splitViewNotes.right) {
-                    setSplitViewNotes({ left: uLeft || null, right: uRight || null });
-                 }
+                 setSplitViewNotes({ left: uLeft || null, right: uRight || null });
              }
             setLoading(false);
         }, (error) => { console.error("Error fetching notes:", error); setLoading(false); setUploadProgress({ progress: 0, status: '', error: 'Could not load notes.' }); });
         return () => unsubscribe();
-        // Adjusted dependencies to be more stable
-    }, [user?.uid]); // Primarily depend on user ID. Inner logic handles updates based on current state.
+        // Dependencies need to correctly handle refreshes without causing loops
+    }, [user, selectedNote?.id, showSplitView, splitViewNotes.left?.id, splitViewNotes.right?.id, chatNote?.id, isChatOverlayVisible]);
 
 
     // Scroll content to top when note changes (excluding PDF view)
     useEffect(() => {
-        // Scroll main content area only if not in PDF view
         if (contentRef.current && !showPdfViewer) {
              contentRef.current.scrollTop = 0;
         }
-    }, [selectedNote?.id, isEditing, showSplitView, showPdfViewer]); // Trigger on key state changes, excluding PDF view scroll
+    }, [selectedNote, isEditing, splitViewNotes, showPdfViewer]);
 
-    // Reset PDF viewer state when note changes or isn't PDF type
+    // Reset PDF viewer state when note changes or isn't PDF
     useEffect(() => {
-        const isPdfNoteSelected = selectedNote?.type === 'pdf' && !!selectedNote.sourceUrl;
-
-        if (!isPdfNoteSelected) {
+        if (selectedNote?.type !== 'pdf' || !selectedNote.sourceUrl) {
             // If switching away from PDF or to a non-PDF note
-            if (showPdfViewer) setShowPdfViewer(false); // Turn off viewer only if it was on
+            if (showPdfViewer) setShowPdfViewer(false); // Explicitly turn off viewer if active
             setNumPages(null);
             setPdfError(null);
             setPdfScale(1.0);
@@ -193,53 +188,30 @@ export function Notes() {
             setShowHighlightButtons(false);
             setSelectedPdfText(null);
         } else {
-            // If a PDF note IS selected, reset defaults but DON'T automatically show viewer
-            // Resetting here ensures that if user toggles viewer off/on, it starts fresh
-            setNumPages(null);
-            setPdfError(null);
-            setPdfScale(1.0);
-            setPdfRotation(0);
-            setShowHighlightButtons(false);
-            setSelectedPdfText(null);
+            // If selecting a PDF note (but not necessarily viewing it yet)
+             // Reset state, but don't force showPdfViewer on, let user click the Eye icon
+             setShowPdfViewer(false);
+             setNumPages(null);
+             setPdfError(null);
+             setPdfScale(1.0);
+             setPdfRotation(0);
+             setShowHighlightButtons(false);
+             setSelectedPdfText(null);
         }
-    }, [selectedNote?.id, selectedNote?.type, selectedNote?.sourceUrl]); // Depend on note identity and type
-
+    }, [selectedNote]); // Only trigger on selectedNote change
 
     // --- Handlers ---
     const handleToggleSidebar = () => setIsSidebarCollapsed(prev => !prev);
-    const handleSelectNote = (note: Note) => {
-        if (showSplitView) {
-            handleSplitViewSelect(note);
-        } else {
-            setSelectedNote(note);
-            setIsEditing(false);
-            setQuestionAnswers({});
-            if (isMobile) { setShowNotesListOnMobile(false); }
-            setIsChatOverlayVisible(false); // Close overlay chat on any new selection
-            setChatNote(null);
-            setShowPdfViewer(false); // Ensure PDF viewer is off when selecting note initially
-        }
-    };
-    const handleSplitViewSelect = (note: Note) => {
-        if (!splitViewNotes.left) {
-            setSplitViewNotes({ ...splitViewNotes, left: note });
-        } else if (!splitViewNotes.right && note.id !== splitViewNotes.left.id) {
-            setSplitViewNotes({ ...splitViewNotes, right: note });
-            if (isMobile) { setShowNotesListOnMobile(false); }
-        }
-        setIsChatOverlayVisible(false); // Close overlay chat if split view is active
-        setChatNote(null);
-        setShowPdfViewer(false); // Ensure PDF viewer is off
-    };
+    const handleSelectNote = (note: Note) => { if (showSplitView) { handleSplitViewSelect(note); } else { setSelectedNote(note); setIsEditing(false); setQuestionAnswers({}); if (isMobile) { setShowNotesListOnMobile(false); } setIsChatOverlayVisible(false); // Close overlay chat on new selection setChatNote(null); setShowPdfViewer(false); // Ensure PDF viewer is off when selecting note initially } };
+    const handleSplitViewSelect = (note: Note) => { if (!splitViewNotes.left) { setSplitViewNotes({ ...splitViewNotes, left: note }); } else if (!splitViewNotes.right && note.id !== splitViewNotes.left.id) { setSplitViewNotes({ ...splitViewNotes, right: note }); if (isMobile) { setShowNotesListOnMobile(false); } } setIsChatOverlayVisible(false); setChatNote(null); setShowPdfViewer(false);};
     const startSplitView = () => { setShowSplitView(true); setSelectedNote(null); setSplitViewNotes({ left: null, right: null }); setIsChatOverlayVisible(false); setChatNote(null); setShowPdfViewer(false); if (isMobile) { setShowNotesListOnMobile(true); } };
     const closeSplitView = () => { setShowSplitView(false); setSplitViewNotes({ left: null, right: null }); if (notes.length > 0 && !isMobile) { setSelectedNote(notes[0]); } else { setSelectedNote(null); } if (isMobile) { setShowNotesListOnMobile(true); } setIsChatOverlayVisible(false); setChatNote(null); setShowPdfViewer(false); };
 
-    const handleChatWithNote = (note: Note) => {
-         if (note.type === 'pdf' && note.sourceUrl) {
-             // For PDF, clicking chat activates the PDF view for side-by-side
-             if (selectedNote?.id !== note.id) {
-                 setSelectedNote(note); // Select if not already selected
-             }
+     // Chat initiation logic
+     const handleChatWithNote = (note: Note) => {
+         if (note.type === 'pdf') {
+             // For PDF, clicking chat *also* activates the PDF view for side-by-side
+             setSelectedNote(note); // Ensure the note is selected
              setShowPdfViewer(true); // Activate side-by-side view
              setIsChatOverlayVisible(false); // Ensure overlay is hidden
              setChatNote(null); // Clear overlay note tracker
@@ -248,28 +220,23 @@ export function Notes() {
              // For non-PDF, open the overlay chat
              setChatNote(note); // Set note for overlay
              setIsChatOverlayVisible(true); // Show overlay
-             if (selectedNote?.id !== note.id) {
-                 setSelectedNote(note); // Also select the note in the main view if not already
-             }
+             setSelectedNote(note); // Also select the note in the main view if not already
              setShowPdfViewer(false); // Ensure PDF viewer is off
              setIsEditing(false); // Ensure not in edit mode
              if (isMobile) { setShowNotesListOnMobile(false); }
          }
      };
-    const handleCloseChatOverlay = () => setIsChatOverlayVisible(false); // Only closes the overlay chat
+     const handleCloseChatOverlay = () => setIsChatOverlayVisible(false); // Only closes the overlay
 
     const handleUpdateNoteContentFromChat = async (noteId: string, newContent: string) => {
         if (!user) return; console.log("Updating note from chat:", noteId); setIsSaving(true); setUploadProgress({ progress: 0, status: 'Updating via chat...', error: null });
-        try { await updateNote(noteId, { content: newContent }); setUploadProgress({ progress: 100, status: 'Updated via chat!', error: null }); setTimeout(() => setUploadProgress({ progress: 0, status: '', error: null }), 2000);
-            // Manually update local state if needed, though listener should catch it
-            // setSelectedNote(prev => (prev && prev.id === noteId ? { ...prev, content: newContent } : prev));
-         }
+        try { await updateNote(noteId, { content: newContent }); setUploadProgress({ progress: 100, status: 'Updated via chat!', error: null }); setTimeout(() => setUploadProgress({ progress: 0, status: '', error: null }), 2000); }
         catch (error) { console.error('Error updating note from chat:', error); setUploadProgress({ progress: 0, status: '', error: 'Failed to update note from chat' }); }
         finally { setIsSaving(false); }
     };
 
     const handleEditNote = () => {
-        if (!selectedNote) return; setEditTitle(selectedNote.title); setEditContent(selectedNote.content); setEditTags(selectedNote.tags || []); setNewTag(''); setIsEditing(true); setIsChatOverlayVisible(false); setChatNote(null); setShowPdfViewer(false); // Turn off PDF viewer when entering edit mode
+        if (!selectedNote) return; setEditTitle(selectedNote.title); setEditContent(selectedNote.content); setEditTags(selectedNote.tags || []); setNewTag(''); setIsEditing(true); setIsChatOverlayVisible(false); setChatNote(null); setShowPdfViewer(false); // Turn off PDF viewer when editing
         if (isMobile) { setShowNotesListOnMobile(false); }
     };
 
@@ -287,31 +254,15 @@ export function Notes() {
 
     const handleDeleteNote = async (noteId: string) => {
         if (!window.confirm('Delete this note?')) return; setUploadProgress({ progress: 0, status: 'Deleting...', error: null });
-        try {
-            // Optimistic UI update handled by listener removing the note
-            await deleteNote(noteId);
-             // Explicitly clear state if the deleted note was selected/active
-             if (selectedNote?.id === noteId) {
-                 setSelectedNote(null);
-                 setShowPdfViewer(false);
-                 setIsChatOverlayVisible(false);
-                 setChatNote(null);
-             }
-             if (splitViewNotes.left?.id === noteId || splitViewNotes.right?.id === noteId) {
-                 setSplitViewNotes(prev => ({
-                     left: prev.left?.id === noteId ? null : prev.left,
-                     right: prev.right?.id === noteId ? null : prev.right
-                 }));
-             }
+        try { await deleteNote(noteId);
+            // State cleanup happens via listener + checks in the listener useEffect
             setUploadProgress({ progress: 100, status: 'Deleted!', error: null }); setTimeout(() => setUploadProgress({ progress: 0, status: '', error: null }), 2000);
         } catch (error) { console.error('Error deleting note:', error); setUploadProgress({ progress: 0, status: '', error: 'Failed to delete note' }); }
     };
 
     const handleTogglePublic = async (noteId: string, currentIsPublic: boolean) => {
         setUploadProgress({ progress: 0, status: 'Updating visibility...', error: null });
-        try { await toggleNotePublicStatus(noteId, !currentIsPublic); setUploadProgress({ progress: 100, status: 'Visibility updated!', error: null }); setTimeout(() => setUploadProgress({ progress: 0, status: '', error: null }), 2000); if (currentIsPublic) setLinkCopied(false);
-            // Listener should update the note, including selectedNote if applicable
-        }
+        try { await toggleNotePublicStatus(noteId, !currentIsPublic); setUploadProgress({ progress: 100, status: 'Visibility updated!', error: null }); setTimeout(() => setUploadProgress({ progress: 0, status: '', error: null }), 2000); if (currentIsPublic) setLinkCopied(false); }
         catch (error) { console.error('Error toggling public status:', error); setUploadProgress({ progress: 0, status: '', error: 'Failed to update note visibility' }); }
     };
 
@@ -324,7 +275,7 @@ export function Notes() {
     const handleCreatePersonalNote = async (title: string, content: string, tags: string[]) => { if (!user) return; setUploadProgress({ progress: 0, status: 'Creating note...', error: null }); try { await savePersonalNote(user.uid, title, content, tags); setUploadProgress({ progress: 100, status: 'Note created!', error: null }); setShowNewNoteModal(false); setTimeout(() => setUploadProgress({ progress: 0, status: '', error: null }), 2000); } catch (error) { console.error('Error creating personal note:', error); setUploadProgress({ progress: 0, status: '', error: 'Failed to create note' }); } };
     const handleAddTag = () => { const trimmedTag = newTag.trim().toLowerCase().replace(/\s+/g, '-'); if (trimmedTag && !editTags.includes(trimmedTag) && editTags.length < 5) { setEditTags([...editTags, trimmedTag]); setNewTag(''); } else if (editTags.length >= 5) { alert("Max 5 tags."); } else if (!trimmedTag) { alert("Tag empty."); } };
     const handleRemoveTag = (tagToRemove: string) => setEditTags(editTags.filter(tag => tag !== tagToRemove));
-    const handleRegenerateQuestions = async () => { if (!selectedNote || !geminiApiKey || isRegeneratingQuestions) return; setIsRegeneratingQuestions(true); setUploadProgress({ progress: 0, status: 'Regenerating questions...', error: null }); try { const updatedQuestions = await regenerateStudyQuestions(selectedNote.id, selectedNote.content, geminiApiKey); setSelectedNote(prev => prev ? { ...prev, questions: updatedQuestions } : null); // Update state directly setQuestionAnswers({}); setUploadProgress({ progress: 100, status: 'Questions regenerated!', error: null }); setTimeout(() => setUploadProgress({ progress: 0, status: '', error: null }), 2000); } catch (error) { console.error('Error regenerating questions:', error); setUploadProgress({ progress: 0, status: '', error: error instanceof Error ? error.message : 'Failed to regenerate questions' }); } finally { setIsRegeneratingQuestions(false); } };
+    const handleRegenerateQuestions = async () => { if (!selectedNote || !geminiApiKey || isRegeneratingQuestions) return; setIsRegeneratingQuestions(true); setUploadProgress({ progress: 0, status: 'Regenerating questions...', error: null }); try { const updatedQuestions = await regenerateStudyQuestions(selectedNote.id, selectedNote.content, geminiApiKey); // Update selectedNote state directly here as listener might not catch nested change fast enough setSelectedNote(prev => prev ? { ...prev, questions: updatedQuestions } : null); setQuestionAnswers({}); setUploadProgress({ progress: 100, status: 'Questions regenerated!', error: null }); setTimeout(() => setUploadProgress({ progress: 0, status: '', error: null }), 2000); } catch (error) { console.error('Error regenerating questions:', error); setUploadProgress({ progress: 0, status: '', error: error instanceof Error ? error.message : 'Failed to regenerate questions' }); } finally { setIsRegeneratingQuestions(false); } };
     const handleCreateAINote = async (text: string) => { if (!user || !geminiApiKey) return; setUploadProgress({ progress: 0, status: 'Processing text...', error: null }); try { setUploadProgress(prev => ({ ...prev, progress: 20 })); const processedText = await processTextToAINoteData(text, user.uid, geminiApiKey); setUploadProgress(prev => ({ ...prev, progress: 80, status: 'Saving note...' })); await saveNote({ ...processedText, userId: user.uid, isPublic: false, tags: ['ai-processed'], type: 'personal' }); setUploadProgress({ progress: 100, status: 'AI Note Created!', error: null }); setShowNewNoteModal(false); setTimeout(() => setUploadProgress({ progress: 0, status: '', error: null }), 2000); } catch (error) { console.error('Error creating AI note:', error); setUploadProgress({ progress: 0, status: '', error: error instanceof Error ? error.message : 'Failed to create AI note' }); } };
     const handlePDFUpload = async (file: File) => { if (!user || !geminiApiKey) return; setUploadProgress({ progress: 0, status: 'Uploading PDF...', error: null }); try { const processedPDF = await processPDF( file, user.uid, geminiApiKey, (progress, status, error) => setUploadProgress({ progress, status, error }) ); setUploadProgress({ progress: 95, status: 'Saving note...', error: null }); await saveNote({ title: processedPDF.title, content: processedPDF.content, type: 'pdf', keyPoints: processedPDF.keyPoints, questions: processedPDF.questions, sourceUrl: processedPDF.sourceUrl, userId: user.uid, isPublic: false, tags: ['pdf', file.name.split('.').pop() || 'file'] }); setUploadProgress({ progress: 100, status: 'PDF Note Created!', error: null }); setShowNewNoteModal(false); setTimeout(() => setUploadProgress({ progress: 0, status: '', error: null }), 2000); } catch (error) { console.error('Error processing PDF:', error); setUploadProgress({ progress: 0, status: '', error: error instanceof Error ? error.message : 'Failed to process PDF' }); } };
     const handleYoutubeLink = async (url: string) => { if (!user || !geminiApiKey) return; setUploadProgress({ progress: 0, status: 'Processing YouTube...', error: null }); try { const processedYouTube = await processYouTube( url, user.uid, geminiApiKey, (progress, status, error) => setUploadProgress({ progress, status, error }) ); setUploadProgress({ progress: 95, status: 'Saving note...', error: null }); await saveNote({ title: processedYouTube.title, content: processedYouTube.content, type: 'youtube', keyPoints: processedYouTube.keyPoints, questions: processedYouTube.questions, sourceUrl: processedYouTube.sourceUrl, userId: user.uid, isPublic: false, tags: ['youtube', 'video'] }); setUploadProgress({ progress: 100, status: 'YouTube Note Created!', error: null }); setShowNewNoteModal(false); setTimeout(() => setUploadProgress({ progress: 0, status: '', error: null }), 2000); } catch (error) { console.error('Error processing YouTube:', error); setUploadProgress({ progress: 0, status: '', error: error instanceof Error ? error.message : 'Failed to process YouTube' }); } };
@@ -332,17 +283,19 @@ export function Notes() {
 
     // PDF Viewer Handlers
     const onDocumentLoadSuccess = ({ numPages: nextNumPages }: { numPages: number }) => { setNumPages(nextNumPages); setPdfError(null); };
-    const onDocumentLoadError = (error: Error) => { console.error('Failed to load PDF:', error); setPdfError(`Failed to load PDF: ${error.message}. Check console for details.`); setNumPages(null); };
-    const togglePdfViewer = () => { if (selectedNote?.type === 'pdf' && selectedNote.sourceUrl) { setShowPdfViewer(prev => !prev); // Toggle PDF view // If turning off PDF view, also hide overlay chat if it was related if (showPdfViewer) { setIsChatOverlayVisible(false); setChatNote(null); } } };
-    const changeScale = (amount: number) => setPdfScale(prevScale => Math.max(0.5, Math.min(prevScale + amount, 3.0))); // Added max scale
+    const onDocumentLoadError = (error: Error) => { console.error('Failed to load PDF:', error); setPdfError(`Failed to load PDF: ${error.message}. Ensure worker is loaded and URL is correct.`); setNumPages(null); };
+    const togglePdfViewer = () => { if (selectedNote?.type === 'pdf' && selectedNote.sourceUrl) { setShowPdfViewer(prev => !prev); // Toggle PDF view // If turning off PDF view, also hide overlay chat if it was for this note if (showPdfViewer) { setIsChatOverlayVisible(false); setChatNote(null); } } };
+    // Removed changePage
+    const changeScale = (amount: number) => setPdfScale(prevScale => Math.max(0.5, prevScale + amount));
     const changeRotation = (amount: number) => setPdfRotation(prevRotation => (prevRotation + amount + 360) % 360);
 
     // PDF Text Selection Handler
     const handlePdfTextSelection = useCallback(() => {
-        if (!pdfViewerContainerRef.current || !showPdfViewer) return;
+        if (!pdfViewerContainerRef.current || !showPdfViewer) return; // Only run if PDF viewer is active
         const selection = window.getSelection();
         if (selection && !selection.isCollapsed && selection.rangeCount > 0) {
             const range = selection.getRangeAt(0);
+            // Crucially, check if the selection's container is INSIDE the PDF viewer div
             if (pdfViewerContainerRef.current.contains(range.commonAncestorContainer)) {
                 const selectedText = range.toString().trim();
                 const containerRect = pdfViewerContainerRef.current.getBoundingClientRect();
@@ -350,20 +303,21 @@ export function Notes() {
 
                 if (selectedText.length > 2) {
                     setSelectedPdfText(selectedText);
-                    const top = rangeRect.top - containerRect.top + pdfViewerContainerRef.current.scrollTop - 35; // Offset above selection
-                    const left = rangeRect.right - containerRect.left + pdfViewerContainerRef.current.scrollLeft - (rangeRect.width / 2); // Centered
-                    setHighlightButtonPosition({ top: Math.max(5, top), left: Math.max(5, left) }); // Ensure within bounds
+                    const top = rangeRect.top - containerRect.top + pdfViewerContainerRef.current.scrollTop - 35;
+                    const left = rangeRect.right - containerRect.left + pdfViewerContainerRef.current.scrollLeft - (rangeRect.width / 2);
+                    setHighlightButtonPosition({ top: Math.max(0, top), left: Math.max(0, left) });
                     setShowHighlightButtons(true);
                     return;
                 }
             }
         }
-        if (showHighlightButtons) {
+        // If no valid selection inside the container, hide buttons
+        if (showHighlightButtons) { // Check needed to avoid state update loop
             setShowHighlightButtons(false);
             setSelectedPdfText(null);
             setHighlightButtonPosition(null);
         }
-    }, [showHighlightButtons, showPdfViewer]);
+    }, [showHighlightButtons, showPdfViewer]); // Depend on showPdfViewer
 
     // Click outside handler for highlight buttons
     useEffect(() => {
@@ -378,10 +332,10 @@ export function Notes() {
                 }
             }
         };
-        // Add listener only when buttons could be visible
         document.addEventListener('mousedown', handleClickOutside);
         return () => { document.removeEventListener('mousedown', handleClickOutside); };
     }, [showHighlightButtons, highlightButtonPosition]);
+
 
     // Highlight Button Actions
     const handleExplainHighlight = () => {
@@ -435,6 +389,7 @@ export function Notes() {
     // Determine if side-by-side chat should be active
     const showSideBySideChat = selectedNote?.type === 'pdf' && showPdfViewer && !!selectedNote.sourceUrl && !!user && !!geminiApiKey;
 
+
     return (
         <div className={`flex h-screen overflow-hidden ${containerClass} font-sans`}>
             {/* Sidebar */}
@@ -444,8 +399,13 @@ export function Notes() {
             <main className={`flex-1 flex overflow-hidden transition-all duration-300 ${ isSidebarCollapsed ? 'ml-16 md:ml-20' : 'ml-64' }`}>
 
                 {/* === 1. Main Content Area === */}
+                {/*
+                    This outer div manages the main content area's scrolling.
+                    When side-by-side chat is active, its inner columns handle their own scrolling.
+                    Otherwise, this div handles scrolling for note view, edit view, etc.
+                */}
                 <div ref={contentRef} className={`flex-1 ${mainContentBg} relative ${showSideBySideChat ? 'overflow-hidden' : 'overflow-y-auto'}`}>
-                    {/* Mobile Header (Only shows when not in side-by-side view) */}
+                    {/* Mobile Header */}
                     {isMobile && !showNotesListOnMobile && !showSideBySideChat && (
                         <div className={`sticky top-0 z-10 p-2 border-b ${borderColor} ${isIlluminateEnabled ? 'bg-white/80 backdrop-blur-sm' : 'bg-gray-900/80 backdrop-blur-sm'} flex items-center justify-between`}>
                             <button onClick={() => setShowNotesListOnMobile(true)} className={`p-1.5 rounded-md ${buttonSecondaryClass} ${iconHoverColor}`} title="Show Notes"> <List className="w-4 h-4" /> </button>
@@ -467,16 +427,22 @@ export function Notes() {
                              <div className="w-full md:w-3/5 lg:w-2/3 h-1/2 md:h-full flex flex-col overflow-hidden relative border-r border-gray-200 dark:border-gray-700">
                                  {/* PDF Controls */}
                                  <div className={`flex-shrink-0 p-1.5 border-b ${borderColor} ${isIlluminateEnabled ? 'bg-gray-50' : 'bg-gray-800/50'} flex items-center justify-between gap-1 sticky top-0 z-10`}>
+                                     {/* Left Aligned Buttons */}
                                      <div className="flex items-center gap-1">
                                          <button onClick={togglePdfViewer} className={`p-1.5 rounded-md ${buttonSecondaryClass} ${iconHoverColor}`} title="Show Note Content"> <FileText className="w-4 h-4" /> </button>
                                      </div>
-                                     <div className={`flex items-center gap-1 text-xs font-medium truncate px-2 ${textColor}`}>
-                                         PDF: {selectedNote.title}
+                                      {/* Center Info (Optional - Removed Page Numbers) */}
+                                     <div className="flex items-center gap-1 text-xs font-medium">
+                                         PDF View: {selectedNote.title}
                                      </div>
+                                     {/* Right Aligned Buttons */}
                                      <div className="flex items-center gap-1">
-                                         <button onClick={() => changeScale(-0.1)} disabled={pdfScale <= 0.5} className={`p-1.5 rounded-md ${buttonSecondaryClass} ${iconHoverColor} ${pdfScale <= 0.5 ? buttonDisabledClass : ''}`} title="Zoom Out"> <ZoomOut className="w-4 h-4" /> </button>
+                                         {/* <span className={`text-xs font-medium px-1 ${textColor}`}>Page {currentPage} of {numPages || '--'}</span> */}
+                                         {/* Removed Page Nav */}
+                                         <div className={`w-px h-4 ${isIlluminateEnabled ? 'bg-gray-300' : 'bg-gray-600'} mx-0.5`}></div>
+                                         <button onClick={() => changeScale(-0.1)} className={`p-1.5 rounded-md ${buttonSecondaryClass} ${iconHoverColor}`} title="Zoom Out"> <ZoomOut className="w-4 h-4" /> </button>
                                          <span className={`text-xs font-medium px-1 ${textColor}`}>{Math.round(pdfScale * 100)}%</span>
-                                         <button onClick={() => changeScale(0.1)} disabled={pdfScale >= 3.0} className={`p-1.5 rounded-md ${buttonSecondaryClass} ${iconHoverColor} ${pdfScale >= 3.0 ? buttonDisabledClass : ''}`} title="Zoom In"> <ZoomIn className="w-4 h-4" /> </button>
+                                         <button onClick={() => changeScale(0.1)} className={`p-1.5 rounded-md ${buttonSecondaryClass} ${iconHoverColor}`} title="Zoom In"> <ZoomIn className="w-4 h-4" /> </button>
                                          <div className={`w-px h-4 ${isIlluminateEnabled ? 'bg-gray-300' : 'bg-gray-600'} mx-0.5`}></div>
                                          <button onClick={() => changeRotation(-90)} className={`p-1.5 rounded-md ${buttonSecondaryClass} ${iconHoverColor}`} title="Rotate Left"> <RotateCcw className="w-4 h-4 transform -scale-x-100" /> </button>
                                          <button onClick={() => changeRotation(90)} className={`p-1.5 rounded-md ${buttonSecondaryClass} ${iconHoverColor}`} title="Rotate Right"> <RotateCcw className="w-4 h-4" /> </button>
@@ -506,7 +472,7 @@ export function Notes() {
                                                       renderAnnotationLayer={true}
                                                       renderTextLayer={true} // Essential for text selection
                                                       width={pdfViewerContainerRef.current?.clientWidth ? Math.min(pdfViewerContainerRef.current.clientWidth * 0.95, 1000) : undefined} // Responsive width
-                                                      className="mb-4 shadow-lg pdf-page-container" // Add spacing and shadow, and a class
+                                                      className="mb-4 shadow-lg" // Add more spacing and shadow
                                                       loading={<div className="h-64 flex items-center justify-center text-xs">Loading page {index + 1}...</div>}
                                                  />
                                              ))}
@@ -544,7 +510,8 @@ export function Notes() {
                          </div>
                      ) : (
                          // --- Default View: Single Note, Edit, Split Placeholder, or Initial Placeholder ---
-                         <div className={`p-4 md:p-6 lg:p-8 h-full ${isEditing ? 'flex flex-col' : ''}`}> {/* Added padding back */}
+                         // This container needs padding only when NOT showing side-by-side PDF
+                         <div className={`p-4 md:p-6 lg:p-8 h-full ${isEditing ? 'flex flex-col' : ''}`}>
                             {showSplitView && (!splitViewNotes.left || !splitViewNotes.right) ? (
                                 <div className={`flex flex-col items-center justify-center rounded-lg ${noteViewBg} h-full text-center p-6`}> <SplitSquareVertical className={`w-12 h-12 ${iconColor} mb-4`} /> <h2 className={`text-lg font-semibold ${headingClass} mb-2`}>Split View</h2> <p className={`${subheadingClass} text-sm mb-4`}>Select {splitViewNotes.left ? 'one more note' : 'two notes'} from the list.</p> <p className={`text-xs ${subheadingClass} mb-4`}>Selected: {splitViewNotes.left ? 1 : 0}/2</p> <button onClick={closeSplitView} className={`${buttonSecondaryClass} px-3 py-1.5 rounded-md text-sm`}>Cancel Split View</button> </div>
                             ) : selectedNote ? (
@@ -580,6 +547,7 @@ export function Notes() {
                                     </div>
                                 ) : (
                                     // --- View Mode (Non-PDF or PDF Note Content View) ---
+                                    // This container takes full height and scrolls internally if needed
                                     <div className={`${noteViewBg} rounded-lg flex flex-col overflow-hidden h-full p-4 md:p-6 lg:p-8 animate-fadeIn`}>
                                         {/* Header */}
                                         <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-2 flex-shrink-0`}>
@@ -655,6 +623,6 @@ export function Notes() {
 
         </div> // End Root Flex Container
     );
-} // <<< Added missing closing brace here
+};
 
 export default Notes;

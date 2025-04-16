@@ -11,7 +11,7 @@ async function fetchWithRetry(url: string, options: RequestInit, retries = 3, de
 const extractCandidateText = (responseText: string): string => { try { const jsonResponse = JSON.parse(responseText); if (jsonResponse?.candidates?.[0]?.content?.parts?.[0]?.text) { return jsonResponse.candidates[0].content.parts[0].text; } if (jsonResponse?.error?.message) { console.error("Gemini API Error:", jsonResponse.error.message); return `Error: ${jsonResponse.error.message}`; } if (jsonResponse?.candidates?.[0]?.finishReason && jsonResponse.candidates[0].finishReason !== 'STOP') { console.warn(`Gemini finish reason: ${jsonResponse.candidates[0].finishReason}`, jsonResponse); return `Error: Generation stopped due to ${jsonResponse.candidates[0].finishReason}`; } console.warn("No candidate text found:", jsonResponse); return "Error: No text content found in AI response."; } catch (err) { console.error('Error parsing Gemini response:', err); return "Error: Could not parse AI response."; } };
 
 // Use 1.5 Flash by default - Ensure the key is loaded correctly via dashboard-firebase
-const GEMINI_DEFAULT_MODEL = 'gemini-1.5-flash-latest';
+const GEMINI_DEFAULT_MODEL = 'gemini-2.0-flash';
 const getGeminiEndpoint = (apiKey: string | undefined, model = GEMINI_DEFAULT_MODEL) => {
     if (!apiKey) throw new Error("Gemini API Key is missing in getGeminiEndpoint.");
     return `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;

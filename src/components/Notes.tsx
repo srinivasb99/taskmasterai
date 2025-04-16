@@ -29,16 +29,13 @@ import { getCurrentUser } from '../lib/settings-firebase';
 import { geminiApiKey } from '../lib/dashboard-firebase';
 
 // --- PDF Viewer Imports ---
-import { Document, Page, pdfjs } from 'react-pdf';
+import { Document, Page} from 'react-pdf';
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
 import 'react-pdf/dist/esm/Page/TextLayer.css';
 
 // --- Markdown Editor Import ---
 import MDEditor from '@uiw/react-md-editor';
 
-
-// Configure PDF.js worker
-pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js'; // Load from public folder
 
 // Types
 interface Note {

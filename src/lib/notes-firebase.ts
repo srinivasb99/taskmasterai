@@ -66,16 +66,96 @@ export async function regenerateStudyQuestions( noteId: string, content: string,
    const currentGeminiEndpoint = getGeminiEndpoint(apiKey);
    console.log(`Regenerating 10 questions for note: ${noteId}`);
   try {
-    const questionsPrompt = `Based on the note content, generate exactly 10 MCQs (4 options A,B,C,D), correct letter, explanation. Format strictly:\n\nQuestion: [Q]\nA) [A]\nB) [B]\nC) [C]\nD) [D]\nCorrect: [Letter]\nExplanation: [E]\n\n---DIVIDER---\n\nGenerate 10.\n\nContent:\n---\n${content.slice(0, 15000)}\n---`;
+    // --- Refined Prompt ---
+    const questionsPrompt = `Based on the following note content, generate exactly 10 multiple-choice study questions. Each question MUST have 4 options (labeled A, B, C, D), the correct answer letter, and a brief explanation.
+
+**VERY IMPORTANT:** Format EACH question *strictly* as follows, separated by '---DIVIDER---':
+
+Question: [Your question here]
+A) [Option A]
+B) [Option B]
+C) [Option C]
+D) [Option D]
+Correct: [Correct Answer Letter (A, B, C, or D)]
+Explanation: [Brief explanation why it's correct]
+
+---DIVIDER---
+
+Ensure all 10 questions are generated and precisely follow this structure including the divider.
+
+Note Content (excerpt):
+---
+${content.slice(0, 15000)}
+---`;
+    // --- End Refined Prompt ---
+
     const qOptions = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: questionsPrompt }] }], generationConfig: { temperature: 0.5, maxOutputTokens: 3000 } }) };
-    const qResponse = await fetchWithRetry(currentGeminiEndpoint, qOptions); const qText = extractCandidateText(await qResponse.text()); if (qText.startsWith("Error:")) throw new Error(`API/Parse Error: ${qText}`);
+    const qResponse = await fetchWithRetry(currentGeminiEndpoint, qOptions);
+    const qText = extractCandidateText(await qResponse.text()); // Get raw response text
+
+    if (qText.startsWith("Error:")) {
+        // Handle API errors or errors from extractCandidateText
+        throw new Error(`Question generation failed: ${qText}`);
+    }
+
     let newQuestions: NoteData['questions'] = [];
     const blocks = qText.split(/---DIVIDER---/i);
-    for (const block of blocks) { if (newQuestions.length >= 10) break; const T=block.trim(); if (!T) continue; const qM=T.match(/^Question:\s*([\s\S]*?)\s*A\)/i); const oM=T.match(/A\)\s*(.*?)\s*B\)\s*(.*?)\s*C\)\s*(.*?)\s*D\)\s*(.*?)\s*Correct:/is); const cM=T.match(/Correct:\s*([A-D])\b/i); const eM=T.match(/Explanation:\s*([\s\S]*?)(?:---DIVIDER---|$)/i); if(qM&&oM&&cM&&eM){const qT=qM[1].trim(); const oL=[oM[1],oM[2],oM[3],oM[4]].map(o=>o.replace(/^(.*?)\s*(?:B\)|C\)|D\)|Correct:).*$/is,'$1').trim()); const cL=cM[1].toUpperCase(); const eT=eM[1].trim(); if(qT&&oL.length===4&&oL.every(o=>o)&&['A','B','C','D'].includes(cL)&&eT) newQuestions.push({question:qT,options:oL,correctAnswer:['A','B','C','D'].indexOf(cL),explanation:eT}); else console.warn("Partial regen Q parse");} else console.warn("Regen Q structure parse fail"); }
-    if (newQuestions.length === 0) { if (qText.toLowerCase().includes("question:")) throw new Error(`Parsed 0 questions, but response contained 'question'.`); else throw new Error(`No valid questions generated/parsed.`); }
-    else { console.log(`Regenerated ${newQuestions.length} questions for note ${noteId}.`); }
-    await updateNote(noteId, { questions: newQuestions }); console.log("Questions regenerated and updated."); return newQuestions;
-  } catch (error) { console.error(`Error regenerating questions for note ${noteId}:`, error); throw new Error(`Failed to regenerate questions: ${error instanceof Error ? error.message : 'Unknown'}`); }
+
+    console.log(`Received ${blocks.length -1} potential question blocks for regeneration.`); // Log how many blocks were found
+
+    for (const block of blocks) {
+        if (newQuestions.length >= 10) break; // Stop if we got 10 valid ones
+        const T=block.trim(); if (!T) continue; // Skip empty lines/blocks
+
+        // Use the same parsing regex
+        const qM=T.match(/^Question:\s*([\s\S]*?)\s*A\)/i);
+        const oM=T.match(/A\)\s*(.*?)\s*B\)\s*(.*?)\s*C\)\s*(.*?)\s*D\)\s*(.*?)\s*Correct:/is);
+        const cM=T.match(/Correct:\s*([A-D])\b/i);
+        const eM=T.match(/Explanation:\s*([\s\S]*?)(?:---DIVIDER---|$)/i);
+
+        if(qM && oM && cM && eM){ // Check if all parts were matched
+            const qT=qM[1].trim();
+            const oL=[oM[1],oM[2],oM[3],oM[4]].map(o=>o.replace(/^(.*?)\s*(?:B\)|C\)|D\)|Correct:).*$/is,'$1').trim()); // Clean options
+            const cL=cM[1].toUpperCase();
+            const eT=eM[1].trim();
+
+            // Validate content
+            if(qT && oL.length===4 && oL.every(o=>o) && ['A','B','C','D'].includes(cL) && eT) {
+                newQuestions.push({question:qT,options:oL,correctAnswer:['A','B','C','D'].indexOf(cL),explanation:eT});
+            } else {
+                 console.warn("Partial regen Q parse - Data validation failed:", {qT, oL, cL, eT}); // Log invalid parsed data
+            }
+        } else {
+             // Log blocks that failed the regex match structure
+             if(T.length > 10) console.warn("Regen Q structure parse fail for block:", T.substring(0, 100) + "...");
+        }
+    } // End parsing loop
+
+    // --- Updated Error Handling ---
+    if (newQuestions.length === 0) {
+        console.error("Failed to parse ANY questions from regeneration response. Raw response was:");
+        console.error("<<< START RAW RESPONSE >>>");
+        console.error(qText); // Log the full raw text for debugging
+        console.error("<<< END RAW RESPONSE >>>");
+        // Throw a general error, the UI will catch this
+        throw new Error(`AI response format was unusable for question regeneration.`);
+    }
+    // --- End Updated Error Handling ---
+
+    console.log(`Successfully parsed ${newQuestions.length} regenerated questions for note ${noteId}.`);
+    if (newQuestions.length < 10) {
+        console.warn(`Warning: Regenerated fewer than 10 questions (${newQuestions.length}).`)
+    }
+
+    // Update Firestore only if questions were successfully parsed
+    await updateNote(noteId, { questions: newQuestions });
+    console.log("Regenerated questions updated in Firestore.");
+    return newQuestions; // Return the successfully parsed questions
+
+  } catch (error) {
+    // Catch errors from API call or the new general throw above
+    console.error(`Error during question regeneration process for note ${noteId}:`, error);
+    // Re-throw the error so the UI catch block in Notes.tsx can display feedback
+    throw new Error(`Failed to regenerate questions: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 }
-
-

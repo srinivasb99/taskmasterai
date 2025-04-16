@@ -544,7 +544,7 @@ export function Notes() {
     // Highlight Button Actions
     const handleExplainHighlight = () => {
         if (selectedPdfText && noteChatRef.current) { // Use noteChatRef (side-by-side instance)
-            noteChatRef.current.sendMessage(`Explain the following text from the document:\n\n"${selectedPdfText}"`);
+            noteChatRef.current.sendMessage(`Explain the following text:\n\n"${selectedPdfText}"`);
             setShowHighlightButtons(false);
             setSelectedPdfText(null);
             window.getSelection()?.removeAllRanges(); // Clear visual selection
@@ -555,7 +555,7 @@ export function Notes() {
 
     const handleChatAboutHighlight = () => {
         if (selectedPdfText && noteChatRef.current) { // Use noteChatRef (side-by-side instance)
-            noteChatRef.current.sendMessage(`Let's discuss this part of the document:\n\n"${selectedPdfText}"`);
+            noteChatRef.current.sendMessage(`Let's discuss this part:\n\n"${selectedPdfText}"`);
             setShowHighlightButtons(false);
             setSelectedPdfText(null);
             window.getSelection()?.removeAllRanges(); // Clear visual selection

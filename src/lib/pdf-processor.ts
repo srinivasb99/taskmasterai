@@ -183,7 +183,7 @@ ${noteInputText}
     safeProgress({ progress: 75, status: 'Generating key points...', error: null });
     // Use a smaller slice for key points - focus on overall themes
     const MAX_INPUT_CHARS_KP = 20000; // ~5k tokens
-    const keyPointsPrompt = `From the following text (extracted from PDF "${file.name}"), identify and list exactly 10 distinct and significant key points or main takeaways. Focus on the most crucial concepts, findings, or conclusions. List only the points, one per line, starting each line with '* '.
+    const keyPointsPrompt = `From the following text (extracted from PDF "${file.name}"), identify and list exactly 10 distinct and significant key points or main takeaways. Focus on the most crucial concepts, findings, or conclusions. In your output, NEVER SAY: "Here are 10 distinct and significant key points from the provided text:". List only the points, one per line, starting each line with '* '.
 
 Text Excerpt:
 ---
@@ -256,9 +256,7 @@ Explanation: [Brief explanation why the chosen answer is correct]
 
 ---DIVIDER---
 
-Generate exactly 10 distinct questions in this precise format. Ensure all parts (Question, A, B, C, D, Correct, Explanation) are present for every question.
-In your output, NEVER SAY: "Here are 10 distinct and significant key points from the provided text:"
-`;
+Generate exactly 10 distinct questions in this precise format. Ensure all parts (Question, A, B, C, D, Correct, Explanation) are present for every question.`;
 
     const questionsOptions = {
       method: 'POST',

@@ -545,7 +545,7 @@ ${recentHistory
                               parsedSuccessfully = true; console.log("Parsed full content replacement proposal successfully.");
                         } else {
                             console.warn("JSON structure invalid:", parsedJson);
-                             assistantFinalMessage.content = `Warning: AI proposed an edit, but structure was invalid.\n\n---\n${finalDisplayedContent}`;
+                             assistantFinalMessage.content = `Warning: AI proposed an edit, but structure was invalid. Please instruct the AI to try again. \n\n---\n${finalDisplayedContent}`;
                              assistantFinalMessage.error = true;
                         }
                         if (parsedSuccessfully) {

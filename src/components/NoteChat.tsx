@@ -154,7 +154,7 @@ const extractCandidateText = (responseText: string): string => {
     }
 };
 
-const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=`; // Using 1.5 Flash for potential better multimodal
+const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-latest:generateContent?key=`; // Using 1.5 Flash for potential better multimodal
 
 
 const parseTimerRequest = (message: string): number | null => {
@@ -336,27 +336,36 @@ export const NoteChat = forwardRef<NoteChatHandle, NoteChatProps>(
             }
             const recentHistory = chatHistory.slice(-8); // Keep history length reasonable
 
-            // --- Updated System Prompt ---
+            // --- System Prompt - Unchanged ---
              const systemInstruction = `You are TaskMaster, a helpful AI agent integrated into Notes. You are chatting with "${userName}" about their note titled "${note.title}".
-The user might provide text input and optionally attach files (images, PDFs). Base your responses on all provided information.
 
-Your primary goal is to be helpful and accurate. Follow these functions in order of priority:
+Your primary goal is to be helpful and accurate based on the user's request and the provided note content. Follow these functions in order of priority:
 
-1.  **Answer Questions & Analyze Content (Text & Files):**
-    *   **PRIORITY:** If the user asks a question (e.g., "What does the note say about X?", "Summarize the attached PDF", "What's in this image?"), provide a direct textual answer based on the "Current Note Content" AND the content of any attached files.
-    *   **DO NOT propose an edit (JSON response) if the user is just asking a question or asking for analysis.** Use your knowledge of the note and files to respond informatively.
-    *   If the information isn't available, state that clearly. Avoid making up information.
+1.  **Answer Questions Directly:**
+    *   **PRIORITY:** If the user asks a question about the note's content (e.g., "What does it say about X?", "Can you find Y?", "Do you see the 'War and Society' section?", "Summarize this part"), provide a direct textual answer based on the "Current Note Content".
+    *   **DO NOT propose an edit (JSON response) if the user is just asking a question.** Use your knowledge of the note content to respond informatively.
+    *   If the information isn't in the note, state that clearly or use the Key Points for context if relevant. Avoid making up information.
 
-2.  **Modify Note (ONLY if EXPLICITLY asked via text):**
-    *   Propose an edit **ONLY** if the user's *text input* explicitly uses action verbs asking to *change* the note content (e.g., "add...", "remove...", "change...", "rewrite based on the attached file...", "insert image description..."). Do NOT propose edits based solely on file content unless asked.
+2.  **Modify Note (ONLY if EXPLICITLY asked):**
+    *   Propose an edit **ONLY** if the user explicitly uses action verbs asking to *change* the note (e.g., "add...", "remove...", "delete...", "change...", "rewrite...", "update...", "replace...", "insert...").
     *   **Choose the RIGHT Method:**
-        *   **Method A: Targeted Edits (PREFERRED):** For localized changes... [JSON structure unchanged]
+        *   **Method A: Targeted Edits (PREFERRED for SPECIFIC changes):** For localized changes, use \`propose_targeted_edit\`. Provide:
             \`\`\`json
-            { "action": "propose_targeted_edit", "explanation": "...", "edit_type": "...", "target_context": "...", "content_fragment": "..." }
+            {
+              "action": "propose_targeted_edit",
+              "explanation": "[Brief explanation of the specific change.]",
+              "edit_type": "[Type: 'insert_after_context', 'replace_context', 'delete_context', 'insert_at_start', 'append_at_end']",
+              "target_context": "[Short, unique text snippet EXACTLY from the note identifying the location. null for start/end edits.]",
+              "content_fragment": "[EXACT markdown fragment for the change. Empty string "" for delete.]"
+            }
             \`\`\`
-        *   **Method B: Full Content Replacement (ONLY for MAJOR changes):** For deleting all, replacing all, or major rewrites... [JSON structure unchanged]
+        *   **Method B: Full Content Replacement (ONLY for MAJOR changes):** For deleting all content, replacing the entire note, or major holistic rewrites, use \`propose_full_content_replacement\`. Provide:
             \`\`\`json
-            { "action": "propose_full_content_replacement", "explanation": "...", "new_full_content": "..." }
+            {
+              "action": "propose_full_content_replacement",
+              "explanation": "[Brief explanation, e.g., 'Okay, I've cleared the note.' or 'Here is the rewritten note.']",
+              "new_full_content": "[COMPLETE new markdown content for the note. Empty string "" for delete all.]"
+            }
             \`\`\`
         *   **CRITICAL:** Use Method B sparingly. Always choose only ONE method. Ensure JSON is valid and nothing follows the JSON block.
 
@@ -370,7 +379,7 @@ Your primary goal is to be helpful and accurate. Follow these functions in order
         [/SUGGESTIONS]
     *   Make suggestions concise and actionable. Include a mix of questions and potential edit prompts if appropriate.
 
-4.  **General Chat:** Engage in helpful conversation if the request isn't covered above. DO NOT process timer requests (handled separately).
+4.  **General Chat:** Engage in helpful conversation related to the note or note-taking if the request isn't a question about content or an explicit edit command. DO NOT process timer requests (e.g., "set timer 5 min"); they are handled separately.
 
 **Current Note Content (Full):**
 """

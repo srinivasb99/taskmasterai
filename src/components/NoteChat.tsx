@@ -346,11 +346,11 @@ export const NoteChat = forwardRef<NoteChatHandle, NoteChatProps>(
             if (attachmentTextParts.length > 0) {
                 // Add a newline if there's existing message content
                 const prefix = userMsgContent ? '\n\n' : '';
-                 userMsgContent += `${prefix}[Attached: ${attachmentTextParts.join(', ')}]`;
+                 userMsgContent += `${prefix}`;
             }
              // If there's *only* an image and no text, set default content
              if (!messageContent && imageFiles.length > 0 && nonImageFiles.length === 0) {
-                  userMsgContent = `[Image Attached: ${imageFiles[0].name}]`; // Or simply keep it as generated above
+                  userMsgContent = ``; // Or simply keep it as generated above
              }
 
 

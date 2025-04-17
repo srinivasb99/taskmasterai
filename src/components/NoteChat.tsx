@@ -154,7 +154,7 @@ const extractCandidateText = (responseText: string): string => {
     }
 };
 
-const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-latest:generateContent?key=`; // Using 1.5 Flash for potential better multimodal
+const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=`; // Using 1.5 Flash for potential better multimodal
 
 
 const parseTimerRequest = (message: string): number | null => {

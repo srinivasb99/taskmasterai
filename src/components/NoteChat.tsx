@@ -87,7 +87,10 @@ const extractCandidateText = (responseText: string): string => {
             return jsonResponse.candidates[0].content.parts[0].text;
         }
         if (jsonResponse?.candidates?.[0]?.finishReason === 'SAFETY') {
-            return "My response was blocked due to safety filters.";
+            // NOTE: While the API call might not have safety settings anymore,
+            // the API *might* still return this reason if internal checks trigger.
+            // Keeping this check for robustness, though its likelihood decreases.
+            return "My response was blocked. This might be due to internal safety checks.";
         }
         if (jsonResponse?.error?.message) {
             // Make context length error more user-friendly
@@ -231,7 +234,7 @@ export const NoteChat = forwardRef<NoteChatHandle, NoteChatProps>(
             setIsChatLoading(true); const loadingMsgId = `load-${Date.now()}`; setChatHistory(prev => [...prev, { id: loadingMsgId, role: 'assistant', content: '...' }]);
             const recentHistory = chatHistory.slice(-8);
 
-            // --- Updated System Prompt - Emphasize Answering vs Editing ---
+            // --- System Prompt - Unchanged ---
              const systemInstruction = `You are TaskMaster, a helpful AI agent integrated into Notes. You are chatting with "${userName}" about their note titled "${note.title}".
 
 Your primary goal is to be helpful and accurate based on the user's request and the provided note content. Follow these functions in order of priority:
@@ -293,7 +296,8 @@ ${recentHistory
                     body: JSON.stringify({
                     contents: [{ parts: [{ text: systemInstruction }] }],
                     generationConfig: { temperature: 0.5, maxOutputTokens: 8192, topP: 0.95, responseMimeType: "text/plain" }, // Slightly lowered temperature
-                    safetySettings: [ { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" }, { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_MEDIUM_AND_ABOVE" }, { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_MEDIUM_AND_ABOVE" }, { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" }, ],
+                    // *** SAFETY SETTINGS REMOVED AS REQUESTED ***
+                    // safetySettings: [ { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" }, { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_MEDIUM_AND_ABOVE" }, { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_MEDIUM_AND_ABOVE" }, { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" }, ],
                     })
                 };
                 const response = await fetchWithRetry(fullGeminiEndpoint, geminiOptions); // fetchWithRetry now handles context errors better

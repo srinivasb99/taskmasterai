@@ -1,4 +1,3 @@
-// NoteChat.tsx
 import React, { useState, useRef, useEffect, useImperativeHandle, forwardRef, useCallback } from 'react';
 import { MessageCircle, Send, Timer as TimerIcon, Paperclip, Bot, X, AlertTriangle, Loader2, Sparkles, ChevronDown, Maximize, Minimize, Edit, Check, RefreshCcw } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -154,7 +153,7 @@ const extractCandidateText = (responseText: string): string => {
     }
 };
 
-const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=`; // Using 1.5 Flash for potential better multimodal
+const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=`; // Using 1.5 Flash
 
 
 const parseTimerRequest = (message: string): number | null => {
@@ -201,6 +200,7 @@ export const NoteChat = forwardRef<NoteChatHandle, NoteChatProps>(
         const placeholderColor = isIlluminateEnabled ? "placeholder-gray-400" : "placeholder-gray-500";
         const buttonPrimaryClass = "bg-blue-600 hover:bg-blue-700 text-white";
         const buttonSecondaryClass = isIlluminateEnabled ? "bg-gray-200 hover:bg-gray-300 text-gray-700" : "bg-gray-600 hover:bg-gray-500 text-gray-300";
+        // Updated Suggestion Button Style
         const suggestionButtonClass = isIlluminateEnabled ? "bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-200" : "bg-gray-700 hover:bg-gray-600 text-gray-300 border border-gray-600";
         const buttonDisabledClass = "opacity-50 cursor-not-allowed";
         const userBubbleClass = isIlluminateEnabled ? 'bg-blue-500 text-white' : 'bg-blue-600 text-white';
@@ -215,7 +215,7 @@ export const NoteChat = forwardRef<NoteChatHandle, NoteChatProps>(
         // Reset chat effect
         useEffect(() => {
             if (note && (note.id !== currentNoteId.current || (displayMode === 'overlay' && isVisible && !initialMessageSent.current))) {
-                setChatHistory([{ id: `init-${Date.now()}`, role: 'assistant', content: `Hi ${userName}! Ask about **"${note.title}"**, ask me to change it, or attach a file.` }]);
+                setChatHistory([{ id: `init-${Date.now()}`, role: 'assistant', content: `Hi ${userName}! Ask about **"${note.title}"**, ask me to change it, or attach/paste a file.` }]);
                 setChatMessage(''); setSelectedFiles([]); setSuggestedPrompts([]); setIsChatLoading(false); initialMessageSent.current = true; currentNoteId.current = note.id;
             } else if (displayMode === 'overlay' && !isVisible) { initialMessageSent.current = false; currentNoteId.current = null; }
         }, [note, isVisible, userName, displayMode]);
@@ -227,7 +227,7 @@ export const NoteChat = forwardRef<NoteChatHandle, NoteChatProps>(
         const handleTimerComplete = (timerId: string) => setChatHistory(prev => [...prev, { id: `timer-comp-${timerId}`, role: 'assistant', content: "⏰ Time's up!" }]);
 
         // Accept Edit Handler (unchanged)
-        const handleAcceptEdit = async (message: ChatMessage) => { /* ... implementation unchanged ... */
+        const handleAcceptEdit = async (message: ChatMessage) => {
             if (!note || isChatLoading || !message.isEditSuggestion || !message.editAction) {
                 console.error("Invalid edit proposal:", message);
                 setChatHistory(prev => [...prev, { id: `edit-app-err-${Date.now()}`, role: 'assistant', content: `❌ Error: Could not apply edit. Invalid proposal data.`, error: true }]);
@@ -261,31 +261,43 @@ export const NoteChat = forwardRef<NoteChatHandle, NoteChatProps>(
             } finally { setIsChatLoading(false); }
         };
 
-        // File Selection Handler
+        // File Selection Handler (unchanged)
         const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
             const files = event.target.files;
             if (!files) return;
             setIsChatLoading(true); // Show loading while processing files
             const newFiles: SelectedFile[] = [];
             const filePromises: Promise<SelectedFile>[] = [];
+             // Keep track of existing file names to avoid duplicates
+            const existingFileNames = new Set(selectedFiles.map(f => f.name));
 
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
+
+                // Check for duplicates
+                if (existingFileNames.has(file.name)) {
+                     console.log(`Skipping duplicate file: ${file.name}`);
+                     setChatHistory(prev => [...prev, { id: `file-err-dup-${Date.now()}-${file.name}`, role: 'assistant', content: `ℹ️ Skipped duplicate file: "${file.name}".`, error: false }]); // Inform user non-critically
+                     continue;
+                }
+
                 // Basic validation (example: size limit 20MB)
                 if (file.size > 20 * 1024 * 1024) {
                      setChatHistory(prev => [...prev, { id: `file-err-size-${Date.now()}`, role: 'assistant', content: `❌ File "${file.name}" is too large (max 20MB).`, error: true }]);
                      continue; // Skip this file
                 }
-                // Allowed types
+                // Allowed types (Images + PDF)
                  if (!file.type.startsWith('image/') && file.type !== 'application/pdf') {
                      setChatHistory(prev => [...prev, { id: `file-err-type-${Date.now()}`, role: 'assistant', content: `❌ File type for "${file.name}" is not supported (only images and PDFs).`, error: true }]);
                     continue; // Skip this file
                  }
                 filePromises.push(readFileAsBase64(file));
+                 existingFileNames.add(file.name); // Add to set to prevent duplicates within the same selection
             }
 
             try {
                 const results = await Promise.all(filePromises);
+                // Add only the newly processed files
                 setSelectedFiles(prev => [...prev, ...results]);
             } catch (error) {
                  console.error("Error reading files:", error);
@@ -297,43 +309,48 @@ export const NoteChat = forwardRef<NoteChatHandle, NoteChatProps>(
             }
         };
 
-        // Remove File Handler
+        // Remove File Handler (unchanged)
         const handleRemoveFile = (fileName: string) => {
             setSelectedFiles(prev => prev.filter(f => f.name !== fileName));
         };
 
-         // Trigger File Input Click
+         // Trigger File Input Click (unchanged)
         const triggerFileSelect = () => {
             fileInputRef.current?.click();
         };
 
         // --- Core Chat Submit Logic ---
+        // (Unchanged except for clearing suggestions immediately and handling files)
         const submitMessageToAI = async (messageContent: string, filesToSend?: SelectedFile[]) => {
             const currentFiles = filesToSend || selectedFiles; // Use passed files or state
             if ((!messageContent && currentFiles.length === 0) || isChatLoading || !geminiApiKey || !note) return;
 
             const timerDuration = parseTimerRequest(messageContent);
+            // Create user message content, include file names if files are present
             const userMsgContent = messageContent + (currentFiles.length > 0 ? `\n\n[Attached: ${currentFiles.map(f => f.name).join(', ')}]` : '');
             const userMsg: ChatMessage = { id: `user-${Date.now()}`, role: 'user', content: userMsgContent };
+
+            // Update chat history and immediately clear suggestions
             setChatHistory(prev => [...prev, userMsg]);
-            setSuggestedPrompts([]); // Clear suggestions when user sends a message
+            setSuggestedPrompts([]); // Clear suggestions as soon as user sends anything
+
+             // Clear files from state *after* they are captured for the request
+            if (!filesToSend) { // Don't clear if files were explicitly passed (e.g., for retry or specific submit)
+                 setSelectedFiles([]);
+            }
 
             if (timerDuration) {
                 const tId = `t-${Date.now()}`; const dTxt = timerDuration >= 3600 ? `${Math.round(timerDuration / 3600)}h` : timerDuration >= 60 ? `${Math.round(timerDuration / 60)}m` : `${timerDuration}s`;
                 setChatHistory(prev => [ ...prev, { id: `tstart-${tId}`, role: 'assistant', content: `Timer set: ${dTxt}.`, timer: { type: 'timer', duration: timerDuration, id: tId } } ]);
-                // Clear input and files *if* it was just a timer command
+                // Clear input if it was just a timer command
                 if (messageContent.toLowerCase().startsWith('set timer') || messageContent.toLowerCase().startsWith('timer for')) {
                      setChatMessage('');
-                     setSelectedFiles([]);
                 }
                 return; // Stop if it was ONLY a timer command
             }
 
             setIsChatLoading(true); const loadingMsgId = `load-${Date.now()}`; setChatHistory(prev => [...prev, { id: loadingMsgId, role: 'assistant', content: '...' }]);
-             // Clear files from state *after* they are sent
-            if (!filesToSend) { // Don't clear if files were explicitly passed (e.g., for retry)
-                 setSelectedFiles([]);
-            }
+
             const recentHistory = chatHistory.slice(-8); // Keep history length reasonable
 
             // --- System Prompt - Unchanged ---
@@ -404,53 +421,56 @@ ${recentHistory
             try {
                 const fullGeminiEndpoint = `${GEMINI_ENDPOINT}${geminiApiKey}`;
 
-                // Construct the parts for the API call
-                const apiParts: any[] = [{ text: systemInstruction }]; // Start with the system instruction
+                // Construct the parts for the API call more dynamically
+                const apiContent: any[] = [];
+                 // Add previous relevant history (simple user/model alternation)
+                recentHistory.forEach(msg => {
+                     if (msg.role === 'user') {
+                         apiContent.push({ role: "user", parts: [{ text: msg.content.replace(/\[Attached:.*?\]/g, '').trim() }] }); // Remove file attachment text from history
+                     } else if (msg.role === 'assistant' && !msg.content.startsWith("Timer set:") && !msg.timer) {
+                         // Add assistant messages, stripping potential JSON edit proposals from history sent to API
+                         const assistantContent = msg.content?.replace(/```json[\s\S]*?```/g, msg.isEditSuggestion ? `(Proposed Edit: ${msg.editExplanation || 'Details omitted'})` : '(Response provided)');
+                         if (assistantContent?.trim()) {
+                              apiContent.push({ role: "model", parts: [{ text: assistantContent }] });
+                         }
+                     }
+                 });
 
-                // Add files if present
+
+                // Prepare the current user turn's parts
+                const currentUserParts: any[] = [];
+                currentUserParts.push({ text: systemInstruction }); // Use the detailed prompt as the *base* text for this turn
+
+                // Add files if present for this specific turn
                 if (currentFiles.length > 0) {
                     currentFiles.forEach(file => {
-                        apiParts.push({
-                            inline_data: {
-                                mime_type: file.type,
-                                data: file.base64Data
-                            }
-                        });
+                        // Validate MIME type slightly more strictly before sending
+                        if (file.type.startsWith('image/') || file.type === 'application/pdf') {
+                            currentUserParts.push({
+                                inline_data: {
+                                    mime_type: file.type,
+                                    data: file.base64Data
+                                }
+                            });
+                        } else {
+                             console.warn(`Skipping file with unsupported MIME type for API: ${file.name} (${file.type})`);
+                             // Optionally inform user via chat history?
+                        }
                     });
-                }
+                 }
+                 // Add the actual user text message only if it's not empty, as it's already embedded in the system instruction
+                 // Let's rely on the system instruction containing the latest message. Avoid duplicating it.
 
-                // Add the user's text message (already included in systemInstruction context, but needed for multimodal structure if files exist)
-                // Let's ensure the final user text part is distinct if needed, or rely on the prompt structure
-                 // The prompt structure already includes the last user message.
-                 // If files are present, Gemini expects alternating user/model or structured parts.
-                 // Let's adjust the prompt slightly to fit the standard turn structure if needed.
-                 // The current prompt ends with "Assistant:", implicitly starting the AI's turn.
-                 // Let's re-structure `contents` more explicitly if files are present.
 
-                let requestBody;
-                if (currentFiles.length > 0) {
-                    // For multimodal, structure might need user/model turns, or just a single content block with multiple parts
-                     // Let's try the single content block approach first, as it's simpler
-                     const multiModalParts: any[] = [{ text: systemInstruction }]; // System instruction still sets context
-                     currentFiles.forEach(file => {
-                        multiModalParts.push({ inline_data: { mime_type: file.type, data: file.base64Data } });
-                     });
-                     // Add the actual user text query if it wasn't empty
-                    // if (messageContent) { multiModalParts.push({ text: messageContent }); } // Redundant? Included in system prompt. Test this.
-                     requestBody = JSON.stringify({
-                        contents: [{ role: "user", parts: multiModalParts }], // Wrap parts in a 'user' role
-                        generationConfig: { temperature: 0.6, maxOutputTokens: 8192, topP: 0.95, responseMimeType: "text/plain" },
-                        // Safety settings removed
-                    });
+                // Add the current user turn to the content history
+                apiContent.push({ role: "user", parts: currentUserParts });
 
-                } else {
-                    // Text only
-                    requestBody = JSON.stringify({
-                        contents: [{ parts: [{ text: systemInstruction }] }], // Original structure
-                        generationConfig: { temperature: 0.5, maxOutputTokens: 8192, topP: 0.95, responseMimeType: "text/plain" },
-                       // Safety settings removed
-                    });
-                }
+
+                let requestBody = JSON.stringify({
+                    contents: apiContent,
+                    generationConfig: { temperature: 0.6, maxOutputTokens: 8192, topP: 0.95, responseMimeType: "text/plain" },
+                   // Safety settings removed
+                });
 
 
                 const geminiOptions = {
@@ -465,20 +485,22 @@ ${recentHistory
                 let finalDisplayedContent = assistantRawContent;
                 let extractedSuggestions: string[] = [];
 
-                // --- Suggestion Parsing ---
+                // --- Suggestion Parsing (Improved Robustness) ---
                 const suggestionRegex = /\[SUGGESTIONS\]([\s\S]*?)\[\/SUGGESTIONS\]/i;
                 const suggestionMatch = assistantRawContent.match(suggestionRegex);
-                if (suggestionMatch && suggestionMatch[1]) {
-                    extractedSuggestions = suggestionMatch[1]
-                        .split('\n')
-                        .map(s => s.trim())
-                        .filter(s => s.length > 0 && s.length < 100); // Basic filtering
-                    // Remove the suggestion block from the displayed content
-                    finalDisplayedContent = assistantRawContent.replace(suggestionRegex, '').trim();
-                    setSuggestedPrompts(extractedSuggestions);
-                } else {
+                 if (suggestionMatch && suggestionMatch[1]) {
+                     extractedSuggestions = suggestionMatch[1]
+                         .split('\n')
+                         .map(s => s.trim().replace(/^- /, '').trim()) // Remove leading dashes/spaces
+                         .filter(s => s.length > 1 && s.length < 120); // Filter empty/short/long strings
+                     // Remove the suggestion block and any trailing whitespace/newlines from the displayed content
+                     finalDisplayedContent = assistantRawContent.replace(suggestionRegex, '').trim();
+                      // Limit to max 3-4 suggestions if more are generated
+                     extractedSuggestions = extractedSuggestions.slice(0, 4);
+                     setSuggestedPrompts(extractedSuggestions);
+                 } else {
                      setSuggestedPrompts([]); // Clear if none found
-                }
+                 }
 
 
                 let assistantFinalMessage: ChatMessage = {
@@ -486,7 +508,8 @@ ${recentHistory
                 };
 
                 // --- JSON Parsing Logic (Targeting finalDisplayedContent) ---
-                const jsonMatch = finalDisplayedContent.match(/```json\s*([\s\S]*?)\s*```/);
+                // (Unchanged logic - seems robust)
+                 const jsonMatch = finalDisplayedContent.match(/```json\s*([\s\S]*?)\s*```/);
                 let potentialJsonString: string | null = null;
                 if (jsonMatch && jsonMatch[1]) {
                     potentialJsonString = jsonMatch[1].trim();
@@ -548,14 +571,14 @@ ${recentHistory
             } finally { setIsChatLoading(false); }
         };
 
-        // Chat Submit Handler (using textarea)
+        // Chat Submit Handler (using textarea) - Unchanged
         const handleChatSubmit = async (e?: React.FormEvent) => {
             e?.preventDefault();
             const currentMessage = chatMessage.trim();
              if (!currentMessage && selectedFiles.length === 0) return; // Need text or file
             const filesToSubmit = [...selectedFiles]; // Capture current files
             setChatMessage(''); // Clear text input immediately
-            // setSelectedFiles([]); // Clear files state *after* submit call completes
+            // setSelectedFiles([]); // Files state cleared within submitMessageToAI now
             await submitMessageToAI(currentMessage, filesToSubmit);
              // Auto-resize textarea back down after submit
              if (textareaRef.current) {
@@ -563,7 +586,7 @@ ${recentHistory
              }
         };
 
-        // Textarea KeyDown Handler (Shift+Enter)
+        // Textarea KeyDown Handler (Shift+Enter) - Unchanged
         const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault(); // Prevent default newline on Enter
@@ -572,7 +595,7 @@ ${recentHistory
             // Allow default behavior for Shift+Enter (inserts newline)
         };
 
-         // Textarea Auto-Resize Handler
+         // Textarea Auto-Resize Handler - Unchanged
          const handleTextareaInput = (e: React.FormEvent<HTMLTextAreaElement>) => {
             const textarea = e.currentTarget;
             textarea.style.height = 'auto'; // Reset height to shrink if needed
@@ -580,18 +603,63 @@ ${recentHistory
              setChatMessage(textarea.value); // Keep state updated
         };
 
-         // Click Suggestion Handler
+         // Click Suggestion Handler - UPDATED
         const handleSuggestionClick = (suggestion: string) => {
-             setChatMessage(suggestion); // Set suggestion text in input
-             // Focus the textarea after setting the value
-             setTimeout(() => textareaRef.current?.focus(), 0);
-            // Optionally submit immediately:
-             // submitMessageToAI(suggestion);
-             // setChatMessage('');
+             // Immediately submit the suggestion content
+            submitMessageToAI(suggestion);
+             // No need to setChatMessage or focus input anymore
+             // submitMessageToAI already clears suggestions
         };
 
+        // NEW: Paste Handler for Textarea
+        const handlePaste = useCallback(async (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
+            const items = event.clipboardData?.items;
+            if (!items) return;
 
-        // Expose sendMessage method
+            let imagePasted = false;
+            const filePromises: Promise<SelectedFile>[] = [];
+            const existingFileNames = new Set(selectedFiles.map(f => f.name)); // Check against current selection
+
+            for (let i = 0; i < items.length; i++) {
+                const item = items[i];
+                if (item.kind === 'file' && item.type.startsWith('image/')) {
+                    const file = item.getAsFile();
+                    if (file) {
+                        // Add basic validation (similar to handleFileSelect)
+                         if (existingFileNames.has(file.name)) {
+                             console.log(`Skipping duplicate pasted file: ${file.name}`);
+                              setChatHistory(prev => [...prev, { id: `paste-err-dup-${Date.now()}-${file.name}`, role: 'assistant', content: `ℹ️ Skipped duplicate pasted file: "${file.name}".`, error: false }]);
+                             continue;
+                         }
+                        if (file.size > 20 * 1024 * 1024) {
+                             setChatHistory(prev => [...prev, { id: `paste-err-size-${Date.now()}`, role: 'assistant', content: `❌ Pasted image "${file.name}" is too large (max 20MB).`, error: true }]);
+                            continue;
+                        }
+                         filePromises.push(readFileAsBase64(file));
+                         existingFileNames.add(file.name); // Add to set to prevent duplicates within the same paste
+                         imagePasted = true;
+                     }
+                }
+            }
+
+            if (imagePasted) {
+                event.preventDefault(); // Prevent default paste behavior ONLY if an image was handled
+                setIsChatLoading(true); // Show loading indicator while processing
+                try {
+                    const results = await Promise.all(filePromises);
+                    setSelectedFiles(prev => [...prev, ...results]); // Add newly processed files
+                 } catch (error) {
+                     console.error("Error processing pasted image:", error);
+                     setChatHistory(prev => [...prev, { id: `paste-err-read-${Date.now()}`, role: 'assistant', content: `❌ Error processing pasted image. Please try again.`, error: true }]);
+                 } finally {
+                    setIsChatLoading(false);
+                 }
+            }
+            // Allow default paste behavior for text, etc., if no image was handled
+        }, [selectedFiles]); // Dependency: selectedFiles for duplicate check
+
+
+        // Expose sendMessage method (unchanged)
         useImperativeHandle(ref, () => ({ sendMessage: (message: string) => { submitMessageToAI(message); } }));
 
         // --- Dynamic Styles & Render Logic ---
@@ -603,7 +671,7 @@ ${recentHistory
 
         return (
             <div className={rootClasses}>
-                {/* Header */}
+                {/* Header (unchanged) */}
                 <div className={`p-2 border-b ${headerBg} flex justify-between items-center shrink-0 sticky top-0 z-10 ${displayMode === 'overlay' ? 'cursor-pointer' : ''}`} onClick={displayMode === 'overlay' ? () => setIsMinimized(!isMinimized) : undefined} title={displayMode === 'overlay' ? (isMinimized ? "Expand" : "Minimize") : undefined}>
                     <h3 className={`text-sm font-semibold ${headingColor} flex items-center gap-1.5 truncate pr-2`}> <MessageCircle className={`w-4 h-4 shrink-0 ${isIlluminateEnabled ? 'text-blue-600' : 'text-blue-400'}`} /> <span className="truncate" title={`Chat: ${note.title}`}>Chat: {note.title}</span> </h3>
                      {/* Header buttons... (unchanged) */}
@@ -642,9 +710,9 @@ ${recentHistory
                                                 }}
                                             >{message.content}</ReactMarkdown>
                                         ) : null}
-                                         {/* Timer Display */}
+                                         {/* Timer Display (unchanged) */}
                                         {message.timer && ( <div className="mt-1.5"><div className={`flex items-center space-x-2 rounded-md px-2 py-1 text-xs border ${isIlluminateEnabled ? 'bg-blue-50 border-blue-200 text-blue-800' : 'bg-gray-800/60 border-gray-600 text-blue-300'}`}><TimerIcon className="w-3.5 h-3.5"/> <Timer key={message.timer.id} initialDuration={message.timer.duration} onComplete={() => handleTimerComplete(message.timer.id)} compact={true} isIlluminateEnabled={isIlluminateEnabled}/></div></div> )}
-                                        {/* Edit Suggestion Action */}
+                                        {/* Edit Suggestion Action (unchanged) */}
                                         {message.isEditSuggestion && message.editAction && !isChatLoading && !message.error && (
                                             <div className="mt-2 border-t pt-1.5 flex justify-end">
                                                 <button onClick={() => handleAcceptEdit(message)} className={`${buttonSecondaryClass} px-2.5 py-1 rounded-md text-xs flex items-center gap-1 hover:brightness-110`} disabled={isChatLoading} >
@@ -658,27 +726,29 @@ ${recentHistory
                             <div ref={chatEndRef} className="h-0"></div> {/* Scroll target */}
                         </div>
 
-                        {/* Suggestions Area */}
+                        {/* Suggestions Area - UPDATED UI */}
                         {suggestedPrompts.length > 0 && !isChatLoading && (
-                            <div className="px-2 pb-1 pt-0.5 flex flex-wrap gap-1.5 border-t border-b-0">
-                                 <p className={`text-xs font-medium w-full mb-1 ${isIlluminateEnabled ? 'text-gray-600' : 'text-gray-400'}`}>Suggestions:</p>
-                                {suggestedPrompts.map((prompt, idx) => (
-                                    <button
-                                        key={idx}
-                                        onClick={() => handleSuggestionClick(prompt)}
-                                        className={`${suggestionButtonClass} text-xs px-2 py-0.5 rounded-full hover:shadow-sm transition-all duration-150`}
-                                        title={prompt}
-                                    >
-                                        {prompt}
-                                    </button>
-                                ))}
+                            <div className={`px-3 py-2 border-t ${isIlluminateEnabled ? 'border-gray-200' : 'border-gray-700'}`}>
+                                 <p className={`text-xs font-medium w-full mb-2 ${isIlluminateEnabled ? 'text-gray-600' : 'text-gray-400'}`}>Suggestions:</p>
+                                 <div className="flex flex-wrap gap-2"> {/* Increased gap */}
+                                    {suggestedPrompts.map((prompt, idx) => (
+                                        <button
+                                            key={idx}
+                                            onClick={() => handleSuggestionClick(prompt)} // Uses updated handler
+                                            className={`${suggestionButtonClass} text-xs px-2.5 py-1 rounded-md hover:shadow-sm transition-all duration-150 cursor-pointer`} // Updated style: rounded-md, slightly more padding
+                                            title={prompt}
+                                        >
+                                            {prompt}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
                         )}
 
 
                         {/* Input Form Area */}
                         <form onSubmit={handleChatSubmit} className={`p-2 border-t ${headerBg} shrink-0 sticky bottom-0`}>
-                            {/* Selected Files Display */}
+                            {/* Selected Files Display (unchanged) */}
                             {selectedFiles.length > 0 && (
                                 <div className="mb-1.5 flex flex-wrap gap-1.5 px-1">
                                     {selectedFiles.map(file => (
@@ -694,19 +764,20 @@ ${recentHistory
                             )}
                             {/* Input Row */}
                             <div className="flex gap-1.5 items-end"> {/* Use items-end for textarea alignment */}
-                                {/* Textarea Input */}
+                                {/* Textarea Input - ADDED onPaste handler */}
                                  <textarea
                                     ref={textareaRef}
                                     rows={1} // Start with 1 row
                                     value={chatMessage}
                                     onChange={handleTextareaInput} // Use onChange for state update + resize trigger
                                     onKeyDown={handleKeyDown}
-                                    placeholder="Ask, request changes, or attach files..."
+                                    onPaste={handlePaste} // <-- ADDED PASTE HANDLER
+                                    placeholder="Ask, paste an image, or attach files..." // Updated placeholder
                                     className={`flex-1 ${inputBg} ${inputTextColor} ${placeholderColor} rounded-lg px-3 py-1.5 text-sm focus:ring-1 focus:outline-none resize-none overflow-y-auto max-h-[100px] leading-snug ${isChatLoading ? 'opacity-60' : ''}`} // Added max-h, resize-none, overflow-auto
                                     disabled={isChatLoading}
                                     style={{ height: 'auto' }} // Initial auto height
                                 />
-                                {/* Hidden File Input */}
+                                {/* Hidden File Input (unchanged) */}
                                 <input
                                     type="file"
                                     ref={fileInputRef}
@@ -715,7 +786,7 @@ ${recentHistory
                                     accept="image/*,application/pdf" // Accept images and PDFs
                                     className="hidden"
                                 />
-                                {/* Attach Button */}
+                                {/* Attach Button (unchanged) */}
                                 <button
                                     type="button"
                                     onClick={triggerFileSelect}
@@ -725,7 +796,7 @@ ${recentHistory
                                 >
                                     <Paperclip className="w-4 h-4" />
                                 </button>
-                                {/* Send Button */}
+                                {/* Send Button (unchanged) */}
                                 <button
                                     type="submit"
                                     disabled={isChatLoading || (!chatMessage.trim() && selectedFiles.length === 0)}

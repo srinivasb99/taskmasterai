@@ -10,15 +10,16 @@ import { Timer } from './Timer';
 import { User } from 'firebase/auth'; // Import User type
 import { auth } from '../lib/firebase'; // Import auth for current user check
 import {
-    // --- Import Usage Functions ---
+    // --- Import Centralized Usage/Tier Functions ---
     getUserChatUsage,
     updateUserChatUsage,
-    getUserTier,     // Assume this is exported
-    PREMIUM_EMAILS, // Assume these are exported
-    PRO_EMAILS,     // Assume these are exported
-    BASIC_CHAT_LIMIT, // Assume these are exported
-    PRO_CHAT_LIMIT    // Assume these are exported
-} from '../lib/notes-firebase'; // Adjust path if needed
+    getUserTier,
+    // PREMIUM_EMAILS, // Not needed directly if using getUserTier
+    // PRO_EMAILS,     // Not needed directly if using getUserTier
+    BASIC_CHAT_LIMIT,
+    PRO_CHAT_LIMIT,
+    UserTier        // Import type from central location
+} from '../lib/dashboard-firebase'; // <--- CORRECTED IMPORT PATH
 
 // Types
 interface TimerMessage { type: 'timer'; duration: number; id: string; }

@@ -1,6 +1,6 @@
 // Friends.tsx code:
 
-import React, { useState, useEffect, useRef, type ChangeEvent, type FormEvent } from "react";
+import React, { useState, useEffect, useRef, type ChangeEvent, type FormEvent, useMemo } from "react"; // <--- ADD useMemo HERE
 import { useNavigate, Link } from "react-router-dom"; // Import Link
 import { motion, AnimatePresence } from "framer-motion";
 // Consolidate Lucide imports & ensure all used icons are present

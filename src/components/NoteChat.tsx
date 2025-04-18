@@ -11,7 +11,7 @@ import { User } from 'firebase/auth'; // Import User type
 import { auth } from '../lib/firebase'; // Import auth for current user check
 import {
     // --- Import Centralized Usage/Tier Functions ---
-    getUserChatUsage,
+    getUserUsageData, // <--- CORRECTED NAME
     updateUserChatUsage,
     getUserTier,
     // PREMIUM_EMAILS, // Not needed directly if using getUserTier
@@ -261,7 +261,7 @@ export const NoteChat = forwardRef<NoteChatHandle, NoteChatProps>(
             // Load Usage Data (if not premium)
             if (tier !== 'premium') {
                 const currentMonthYear = new Date().toISOString().slice(0, 7);
-                getUserChatUsage(currentUser.uid)
+                getUserUsageData(currentUser.uid)
                     .then(usageData => {
                         if (usageData?.month === currentMonthYear) {
                             setChatCount(usageData.count);

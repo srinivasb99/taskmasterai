@@ -30,6 +30,7 @@ import {
   Bell,
   BrainCircuit, // Added for AI Chat
   Send,          // Added for AI Chat
+  Loader2,       // Added for loading state
 } from "lucide-react";
 import { Sidebar } from "./Sidebar";
 import { auth, db } from "../lib/firebase"; // Import db directly for getDoc
@@ -60,18 +61,26 @@ import {
   subDays,             // Import for AI context
 } from "date-fns";
 import {
-  onCollectionSnapshot,
+  onCollectionSnapshot as onCalendarCollectionSnapshot, // Alias calendar-specific listener
   createEvent,
   updateEvent,
   deleteEvent,
-} from "../lib/calendar-firebase";
+} from "../lib/calendar-firebase"; // Assuming calendar functions are separate
 import {
+  // --- Import Centralized Functions ---
   onCollectionSnapshot as onDashboardCollectionSnapshot,
   updateItem as updateDashboardItem,
   deleteItem as deleteDashboardItem,
   markItemComplete as markDashboardItemComplete,
   geminiApiKey,
-} from '../lib/dashboard-firebase';
+  // --- Import Centralized Tier/Usage ---
+  getUserTier,
+  getUserChatUsage,
+  updateUserChatUsage,
+  UserTier, // Import type
+  BASIC_CHAT_LIMIT,
+  PRO_CHAT_LIMIT,
+} from '../lib/dashboard-firebase'; // <--- Use CENTRALIZED functions
 import { PriorityBadge } from './PriorityBadge';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
@@ -80,9 +89,9 @@ import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
 
 // ---------------------
-// Helper functions for Gemini integration (Ensure these are correct and available)
+// Helper functions for Gemini integration (Assume these are correct and available)
 // ---------------------
-const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}&alt=sse`;
+const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}&alt=sse`; // Use 1.5 Flash
 
 const fetchWithTimeout = async (url: string, options: RequestInit, timeout = 30000) => {
   const controller = new AbortController();
@@ -286,6 +295,20 @@ export function Calendar() {
   const [isChatLoading, setIsChatLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
+  // --- NEW: Tier and Usage State ---
+  const [userTier, setUserTier] = useState<UserTier>('loading');
+  const [chatCount, setChatCount] = useState(0);
+  const [usageMonth, setUsageMonth] = useState(''); // YYYY-MM
+  const [isChatLimitReached, setIsChatLimitReached] = useState(false);
+  const [isLoadingUsage, setIsLoadingUsage] = useState(true); // Loading state for usage data
+
+  // --- Memoized Chat Limit ---
+  const currentChatLimit = useMemo(() => {
+      if (userTier === 'premium') return Infinity;
+      if (userTier === 'pro') return PRO_CHAT_LIMIT;
+      return BASIC_CHAT_LIMIT;
+  }, [userTier]);
+
 
   // ---------------------------
   //   Helper Functions
@@ -410,10 +433,16 @@ export function Calendar() {
         })),
         ].filter(item => item.startDate && !isNaN(item.startDate.getTime()));
 
+        // Combine calendar-specific events
+        const calendarItemsTyped: CalendarEvent[] = calendarEvents.map(item => ({
+            ...item,
+            type: 'event' as 'event' // Ensure type is correct
+        }));
+
         // Combine and ensure uniqueness by ID, prioritizing calendarEvents if IDs clash
         const uniqueMap = new Map<string, CalendarItem>();
         dashboardItems.forEach(item => uniqueMap.set(item.id, item));
-        calendarEvents.forEach(item => uniqueMap.set(item.id, item));
+        calendarItemsTyped.forEach(item => uniqueMap.set(item.id, item)); // Overwrite dashboard items if ID clash
 
         return Array.from(uniqueMap.values());
     }, [calendarEvents, dashboardTasks, dashboardGoals, dashboardProjects, dashboardPlans]);
@@ -448,31 +477,83 @@ export function Calendar() {
     useEffect(() => localStorage.setItem('isSidebarIlluminateEnabled', JSON.stringify(isSidebarIlluminateEnabled)), [isSidebarIlluminateEnabled]);
 
 
+    // --- MODIFIED: Auth Listener also loads Tier/Usage ---
     useEffect(() => {
-        const unsubscribe = auth.onAuthStateChanged((firebaseUser) => {
-        setUser(firebaseUser);
-        if (firebaseUser) {
-            const userDocRef = doc(db, "users", firebaseUser.uid);
-            getDoc(userDocRef).then(docSnap => {
-                const name = docSnap.exists() && docSnap.data()?.name ? docSnap.data()?.name : firebaseUser.displayName || firebaseUser.email?.split('@')[0] || "User";
-                setUserName(name);
-            }).catch(() => {
-                setUserName(firebaseUser.displayName || firebaseUser.email?.split('@')[0] || "User");
-            });
-        } else {
-            setCalendarEvents([]);
-            setDashboardTasks([]);
-            setDashboardGoals([]);
-            setDashboardProjects([]);
-            setDashboardPlans([]);
-            setUserName("User");
-            navigate("/login");
-        }
-        // Initial loading should be handled within data listeners now
-        // setLoading(false);
+        setLoading(true);
+        setUserTier('loading'); // Reset tier on auth change
+        setIsLoadingUsage(true); // Start loading usage
+
+        const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => { // Make async
+            setUser(firebaseUser);
+            if (firebaseUser) {
+                // Fetch user name
+                const userDocRef = doc(db, "users", firebaseUser.uid);
+                getDoc(userDocRef).then(docSnap => {
+                    const name = docSnap.exists() && docSnap.data()?.name ? docSnap.data()?.name : firebaseUser.displayName || firebaseUser.email?.split('@')[0] || "User";
+                    setUserName(name);
+                }).catch(() => {
+                    setUserName(firebaseUser.displayName || firebaseUser.email?.split('@')[0] || "User");
+                });
+
+                 // Determine Tier
+                const tier = getUserTier(firebaseUser.email); // Use utility function
+                setUserTier(tier);
+
+                // Load Usage Data (only if not premium)
+                if (tier !== 'premium') {
+                    try {
+                        const currentMonthYear = new Date().toISOString().slice(0, 7); // "YYYY-MM"
+                        const usageData = await getUserChatUsage(firebaseUser.uid); // Use central chat usage function
+
+                        if (usageData?.month === currentMonthYear) {
+                            setChatCount(usageData.count);
+                            setUsageMonth(usageData.month);
+                            const limit = tier === 'pro' ? PRO_CHAT_LIMIT : BASIC_CHAT_LIMIT;
+                            setIsChatLimitReached(usageData.count >= limit);
+                        } else {
+                            // No data OR data from previous month - reset
+                            setChatCount(0);
+                            setUsageMonth(currentMonthYear);
+                            setIsChatLimitReached(false);
+                            // Update Firestore with reset count
+                            await updateUserChatUsage(firebaseUser.uid, 0, currentMonthYear);
+                        }
+                    } catch (err) {
+                        console.error("Calendar: Error loading/updating chat usage data:", err);
+                        setChatCount(0); // Default to 0 on error
+                        setUsageMonth(new Date().toISOString().slice(0, 7));
+                        setIsChatLimitReached(false);
+                    } finally {
+                         setIsLoadingUsage(false); // Usage loading finished
+                    }
+                } else {
+                    // Premium users
+                    setChatCount(0);
+                    setUsageMonth('');
+                    setIsChatLimitReached(false);
+                    setIsLoadingUsage(false);
+                }
+
+            } else {
+                // Reset all relevant state on logout
+                setCalendarEvents([]);
+                setDashboardTasks([]);
+                setDashboardGoals([]);
+                setDashboardProjects([]);
+                setDashboardPlans([]);
+                setUserName("User");
+                setUserTier('loading');
+                setChatCount(0);
+                setUsageMonth('');
+                setIsChatLimitReached(false);
+                setIsLoadingUsage(true);
+                navigate("/login");
+            }
+            // setLoading(false); // Loading should be tied to data listeners completing
         });
         return () => unsubscribe();
     }, [navigate]);
+    // --- END MODIFIED AUTH LISTENER ---
 
 
     // Scroll AI chat to bottom
@@ -486,55 +567,65 @@ export function Calendar() {
 
 
     useEffect(() => {
-        if (!user?.uid) return;
+        if (!user?.uid) {
+             // Clear data if user logs out
+             setCalendarEvents([]);
+             setDashboardTasks([]);
+             setDashboardGoals([]);
+             setDashboardProjects([]);
+             setDashboardPlans([]);
+             setLoading(true); // Show loading until new listeners (if any) are set up
+             return;
+         }
 
         let eventLoaded = false, taskLoaded = false, goalLoaded = false, projectLoaded = false, planLoaded = false;
+        setLoading(true); // Start loading when user ID is available
+
         const checkAllLoaded = () => {
             if (eventLoaded && taskLoaded && goalLoaded && projectLoaded && planLoaded) {
-                setLoading(false);
+                setLoading(false); // Stop loading only when all data sources report back
             }
         }
 
         // Listener for Calendar-specific Events
-        const unsubEvents = onCollectionSnapshot("events", user.uid, (items) => {
+        const unsubEvents = onCalendarCollectionSnapshot("events", user.uid, (items) => { // Use aliased listener
             setCalendarEvents(
                 items.map((item) => ({
                     id: item.id,
                     title: item.data.title || "Untitled Event",
-                    startDate: item.data.startDate?.toDate ? item.data.startDate.toDate() : new Date(),
-                    endDate: item.data.endDate?.toDate ? item.data.endDate.toDate() : addDays(new Date(), 1),
+                    // Use nullish coalescing for start/end dates
+                    startDate: item.data.startDate?.toDate?.() ?? new Date(),
+                    endDate: item.data.endDate?.toDate?.() ?? addDays(item.data.startDate?.toDate?.() ?? new Date(), 1), // Default end 1 day after start
                     type: "event",
                     userId: item.data.userId,
                     color: item.data.color || "#3B82F6",
-                    isAllDay: item.data.isAllDay || false,
+                    isAllDay: item.data.isAllDay ?? false,
                     description: item.data.description || "",
-                    // Ensure calendar events don't inherit dashboard properties unless intended
-                    status: undefined,
-                    priority: undefined,
-                    originalCollection: undefined,
-                })).filter(event => event.startDate && !isNaN(event.startDate.getTime()))
+                    status: undefined, priority: undefined, originalCollection: undefined,
+                })).filter(event => event.startDate && !isNaN(event.startDate.getTime())) // Filter invalid dates robustly
             );
             eventLoaded = true; checkAllLoaded();
-        }, (error) => {
+        }, (error: Error) => { // Type the error
             console.error("Error fetching events:", error);
             eventLoaded = true; checkAllLoaded(); // Consider loaded even on error to unblock UI
         });
 
+
         // Listeners for Dashboard Items
-        const unsubTasks = onDashboardCollectionSnapshot("tasks", user.uid, (data) => { setDashboardTasks(data); taskLoaded = true; checkAllLoaded(); }, (error) => { console.error("Error fetching tasks:", error); taskLoaded = true; checkAllLoaded(); });
-        const unsubGoals = onDashboardCollectionSnapshot("goals", user.uid, (data) => { setDashboardGoals(data); goalLoaded = true; checkAllLoaded(); }, (error) => { console.error("Error fetching goals:", error); goalLoaded = true; checkAllLoaded(); });
-        const unsubProjects = onDashboardCollectionSnapshot("projects", user.uid, (data) => { setDashboardProjects(data); projectLoaded = true; checkAllLoaded(); }, (error) => { console.error("Error fetching projects:", error); projectLoaded = true; checkAllLoaded(); });
-        const unsubPlans = onDashboardCollectionSnapshot("plans", user.uid, (data) => { setDashboardPlans(data); planLoaded = true; checkAllLoaded(); }, (error) => { console.error("Error fetching plans:", error); planLoaded = true; checkAllLoaded(); });
+        const unsubTasks = onDashboardCollectionSnapshot("tasks", user.uid, (data) => { setDashboardTasks(data); taskLoaded = true; checkAllLoaded(); }, (error: Error) => { console.error("Error fetching tasks:", error); taskLoaded = true; checkAllLoaded(); });
+        const unsubGoals = onDashboardCollectionSnapshot("goals", user.uid, (data) => { setDashboardGoals(data); goalLoaded = true; checkAllLoaded(); }, (error: Error) => { console.error("Error fetching goals:", error); goalLoaded = true; checkAllLoaded(); });
+        const unsubProjects = onDashboardCollectionSnapshot("projects", user.uid, (data) => { setDashboardProjects(data); projectLoaded = true; checkAllLoaded(); }, (error: Error) => { console.error("Error fetching projects:", error); projectLoaded = true; checkAllLoaded(); });
+        const unsubPlans = onDashboardCollectionSnapshot("plans", user.uid, (data) => { setDashboardPlans(data); planLoaded = true; checkAllLoaded(); }, (error: Error) => { console.error("Error fetching plans:", error); planLoaded = true; checkAllLoaded(); });
 
 
         return () => {
-        unsubEvents();
-        unsubTasks();
-        unsubGoals();
-        unsubProjects();
-        unsubPlans();
+            unsubEvents();
+            unsubTasks();
+            unsubGoals();
+            unsubProjects();
+            unsubPlans();
         };
-    }, [user]);
+    }, [user?.uid]); // Rerun only when user ID changes
 
 
   // ---------------------------
@@ -771,10 +862,42 @@ export function Calendar() {
     };
 
 
-    // Handle AI Chat Submit
+    // Handle AI Chat Submit (MODIFIED with Usage Check)
     const handleCalendarChatSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!chatMessage.trim() || isChatLoading || !geminiApiKey) return;
+        if (!chatMessage.trim() || isChatLoading || !geminiApiKey || !user) return; // Added user check
+
+        // --- Usage Check ---
+        if (userTier !== 'premium') {
+            const currentMonthYear = new Date().toISOString().slice(0, 7);
+            let currentCount = chatCount;
+
+            // Check if the stored month matches the current month
+            if (usageMonth !== currentMonthYear) {
+                console.log(`CalendarChat: Chat month mismatch (State: ${usageMonth}, Current: ${currentMonthYear}). Resetting count.`);
+                currentCount = 0; // Reset count locally
+                setChatCount(0); // Update state
+                setUsageMonth(currentMonthYear); // Update state
+                setIsChatLimitReached(false); // Reset limit flag
+                // Update Firestore asynchronously
+                updateUserChatUsage(user.uid, 0, currentMonthYear).catch(err => {
+                    console.error("CalendarChat: Failed to reset chat usage in Firestore on month change:", err);
+                });
+            }
+
+            const limit = userTier === 'pro' ? PRO_CHAT_LIMIT : BASIC_CHAT_LIMIT;
+            if (currentCount >= limit) {
+                setChatHistory(prev => [...prev, {
+                    id: `cal-limit-${Date.now()}`,
+                    role: 'assistant',
+                    content: `You've reached your ${limit} chat message limit for this month. Upgrade for more interactions!`,
+                    error: true
+                }]);
+                setChatMessage(''); // Clear input if limit reached
+                return; // Stop submission
+            }
+        }
+        // --- End Usage Check ---
 
         const currentMessage = chatMessage;
         setChatMessage('');
@@ -782,6 +905,20 @@ export function Calendar() {
         const userMsg: ChatMessage = { id: `user-${Date.now()}`, role: 'user', content: currentMessage };
         setChatHistory(prev => [...prev, userMsg]);
         setIsChatLoading(true);
+
+        // --- Increment Usage Count (Before API Call) ---
+        if (userTier !== 'premium') {
+            const newCount = chatCount + 1;
+            const limit = userTier === 'pro' ? PRO_CHAT_LIMIT : BASIC_CHAT_LIMIT;
+            setChatCount(newCount); // Optimistic UI update
+            setIsChatLimitReached(newCount >= limit); // Update limit state
+            updateUserChatUsage(user.uid, newCount, usageMonth).catch(err => {
+                console.error("CalendarChat: Failed to update chat usage in Firestore:", err);
+                // Consider reverting optimistic update or showing warning?
+            });
+        }
+        // --- End Increment Logic ---
+
 
         const conversationHistory = chatHistory
             .slice(-6) // Limit history context
@@ -832,20 +969,14 @@ Respond directly to the user's message following these guidelines.`;
                 body: JSON.stringify({
                     contents: [{ parts: [{ text: prompt }] }],
                     generationConfig: { temperature: 0.6, maxOutputTokens: 800 },
-                    safetySettings: [ /* ... standard safety settings ... */ ],
+                    safetySettings: [ // Standard safety settings
+                        { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+                        { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+                        { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+                        { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+                    ],
                 })
             };
-              // Add safety settings
-              const safetySettings = [
-                { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-                { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-                { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-                { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-              ];
-              const body = JSON.parse(geminiOptions.body);
-              body.safetySettings = safetySettings;
-              geminiOptions.body = JSON.stringify(body);
-
 
             await streamResponse(geminiEndpoint, geminiOptions, (rawChunkAccumulated) => {
                 finalRawResponseText = rawChunkAccumulated;
@@ -864,7 +995,7 @@ Respond directly to the user's message following these guidelines.`;
                  if (msg.id === assistantMsgId) {
                      // Use final extracted text, or provide a fallback error if extraction failed
                      const finalContent = finalExtractedText || "Sorry, I couldn't process that request.";
-                     const isError = !finalExtractedText;
+                     const isError = !finalExtractedText || finalExtractedText.startsWith("Error:"); // Mark as error if extraction failed or returned an error
                      return { ...msg, content: finalContent, error: isError };
                  }
                  return msg;
@@ -881,6 +1012,7 @@ Respond directly to the user's message following these guidelines.`;
             setIsChatLoading(false);
         }
     };
+
 
   // ---------------------------
   //   Styling Variables
@@ -908,8 +1040,12 @@ Respond directly to the user's message following these guidelines.`;
   // ---------------------------
 
 
-  if (!user) {
-    return null; // Should be redirected by auth effect
+  if (loading) { // Show loader until all initial data is loaded
+    return (
+      <div className={`flex h-screen ${containerClass} items-center justify-center`}>
+        <Loader2 className="w-10 h-10 animate-spin text-blue-500" />
+      </div>
+    );
   }
 
 
@@ -1147,9 +1283,6 @@ Respond directly to the user's message following these guidelines.`;
                      placeholder={ itemForm.type ? `Enter ${itemForm.type} title` : "Enter title"}
                      // No longer disabled: disabled={!!selectedItem?.originalCollection && selectedItem.type !== 'event'}
                    />
-                    {/* {!!selectedItem?.originalCollection && selectedItem.type !== 'event' && (
-                       <p className="text-[10px] text-yellow-600 dark:text-yellow-400 mt-1">Title edited in Dashboard.</p>
-                    )} */}
                  </div>
 
                  {/* Dates & All Day Toggle */}
@@ -1303,6 +1436,7 @@ Respond directly to the user's message following these guidelines.`;
                                     <ReactMarkdown
                                         remarkPlugins={[remarkMath, remarkGfm]}
                                         rehypePlugins={[rehypeKatex]}
+                                        className={`prose prose-sm max-w-none ${isIlluminateEnabled ? 'prose-gray' : 'prose-invert'} text-current`} // Use text-current for bubble color
                                         components={{ /* Add Markdown components if needed */ }} >
                                         {message.content}
                                     </ReactMarkdown>
@@ -1319,14 +1453,41 @@ Respond directly to the user's message following these guidelines.`;
                 </div>
 
                 {/* Chat Input Form */}
-                <form onSubmit={handleCalendarChatSubmit} className={`p-2 sm:p-3 border-t ${borderColor} ${isIlluminateEnabled ? 'bg-gray-100/80' : 'bg-gray-800/90'} flex-shrink-0 sticky bottom-0 backdrop-blur-sm`}>
-                    <div className="flex gap-1.5 items-center">
-                        <input type="text" value={chatMessage} onChange={(e) => setChatMessage(e.target.value)} placeholder="Ask about your schedule..." className={`flex-1 ${inputBg} border ${borderColor} rounded-full px-4 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-150 shadow-sm placeholder-gray-400 dark:placeholder-gray-500 disabled:opacity-60`} disabled={isChatLoading} aria-label="Chat input" />
-                        <button type="submit" disabled={isChatLoading || !chatMessage.trim()} className="bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105 active:scale-100 shadow-sm flex-shrink-0" title="Send Message" aria-label="Send chat message" >
-                            {isChatLoading ? ( <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> ) : ( <Send className="w-4 h-4" /> )}
-                        </button>
-                    </div>
-                </form>
+                <div className={`p-2 sm:p-3 border-t ${borderColor} ${isIlluminateEnabled ? 'bg-gray-100/80' : 'bg-gray-800/90'} flex-shrink-0 sticky bottom-0 backdrop-blur-sm`}>
+                     {/* --- NEW: Usage Display --- */}
+                    {userTier !== 'premium' && userTier !== 'loading' && (
+                        <div className="pb-1.5 text-xs text-center">
+                            <span className={isIlluminateEnabled ? 'text-gray-600' : 'text-gray-400'}>
+                                Messages this month: {isLoadingUsage ? '...' : chatCount} / {currentChatLimit === Infinity ? '∞' : currentChatLimit}
+                            </span>
+                            {isChatLimitReached && !isLoadingUsage && (
+                                <span className="text-red-500 ml-1 font-medium">(Limit Reached)</span>
+                            )}
+                        </div>
+                    )}
+                    {/* --- End Usage Display --- */}
+                    <form onSubmit={handleCalendarChatSubmit} >
+                        <div className="flex gap-1.5 items-center">
+                            <input
+                                type="text"
+                                value={chatMessage}
+                                onChange={(e) => setChatMessage(e.target.value)}
+                                placeholder={isChatLimitReached ? "Monthly chat limit reached..." : "Ask about your schedule..."}
+                                className={`flex-1 ${inputBg} border ${borderColor} rounded-full px-4 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-150 shadow-sm placeholder-gray-400 dark:placeholder-gray-500 disabled:opacity-60 ${isChatLimitReached || isLoadingUsage ? 'cursor-not-allowed' : ''}`}
+                                disabled={isChatLoading || isChatLimitReached || isLoadingUsage}
+                                aria-label="Chat input"
+                            />
+                            <button
+                                type="submit"
+                                disabled={isChatLoading || isLoadingUsage || !chatMessage.trim() || isChatLimitReached}
+                                className={`bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105 active:scale-100 shadow-sm flex-shrink-0 ${isChatLimitReached || isLoadingUsage ? 'cursor-not-allowed' : ''}`}
+                                title="Send Message"
+                                aria-label="Send chat message" >
+                                {isChatLoading ? ( <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> ) : ( <Send className="w-4 h-4" /> )}
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div> {/* End AI Chat Sidebar */}
 
       </main>

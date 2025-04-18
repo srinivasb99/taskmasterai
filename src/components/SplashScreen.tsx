@@ -190,8 +190,8 @@ function SplashScreen() {
             {currentFeature.image && (
               <div
                 key={currentFeature.image}
-                // Added perspective here for potential 3D transforms, though not strictly needed for just shadow/translateY
-                className="md:w-1/2 mt-4 md:mt-0 group relative rounded-xl overflow-hidden [perspective:1000px]"
+                // Adding group class to this container
+                className="md:w-1/2 mt-4 md:mt-0 group relative rounded-xl overflow-hidden"
               >
                  {/* Background gradient placeholder (Unchanged) */}
                  <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 via-purple-500/10 to-gray-800/10"></div>
@@ -204,13 +204,12 @@ function SplashScreen() {
                   src={currentFeature.image}
                   alt={`${currentFeature.title} Preview`}
                   className={`
-                    relative w-full h-auto md:h-full md:object-cover rounded-xl shadow-lg /* Base shadow */
-                    transform transition-all duration-300 ease-out /* Faster, smoother transition */
-                    ${ isImageLoaded ? 'opacity-100 blur-0 scale-100' : 'opacity-0 blur-sm scale-105' } /* Loading animation */
-                    /* --- Hover Effects --- */
-                    group-hover:shadow-xl /* Increase shadow significantly */
-                    group-hover:-translate-y-1 /* Lift slightly */
-                    /* Removed group-hover:scale */
+                    relative w-full h-auto md:h-full md:object-cover /* Base layout/sizing */
+                    rounded-xl shadow-lg /* Base appearance */
+                    transform transition-all duration-500 ease-out /* Enable transform, match old duration */
+                    ${ isImageLoaded ? 'opacity-100 scale-100 blur-0' : 'opacity-0 scale-105 blur-sm' } /* Loading state */
+                    /* --- Hover Effect (from old code) --- */
+                    group-hover:scale-[1.02]
                   `}
                  />
                  {/* --- END MODIFIED IMAGE --- */}

@@ -33,6 +33,71 @@ import {
    2. AUTH LISTENERS
    ------------------------------------------------------------------ */
 
+export const getUserUsageData = async (userId) => {
+  if (!userId) return null;
+  try {
+    const usageRef = doc(db, `users/${userId}/usage/chat`); // Store usage in a subcollection doc
+    const docSnap = await getDoc(usageRef);
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      // Ensure both count and month exist
+      if (typeof data.count === 'number' && typeof data.month === 'string') {
+        return { count: data.count, month: data.month };
+      }
+    }
+    return null; // No valid data found
+  } catch (error) {
+    console.error("Error getting user chat usage:", error);
+    return null; // Return null on error
+  }
+};
+
+/**
+ * Updates or sets the user's chat usage count for a specific month.
+ * @param {string} userId - The user's Firebase UID.
+ * @param {number} newCount - The new chat count.
+ * @param {string} currentMonth - The current month in "YYYY-MM" format.
+ * @returns {Promise<void>}
+ */
+export const updateUserChatUsage = async (userId, newCount, currentMonth) => {
+  if (!userId || typeof newCount !== 'number' || !currentMonth) return;
+  try {
+    const usageRef = doc(db, `users/${userId}/usage/chat`);
+    // Use setDoc with merge: true to create or update the document safely
+    await setDoc(usageRef, {
+      count: newCount,
+      month: currentMonth,
+      lastUpdated: serverTimestamp() // Track last update time
+    }, { merge: true });
+  } catch (error) {
+    console.error("Error updating user chat usage:", error);
+    // Optionally re-throw or handle more gracefully
+  }
+};
+
+// --- Ensure other necessary functions like updateDashboardLastSeen are also exported ---
+export const updateDashboardLastSeen = async (userId) => {
+    if (!userId) return;
+    try {
+        const userRef = doc(db, "users", userId);
+        // Use updateDoc to only update the lastSeen field
+        await updateDoc(userRef, {
+            lastSeen: serverTimestamp()
+        });
+        // console.log("Updated lastSeen for user:", userId);
+    } catch (error) {
+         // If the user document doesn't exist, setDoc might be better,
+         // but for just 'lastSeen', failing gracefully might be okay.
+        console.warn("Could not update lastSeen (user doc might not exist or other error):", error);
+        // Optionally try setDoc if update fails?
+        // try {
+        //     await setDoc(userRef, { lastSeen: serverTimestamp() }, { merge: true });
+        // } catch (setErr) {
+        //     console.error("Failed to set lastSeen either:", setErr);
+        // }
+    }
+};
+
 export function onFirebaseAuthStateChanged(callback: (user: User | null) => void) {
   return onAuthStateChanged(auth, (user) => {
     callback(user)

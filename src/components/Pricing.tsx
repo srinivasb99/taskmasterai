@@ -2,12 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Loader2, Crown, Gem, Check } from 'lucide-react';
 import { subscribeToAuthState } from '../lib/pricing-firebase';
+import { Logo } from './Logo';
 // Assuming createCheckoutSession is not used as per the original code's usage of direct links
 // import { createCheckoutSession } from '../lib/stripe-client';
-import { Logo } from './Logo';
 import { motion } from 'framer-motion';
 
-// Direct Stripe checkout URLs (No changes here)
+// Direct Stripe checkout URLs
 const STRIPE_PRICES = {
   PREMIUM: {
     yearly: 'https://buy.stripe.com/eVa6q71vu9UMghydQS',
@@ -52,7 +52,7 @@ function Pricing() {
     );
   }
 
-  // Pricing logic (Corrected typo: standardPrice -> premiumPrice)
+  // Pricing logic
   const premiumPriceText = isYearly ? '$7.99 per month' : '$9.99 per month';
   const proPriceText = isYearly ? '$4.99 per month' : '$6.99 per month';
   const premiumBillingText = isYearly ? 'Billed yearly' : 'Billed monthly';
@@ -63,7 +63,7 @@ function Pricing() {
   const premiumAnnualSavings = (Number(premiumMonthlySavings) * 12).toFixed(2);
   const recommendationText = `Recommended – Save $${premiumMonthlySavings}/month ($${premiumAnnualSavings}/year)`;
 
-  // Framer Motion Variants (No changes here)
+  // Framer Motion Variants
   const headerVariants = {
     hidden: { opacity: 0, y: -50 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: 'easeOut' } }
@@ -84,7 +84,7 @@ function Pricing() {
     tap: { scale: 0.95 }
   };
 
-  // Helper to render list items with a check icon. (No changes here)
+  // Helper to render list items with a check icon.
   const renderFeatureItem = (text: string) => (
     <li className="flex items-center">
       <Check className="w-5 h-5 text-green-500 mr-2 flex-shrink-0" />
@@ -92,13 +92,12 @@ function Pricing() {
     </li>
   );
 
-  // Placeholder div height to ensure consistent layout when banner is shown/hidden
-  // Adjust h-8 if the banner height + margin is different
-  const bannerPlaceholderHeight = "h-8"; // Approx height for banner + mb-2
+  // Height for the banner space, adjust if needed based on final banner styles
+  const bannerHeightClass = "h-10"; // Adjusted slightly for padding/font size
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-900 font-poppins">
-      {/* --- START: NAV - NO MAJOR CHANGES --- */}
+      {/* --- START: NAV --- */}
       <motion.header
         className="fixed w-full bg-gray-900/80 backdrop-blur-lg border-b border-gray-800 z-50"
         variants={headerVariants}
@@ -186,7 +185,7 @@ function Pricing() {
 
 
       {/* --- START: Main Pricing Content --- */}
-      <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-8 text-white w-full"> {/* Changed max-w-10xl to max-w-7xl for better card spacing */}
+      <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-8 text-white w-full">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -197,7 +196,7 @@ function Pricing() {
           <p className="text-gray-300">Select a plan that works best for you.</p>
         </motion.div>
 
-        {/* Toggle Button - No Changes */}
+        {/* Toggle Button */}
         <motion.div
           initial="hidden"
           animate="visible"
@@ -232,154 +231,162 @@ function Pricing() {
           initial="hidden"
           animate="visible"
           variants={containerVariants}
-          // Use grid for better alignment control, or stick with flex but ensure widths add up correctly
-          className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch" // Using grid for equal height columns by default
+          className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch"
         >
 
           {/* Basic Plan */}
           <motion.div
             variants={cardVariants}
-            // Updated width and structure for consistency
-            className="bg-gray-800 rounded-xl p-6 flex flex-col" // Removed w- classes, grid handles it
+            // Added overflow-hidden to ensure content respects border-radius
+            className="bg-gray-800 rounded-xl flex flex-col overflow-hidden"
           >
-            {/* Placeholder for Banner space alignment */}
-            <div className={`${bannerPlaceholderHeight} mb-2 invisible`}></div>
-            <div>
-              <h2 className="text-2xl font-bold mb-4">Basic</h2>
-              <p className="text-3xl font-extrabold text-indigo-400 mb-1">Free</p>
-              <p className="text-sm text-gray-400 mb-4">Forever free</p>
-              <ul className="mb-6 space-y-2 text-gray-300">
-                {renderFeatureItem("2 PDF and Text Notes per month")}
-                {renderFeatureItem("1 YouTube Notes per month")}
-                {renderFeatureItem("10 AI Chat Interactions per month")}
-                {renderFeatureItem("500 Tokens Included")}
-                {renderFeatureItem("Add Up to 3 Friends")}
-              </ul>
-            </div>
-            <div className="mt-auto"> {/* Pushes button to bottom */}
-              <motion.a
-                variants={buttonVariants}
-                whileHover="hover"
-                whileTap="tap"
-                href={user ? "/dashboard" : "/signup"}
-                className="block w-full text-center py-3 rounded-full font-semibold bg-indigo-500 text-white transition-transform" // Changed inline-block to block
-              >
-                {user ? 'Access Dashboard' : 'Sign Up Free'}
-              </motion.a>
-            </div>
+             {/* Banner Placeholder: occupies space but is invisible */}
+             <div className={`${bannerHeightClass} invisible`}></div>
+             {/* Card Content Area with Padding */}
+             <div className="p-6 flex flex-col flex-grow"> {/* Added flex-grow */}
+                <div>
+                    <h2 className="text-2xl font-bold mb-4">Basic</h2>
+                    <p className="text-3xl font-extrabold text-indigo-400 mb-1">Free</p>
+                    <p className="text-sm text-gray-400 mb-4">Forever free</p>
+                    <ul className="mb-6 space-y-2 text-gray-300">
+                        {renderFeatureItem("2 PDF and Text Notes per month")}
+                        {renderFeatureItem("1 YouTube Notes per month")}
+                        {renderFeatureItem("10 AI Chat Interactions per month")}
+                        {renderFeatureItem("500 Tokens Included")}
+                        {renderFeatureItem("Add Up to 3 Friends")}
+                    </ul>
+                </div>
+                <div className="mt-auto"> {/* Pushes button to bottom */}
+                    <motion.a
+                        variants={buttonVariants}
+                        whileHover="hover"
+                        whileTap="tap"
+                        href={user ? "/dashboard" : "/signup"}
+                        className="block w-full text-center py-3 rounded-full font-semibold bg-indigo-500 text-white transition-transform"
+                    >
+                        {user ? 'Access Dashboard' : 'Sign Up Free'}
+                    </motion.a>
+                </div>
+             </div>
           </motion.div>
 
           {/* Premium Plan */}
           <motion.div
             variants={cardVariants}
-            // Added border, updated width
-            className="bg-gray-800 rounded-xl p-6 flex flex-col border-2 border-indigo-500 relative" // Added relative for potential absolute positioning of banner if needed, though block works fine here
+            // Added overflow-hidden
+            className="bg-gray-800 rounded-xl flex flex-col border-2 border-indigo-500 overflow-hidden"
           >
-            {/* Recommendation Banner - Moved ABOVE title */}
-            <div className={`${bannerPlaceholderHeight} mb-2`}> {/* Container to reserve space even when hidden */}
+            {/* Recommendation Banner - Integrated at the top */}
+            <div className={`${bannerHeightClass} flex items-center justify-center`}> {/* Container to ensure consistent height */}
              {isYearly && (
-                <div className="bg-yellow-500 text-black text-xs font-bold px-3 py-1 rounded-full text-center w-full truncate"> {/* Added text-center, w-full, truncate for single line */}
+                <div className="bg-yellow-500 text-black text-xs font-bold w-full h-full flex items-center justify-center px-4 text-center truncate"> {/* Fill height/width, center content */}
                  {recommendationText}
                 </div>
              )}
             </div>
-            <div>
-              <h2 className="text-2xl font-bold mb-2 flex items-center gap-2">
-                <Crown className="w-6 h-6 text-yellow-400" />
-                Premium
-              </h2>
-              {/* Price and Billing - Ensure these align with others */}
-              <p className="text-3xl font-extrabold text-indigo-400 mb-1">{premiumPriceText}</p>
-              <p className="text-sm text-gray-400 mb-4">{premiumBillingText}</p>
-              <ul className="mb-6 space-y-2 text-gray-300">
-                {renderFeatureItem("Unlimited PDF and Text Notes")}
-                {renderFeatureItem("Unlimited YouTube Notes")}
-                {renderFeatureItem("Unlimited AI Chat Interactions")}
-                {renderFeatureItem("2,500 Tokens Included")}
-                {renderFeatureItem("Add Unlimited Friends")}
-                {renderFeatureItem("Unlimited Access to Smart Overview")}
-              </ul>
-            </div>
-            <div className="mt-auto"> {/* Pushes button to bottom */}
-              {user ? (
-                <motion.button
-                  variants={buttonVariants}
-                  whileHover="hover"
-                  whileTap="tap"
-                  onClick={() => handleSubscribe(STRIPE_PRICES.PREMIUM[isYearly ? 'yearly' : 'monthly'])}
-                  className="w-full text-center py-3 rounded-full font-semibold bg-white text-indigo-600 transition-transform"
-                >
-                  Subscribe Now
-                </motion.button>
-              ) : (
-                <motion.a
-                  variants={buttonVariants}
-                  whileHover="hover"
-                  whileTap="tap"
-                  href="/signup"
-                  className="block w-full text-center py-3 rounded-full font-semibold bg-white text-indigo-600 transition-transform" // Changed inline-block to block
-                >
-                  Sign Up to Subscribe
-                </motion.a>
-              )}
+            {/* Card Content Area with Padding */}
+            <div className="p-6 flex flex-col flex-grow"> {/* Added flex-grow */}
+                <div>
+                    <h2 className="text-2xl font-bold mb-2 flex items-center gap-2">
+                        <Crown className="w-6 h-6 text-yellow-400" />
+                        Premium
+                    </h2>
+                    {/* Price and Billing */}
+                    <p className="text-3xl font-extrabold text-indigo-400 mb-1">{premiumPriceText}</p>
+                    <p className="text-sm text-gray-400 mb-4">{premiumBillingText}</p>
+                    <ul className="mb-6 space-y-2 text-gray-300">
+                        {renderFeatureItem("Unlimited PDF and Text Notes")}
+                        {renderFeatureItem("Unlimited YouTube Notes")}
+                        {renderFeatureItem("Unlimited AI Chat Interactions")}
+                        {renderFeatureItem("2,500 Tokens Included")}
+                        {renderFeatureItem("Add Unlimited Friends")}
+                        {renderFeatureItem("Unlimited Access to Smart Overview")}
+                    </ul>
+                </div>
+                <div className="mt-auto"> {/* Pushes button to bottom */}
+                    {user ? (
+                        <motion.button
+                            variants={buttonVariants}
+                            whileHover="hover"
+                            whileTap="tap"
+                            onClick={() => handleSubscribe(STRIPE_PRICES.PREMIUM[isYearly ? 'yearly' : 'monthly'])}
+                            className="w-full text-center py-3 rounded-full font-semibold bg-white text-indigo-600 transition-transform"
+                        >
+                            Subscribe Now
+                        </motion.button>
+                    ) : (
+                        <motion.a
+                            variants={buttonVariants}
+                            whileHover="hover"
+                            whileTap="tap"
+                            href="/signup"
+                            className="block w-full text-center py-3 rounded-full font-semibold bg-white text-indigo-600 transition-transform"
+                        >
+                            Sign Up to Subscribe
+                        </motion.a>
+                    )}
+                </div>
             </div>
           </motion.div>
 
           {/* Pro Plan */}
           <motion.div
             variants={cardVariants}
-            // Updated width
-             className="bg-gray-800 rounded-xl p-6 flex flex-col" // Removed w- classes, grid handles it
+            // Added overflow-hidden
+            className="bg-gray-800 rounded-xl flex flex-col overflow-hidden"
           >
-             {/* Placeholder for Banner space alignment */}
-             <div className={`${bannerPlaceholderHeight} mb-2 invisible`}></div>
-            <div>
-              <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
-                <Gem className="w-6 h-6 text-purple-400" />
-                Pro
-              </h2>
-              <p className="text-3xl font-extrabold text-indigo-400 mb-1">{proPriceText}</p>
-              <p className="text-sm text-gray-400 mb-4">{proBillingText}</p>
-              <ul className="mb-6 space-y-2 text-gray-300">
-                {renderFeatureItem("10 PDF and Text Notes per month")}
-                {renderFeatureItem("5 YouTube Notes per month")}
-                {renderFeatureItem("200 AI Chat Interactions per Month")}
-                {renderFeatureItem("1,000 Tokens Included")}
-                {renderFeatureItem("Add Up to 10 Friends")}
-                {renderFeatureItem("Limited Access to Smart Overview")}
-              </ul>
-            </div>
-            <div className="mt-auto"> {/* Pushes button to bottom */}
-              {user ? (
-                <motion.button
-                  variants={buttonVariants}
-                  whileHover="hover"
-                  whileTap="tap"
-                  onClick={() => handleSubscribe(STRIPE_PRICES.PRO[isYearly ? 'yearly' : 'monthly'])}
-                  className="w-full text-center py-3 rounded-full font-semibold bg-indigo-500 text-white transition-transform"
-                >
-                  Subscribe Now
-                </motion.button>
-              ) : (
-                <motion.a
-                  variants={buttonVariants}
-                  whileHover="hover"
-                  whileTap="tap"
-                  href="/signup"
-                  className="block w-full text-center py-3 rounded-full font-semibold bg-indigo-500 text-white transition-transform" // Changed inline-block to block
-                >
-                  Sign Up to Subscribe
-                </motion.a>
-              )}
-            </div>
+             {/* Banner Placeholder: occupies space but is invisible */}
+             <div className={`${bannerHeightClass} invisible`}></div>
+             {/* Card Content Area with Padding */}
+             <div className="p-6 flex flex-col flex-grow"> {/* Added flex-grow */}
+                <div>
+                    <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
+                        <Gem className="w-6 h-6 text-purple-400" />
+                        Pro
+                    </h2>
+                    <p className="text-3xl font-extrabold text-indigo-400 mb-1">{proPriceText}</p>
+                    <p className="text-sm text-gray-400 mb-4">{proBillingText}</p>
+                    <ul className="mb-6 space-y-2 text-gray-300">
+                        {renderFeatureItem("10 PDF and Text Notes per month")}
+                        {renderFeatureItem("5 YouTube Notes per month")}
+                        {renderFeatureItem("200 AI Chat Interactions per Month")}
+                        {renderFeatureItem("1,000 Tokens Included")}
+                        {renderFeatureItem("Add Up to 10 Friends")}
+                        {renderFeatureItem("Limited Access to Smart Overview")}
+                    </ul>
+                </div>
+                <div className="mt-auto"> {/* Pushes button to bottom */}
+                    {user ? (
+                        <motion.button
+                            variants={buttonVariants}
+                            whileHover="hover"
+                            whileTap="tap"
+                            onClick={() => handleSubscribe(STRIPE_PRICES.PRO[isYearly ? 'yearly' : 'monthly'])}
+                            className="w-full text-center py-3 rounded-full font-semibold bg-indigo-500 text-white transition-transform"
+                        >
+                            Subscribe Now
+                        </motion.button>
+                    ) : (
+                        <motion.a
+                            variants={buttonVariants}
+                            whileHover="hover"
+                            whileTap="tap"
+                            href="/signup"
+                            className="block w-full text-center py-3 rounded-full font-semibold bg-indigo-500 text-white transition-transform"
+                        >
+                            Sign Up to Subscribe
+                        </motion.a>
+                    )}
+                </div>
+             </div>
           </motion.div>
         </motion.div>
       </main>
       {/* --- END: Main Pricing Content --- */}
 
 
-      {/* --- START: FOOTER - NO MAJOR CHANGES --- */}
-      <footer className="bg-gray-900 border-t border-gray-800 mt-auto"> {/* Added mt-auto in case content is short */}
+      {/* --- START: FOOTER --- */}
+      <footer className="bg-gray-900 border-t border-gray-800 mt-auto">
         <div className="container mx-auto px-4 py-6">
           <div className="flex flex-col md:flex-row items-center justify-between">
             <div className="flex items-center space-x-4">

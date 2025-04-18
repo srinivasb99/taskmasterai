@@ -228,14 +228,16 @@ export async function deleteCustomTimer(timerId: string) {
   await deleteDoc(doc(db, "customTimers", timerId)) // Changed collection name
 }
 
-// Modified listener to match Dashboard.tsx usage
 export function onCustomTimersSnapshot(
   userId: string,
   callback: (timers: Array<{ id: string; data: DocumentData }>) => void,
-): (() => void) => { // Ensure it returns unsubscribe
-  if (!userId) return () => {}; // Handle no user case
-  const q = query(collection(db, "customTimers"), where("userId", "==", userId), orderBy("createdAt", "asc")) // Changed collection name
-  return onSnapshot(
+): () => void { // <-- Move return type declaration here
+  if (!userId) {
+      console.warn(`No user ID provided for customTimers listener.`);
+      return () => {}; // Return a no-op unsubscribe function
+  }
+  const q = query(collection(db, "customTimers"), where("userId", "==", userId), orderBy("createdAt", "asc")); // Changed collection name
+  const unsubscribe = onSnapshot( // <-- Assign the result of onSnapshot to unsubscribe
     q,
     (snapshot) => {
       const results: Array<{ id: string; data: DocumentData }> = []
@@ -248,9 +250,9 @@ export function onCustomTimersSnapshot(
       console.error("Error listening to custom timers:", error)
       callback([]); // Send empty array on error
     },
-  )
+  );
+  return unsubscribe; // <-- Explicitly return the unsubscribe function
 }
-
 /* ------------------------------------------------------------------
    5. TASKS / GOALS / PROJECTS / PLANS (CRUD + LISTENERS) (Kept Original Structure)
    ------------------------------------------------------------------ */

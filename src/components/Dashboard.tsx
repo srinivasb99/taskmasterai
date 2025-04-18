@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useState, useRef, useMemo } from 'react'; // Added useMemo
+import { useNavigate, Link } from 'react-router-dom'; // Import Link
 // Ensure all used icons are imported
 import { Play, Pause, PlusCircle, Edit, Trash, Sparkles, CheckCircle, MessageCircle, RotateCcw, Square, X, TimerIcon, Send, ChevronLeft, ChevronRight, Moon, Sun, Star, Wind, Droplets, Zap, Calendar, Clock, MoreHorizontal, ArrowUpRight, Bookmark, BookOpen, Lightbulb, Flame, Award, TrendingUp, Rocket, Target, Layers, Clipboard, AlertCircle, ThumbsUp, ThumbsDown, BrainCircuit, ArrowRight, Flag, Bell, Filter, Tag, BarChart, PieChart } from 'lucide-react';
 import { Sidebar } from './Sidebar';
@@ -30,6 +30,9 @@ import {
   weatherApiKey,
   hfApiKey, // hfApiKey seems unused, but kept import as per instruction
   geminiApiKey,
+  // --- IMPORT NEW FUNCTIONS ---
+  getUserUsageData,
+  updateUserChatUsage,
 } from '../lib/dashboard-firebase'; // Ensure this file exports all functions and constants
 import { auth, db } from '../lib/firebase';
 import { User } from 'firebase/auth';
@@ -41,9 +44,18 @@ import { TaskAnalytics } from './TaskAnalytics'; // Ensure this component exists
 
 
 // ---------------------
+// Constants for Tiers & Limits
+// ---------------------
+const PREMIUM_EMAILS = ["robinmyh@gmail.com", "oliverbeckett069420@gmail.com"];
+const PRO_EMAILS = ["srinibaj10@gmail.com"];
+const BASIC_CHAT_LIMIT = 10;
+const PRO_CHAT_LIMIT = 200;
+
+
+// ---------------------
 // Helper functions for Gemini integration
 // ---------------------
-const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}&alt=sse`; // Use 1.5 flash and enable SSE
+const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}&alt=sse`; // Use 1.5 flash and enable SSE
 
 const fetchWithTimeout = async (url: string, options: RequestInit, timeout = 30000) => {
   const controller = new AbortController();
@@ -265,6 +277,12 @@ export function Dashboard() {
   const [quote, setQuote] = useState(getRandomQuote());
   const [greeting, setGreeting] = useState(getTimeBasedGreeting());
 
+  // --- NEW State for Tier and Usage ---
+  const [userTier, setUserTier] = useState<'basic' | 'pro' | 'premium' | 'loading'>('loading');
+  const [chatCount, setChatCount] = useState(0);
+  const [chatMonth, setChatMonth] = useState(''); // Store YYYY-MM
+  const [isChatLimitReached, setIsChatLimitReached] = useState(false);
+
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     const stored = localStorage.getItem('isSidebarCollapsed');
     return stored ? JSON.parse(stored) : false;
@@ -460,7 +478,50 @@ export function Dashboard() {
   // Handle Chat Submit
     const handleChatSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
-      if (!chatMessage.trim() || isChatLoading) return;
+      if (!chatMessage.trim() || isChatLoading || !user) return; // Added !user check
+
+      // --- Usage Check ---
+      const currentMonthYear = new Date().toISOString().slice(0, 7);
+      let limitReached = false;
+      let currentLimit = Infinity; // Default for premium
+
+      if (userTier !== 'premium') {
+          currentLimit = userTier === 'pro' ? PRO_CHAT_LIMIT : BASIC_CHAT_LIMIT;
+          let currentCount = chatCount; // Use state value
+
+          // Check if the stored month matches the current month
+          if (chatMonth !== currentMonthYear) {
+              console.log(`Chat month mismatch (State: ${chatMonth}, Current: ${currentMonthYear}). Resetting count.`);
+              currentCount = 0; // Reset count locally
+              setChatCount(0); // Update state
+              setChatMonth(currentMonthYear); // Update state
+              // Reset limit flag
+              setIsChatLimitReached(false);
+              limitReached = false; // Reset limit flag for this check
+              // Update Firestore asynchronously
+              updateUserChatUsage(user.uid, 0, currentMonthYear).catch(err => {
+                  console.error("Failed to reset chat usage in Firestore on month change:", err);
+              });
+          } else {
+              // Month matches, check current count against limit
+              limitReached = currentCount >= currentLimit;
+              // Update state just in case it was out of sync (e.g., another device)
+              setIsChatLimitReached(limitReached);
+          }
+      }
+
+      if (limitReached) {
+            setChatHistory(prev => [...prev, {
+                id: `limit-${Date.now()}`,
+                role: 'assistant',
+                content: `You've reached your ${currentLimit} chat message limit for this month. Upgrade for more interactions!`,
+                error: true
+            }]);
+            setChatMessage(''); // Clear input
+            return; // Stop submission
+      }
+      // --- End Usage Check ---
+
 
       const currentMessage = chatMessage; // Capture message before clearing
       setChatMessage(''); // Clear input immediately
@@ -474,6 +535,21 @@ export function Dashboard() {
 
       setChatHistory(prev => [...prev, userMsg]);
       setIsChatLoading(true); // Set loading early
+
+      // --- Increment Usage Count (Before API Call) ---
+      let newCount = chatCount;
+      if (userTier !== 'premium' && user?.uid) {
+          newCount = chatCount + 1;
+          setChatCount(newCount); // Optimistic UI update
+          setIsChatLimitReached(newCount >= currentLimit); // Update limit state too
+          // Update Firestore (fire-and-forget or handle errors)
+          updateUserChatUsage(user.uid, newCount, currentMonthYear).catch(err => {
+              console.error("Failed to update chat usage in Firestore:", err);
+              // Consider reverting optimistic update or showing warning? For now, log error.
+          });
+      }
+      // --- End Increment Logic ---
+
 
       if (timerDuration) {
         const timerId = Math.random().toString(36).substring(2, 9);
@@ -629,16 +705,7 @@ Follow these instructions strictly.`;
             // This will return only the actual text content or empty string/error message
             const currentExtractedText = extractCandidateText(rawChunkAccumulated);
 
-            // Append *only* the newly extracted text (avoid duplicates from re-parsing)
-            // Basic check to see if the end of the accumulated matches the new extraction
-            if (currentExtractedText && !accumulatedStreamedText.endsWith(currentExtractedText)) {
-                 // A simple heuristic: assume the new text is appended if it doesn't fully overlap.
-                 // This is imperfect for complex edits mid-stream but often works.
-                 // A more robust diffing approach could be used if needed.
-                 // Let's try accumulating directly for now, assuming Gemini appends.
-                 accumulatedStreamedText += currentExtractedText; // Update the text we display
-            }
-             // Re-extract from the full raw chunk each time to get the latest *complete* text state
+            // Update the accumulated displayed text state by re-extracting from the full raw chunk each time
             accumulatedStreamedText = extractCandidateText(rawChunkAccumulated);
 
             // Update the placeholder message content ONLY if new text is extracted
@@ -1024,34 +1091,76 @@ Follow these instructions strictly.`;
 
 
   // ---------------------
-  // 7. AUTH LISTENER
+  // 7. AUTH LISTENER & TIER/USAGE CHECK
   // ---------------------
   useEffect(() => {
-    const unsubscribe = onFirebaseAuthStateChanged((firebaseUser) => { // Assumes this sets up the listener correctly
+    const unsubscribe = onFirebaseAuthStateChanged(async (firebaseUser) => { // Make async
       setUser(firebaseUser); // Update user state
       if (firebaseUser) {
         // Fetch display name preference or fallback
-        getDoc(doc(db, "users", firebaseUser.uid))
-            .then((docSnap) => {
-              let nameToSet = "User"; // Default fallback
-              if (docSnap.exists() && docSnap.data().name) {
+        try {
+            const docSnap = await getDoc(doc(db, "users", firebaseUser.uid));
+            let nameToSet = "User"; // Default fallback
+            if (docSnap.exists() && docSnap.data().name) {
                 nameToSet = docSnap.data().name;
-              } else if (firebaseUser.displayName) {
-                 nameToSet = firebaseUser.displayName;
-              } else if (firebaseUser.email) {
-                  nameToSet = firebaseUser.email.split('@')[0]; // Use email prefix if no name
-              }
-              setUserName(nameToSet);
-            })
-            .catch((error) => {
-              console.error("Error fetching user data:", error);
-               // Use fallback even on error
-               setUserName(firebaseUser.displayName || (firebaseUser.email ? firebaseUser.email.split('@')[0] : "User"));
-            });
+            } else if (firebaseUser.displayName) {
+                nameToSet = firebaseUser.displayName;
+            } else if (firebaseUser.email) {
+                nameToSet = firebaseUser.email.split('@')[0]; // Use email prefix if no name
+            }
+            setUserName(nameToSet);
+        } catch (error) {
+            console.error("Error fetching user data:", error);
+            setUserName(firebaseUser.displayName || (firebaseUser.email ? firebaseUser.email.split('@')[0] : "User"));
+        }
+
+        // --- Determine Tier ---
+        let tier: 'basic' | 'pro' | 'premium' = 'basic'; // Default to basic
+        if (firebaseUser.email && PREMIUM_EMAILS.includes(firebaseUser.email)) {
+            tier = 'premium';
+        } else if (firebaseUser.email && PRO_EMAILS.includes(firebaseUser.email)) {
+            tier = 'pro';
+        }
+        setUserTier(tier);
+
+        // --- Load Usage Data (if not premium) ---
+        if (tier !== 'premium') {
+            try {
+                const currentMonthYear = new Date().toISOString().slice(0, 7); // "YYYY-MM"
+                const usageData = await getUserUsageData(firebaseUser.uid); // Use the imported function
+
+                if (usageData && usageData.month === currentMonthYear) {
+                    // Data exists for current month
+                    setChatCount(usageData.count);
+                    setChatMonth(usageData.month);
+                    const limit = tier === 'pro' ? PRO_CHAT_LIMIT : BASIC_CHAT_LIMIT;
+                    setIsChatLimitReached(usageData.count >= limit);
+                } else {
+                    // No data OR data from previous month - reset
+                    setChatCount(0);
+                    setChatMonth(currentMonthYear);
+                    setIsChatLimitReached(false);
+                    // Update Firestore with reset count
+                    await updateUserChatUsage(firebaseUser.uid, 0, currentMonthYear);
+                }
+            } catch (err) {
+                console.error("Error loading/updating usage data:", err);
+                // Handle error - default to 0 count, not limited
+                setChatCount(0);
+                setChatMonth(new Date().toISOString().slice(0, 7));
+                setIsChatLimitReached(false);
+            }
+        } else {
+            // Premium users don't need tracking
+            setChatCount(0); // Reset local count for clarity
+            setChatMonth(''); // Reset local month
+            setIsChatLimitReached(false); // Never limit reached
+        }
+
       } else {
         // User is signed out
         setUserName("Loading..."); // Or "Guest" or appropriate state
-        // Clear sensitive data if needed
+        // Clear sensitive data
          setTasks([]);
          setGoals([]);
          setProjects([]);
@@ -1061,6 +1170,11 @@ Follow these instructions strictly.`;
          setSmartOverview("");
          setSmartInsights([]);
          setChatHistory([ { id: 'initial-greet-logout', role: 'assistant', content: "👋 Hi I'm TaskMaster, How can I help you today?" } ]);
+         // Reset tier and usage state
+         setUserTier('loading');
+         setChatCount(0);
+         setChatMonth('');
+         setIsChatLimitReached(false);
          // Reset Pomodoro on logout? Optional.
          // handlePomodoroReset();
       }
@@ -1189,7 +1303,7 @@ Follow these instructions strictly.`;
   }, [user]); // Re-fetch only when user changes
 
   // ---------------------
-  // 10. SMART OVERVIEW GENERATION
+  // 10. SMART OVERVIEW GENERATION (TIER-BASED)
   // ---------------------
     const [smartOverview, setSmartOverview] = useState<string>("");
     const [overviewLoading, setOverviewLoading] = useState(false);
@@ -1228,15 +1342,42 @@ Follow these instructions strictly.`;
         };
     }, [user, tasks, goals, projects, plans]);
 
-     // Effect to generate overview based on debounced signature
+     // Effect to generate overview based on debounced signature and user tier
     useEffect(() => {
-        if (!user || !geminiApiKey || !debouncedItemsSigForOverview) {
-            setSmartOverview(`<div class="text-gray-400 text-xs italic">Add items for an AI overview.</div>`);
-            setOverviewLoading(false); // Ensure loading is off
+        // Exit if no user, key, signature, or tier is still loading
+        if (!user || !geminiApiKey || !debouncedItemsSigForOverview || userTier === 'loading') {
+            // Set a generic loading/prompt state if tier isn't determined yet
+            if (userTier === 'loading') {
+                 setSmartOverview(`<div class="text-gray-400 text-xs italic">Loading user status...</div>`);
+                 setOverviewLoading(true); // Indicate loading while checking tier
+            } else {
+                 setSmartOverview(`<div class="text-gray-400 text-xs italic">Add items for an AI overview.</div>`);
+                 setOverviewLoading(false);
+            }
+            setLastGeneratedDataSig("");
+            setLastResponse("");
             return;
-        };
+        }
+
+        // --- TIER CHECK ---
+        if (userTier === 'basic') {
+            setSmartOverview(
+                `<div class="${isIlluminateEnabled ? 'text-gray-600' : 'text-gray-400'} text-xs italic flex items-center justify-center gap-1.5 py-2">` +
+                `<Star class="w-3.5 h-3.5 text-yellow-500 flex-shrink-0" />` +
+                `<span>Smart Overview is a Pro/Premium feature.</span>` +
+                `<a href="/pricing" class="text-blue-500 hover:underline font-medium ml-1">Upgrade now</a>` +
+                `</div>`
+            );
+            setOverviewLoading(false);
+            setLastGeneratedDataSig(""); // Clear signature to prevent attempts
+            setLastResponse("");
+            return; // Exit early for basic users
+        }
+        // --- END TIER CHECK ---
+
 
         // Only regenerate if the signature has changed or if we are not currently loading
+        // And if the tier allows generation (pro or premium)
         if (debouncedItemsSigForOverview === lastGeneratedDataSig && !overviewLoading) {
             return;
         }
@@ -1296,7 +1437,7 @@ Another Example: Looks clear for today. Consider planning your next project step
 
             try {
                 // Using the non-streaming endpoint for overview
-                const overviewEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`;
+                const overviewEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`;
                 const geminiOptions = {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -1371,7 +1512,7 @@ Another Example: Looks clear for today. Consider planning your next project step
 
         generateOverview();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [user, debouncedItemsSigForOverview, userName, geminiApiKey, isIlluminateEnabled, lastResponse]); // Added lastResponse dependency
+    }, [user, userTier, debouncedItemsSigForOverview, userName, geminiApiKey, isIlluminateEnabled, lastResponse]); // Added userTier and lastResponse
 
 
   // ---------------------
@@ -1846,21 +1987,35 @@ Another Example: Looks clear for today. Consider planning your next project step
   // ---------------------
   // 13. PROGRESS BARS
   // ---------------------
-  const totalTasks = tasks.length;
-  const completedTasks = tasks.filter((t) => t.data.completed).length;
-  const tasksProgress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+  // Use useMemo to prevent recalculating progress on every render
+  const tasksProgress = useMemo(() => {
+    const totalTasks = tasks.length;
+    if (totalTasks === 0) return 0;
+    const completedTasks = tasks.filter((t) => t.data.completed).length;
+    return Math.round((completedTasks / totalTasks) * 100);
+  }, [tasks]);
 
-  const totalGoals = goals.length;
-  const completedGoals = goals.filter((g) => g.data.completed).length;
-  const goalsProgress = totalGoals > 0 ? Math.round((completedGoals / totalGoals) * 100) : 0;
+  const goalsProgress = useMemo(() => {
+    const totalGoals = goals.length;
+    if (totalGoals === 0) return 0;
+    const completedGoals = goals.filter((g) => g.data.completed).length;
+    return Math.round((completedGoals / totalGoals) * 100);
+  }, [goals]);
 
-  const totalProjects = projects.length;
-  const completedProjects = projects.filter((p) => p.data.completed).length;
-  const projectsProgress = totalProjects > 0 ? Math.round((completedProjects / totalProjects) * 100) : 0;
+  const projectsProgress = useMemo(() => {
+    const totalProjects = projects.length;
+    if (totalProjects === 0) return 0;
+    const completedProjects = projects.filter((p) => p.data.completed).length;
+    return Math.round((completedProjects / totalProjects) * 100);
+  }, [projects]);
 
-  const totalPlans = plans.length;
-  const completedPlans = plans.filter((pl) => pl.data.completed).length;
-  const plansProgress = totalPlans > 0 ? Math.round((completedPlans / totalPlans) * 100) : 0;
+  const plansProgress = useMemo(() => {
+    const totalPlans = plans.length;
+    if (totalPlans === 0) return 0;
+    const completedPlans = plans.filter((pl) => pl.data.completed).length;
+    return Math.round((completedPlans / totalPlans) * 100);
+  }, [plans]);
+
 
   // ---------------------
   // Smart Insights handlers
@@ -1945,11 +2100,12 @@ Another Example: Looks clear for today. Consider planning your next project step
   const inputBg = isIlluminateEnabled ? "bg-gray-100 hover:bg-gray-200/50 border-gray-300 focus:border-blue-500 focus:ring-blue-500" : "bg-gray-700 hover:bg-gray-600/50 border-gray-600 focus:border-blue-500 focus:ring-blue-500"; // Input background with subtle hover and focus
   const iconColor = isIlluminateEnabled ? "text-gray-500 hover:text-gray-700" : "text-gray-400 hover:text-gray-200"; // Generic icon color with hover
 
-
-
-
-  // Memoize expensive calculations if needed (e.g., filtered lists for display)
-  // const upcomingDeadlines = useMemo(() => { ... calculation ... }, [tasks, goals, projects, plans]);
+  // Memoize calculation for current chat limit
+  const currentChatLimit = useMemo(() => {
+      if (userTier === 'premium') return Infinity;
+      if (userTier === 'pro') return PRO_CHAT_LIMIT;
+      return BASIC_CHAT_LIMIT;
+  }, [userTier]);
 
 
   return (
@@ -1960,6 +2116,7 @@ Another Example: Looks clear for today. Consider planning your next project step
         onToggle={handleToggleSidebar}
         isBlackoutEnabled={isBlackoutEnabled && isSidebarBlackoutEnabled}
         isIlluminateEnabled={isIlluminateEnabled && isSidebarIlluminateEnabled}
+        // Sidebar reads premium status directly from auth, no need to pass tier
       />
 
       {/* AI Chat Trigger Button - Positioned Bottom Right */}
@@ -2033,8 +2190,8 @@ Another Example: Looks clear for today. Consider planning your next project step
                 <div className="grid grid-cols-7 gap-px sm:gap-0.5 h-full">
                    <div className="col-span-7 grid grid-cols-7 gap-px sm:gap-0.5">
                     {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(
-                      (day) => (
-                        <div key={day} className={`text-center text-[9px] font-medium ${subheadingClass} pt-0.5`}>
+                      (day, index) => ( // Add index for key
+                        <div key={index} className={`text-center text-[9px] font-medium ${subheadingClass} pt-0.5`}>
                           {day}
                         </div>
                       )
@@ -2160,7 +2317,7 @@ Another Example: Looks clear for today. Consider planning your next project step
         )}
 
 
-        {/* Smart Overview Card */}
+        {/* Smart Overview Card - Modified */}
         <div
           className={`${cardClass} rounded-xl p-3 sm:p-4 relative min-h-[80px] transition-all duration-300 ease-out animate-fadeIn mb-4 sm:mb-5 ${cardVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'} delay-300`}
         >
@@ -2169,12 +2326,31 @@ Another Example: Looks clear for today. Consider planning your next project step
               <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 mr-1.5 text-yellow-400 animate-pulse" />
               Smart Overview
             </h2>
-            <span className="text-[9px] sm:text-[10px] bg-gradient-to-r from-pink-500 to-purple-500 text-white px-1.5 py-0.5 rounded-full font-medium">
-              BETA
-            </span>
+             {/* Show tier badge */}
+             {userTier === 'pro' && (
+                <span className="text-[9px] sm:text-[10px] bg-gradient-to-r from-teal-400 to-cyan-500 text-white px-1.5 py-0.5 rounded-full font-medium">
+                  PRO
+                </span>
+             )}
+             {userTier === 'premium' && (
+                 <span className="text-[9px] sm:text-[10px] bg-gradient-to-r from-amber-400 to-orange-500 text-white px-1.5 py-0.5 rounded-full font-medium">
+                  PREMIUM
+                 </span>
+             )}
+             {/* BETA badge only if Pro or Premium */}
+              {(userTier === 'pro' || userTier === 'premium') && (
+                 <span className="text-[9px] sm:text-[10px] bg-gradient-to-r from-pink-500 to-purple-500 text-white px-1.5 py-0.5 rounded-full font-medium">
+                  BETA
+                 </span>
+              )}
           </div>
 
-          {overviewLoading ? (
+          {/* Conditional Rendering based on tier */}
+          {userTier === 'loading' ? (
+              <div className="animate-pulse space-y-1.5 pt-1">
+                  <div className={`h-3 rounded-full w-1/2 ${isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700'}`}></div>
+              </div>
+          ) : overviewLoading ? (
              <div className="space-y-1.5 animate-pulse pt-1">
               <div className={`h-3 rounded-full w-11/12 ${isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700'}`}></div>
               <div className={`h-3 rounded-full w-3/4 ${isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700'}`}></div>
@@ -2183,11 +2359,15 @@ Another Example: Looks clear for today. Consider planning your next project step
             <>
                <div
                  className={`text-xs sm:text-sm prose-sm max-w-none animate-fadeIn ${isIlluminateEnabled ? 'text-gray-800' : 'text-gray-300'} leading-snug`}
-                 dangerouslySetInnerHTML={{ __html: smartOverview || `<div class="${isIlluminateEnabled ? 'text-gray-500' : 'text-gray-400'} text-xs italic">Add pending items for an AI overview.</div>` }}
+                 // SmartOverview content is set based on tier in useEffect
+                 dangerouslySetInnerHTML={{ __html: smartOverview }}
                />
-               <div className="mt-1.5 text-left text-[10px] text-gray-500/80">
-                 AI responses may be inaccurate. Verify critical info.
-              </div>
+               {/* Show AI disclaimer only if overview was actually generated */}
+               {(userTier === 'pro' || userTier === 'premium') && smartOverview && !smartOverview.includes('feature') && !smartOverview.includes('unavailable') && (
+                  <div className="mt-1.5 text-left text-[10px] text-gray-500/80">
+                      AI responses may be inaccurate. Verify critical info.
+                  </div>
+               )}
             </>
           )}
         </div>
@@ -2227,16 +2407,16 @@ Another Example: Looks clear for today. Consider planning your next project step
                  </div>
                ) : (
                   <div className="space-y-3 animate-fadeIn">
-                    {(totalTasks > 0 || totalGoals > 0 || totalProjects > 0 || totalPlans > 0) ? (
+                    {(tasks.length > 0 || goals.length > 0 || projects.length > 0 || plans.length > 0) ? ( // Check length instead of total
                          <>
-                           {totalTasks > 0 && (
+                           {tasks.length > 0 && ( // Check length
                              <div>
                                <div className="flex justify-between items-center mb-0.5 text-xs sm:text-sm">
                                  <p className="flex items-center font-medium">
                                    <Clipboard className="w-3.5 h-3.5 mr-1 text-gray-400" /> Tasks
                                  </p>
                                   <p className={`${illuminateTextGreen} font-semibold text-xs`}>
-                                   {completedTasks}/{totalTasks} ({tasksProgress}%)
+                                   {tasks.filter(t => t.data.completed).length}/{tasks.length} ({tasksProgress}%)
                                  </p>
                                </div>
                                 <div className={`w-full h-1.5 ${isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-600'} rounded-full overflow-hidden`}>
@@ -2244,14 +2424,14 @@ Another Example: Looks clear for today. Consider planning your next project step
                                </div>
                              </div>
                            )}
-                            {totalGoals > 0 && (
+                            {goals.length > 0 && ( // Check length
                              <div>
                                <div className="flex justify-between items-center mb-0.5 text-xs sm:text-sm">
                                  <p className="flex items-center font-medium">
                                    <Target className="w-3.5 h-3.5 mr-1 text-gray-400" /> Goals
                                  </p>
                                   <p className={`${illuminateTextPink} font-semibold text-xs`}>
-                                   {completedGoals}/{totalGoals} ({goalsProgress}%)
+                                   {goals.filter(g => g.data.completed).length}/{goals.length} ({goalsProgress}%)
                                  </p>
                                </div>
                                 <div className={`w-full h-1.5 ${isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-600'} rounded-full overflow-hidden`}>
@@ -2259,14 +2439,14 @@ Another Example: Looks clear for today. Consider planning your next project step
                                </div>
                              </div>
                            )}
-                             {totalProjects > 0 && (
+                             {projects.length > 0 && ( // Check length
                              <div>
                                <div className="flex justify-between items-center mb-0.5 text-xs sm:text-sm">
                                  <p className="flex items-center font-medium">
                                    <Layers className="w-3.5 h-3.5 mr-1 text-gray-400" /> Projects
                                  </p>
                                   <p className={`${illuminateTextBlue} font-semibold text-xs`}>
-                                   {completedProjects}/{totalProjects} ({projectsProgress}%)
+                                   {projects.filter(p => p.data.completed).length}/{projects.length} ({projectsProgress}%)
                                  </p>
                                </div>
                                 <div className={`w-full h-1.5 ${isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-600'} rounded-full overflow-hidden`}>
@@ -2274,14 +2454,14 @@ Another Example: Looks clear for today. Consider planning your next project step
                                </div>
                              </div>
                            )}
-                             {totalPlans > 0 && (
+                             {plans.length > 0 && ( // Check length
                              <div>
                                <div className="flex justify-between items-center mb-0.5 text-xs sm:text-sm">
                                  <p className="flex items-center font-medium">
                                    <Rocket className="w-3.5 h-3.5 mr-1 text-gray-400" /> Plans
                                  </p>
                                   <p className={`${illuminateTextYellow} font-semibold text-xs`}>
-                                   {completedPlans}/{totalPlans} ({plansProgress}%)
+                                   {plans.filter(p => p.data.completed).length}/{plans.length} ({plansProgress}%)
                                  </p>
                                </div>
                                 <div className={`w-full h-1.5 ${isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-600'} rounded-full overflow-hidden`}>
@@ -2379,10 +2559,10 @@ Another Example: Looks clear for today. Consider planning your next project step
                                <span className={`font-medium mr-1.5 ${isIlluminateEnabled ? urgencyClass : urgencyClass.replace('600', '400').replace('500','400')}`}>{dueDateStr}</span>
                                {urgencyText && (
                                    <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-medium ${
-                                       daysRemaining <= 0 ? 'bg-red-500/10 text-red-600 dark:text-red-400' :
-                                       daysRemaining <= 1 ? 'bg-orange-500/10 text-orange-600 dark:text-orange-400' :
-                                       daysRemaining <= 3 ? 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-500' :
-                                       'bg-green-500/10 text-green-600 dark:text-green-500'
+                                       daysRemaining <= 0 ? (isIlluminateEnabled ? 'bg-red-100 text-red-600' : 'bg-red-900/50 text-red-400') :
+                                       daysRemaining <= 1 ? (isIlluminateEnabled ? 'bg-orange-100 text-orange-600' : 'bg-orange-900/50 text-orange-400') :
+                                       daysRemaining <= 3 ? (isIlluminateEnabled ? 'bg-yellow-100 text-yellow-700' : 'bg-yellow-900/50 text-yellow-400') :
+                                       (isIlluminateEnabled ? 'bg-green-100 text-green-600' : 'bg-green-900/50 text-green-400')
                                    }`}>
                                        {urgencyText}
                                    </span>
@@ -3052,35 +3232,50 @@ Another Example: Looks clear for today. Consider planning your next project step
            )}
         </div>
 
-        {/* Chat Input Form */}
-         <form onSubmit={handleChatSubmit} className={`p-2 sm:p-3 border-t ${isIlluminateEnabled ? 'border-gray-200 bg-gray-100/80' : 'border-gray-700 bg-gray-800/90'} flex-shrink-0 sticky bottom-0 backdrop-blur-sm`}>
-          <div className="flex gap-1.5 items-center">
-            <input
-              type="text"
-              value={chatMessage}
-              onChange={(e) => setChatMessage(e.target.value)}
-              placeholder="Ask TaskMaster AI..."
-               className={`flex-1 ${inputBg} border ${isIlluminateEnabled ? 'border-gray-300' : 'border-gray-600'} rounded-full px-4 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-150 shadow-sm placeholder-gray-400 dark:placeholder-gray-500 disabled:opacity-60`}
-              disabled={isChatLoading}
-              aria-label="Chat input" // Accessibility
-            />
-            <button
-              type="submit"
-              disabled={isChatLoading || !chatMessage.trim()}
-              className="bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105 active:scale-100 shadow-sm flex-shrink-0"
-              title="Send Message"
-              aria-label="Send chat message" // Accessibility
-            >
-              {isChatLoading ? (
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-              ) : (
-                  <Send className="w-4 h-4" />
-              )}
-            </button>
-          </div>
-        </form>
+        {/* Chat Input Form - Modified */}
+         <div className={`px-2 sm:px-3 pt-1 border-t ${isIlluminateEnabled ? 'border-gray-200 bg-gray-100/80' : 'border-gray-700 bg-gray-800/90'} flex-shrink-0 sticky bottom-0 backdrop-blur-sm`}>
+            {/* Usage Display */}
+             {userTier !== 'premium' && userTier !== 'loading' && (
+                 <div className="pb-1.5 text-xs text-center">
+                    <span className={isIlluminateEnabled ? 'text-gray-600' : 'text-gray-400'}>
+                        Messages this month: {chatCount} / {currentChatLimit}
+                    </span>
+                    {isChatLimitReached && (
+                        <span className="text-red-500 ml-1 font-medium">(Limit Reached)</span>
+                    )}
+                 </div>
+             )}
+             {/* Input Form */}
+            <form onSubmit={handleChatSubmit} className="flex gap-1.5 items-center pb-2">
+                <input
+                    type="text"
+                    value={chatMessage}
+                    onChange={(e) => setChatMessage(e.target.value)}
+                    placeholder={isChatLimitReached ? "Monthly limit reached..." : "Ask TaskMaster AI..."}
+                    className={`flex-1 ${inputBg} border ${isIlluminateEnabled ? 'border-gray-300' : 'border-gray-600'} rounded-full px-4 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-150 shadow-sm placeholder-gray-400 dark:placeholder-gray-500 disabled:opacity-60 ${isChatLimitReached ? 'cursor-not-allowed' : ''}`}
+                    disabled={isChatLoading || isChatLimitReached || userTier === 'loading'} // Disable input when loading, limit reached, or tier unknown
+                    aria-label="Chat input" // Accessibility
+                />
+                <button
+                    type="submit"
+                    disabled={isChatLoading || !chatMessage.trim() || isChatLimitReached || userTier === 'loading'}
+                    className={`bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105 active:scale-100 shadow-sm flex-shrink-0 ${isChatLimitReached ? 'cursor-not-allowed' : ''}`}
+                    title="Send Message"
+                    aria-label="Send chat message" // Accessibility
+                >
+                    {isChatLoading ? (
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                        <Send className="w-4 h-4" />
+                    )}
+                </button>
+            </form>
+        </div>
       </div> {/* End AI Chat Sidebar */}
 
     </div> // End container
   );
 }
+
+// Default export if needed
+// export default Dashboard;

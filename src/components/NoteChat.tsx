@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useImperativeHandle, forwardRef, useCallback } from 'react';
-import { MessageCircle, Send, Timer as TimerIcon, Paperclip, Bot, X, AlertTriangle, Loader2, Sparkles, ChevronDown, Maximize, Minimize, Edit, Check, RefreshCcw } from 'lucide-react';
+import { MessageCircle, Send, Timer as TimerIcon, Paperclip, Bot, X, AlertTriangle, Loader2, Sparkles, ChevronDown, Maximize, Minimize, Edit, Check, RefreshCcw } from 'lucide-react'; // Added RefreshCcw
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import remarkGfm from 'remark-gfm';
@@ -16,11 +16,10 @@ interface ImageData {
     name: string;
 }
 
-// --- NEW: Define structure for a single edit step ---
 interface EditStep {
     editType: 'insert_after_context' | 'replace_context' | 'delete_context' | 'insert_at_start' | 'append_at_end';
-    targetContext: string | null; // null only for insert_at_start / append_at_end
-    contentFragment: string; // Empty string "" for delete_context
+    targetContext: string | null;
+    contentFragment: string;
 }
 
 interface ChatMessage {
@@ -30,18 +29,23 @@ interface ChatMessage {
     imageData?: ImageData;
     timer?: TimerMessage;
     error?: boolean;
-    isEditSuggestion?: boolean;
+    isEditSuggestion?: boolean; // True if it's a proposal from AI
     editExplanation?: string;
-    // --- MODIFIED: Update editAction types ---
     editAction?: 'propose_targeted_edit' | 'propose_full_content_replacement' | 'propose_sequential_edits';
-    // --- For single targeted edit ---
+    // For single targeted edit
     editType?: EditStep['editType'];
     targetContext?: EditStep['targetContext'];
     contentFragment?: EditStep['contentFragment'];
-    // --- For full replacement ---
+    // For full replacement
     newFullContent?: string;
-    // --- NEW: For sequential edits ---
+    // For sequential edits
     sequentialEdits?: EditStep[];
+
+    // --- NEW: Fields for Revert ---
+    isUpdateConfirmation?: boolean; // True if this message confirms a successful update
+    canRevert?: boolean;          // True if this specific confirmation can be reverted
+    previousContent?: string;     // Content before the update was applied
+    noteIdToRevert?: string;      // ID of the note that was updated
 }
 
 
@@ -173,6 +177,16 @@ const parseTimerRequest = (message: string): number | null => {
     return null;
 };
 
+
+// --- NEW: Loading Indicator Component ---
+const LoadingIndicator = ({ isIlluminateEnabled }: { isIlluminateEnabled: boolean }) => (
+    <div className={`flex items-center gap-2 p-1 ${isIlluminateEnabled ? 'text-gray-600' : 'text-gray-400'}`}>
+        <Loader2 className="w-4 h-4 animate-spin" />
+        <span className="text-xs">Thinking...</span>
+    </div>
+);
+
+
 // --- Component ---
 export const NoteChat = forwardRef<NoteChatHandle, NoteChatProps>(
     ({ note, onClose, geminiApiKey, userName, isIlluminateEnabled, isBlackoutEnabled, isVisible, onUpdateNoteContent, displayMode = 'overlay' }: NoteChatProps, ref) => {
@@ -187,6 +201,7 @@ export const NoteChat = forwardRef<NoteChatHandle, NoteChatProps>(
         const currentNoteId = useRef<string | null>(null);
         const fileInputRef = useRef<HTMLInputElement>(null);
         const textareaRef = useRef<HTMLTextAreaElement>(null);
+        const [loadingMsgId, setLoadingMsgId] = useState<string | null>(null); // Track the ID of the message showing the loader
 
         // --- Theme Styles (Unchanged) ---
         const overlayBg = isIlluminateEnabled ? "bg-white" : isBlackoutEnabled ? "bg-black border border-gray-700/60" : "bg-gray-800";
@@ -203,6 +218,8 @@ export const NoteChat = forwardRef<NoteChatHandle, NoteChatProps>(
         const assistantBubbleClass = isIlluminateEnabled ? 'bg-gray-100 text-gray-800 border border-gray-200/80' : 'bg-gray-700/80 text-gray-200 border border-gray-600/50';
         const errorBubbleClass = isIlluminateEnabled ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-red-900/30 text-red-300 border border-red-700/50';
         const editSuggestionBubbleClass = isIlluminateEnabled ? 'bg-yellow-50 border border-yellow-200 text-yellow-800' : 'bg-yellow-900/30 border border-yellow-700/50 text-yellow-300';
+        // --- NEW: Confirmation bubble style ---
+        const confirmationBubbleClass = isIlluminateEnabled ? 'bg-green-50 border border-green-200 text-green-800' : 'bg-green-900/30 border border-green-700/50 text-green-300';
         const iconColor = isIlluminateEnabled ? "text-gray-500 hover:text-gray-700" : "text-gray-400 hover:text-gray-200";
         const filePillBg = isIlluminateEnabled ? "bg-blue-100 border-blue-200" : "bg-blue-900/50 border-blue-700/50";
         const filePillText = isIlluminateEnabled ? "text-blue-800" : "text-blue-300";
@@ -211,16 +228,16 @@ export const NoteChat = forwardRef<NoteChatHandle, NoteChatProps>(
         useEffect(() => {
             if (note && (note.id !== currentNoteId.current || (displayMode === 'overlay' && isVisible && !initialMessageSent.current))) {
                 setChatHistory([{ id: `init-${Date.now()}`, role: 'assistant', content: `Hi ${userName}! Ask about **"${note.title}"**, ask me to change it, or attach/paste a file.` }]);
-                setChatMessage(''); setSelectedFiles([]); setSuggestedPrompts([]); setIsChatLoading(false); initialMessageSent.current = true; currentNoteId.current = note.id;
+                setChatMessage(''); setSelectedFiles([]); setSuggestedPrompts([]); setIsChatLoading(false); initialMessageSent.current = true; currentNoteId.current = note.id; setLoadingMsgId(null);
             } else if (displayMode === 'overlay' && !isVisible) { initialMessageSent.current = false; currentNoteId.current = null; }
         }, [note, isVisible, userName, displayMode]);
 
         useEffect(() => { if (!isMinimized || displayMode === 'inline') { setTimeout(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }); }, 150); } }, [chatHistory, isMinimized, displayMode, suggestedPrompts]);
 
-        // --- Handlers (Unchanged except handleAcceptEdit) ---
+        // --- Handlers ---
         const handleTimerComplete = (timerId: string) => setChatHistory(prev => [...prev, { id: `timer-comp-${timerId}`, role: 'assistant', content: "⏰ Time's up!" }]);
 
-        // --- MODIFIED: handleAcceptEdit to support sequential edits ---
+        // --- MODIFIED: handleAcceptEdit to store previous content ---
         const handleAcceptEdit = async (message: ChatMessage) => {
             if (!note || isChatLoading || !message.isEditSuggestion || !message.editAction) {
                 console.error("Invalid edit proposal:", message);
@@ -228,92 +245,130 @@ export const NoteChat = forwardRef<NoteChatHandle, NoteChatProps>(
                 return;
             }
             setIsChatLoading(true);
+            setLoadingMsgId(null); // Clear any previous loading state
+
             let finalContent: string | null = null;
-            let currentContent = note.content; // Start with the current note content
+            const contentBeforeEdit = note.content; // Store content BEFORE modification
 
             try {
+                let currentContent = contentBeforeEdit; // Start with the current note content
+
                 if (message.editAction === 'propose_targeted_edit') {
                     // Apply single targeted edit (existing logic)
                     console.log("Applying single targeted edit:", message);
-                    if (!message.editType) throw new Error("Missing edit type.");
+                     if (!message.editType) throw new Error("Missing edit type.");
                     let applied = false;
                     const { editType, targetContext, contentFragment = "" } = message;
-                    switch (editType) {
-                        case 'insert_at_start': currentContent = contentFragment + (currentContent ? "\n" + currentContent : ""); applied = true; break;
-                        case 'append_at_end': currentContent = (currentContent ? currentContent + "\n" : "") + contentFragment; applied = true; break;
-                        case 'insert_after_context':
+                     switch (editType) {
+                         case 'insert_at_start': currentContent = contentFragment + (currentContent ? "\n" + currentContent : ""); applied = true; break;
+                         case 'append_at_end': currentContent = (currentContent ? currentContent + "\n" : "") + contentFragment; applied = true; break;
+                         case 'insert_after_context':
                             if (targetContext) { const i = currentContent.indexOf(targetContext); if (i !== -1) { const p = i + targetContext.length; const x = currentContent.endsWith('\n') || currentContent.slice(p).startsWith('\n') || p === 0 ? "" : "\n"; currentContent = currentContent.slice(0, p) + x + contentFragment + currentContent.slice(p); applied = true; } else throw new Error("Target context for insertion not found."); } else throw new Error("Missing target context for insert."); break;
                         case 'replace_context':
                             if (targetContext) { const i = currentContent.indexOf(targetContext); if (i !== -1) { currentContent = currentContent.slice(0, i) + contentFragment + currentContent.slice(i + targetContext.length); applied = true; } else throw new Error("Target context for replacement not found."); } else throw new Error("Missing target context for replace."); break;
                         case 'delete_context':
                             if (targetContext) { const i = currentContent.indexOf(targetContext); if (i !== -1) { currentContent = currentContent.slice(0, i) + currentContent.slice(i + targetContext.length); currentContent = currentContent.replace(/\n\n+/g, '\n').trim(); applied = true; } else throw new Error("Target context for deletion not found."); } else throw new Error("Missing target context for delete."); break;
-                        default: throw new Error(`Unsupported edit type: ${editType}`);
+                         default: throw new Error(`Unsupported edit type: ${editType}`);
                     }
-                    if (applied) finalContent = currentContent; else throw new Error("Targeted edit failed.");
+                     if (applied) finalContent = currentContent; else throw new Error("Targeted edit failed.");
 
                 } else if (message.editAction === 'propose_full_content_replacement') {
                     // Apply full replacement (existing logic)
-                    console.log("Applying full content replacement.");
-                    if (typeof message.newFullContent === 'string') { finalContent = message.newFullContent; }
-                    else { throw new Error("Missing new full content for replacement."); }
+                     console.log("Applying full content replacement.");
+                     if (typeof message.newFullContent === 'string') { finalContent = message.newFullContent; }
+                     else { throw new Error("Missing new full content for replacement."); }
 
                 } else if (message.editAction === 'propose_sequential_edits') {
-                    // --- NEW: Apply sequential edits ---
-                    if (!message.sequentialEdits || !Array.isArray(message.sequentialEdits) || message.sequentialEdits.length === 0) {
-                        throw new Error("Invalid sequential edit proposal: 'edits' array is missing or empty.");
-                    }
+                    // Apply sequential edits (existing logic)
+                     if (!message.sequentialEdits || !Array.isArray(message.sequentialEdits) || message.sequentialEdits.length === 0) {
+                         throw new Error("Invalid sequential edit proposal: 'edits' array is missing or empty.");
+                     }
                     console.log(`Applying ${message.sequentialEdits.length} sequential edits.`);
 
                     let allApplied = true;
                     for (let i = 0; i < message.sequentialEdits.length; i++) {
-                        const editStep = message.sequentialEdits[i];
-                        const { editType, targetContext, contentFragment } = editStep;
-                        let appliedThisStep = false;
-                        const stepNumber = i + 1;
+                         const editStep = message.sequentialEdits[i];
+                         const { editType, targetContext, contentFragment } = editStep;
+                         let appliedThisStep = false;
+                         const stepNumber = i + 1;
 
-                        console.log(`Applying step ${stepNumber}: ${editType}, context: ${targetContext ? `"${targetContext.substring(0, 30)}..."` : '(N/A)'}, fragment: "${contentFragment.substring(0, 50)}..."`);
+                         console.log(`Applying step ${stepNumber}: ${editType}, context: ${targetContext ? `"${targetContext.substring(0, 30)}..."` : '(N/A)'}, fragment: "${contentFragment.substring(0, 50)}..."`);
 
-                        // Re-use the switch logic, operating on the *current* state of currentContent
-                        switch (editType) {
-                            case 'insert_at_start': currentContent = contentFragment + (currentContent ? "\n" + currentContent : ""); appliedThisStep = true; break;
-                            case 'append_at_end': currentContent = (currentContent ? currentContent + "\n" : "") + contentFragment; appliedThisStep = true; break;
+                         switch (editType) {
+                             case 'insert_at_start': currentContent = contentFragment + (currentContent ? "\n" + currentContent : ""); appliedThisStep = true; break;
+                             case 'append_at_end': currentContent = (currentContent ? currentContent + "\n" : "") + contentFragment; appliedThisStep = true; break;
                             case 'insert_after_context':
                                 if (targetContext) { const idx = currentContent.indexOf(targetContext); if (idx !== -1) { const p = idx + targetContext.length; const x = currentContent.endsWith('\n') || currentContent.slice(p).startsWith('\n') || p === 0 ? "" : "\n"; currentContent = currentContent.slice(0, p) + x + contentFragment + currentContent.slice(p); appliedThisStep = true; } else { allApplied = false; console.error(`Sequential edit step ${stepNumber} failed: Target context for insertion not found.`); throw new Error(`Step ${stepNumber}: Target context for insertion not found.`); } } else { allApplied = false; throw new Error(`Step ${stepNumber}: Missing target context for insert.`); } break;
                             case 'replace_context':
                                 if (targetContext) { const idx = currentContent.indexOf(targetContext); if (idx !== -1) { currentContent = currentContent.slice(0, idx) + contentFragment + currentContent.slice(idx + targetContext.length); appliedThisStep = true; } else { allApplied = false; console.error(`Sequential edit step ${stepNumber} failed: Target context for replacement not found.`); throw new Error(`Step ${stepNumber}: Target context for replacement not found.`); } } else { allApplied = false; throw new Error(`Step ${stepNumber}: Missing target context for replace.`); } break;
                             case 'delete_context':
                                 if (targetContext) { const idx = currentContent.indexOf(targetContext); if (idx !== -1) { currentContent = currentContent.slice(0, idx) + currentContent.slice(idx + targetContext.length); currentContent = currentContent.replace(/\n\n+/g, '\n').trim(); appliedThisStep = true; } else { allApplied = false; console.error(`Sequential edit step ${stepNumber} failed: Target context for deletion not found.`); throw new Error(`Step ${stepNumber}: Target context for deletion not found.`); } } else { allApplied = false; throw new Error(`Step ${stepNumber}: Missing target context for delete.`); } break;
-                            default: allApplied = false; throw new Error(`Step ${stepNumber}: Unsupported edit type: ${editType}`);
-                        }
-                        if (!appliedThisStep) {
-                             // This case should theoretically be caught by the checks above, but added for safety.
-                             allApplied = false;
-                             throw new Error(`Sequential edit step ${stepNumber} failed unexpectedly.`);
-                        }
+                             default: allApplied = false; throw new Error(`Step ${stepNumber}: Unsupported edit type: ${editType}`);
+                         }
+                         if (!appliedThisStep) { allApplied = false; throw new Error(`Sequential edit step ${stepNumber} failed unexpectedly.`); }
                          console.log(`After step ${stepNumber}, content starts with: "${currentContent.substring(0, 50)}..."`);
-                    }
+                     }
 
-                    if (allApplied) {
-                        finalContent = currentContent;
-                    } else {
-                        // If any step failed, we already threw an error above.
-                        // This ensures finalContent remains null if the sequence was interrupted.
-                    }
-                    // --- END NEW ---
-
+                     if (allApplied) { finalContent = currentContent; }
                 } else {
                     throw new Error(`Unknown edit action: ${message.editAction}`);
                 }
 
-                // If any of the actions resulted in a valid finalContent, update the note
+                // If any action resulted in valid finalContent, update note
                 if (finalContent !== null) {
                     await onUpdateNoteContent(note.id, finalContent);
-                    setChatHistory(prev => [...prev, { id: `edit-ok-${Date.now()}`, role: 'assistant', content: "✅ Note updated!" }]);
+                    // --- MODIFIED: Add confirmation message with revert capability ---
+                    const confirmationMsgId = `edit-ok-${Date.now()}`;
+                    setChatHistory(prev => [
+                        ...prev,
+                        {
+                            id: confirmationMsgId,
+                            role: 'assistant',
+                            content: "✅ Note updated!",
+                            isUpdateConfirmation: true, // Mark as confirmation
+                            canRevert: true,           // Initially allow revert
+                            previousContent: contentBeforeEdit, // Store previous state
+                            noteIdToRevert: note.id     // Store note ID
+                        }
+                    ]);
                 }
             } catch (error) {
                 console.error("Error applying edit:", error);
                 const eMsg = error instanceof Error ? error.message : 'Unknown error during update.';
                 setChatHistory(prev => [...prev, { id: `edit-err-${Date.now()}`, role: 'assistant', content: `❌ Update failed: ${eMsg}`, error: true }]);
+            } finally {
+                setIsChatLoading(false);
+            }
+        };
+
+        // --- NEW: handleRevertEdit ---
+        const handleRevertEdit = async (message: ChatMessage) => {
+            if (!message.canRevert || typeof message.previousContent !== 'string' || !message.noteIdToRevert || isChatLoading || !message.id) {
+                console.error("Cannot revert this action. Invalid message state:", message);
+                setChatHistory(prev => [...prev, { id: `revert-err-state-${Date.now()}`, role: 'assistant', content: `❌ Cannot revert. Invalid state.`, error: true }]);
+                return;
+            }
+
+            setIsChatLoading(true);
+            setLoadingMsgId(null); // Clear loader state
+
+            const originalMessageId = message.id; // ID of the "✅ Note updated!" message
+
+            try {
+                await onUpdateNoteContent(message.noteIdToRevert, message.previousContent);
+
+                // Add revert confirmation message
+                setChatHistory(prev => [
+                    ...prev.map(msg => // Disable revert on the original message
+                        msg.id === originalMessageId ? { ...msg, canRevert: false } : msg
+                    ),
+                    { id: `revert-ok-${Date.now()}`, role: 'assistant', content: "🔄 Change reverted." }
+                ]);
+
+            } catch (error) {
+                console.error("Error reverting edit:", error);
+                const eMsg = error instanceof Error ? error.message : 'Unknown error during revert.';
+                setChatHistory(prev => [...prev, { id: `revert-err-${Date.now()}`, role: 'assistant', content: `❌ Revert failed: ${eMsg}`, error: true }]);
             } finally {
                 setIsChatLoading(false);
             }
@@ -338,7 +393,7 @@ export const NoteChat = forwardRef<NoteChatHandle, NoteChatProps>(
         const triggerFileSelect = () => fileInputRef.current?.click();
 
 
-        // --- Core Chat Submit Logic - UPDATED (System Prompt & JSON Parsing) ---
+        // --- Core Chat Submit Logic (Unchanged, except for adding loading message ID) ---
         const submitMessageToAI = async (messageContent: string, filesToSend?: SelectedFile[]) => {
             const currentFiles = filesToSend || selectedFiles;
             if ((!messageContent && currentFiles.length === 0) || isChatLoading || !geminiApiKey || !note) return;
@@ -362,12 +417,9 @@ export const NoteChat = forwardRef<NoteChatHandle, NoteChatProps>(
                  const prefix = userMsgContent ? '\n\n' : '';
                  userMsgContent += `${prefix}`; // Only add prefix if there's content
             }
-             // If only an image and no text, set default content
              if (!messageContent && imageFiles.length > 0 && nonImageFiles.length === 0) {
-                 // User message content can remain empty, or you could add a default like "[Image attached]"
                  // userMsgContent = `[Image attached: ${imageFiles[0].name}]`;
              }
-
 
             const userMsg: ChatMessage = { id: `user-${Date.now()}`, role: 'user', content: userMsgContent, imageData: userMsgImageData };
             setChatHistory(prev => [...prev, userMsg]);
@@ -382,11 +434,15 @@ export const NoteChat = forwardRef<NoteChatHandle, NoteChatProps>(
                 return; // Stop if it was ONLY a timer command
             }
 
-            setIsChatLoading(true); const loadingMsgId = `load-${Date.now()}`; setChatHistory(prev => [...prev, { id: loadingMsgId, role: 'assistant', content: '...' }]);
+            setIsChatLoading(true);
+            // --- MODIFIED: Set the loading message ID ---
+            const newLoadingMsgId = `load-${Date.now()}`;
+            setLoadingMsgId(newLoadingMsgId);
+            setChatHistory(prev => [...prev, { id: newLoadingMsgId, role: 'assistant', content: '...' }]); // Use '...' as placeholder content for the loading indicator logic
 
-            const recentHistory = chatHistory.slice(-8); // Keep history length reasonable
+            const recentHistory = chatHistory.slice(-8);
 
-            // --- MODIFIED: System Prompt to include SEQUENTIAL EDITS ---
+            // System Prompt (Unchanged)
             const systemInstruction = `You are TaskMaster, a helpful AI agent integrated into Notes. You are chatting with "${userName}" about their note titled "${note.title}".
 
 Your primary goal is to be helpful and accurate based on the user's request and the provided note content. Follow these functions in order of priority:
@@ -448,7 +504,7 @@ Your primary goal is to be helpful and accurate based on the user's request and 
         Add details about Y.
         Summarize section Z.
         [/SUGGESTIONS]
-    *   Make suggestions concise and actionable. Include a mix of questions and potential edit prompts if appropriate. 
+    *   Make suggestions concise and actionable. Include a mix of questions and potential edit prompts if appropriate.
 
 4.  **General Chat:** Engage in helpful conversation related to the note or note-taking if the request isn't a question about content or an explicit edit command. DO NOT process timer requests (e.g., "set timer 5 min"); they are handled separately.
 
@@ -465,8 +521,8 @@ ${note.keyPoints?.map(p => `- ${p}`).join('\n') || 'N/A'}
 ---
 **Chat History (Recent):**
 ${recentHistory
-    .filter(m => !m.content?.startsWith("Timer set:") && !m.timer)
-    .map(m => `${m.role === 'user' ? userName : 'Assistant'}: ${m.content.replace(/```json[\s\S]*?```/g, '[Edit Proposed]').replace(/\[(?:Image )?Attached:.*?\]/g, '[File Attached]')}`) // Simplify history
+    .filter(m => !m.content?.startsWith("Timer set:") && !m.timer && !m.content?.startsWith("✅ Note updated!") && !m.content?.startsWith("🔄 Change reverted.") && m.content !== '...' && !m.isUpdateConfirmation) // Exclude confirmation/revert/loading messages
+    .map(m => `${m.role === 'user' ? userName : 'Assistant'}: ${m.content.replace(/```json[\s\S]*?```/g, '[Edit Proposed]').replace(/\[(?:Image )?Attached:.*?\]/g, '[File Attached]')}`)
     .join('\n')}
 ---
 
@@ -477,18 +533,17 @@ ${recentHistory
             try {
                 const fullGeminiEndpoint = `${GEMINI_ENDPOINT}${geminiApiKey}`;
                 const apiContent: any[] = [];
-                // Build API history (unchanged, simplified representation)
+                // Build API history (unchanged)
                 recentHistory.forEach(msg => {
                      if (msg.role === 'user') {
                          apiContent.push({ role: "user", parts: [{ text: msg.content.replace(/\[(?:Image )?Attached:.*?\]/g, '').trim() }] });
-                     } else if (msg.role === 'assistant' && !msg.content?.startsWith("Timer set:") && !msg.timer) {
+                     } else if (msg.role === 'assistant' && !msg.content?.startsWith("Timer set:") && !msg.timer && !msg.content?.startsWith("✅ Note updated!") && !m.content?.startsWith("🔄 Change reverted.") && msg.content !== '...' && !msg.isUpdateConfirmation) { // Added more filters
                          const assistantContent = msg.content?.replace(/```json[\s\S]*?```/g, msg.isEditSuggestion ? `(Proposed Edit: ${msg.editExplanation || 'Details omitted'})` : '(Response provided)');
                          if (assistantContent?.trim()) { apiContent.push({ role: "model", parts: [{ text: assistantContent }] }); }
                      }
                  });
 
-                const currentUserParts: any[] = [{ text: systemInstruction }]; // Start with system prompt
-                // Add files to the *current* user turn for the API
+                const currentUserParts: any[] = [{ text: systemInstruction }];
                  if (currentFiles.length > 0) {
                     currentFiles.forEach(file => {
                         if (file.type.startsWith('image/') || file.type === 'application/pdf') {
@@ -496,12 +551,12 @@ ${recentHistory
                         } else { console.warn(`Skipping file with unsupported MIME type for API: ${file.name} (${file.type})`); }
                     });
                  }
-                apiContent.push({ role: "user", parts: currentUserParts }); // Add the combined user turn
+                apiContent.push({ role: "user", parts: currentUserParts });
 
                 let requestBody = JSON.stringify({
                     contents: apiContent,
                     generationConfig: { temperature: 0.6, maxOutputTokens: 8192, topP: 0.95, responseMimeType: "text/plain" },
-                    // safetySettings: [...] // Add safety settings if needed
+                    // safetySettings: [...]
                 });
 
                 const geminiOptions = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: requestBody };
@@ -513,7 +568,7 @@ ${recentHistory
                 let finalDisplayedContent = assistantRawContent;
                 let extractedSuggestions: string[] = [];
 
-                // --- Suggestion Parsing (Unchanged) ---
+                // Suggestion Parsing (Unchanged)
                 const suggestionRegex = /\[SUGGESTIONS\]([\s\S]*?)\[\/SUGGESTIONS\]/i;
                 const suggestionMatch = assistantRawContent.match(suggestionRegex);
                  if (suggestionMatch && suggestionMatch[1]) {
@@ -524,108 +579,73 @@ ${recentHistory
                  } else { setSuggestedPrompts([]); }
 
 
-                let assistantFinalMessage: ChatMessage = { id: loadingMsgId, role: 'assistant', content: finalDisplayedContent || "...", error: assistantRawContent.startsWith("Error:") };
+                let assistantFinalMessage: ChatMessage = { id: newLoadingMsgId, role: 'assistant', content: finalDisplayedContent || "...", error: assistantRawContent.startsWith("Error:") };
 
-                // --- MODIFIED: JSON Parsing Logic to handle new 'propose_sequential_edits' action ---
+                // JSON Parsing Logic (Unchanged)
                 const jsonMatch = finalDisplayedContent.match(/```json\s*([\s\S]*?)\s*```/);
                 let potentialJsonString: string | null = null;
                 if (jsonMatch && jsonMatch[1]) {
                     potentialJsonString = jsonMatch[1].trim();
                     let parsedSuccessfully = false;
                     try {
-                        console.log("Attempting to parse JSON string:", potentialJsonString);
                         const parsedJson = JSON.parse(potentialJsonString);
-                        assistantFinalMessage.isEditSuggestion = false; assistantFinalMessage.error = false; // Reset flags
+                        assistantFinalMessage.isEditSuggestion = false; assistantFinalMessage.error = false; // Reset
 
-                        // 1. Check for Single Targeted Edit
                         if (parsedJson.action === "propose_targeted_edit" && typeof parsedJson.explanation === 'string' && typeof parsedJson.edit_type === 'string' && typeof parsedJson.content_fragment === 'string' && (typeof parsedJson.target_context === 'string' || parsedJson.target_context === null)) {
-                             assistantFinalMessage = { ...assistantFinalMessage, content: parsedJson.explanation, isEditSuggestion: true, editAction: "propose_targeted_edit", editExplanation: parsedJson.explanation, editType: parsedJson.edit_type as EditStep['editType'], targetContext: parsedJson.target_context, contentFragment: parsedJson.content_fragment, sequentialEdits: undefined, newFullContent: undefined };
-                             parsedSuccessfully = true; console.log("Parsed single targeted edit proposal successfully.");
+                             assistantFinalMessage = { ...assistantFinalMessage, content: parsedJson.explanation, isEditSuggestion: true, editAction: "propose_targeted_edit", editExplanation: parsedJson.explanation, editType: parsedJson.edit_type as EditStep['editType'], targetContext: parsedJson.target_context, contentFragment: parsedJson.content_fragment };
+                             parsedSuccessfully = true;
                         }
-                        // 2. Check for Full Content Replacement
                         else if (parsedJson.action === "propose_full_content_replacement" && typeof parsedJson.explanation === 'string' && typeof parsedJson.new_full_content === 'string') {
-                             assistantFinalMessage = { ...assistantFinalMessage, content: parsedJson.explanation, isEditSuggestion: true, editAction: "propose_full_content_replacement", editExplanation: parsedJson.explanation, newFullContent: parsedJson.new_full_content, editType: undefined, targetContext: undefined, contentFragment: undefined, sequentialEdits: undefined };
-                             parsedSuccessfully = true; console.log("Parsed full content replacement proposal successfully.");
+                             assistantFinalMessage = { ...assistantFinalMessage, content: parsedJson.explanation, isEditSuggestion: true, editAction: "propose_full_content_replacement", editExplanation: parsedJson.explanation, newFullContent: parsedJson.new_full_content };
+                             parsedSuccessfully = true;
                         }
-                        // 3. --- NEW: Check for Sequential Edits ---
                         else if (parsedJson.action === "propose_sequential_edits" && typeof parsedJson.explanation === 'string' && Array.isArray(parsedJson.edits) && parsedJson.edits.length > 0) {
-                            // Validate each step in the sequence
-                            const validEdits: EditStep[] = [];
-                            let sequenceIsValid = true;
+                            const validEdits: EditStep[] = []; let sequenceIsValid = true;
                             for (let i = 0; i < parsedJson.edits.length; i++) {
                                 const step = parsedJson.edits[i];
                                 if (typeof step.edit_type === 'string' && typeof step.content_fragment === 'string' && (typeof step.target_context === 'string' || step.target_context === null) &&
                                     ['insert_after_context', 'replace_context', 'delete_context', 'insert_at_start', 'append_at_end'].includes(step.edit_type) &&
-                                    // Ensure target_context is provided when required
                                     (step.edit_type === 'insert_at_start' || step.edit_type === 'append_at_end' || step.target_context !== null)
-                                ) {
-                                    validEdits.push({
-                                        editType: step.edit_type as EditStep['editType'],
-                                        targetContext: step.target_context,
-                                        contentFragment: step.content_fragment
-                                    });
-                                } else {
-                                    console.warn(`Invalid structure in sequential edit step ${i + 1}:`, step);
-                                    sequenceIsValid = false;
-                                    break; // Stop validation on first invalid step
-                                }
+                                ) { validEdits.push({ editType: step.edit_type as EditStep['editType'], targetContext: step.target_context, contentFragment: step.content_fragment }); }
+                                else { sequenceIsValid = false; break; }
                             }
-
                             if (sequenceIsValid) {
-                                assistantFinalMessage = { ...assistantFinalMessage, content: parsedJson.explanation, isEditSuggestion: true, editAction: "propose_sequential_edits", editExplanation: parsedJson.explanation, sequentialEdits: validEdits, editType: undefined, targetContext: undefined, contentFragment: undefined, newFullContent: undefined };
-                                parsedSuccessfully = true; console.log(`Parsed sequential edit proposal with ${validEdits.length} steps successfully.`);
+                                assistantFinalMessage = { ...assistantFinalMessage, content: parsedJson.explanation, isEditSuggestion: true, editAction: "propose_sequential_edits", editExplanation: parsedJson.explanation, sequentialEdits: validEdits };
+                                parsedSuccessfully = true;
                             } else {
-                                assistantFinalMessage.content = `Warning: AI proposed sequential edits, but the structure of step(s) was invalid. Please instruct the AI to try again. \n\n---\n${finalDisplayedContent}`;
-                                assistantFinalMessage.error = true;
+                                assistantFinalMessage.content = `Warning: AI proposed sequential edits, but the structure of step(s) was invalid. \n\n---\n${finalDisplayedContent}`; assistantFinalMessage.error = true;
                             }
                         }
-                         // 4. Handle Invalid JSON structure
                         else {
-                            console.warn("JSON structure invalid or unknown action:", parsedJson);
-                             assistantFinalMessage.content = `Warning: AI proposed an edit, but the JSON structure was invalid or the action unknown. Please instruct the AI to try again. \n\n---\n${finalDisplayedContent}`;
-                             assistantFinalMessage.error = true;
+                             assistantFinalMessage.content = `Warning: AI proposed an edit, but the JSON structure was invalid or action unknown. \n\n---\n${finalDisplayedContent}`; assistantFinalMessage.error = true;
                         }
-
-                        // If JSON parsed and represents an edit, update displayed content
                         if (parsedSuccessfully) {
-                             finalDisplayedContent = finalDisplayedContent.replace(jsonMatch[0], '').trim(); // Remove the JSON block
-                             // Use explanation as content, or fallback if empty
+                             finalDisplayedContent = finalDisplayedContent.replace(jsonMatch[0], '').trim();
                              assistantFinalMessage.content = finalDisplayedContent || parsedJson.explanation || "(Edit proposed)";
                              if (!assistantFinalMessage.content.trim()) assistantFinalMessage.content = "(Edit proposed without explanation)";
                         }
-
                     } catch (parseError: any) {
-                         console.error("Failed to parse JSON. Error:", parseError.message, "Raw JSON:", potentialJsonString);
-                          assistantFinalMessage.content = `Error: Failed to process edit (JSON Parse Error: ${parseError.message}).\n\n---\n${finalDisplayedContent}`;
-                          assistantFinalMessage.error = true;
+                         assistantFinalMessage.content = `Error: Failed to process edit (JSON Parse Error: ${parseError.message}).\n\n---\n${finalDisplayedContent}`; assistantFinalMessage.error = true;
                     }
                 } else if (assistantRawContent.startsWith("Error:")) {
-                    // Handle errors reported directly by extractCandidateText
-                    assistantFinalMessage.error = true;
-                    assistantFinalMessage.content = assistantRawContent;
+                    assistantFinalMessage.error = true; assistantFinalMessage.content = assistantRawContent;
                 }
-                // If it wasn't an edit suggestion, ensure content is set correctly
-                else if (!assistantFinalMessage.isEditSuggestion) {
-                    assistantFinalMessage.content = finalDisplayedContent;
-                }
+                else if (!assistantFinalMessage.isEditSuggestion) { assistantFinalMessage.content = finalDisplayedContent; }
 
-                // Handle empty response case
                 if (!assistantFinalMessage.content?.trim() && !assistantFinalMessage.isEditSuggestion && !assistantFinalMessage.timer) {
-                    assistantFinalMessage.content = "(Received empty response)";
-                    assistantFinalMessage.error = true; // Consider empty response an error/warning
+                    assistantFinalMessage.content = "(Received empty response)"; assistantFinalMessage.error = true;
                 }
 
-                // Update the chat history with the final assistant message
-                setChatHistory(prev => prev.map(msg => msg.id === loadingMsgId ? { ...assistantFinalMessage, id: loadingMsgId } : msg ));
+                setChatHistory(prev => prev.map(msg => msg.id === newLoadingMsgId ? { ...assistantFinalMessage, id: newLoadingMsgId } : msg ));
 
             } catch (err: any) {
                 console.error('Chat submit fetch/process error:', err);
-                // Use the specific error message if available
                 const errorMsg = err instanceof Error ? err.message : 'Unknown error processing request.';
-                setChatHistory(prev => prev.map(msg => msg.id === loadingMsgId ? { id: loadingMsgId, role: 'assistant', content: `❌ ${errorMsg}. Please check console or try again.`, error: true } : msg ));
+                setChatHistory(prev => prev.map(msg => msg.id === newLoadingMsgId ? { id: newLoadingMsgId, role: 'assistant', content: `❌ ${errorMsg}. Please check console or try again.`, error: true } : msg ));
                  setSuggestedPrompts([]); // Clear suggestions on error
             } finally {
                  setIsChatLoading(false);
+                 setLoadingMsgId(null); // Clear loading message ID when done
              }
         };
 
@@ -647,7 +667,7 @@ ${recentHistory
                 if (item.kind === 'file' && item.type.startsWith('image/')) {
                     const file = item.getAsFile();
                     if (file) {
-                        if (existingFileNames.has(file.name)) { console.log(`Skipping duplicate pasted file: ${file.name}`); setChatHistory(prev => [...prev, { id: `paste-err-dup-${Date.now()}-${file.name}`, role: 'assistant', content: `ℹ️ Skipped duplicate pasted file: "${file.name}".`, error: false }]); continue; }
+                        if (existingFileNames.has(file.name)) { setChatHistory(prev => [...prev, { id: `paste-err-dup-${Date.now()}-${file.name}`, role: 'assistant', content: `ℹ️ Skipped duplicate pasted file: "${file.name}".`, error: false }]); continue; }
                         if (file.size > 20 * 1024 * 1024) { setChatHistory(prev => [...prev, { id: `paste-err-size-${Date.now()}`, role: 'assistant', content: `❌ Pasted image "${file.name}" is too large (max 20MB).`, error: true }]); continue; }
                         filePromises.push(readFileAsBase64(file)); existingFileNames.add(file.name); imagePasted = true;
                     }
@@ -663,7 +683,7 @@ ${recentHistory
 
         useImperativeHandle(ref, () => ({ sendMessage: (message: string) => { submitMessageToAI(message); } }));
 
-        // --- Dynamic Styles & Render Logic (Largely Unchanged) ---
+        // --- Dynamic Styles & Render Logic ---
         const rootClasses = displayMode === 'overlay' ? `fixed bottom-4 right-4 z-50 ${overlayBg} rounded-lg w-full max-w-sm flex flex-col shadow-xl transition-all duration-300 ease-in-out ${isMinimized ? 'h-12 overflow-hidden' : 'h-[75vh] max-h-[650px]'}` : `h-full w-full flex flex-col ${overlayBg}`;
         if (displayMode === 'overlay' && !isVisible) return null;
 
@@ -676,51 +696,78 @@ ${recentHistory
                     {displayMode === 'inline' && ( <button onClick={onClose} className={`${iconColor} rounded-full p-1`} title="Close Chat & PDF View"> <X className="w-4 h-4" /> </button> )}
                 </div>
 
-                {/* Chat Body (Render logic unchanged, handles updated ChatMessage structure) */}
+                {/* Chat Body */}
                 {(!isMinimized || displayMode === 'inline') && (
                     <>
                         <div className="flex-1 overflow-y-auto p-3 space-y-3 scrollbar-thin scrollbar-thumb-gray-400 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent">
-                            {chatHistory.map((message, index) => (
-                                <div key={message.id || index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                    <div className={`max-w-[85%] rounded-lg px-2.5 py-1.5 text-sm shadow-sm break-words ${ message.role === 'user' ? userBubbleClass : message.error ? errorBubbleClass : message.isEditSuggestion ? editSuggestionBubbleClass : assistantBubbleClass }`}>
-                                        {/* Loading Indicator */}
-                                        {message.content === "..." && isChatLoading && message.role === 'assistant' ? (
-                                            <div className="flex space-x-1 p-1"><div className={`w-1.5 h-1.5 rounded-full animate-bounce ${isIlluminateEnabled ? 'bg-gray-500' : 'bg-gray-400'}`}></div><div className={`w-1.5 h-1.5 rounded-full animate-bounce delay-100 ${isIlluminateEnabled ? 'bg-gray-500' : 'bg-gray-400'}`}></div><div className={`w-1.5 h-1.5 rounded-full animate-bounce delay-200 ${isIlluminateEnabled ? 'bg-gray-500' : 'bg-gray-400'}`}></div></div>
-                                        ) : message.content ? (
-                                            <ReactMarkdown
-                                                remarkPlugins={[remarkMath, remarkGfm]} rehypePlugins={[rehypeKatex]}
-                                                className={`prose prose-sm max-w-none ${ isIlluminateEnabled ? (message.isEditSuggestion ? 'prose-yellow text-yellow-900' : (message.error ? 'prose-red text-red-800' : 'prose-gray text-gray-800')) : (message.isEditSuggestion ? 'prose-invert text-yellow-200' : (message.error ? 'prose-invert text-red-300' : 'prose-invert text-gray-200')) } prose-p:text-xs prose-p:my-1 prose-ul:text-xs prose-ol:text-xs prose-li:my-0 prose-code:text-[11px] prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-pre:text-[11px] prose-pre:my-1 prose-pre:p-1.5 prose-pre:rounded`}
-                                                components={{
-                                                    a: ({node, ...props}) => <a target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-600" {...props} />,
-                                                    code: ({node, inline, className, children, ...props}) => {
-                                                        const match = /language-(\w+)/.exec(className || ''); const isJson = className === 'language-json';
-                                                        if (inline) { return <code className={`${isIlluminateEnabled ? 'bg-gray-200/70 text-gray-800' : 'bg-gray-600/70 text-gray-100'} px-1 py-0.5 rounded text-[10px]`} {...props}>{children}</code>; }
-                                                        return <pre className={`${isIlluminateEnabled ? '!bg-gray-200/70 !text-gray-800' : '!bg-gray-600/70 !text-gray-100'} p-1.5 rounded my-1 text-[11px] overflow-x-auto`} {...props}><code>{children}</code></pre>;
-                                                    },
-                                                }}
-                                            >{message.content}</ReactMarkdown>
-                                        ) : null}
+                            {chatHistory.map((message, index) => {
+                                // --- MODIFIED: Determine if this is the active loading message ---
+                                const isCurrentLoadingMsg = message.role === 'assistant' && isChatLoading && message.id === loadingMsgId;
 
-                                        {/* Render Image if imageData exists */}
-                                        {message.imageData && (
-                                          <div className={`mt-1.5 ${message.content ? 'border-t pt-1.5' : ''} ${isIlluminateEnabled ? 'border-gray-300/50' : 'border-gray-600/50'}`}>
-                                            <img src={`data:${message.imageData.type};base64,${message.imageData.base64}`} alt={message.imageData.name} className="max-w-full h-auto max-h-48 object-contain rounded-md border border-gray-300 dark:border-gray-600 cursor-pointer" onClick={() => window.open(`data:${message.imageData.type};base64,${message.imageData.base64}`, '_blank')} title={`Click to view full image: ${message.imageData.name}`} />
-                                          </div>
-                                        )}
+                                // --- MODIFIED: Determine bubble class based on new states ---
+                                const bubbleClass = message.role === 'user' ? userBubbleClass
+                                    : message.error ? errorBubbleClass
+                                    : message.isEditSuggestion ? editSuggestionBubbleClass
+                                    : message.isUpdateConfirmation ? confirmationBubbleClass // Style for "Note Updated"
+                                    : assistantBubbleClass; // Default assistant
 
-                                        {/* Timer Display */}
-                                        {message.timer && ( <div className="mt-1.5"><div className={`flex items-center space-x-2 rounded-md px-2 py-1 text-xs border ${isIlluminateEnabled ? 'bg-blue-50 border-blue-200 text-blue-800' : 'bg-gray-800/60 border-gray-600 text-blue-300'}`}><TimerIcon className="w-3.5 h-3.5"/> <Timer key={message.timer.id} initialDuration={message.timer.duration} onComplete={() => handleTimerComplete(message.timer.id)} compact={true} isIlluminateEnabled={isIlluminateEnabled}/></div></div> )}
-                                        {/* Edit Suggestion Action Button */}
-                                        {message.isEditSuggestion && message.editAction && !isChatLoading && !message.error && (
-                                            <div className="mt-2 border-t pt-1.5 flex justify-end border-yellow-300/50 dark:border-yellow-700/50">
-                                                <button onClick={() => handleAcceptEdit(message)} className={`${buttonSecondaryClass} px-2.5 py-1 rounded-md text-xs flex items-center gap-1 hover:brightness-110 ${isIlluminateEnabled ? 'hover:bg-yellow-100' : 'hover:bg-yellow-700/50'} `} disabled={isChatLoading} >
-                                                    <Check className="w-3.5 h-3.5" /> Apply Update{message.editAction === 'propose_sequential_edits' && message.sequentialEdits && message.sequentialEdits.length > 1 ? ` (${message.sequentialEdits.length} steps)` : ''}
-                                                </button>
-                                            </div>
-                                        )}
+                                const proseClass = `prose prose-sm max-w-none ${ isIlluminateEnabled
+                                    ? (message.isEditSuggestion ? 'prose-yellow text-yellow-900' : (message.error ? 'prose-red text-red-800' : (message.isUpdateConfirmation ? 'prose-green text-green-900' : 'prose-gray text-gray-800')))
+                                    : (message.isEditSuggestion ? 'prose-invert text-yellow-200' : (message.error ? 'prose-invert text-red-300' : (message.isUpdateConfirmation ? 'prose-invert text-green-200' : 'prose-invert text-gray-200')))
+                                } prose-p:text-xs prose-p:my-1 prose-ul:text-xs prose-ol:text-xs prose-li:my-0 prose-code:text-[11px] prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-pre:text-[11px] prose-pre:my-1 prose-pre:p-1.5 prose-pre:rounded`;
+
+                                return (
+                                    <div key={message.id || index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                        <div className={`max-w-[85%] rounded-lg px-2.5 py-1.5 text-sm shadow-sm break-words ${bubbleClass}`}>
+                                            {/* --- MODIFIED: Render Loading Indicator --- */}
+                                            {isCurrentLoadingMsg ? (
+                                                <LoadingIndicator isIlluminateEnabled={isIlluminateEnabled} />
+                                            ) : message.content ? (
+                                                <ReactMarkdown
+                                                    remarkPlugins={[remarkMath, remarkGfm]} rehypePlugins={[rehypeKatex]}
+                                                    className={proseClass}
+                                                    components={{
+                                                        a: ({node, ...props}) => <a target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-600" {...props} />,
+                                                        code: ({node, inline, className, children, ...props}) => {
+                                                            const match = /language-(\w+)/.exec(className || ''); const isJson = className === 'language-json';
+                                                            if (inline) { return <code className={`${isIlluminateEnabled ? 'bg-gray-200/70 text-gray-800' : 'bg-gray-600/70 text-gray-100'} px-1 py-0.5 rounded text-[10px]`} {...props}>{children}</code>; }
+                                                            return <pre className={`${isIlluminateEnabled ? '!bg-gray-200/70 !text-gray-800' : '!bg-gray-600/70 !text-gray-100'} p-1.5 rounded my-1 text-[11px] overflow-x-auto`} {...props}><code>{children}</code></pre>;
+                                                        },
+                                                    }}
+                                                >{message.content}</ReactMarkdown>
+                                            ) : null}
+
+                                            {/* Render Image (Unchanged) */}
+                                            {message.imageData && (
+                                              <div className={`mt-1.5 ${message.content ? 'border-t pt-1.5' : ''} ${isIlluminateEnabled ? 'border-gray-300/50' : 'border-gray-600/50'}`}>
+                                                <img src={`data:${message.imageData.type};base64,${message.imageData.base64}`} alt={message.imageData.name} className="max-w-full h-auto max-h-48 object-contain rounded-md border border-gray-300 dark:border-gray-600 cursor-pointer" onClick={() => window.open(`data:${message.imageData.type};base64,${message.imageData.base64}`, '_blank')} title={`Click to view full image: ${message.imageData.name}`} />
+                                              </div>
+                                            )}
+
+                                            {/* Timer Display (Unchanged) */}
+                                            {message.timer && ( <div className="mt-1.5"><div className={`flex items-center space-x-2 rounded-md px-2 py-1 text-xs border ${isIlluminateEnabled ? 'bg-blue-50 border-blue-200 text-blue-800' : 'bg-gray-800/60 border-gray-600 text-blue-300'}`}><TimerIcon className="w-3.5 h-3.5"/> <Timer key={message.timer.id} initialDuration={message.timer.duration} onComplete={() => handleTimerComplete(message.timer.id)} compact={true} isIlluminateEnabled={isIlluminateEnabled}/></div></div> )}
+
+                                            {/* --- MODIFIED: Edit Suggestion & Revert Buttons --- */}
+                                            {/* Apply Edit Button */}
+                                            {message.isEditSuggestion && message.editAction && !isChatLoading && !message.error && (
+                                                <div className="mt-2 border-t pt-1.5 flex justify-end border-yellow-300/50 dark:border-yellow-700/50">
+                                                    <button onClick={() => handleAcceptEdit(message)} className={`${buttonSecondaryClass} px-2.5 py-1 rounded-md text-xs flex items-center gap-1 hover:brightness-110 ${isIlluminateEnabled ? 'hover:bg-yellow-100' : 'hover:bg-yellow-700/50'} `} disabled={isChatLoading} >
+                                                        <Check className="w-3.5 h-3.5" /> Apply Update{message.editAction === 'propose_sequential_edits' && message.sequentialEdits && message.sequentialEdits.length > 1 ? ` (${message.sequentialEdits.length} steps)` : ''}
+                                                    </button>
+                                                </div>
+                                            )}
+                                            {/* Revert Button */}
+                                            {message.isUpdateConfirmation && message.canRevert && !message.error && (
+                                                <div className="mt-2 border-t pt-1.5 flex justify-end border-green-300/50 dark:border-green-700/50">
+                                                    <button onClick={() => handleRevertEdit(message)} className={`${buttonSecondaryClass} px-2.5 py-1 rounded-md text-xs flex items-center gap-1 hover:brightness-110 ${isIlluminateEnabled ? 'hover:bg-gray-200' : 'hover:bg-gray-600'}`} disabled={isChatLoading} title="Revert this change" >
+                                                        <RefreshCcw className="w-3.5 h-3.5" /> Revert
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                             <div ref={chatEndRef} className="h-0"></div> {/* Scroll target */}
                         </div>
 

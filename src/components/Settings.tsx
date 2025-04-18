@@ -925,12 +925,12 @@ export function Settings() {
                           <>
                               <p className={`text-sm ${subheadingClass} mb-2`}>Your premium plan includes:</p>
                               <ul className={`list-disc list-outside pl-5 space-y-1.5 text-xs sm:text-sm ${subheadingClass}`}>
-                                  <li><span className="font-medium text-amber-500 mr-1">*</span>Unlimited PDF and Text Notes</li>
-                                  <li><span className="font-medium text-amber-500 mr-1">*</span>Unlimited YouTube Notes</li>
-                                  <li><span className="font-medium text-amber-500 mr-1">*</span>Unlimited AI Chat Interactions</li>
-                                  <li><span className="font-medium text-amber-500 mr-1">*</span>2,500 Tokens Included</li>
-                                  <li><span className="font-medium text-amber-500 mr-1">*</span>Add Unlimited Friends</li>
-                                  <li><span className="font-medium text-amber-500 mr-1">*</span>Unlimited Access to Smart Overview</li>
+                                  <li><span className="font-medium text-amber-500 mr-1"></span>Unlimited PDF and Text Notes</li>
+                                  <li><span className="font-medium text-amber-500 mr-1"></span>Unlimited YouTube Notes</li>
+                                  <li><span className="font-medium text-amber-500 mr-1"></span>Unlimited AI Chat Interactions</li>
+                                  <li><span className="font-medium text-amber-500 mr-1"></span>2,500 Tokens Included</li>
+                                  <li><span className="font-medium text-amber-500 mr-1"></span>Add Unlimited Friends</li>
+                                  <li><span className="font-medium text-amber-500 mr-1"></span>Unlimited Access to Smart Overview</li>
 
 
                                   {/* Add more premium features */}

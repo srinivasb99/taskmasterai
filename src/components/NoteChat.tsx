@@ -10,29 +10,40 @@ import { Timer } from './Timer';
 // Types
 interface TimerMessage { type: 'timer'; duration: number; id: string; }
 
-// --- NEW: Add imageData structure to ChatMessage ---
 interface ImageData {
     base64: string;
     type: string; // Mime type
     name: string;
 }
 
+// --- NEW: Define structure for a single edit step ---
+interface EditStep {
+    editType: 'insert_after_context' | 'replace_context' | 'delete_context' | 'insert_at_start' | 'append_at_end';
+    targetContext: string | null; // null only for insert_at_start / append_at_end
+    contentFragment: string; // Empty string "" for delete_context
+}
+
 interface ChatMessage {
     id?: string;
     role: 'user' | 'assistant';
     content: string;
-    imageData?: ImageData; // <-- ADDED: To hold image data for rendering
-    // File info is not directly stored on the message, but sent with user input
+    imageData?: ImageData;
     timer?: TimerMessage;
     error?: boolean;
     isEditSuggestion?: boolean;
     editExplanation?: string;
-    editAction?: 'propose_targeted_edit' | 'propose_full_content_replacement';
-    editType?: 'insert_after_context' | 'replace_context' | 'delete_context' | 'insert_at_start' | 'append_at_end' | 'other';
-    targetContext?: string | null;
-    contentFragment?: string;
+    // --- MODIFIED: Update editAction types ---
+    editAction?: 'propose_targeted_edit' | 'propose_full_content_replacement' | 'propose_sequential_edits';
+    // --- For single targeted edit ---
+    editType?: EditStep['editType'];
+    targetContext?: EditStep['targetContext'];
+    contentFragment?: EditStep['contentFragment'];
+    // --- For full replacement ---
     newFullContent?: string;
+    // --- NEW: For sequential edits ---
+    sequentialEdits?: EditStep[];
 }
+
 
 interface SelectedFile {
     name: string;
@@ -58,30 +69,19 @@ export interface NoteChatHandle {
 }
 
 // --- Helper Functions (Unchanged) ---
-
-// Function to read file as base64
 const readFileAsBase64 = (file: File): Promise<SelectedFile> => {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => {
-            const base64String = (reader.result as string).split(',')[1]; // Remove prefix "data:mime/type;base64,"
-            if (!base64String) {
-                reject(new Error("Failed to read file content."));
-                return;
-            }
-            resolve({
-                name: file.name,
-                type: file.type,
-                size: file.size,
-                base64Data: base64String
-            });
+            const base64String = (reader.result as string).split(',')[1];
+            if (!base64String) { reject(new Error("Failed to read file content.")); return; }
+            resolve({ name: file.name, type: file.type, size: file.size, base64Data: base64String });
         };
         reader.onerror = (error) => reject(error);
         reader.readAsDataURL(file);
     });
 };
 
-// Format Bytes
 function formatBytes(bytes: number, decimals = 2): string {
   if (bytes === 0) return '0 Bytes';
   const k = 1024;
@@ -102,8 +102,7 @@ async function fetchWithRetry(url: string, options: RequestInit, retries = 3, de
                     try { const errJson = await response.json(); errorText = errJson?.error?.message || errorText; } catch { /* ignore */ }
                     throw new Error(errorText);
                 }
-                await new Promise(resolve => setTimeout(resolve, delayMs * (attempt + 1)));
-                continue;
+                await new Promise(resolve => setTimeout(resolve, delayMs * (attempt + 1))); continue;
             }
             if (!response.ok) {
                 let errorText = `API Error (${response.status})`;
@@ -124,19 +123,12 @@ async function fetchWithRetry(url: string, options: RequestInit, retries = 3, de
 }
 
 const extractCandidateText = (responseText: string): string => {
-    // (Implementation unchanged)
     try {
         const jsonResponse = JSON.parse(responseText);
-        if (jsonResponse?.candidates?.[0]?.content?.parts?.[0]?.text) {
-            return jsonResponse.candidates[0].content.parts[0].text;
-        }
-        if (jsonResponse?.candidates?.[0]?.finishReason === 'SAFETY') {
-            return "My response was blocked due to potential safety concerns.";
-        }
+        if (jsonResponse?.candidates?.[0]?.content?.parts?.[0]?.text) { return jsonResponse.candidates[0].content.parts[0].text; }
+        if (jsonResponse?.candidates?.[0]?.finishReason === 'SAFETY') { return "My response was blocked due to potential safety concerns."; }
         if (jsonResponse?.error?.message) {
-            if (jsonResponse.error.message.toLowerCase().includes("context length") || jsonResponse.error.message.toLowerCase().includes("request payload size") || jsonResponse.error.message.toLowerCase().includes("request entity too large")) {
-                return "Error: The note content and/or attached files are too large for the AI to process.";
-            }
+            if (jsonResponse.error.message.toLowerCase().includes("context length") || jsonResponse.error.message.toLowerCase().includes("request payload size") || jsonResponse.error.message.toLowerCase().includes("request entity too large")) { return "Error: The note content and/or attached files are too large for the AI to process."; }
             return `Error: ${jsonResponse.error.message}`;
         }
          if (jsonResponse?.candidates?.[0]?.content && !jsonResponse.candidates[0].content.parts) {
@@ -146,14 +138,13 @@ const extractCandidateText = (responseText: string): string => {
              return ""; // Empty content part
         }
         return "Sorry, I received an empty or non-standard response.";
-
     } catch (err) {
          if (typeof responseText === 'string') {
             if (responseText.toLowerCase().includes("api key not valid")) return "Error: Invalid API Key.";
             if (responseText.toLowerCase().includes("quota exceeded")) return "Error: API Quota Exceeded.";
             if (responseText.toLowerCase().includes("internal server error") || responseText.toLowerCase().includes("service unavailable")) return "Error: AI service is temporarily unavailable. Please try again later.";
             if (responseText.toLowerCase().includes("context length") || responseText.toLowerCase().includes("request payload size") || responseText.toLowerCase().includes("request entity too large")) return "Error: The note content and/or attached files are too large for the AI to process.";
-            if (responseText.includes('```json')) return responseText;
+            if (responseText.includes('```json')) return responseText; // Let JSON parsing handle errors inside JSON later
             return responseText;
         }
         console.error('Error parsing/handling Gemini response: Input was not a string.', 'Raw Input:', responseText);
@@ -164,7 +155,6 @@ const extractCandidateText = (responseText: string): string => {
 const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=`;
 
 const parseTimerRequest = (message: string): number | null => {
-    // (Implementation unchanged)
     const cleanedMessage = message.trim().toLowerCase();
     const keywords = ['set timer', 'start timer', 'timer for', 'remind me in'];
     const timeRegex = /(\d+)\s*(m|min|minute|h|hr|hour|s|sec|second)s?\b/i;
@@ -227,24 +217,27 @@ export const NoteChat = forwardRef<NoteChatHandle, NoteChatProps>(
 
         useEffect(() => { if (!isMinimized || displayMode === 'inline') { setTimeout(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }); }, 150); } }, [chatHistory, isMinimized, displayMode, suggestedPrompts]);
 
-        // --- Handlers (Unchanged except submitMessageToAI) ---
+        // --- Handlers (Unchanged except handleAcceptEdit) ---
         const handleTimerComplete = (timerId: string) => setChatHistory(prev => [...prev, { id: `timer-comp-${timerId}`, role: 'assistant', content: "⏰ Time's up!" }]);
 
+        // --- MODIFIED: handleAcceptEdit to support sequential edits ---
         const handleAcceptEdit = async (message: ChatMessage) => {
-            // (Implementation unchanged)
-             if (!note || isChatLoading || !message.isEditSuggestion || !message.editAction) {
+            if (!note || isChatLoading || !message.isEditSuggestion || !message.editAction) {
                 console.error("Invalid edit proposal:", message);
                 setChatHistory(prev => [...prev, { id: `edit-app-err-${Date.now()}`, role: 'assistant', content: `❌ Error: Could not apply edit. Invalid proposal data.`, error: true }]);
                 return;
             }
             setIsChatLoading(true);
             let finalContent: string | null = null;
+            let currentContent = note.content; // Start with the current note content
+
             try {
                 if (message.editAction === 'propose_targeted_edit') {
+                    // Apply single targeted edit (existing logic)
+                    console.log("Applying single targeted edit:", message);
                     if (!message.editType) throw new Error("Missing edit type.");
-                    let currentContent = note.content; let applied = false;
+                    let applied = false;
                     const { editType, targetContext, contentFragment = "" } = message;
-                    console.log("Applying targeted edit:", { editType, targetContext: targetContext?.substring(0, 30)+"...", contentFragment: contentFragment.substring(0, 50) + "..." });
                     switch (editType) {
                         case 'insert_at_start': currentContent = contentFragment + (currentContent ? "\n" + currentContent : ""); applied = true; break;
                         case 'append_at_end': currentContent = (currentContent ? currentContent + "\n" : "") + contentFragment; applied = true; break;
@@ -257,149 +250,156 @@ export const NoteChat = forwardRef<NoteChatHandle, NoteChatProps>(
                         default: throw new Error(`Unsupported edit type: ${editType}`);
                     }
                     if (applied) finalContent = currentContent; else throw new Error("Targeted edit failed.");
+
                 } else if (message.editAction === 'propose_full_content_replacement') {
-                    if (typeof message.newFullContent === 'string') { console.log("Applying full content replacement."); finalContent = message.newFullContent; } else throw new Error("Missing new full content.");
-                } else throw new Error(`Unknown edit action: ${message.editAction}`);
-                if (finalContent !== null) { await onUpdateNoteContent(note.id, finalContent); setChatHistory(prev => [...prev, { id: `edit-ok-${Date.now()}`, role: 'assistant', content: "✅ Note updated!" }]); }
-            } catch (error) { console.error("Error applying edit:", error); const eMsg = error instanceof Error ? error.message : 'Unknown error.'; setChatHistory(prev => [...prev, { id: `edit-err-${Date.now()}`, role: 'assistant', content: `❌ Update failed: ${eMsg}`, error: true }]);
-            } finally { setIsChatLoading(false); }
+                    // Apply full replacement (existing logic)
+                    console.log("Applying full content replacement.");
+                    if (typeof message.newFullContent === 'string') { finalContent = message.newFullContent; }
+                    else { throw new Error("Missing new full content for replacement."); }
+
+                } else if (message.editAction === 'propose_sequential_edits') {
+                    // --- NEW: Apply sequential edits ---
+                    if (!message.sequentialEdits || !Array.isArray(message.sequentialEdits) || message.sequentialEdits.length === 0) {
+                        throw new Error("Invalid sequential edit proposal: 'edits' array is missing or empty.");
+                    }
+                    console.log(`Applying ${message.sequentialEdits.length} sequential edits.`);
+
+                    let allApplied = true;
+                    for (let i = 0; i < message.sequentialEdits.length; i++) {
+                        const editStep = message.sequentialEdits[i];
+                        const { editType, targetContext, contentFragment } = editStep;
+                        let appliedThisStep = false;
+                        const stepNumber = i + 1;
+
+                        console.log(`Applying step ${stepNumber}: ${editType}, context: ${targetContext ? `"${targetContext.substring(0, 30)}..."` : '(N/A)'}, fragment: "${contentFragment.substring(0, 50)}..."`);
+
+                        // Re-use the switch logic, operating on the *current* state of currentContent
+                        switch (editType) {
+                            case 'insert_at_start': currentContent = contentFragment + (currentContent ? "\n" + currentContent : ""); appliedThisStep = true; break;
+                            case 'append_at_end': currentContent = (currentContent ? currentContent + "\n" : "") + contentFragment; appliedThisStep = true; break;
+                            case 'insert_after_context':
+                                if (targetContext) { const idx = currentContent.indexOf(targetContext); if (idx !== -1) { const p = idx + targetContext.length; const x = currentContent.endsWith('\n') || currentContent.slice(p).startsWith('\n') || p === 0 ? "" : "\n"; currentContent = currentContent.slice(0, p) + x + contentFragment + currentContent.slice(p); appliedThisStep = true; } else { allApplied = false; console.error(`Sequential edit step ${stepNumber} failed: Target context for insertion not found.`); throw new Error(`Step ${stepNumber}: Target context for insertion not found.`); } } else { allApplied = false; throw new Error(`Step ${stepNumber}: Missing target context for insert.`); } break;
+                            case 'replace_context':
+                                if (targetContext) { const idx = currentContent.indexOf(targetContext); if (idx !== -1) { currentContent = currentContent.slice(0, idx) + contentFragment + currentContent.slice(idx + targetContext.length); appliedThisStep = true; } else { allApplied = false; console.error(`Sequential edit step ${stepNumber} failed: Target context for replacement not found.`); throw new Error(`Step ${stepNumber}: Target context for replacement not found.`); } } else { allApplied = false; throw new Error(`Step ${stepNumber}: Missing target context for replace.`); } break;
+                            case 'delete_context':
+                                if (targetContext) { const idx = currentContent.indexOf(targetContext); if (idx !== -1) { currentContent = currentContent.slice(0, idx) + currentContent.slice(idx + targetContext.length); currentContent = currentContent.replace(/\n\n+/g, '\n').trim(); appliedThisStep = true; } else { allApplied = false; console.error(`Sequential edit step ${stepNumber} failed: Target context for deletion not found.`); throw new Error(`Step ${stepNumber}: Target context for deletion not found.`); } } else { allApplied = false; throw new Error(`Step ${stepNumber}: Missing target context for delete.`); } break;
+                            default: allApplied = false; throw new Error(`Step ${stepNumber}: Unsupported edit type: ${editType}`);
+                        }
+                        if (!appliedThisStep) {
+                             // This case should theoretically be caught by the checks above, but added for safety.
+                             allApplied = false;
+                             throw new Error(`Sequential edit step ${stepNumber} failed unexpectedly.`);
+                        }
+                         console.log(`After step ${stepNumber}, content starts with: "${currentContent.substring(0, 50)}..."`);
+                    }
+
+                    if (allApplied) {
+                        finalContent = currentContent;
+                    } else {
+                        // If any step failed, we already threw an error above.
+                        // This ensures finalContent remains null if the sequence was interrupted.
+                    }
+                    // --- END NEW ---
+
+                } else {
+                    throw new Error(`Unknown edit action: ${message.editAction}`);
+                }
+
+                // If any of the actions resulted in a valid finalContent, update the note
+                if (finalContent !== null) {
+                    await onUpdateNoteContent(note.id, finalContent);
+                    setChatHistory(prev => [...prev, { id: `edit-ok-${Date.now()}`, role: 'assistant', content: "✅ Note updated!" }]);
+                }
+            } catch (error) {
+                console.error("Error applying edit:", error);
+                const eMsg = error instanceof Error ? error.message : 'Unknown error during update.';
+                setChatHistory(prev => [...prev, { id: `edit-err-${Date.now()}`, role: 'assistant', content: `❌ Update failed: ${eMsg}`, error: true }]);
+            } finally {
+                setIsChatLoading(false);
+            }
         };
+
 
         const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
-            // (Implementation unchanged)
-             const files = event.target.files;
-            if (!files) return;
-            setIsChatLoading(true);
-            const newFiles: SelectedFile[] = [];
-            const filePromises: Promise<SelectedFile>[] = [];
-            const existingFileNames = new Set(selectedFiles.map(f => f.name));
-
-            for (let i = 0; i < files.length; i++) {
+             const files = event.target.files; if (!files) return; setIsChatLoading(true); const newFiles: SelectedFile[] = []; const filePromises: Promise<SelectedFile>[] = []; const existingFileNames = new Set(selectedFiles.map(f => f.name));
+             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
-                if (existingFileNames.has(file.name)) {
-                     console.log(`Skipping duplicate file: ${file.name}`);
-                     setChatHistory(prev => [...prev, { id: `file-err-dup-${Date.now()}-${file.name}`, role: 'assistant', content: `ℹ️ Skipped duplicate file: "${file.name}".`, error: false }]);
-                     continue;
-                }
-                if (file.size > 20 * 1024 * 1024) {
-                     setChatHistory(prev => [...prev, { id: `file-err-size-${Date.now()}`, role: 'assistant', content: `❌ File "${file.name}" is too large (max 20MB).`, error: true }]);
-                     continue;
-                }
-                 if (!file.type.startsWith('image/') && file.type !== 'application/pdf') {
-                     setChatHistory(prev => [...prev, { id: `file-err-type-${Date.now()}`, role: 'assistant', content: `❌ File type for "${file.name}" is not supported (only images and PDFs).`, error: true }]);
-                    continue;
-                 }
-                filePromises.push(readFileAsBase64(file));
-                 existingFileNames.add(file.name);
-            }
-
-            try {
-                const results = await Promise.all(filePromises);
-                setSelectedFiles(prev => [...prev, ...results]);
-            } catch (error) {
-                 console.error("Error reading files:", error);
-                 setChatHistory(prev => [...prev, { id: `file-err-read-${Date.now()}`, role: 'assistant', content: `❌ Error processing selected file(s). Please try again.`, error: true }]);
-            } finally {
-                 setIsChatLoading(false);
-                 if (fileInputRef.current) { fileInputRef.current.value = ''; }
-            }
+                if (existingFileNames.has(file.name)) { console.log(`Skipping duplicate file: ${file.name}`); setChatHistory(prev => [...prev, { id: `file-err-dup-${Date.now()}-${file.name}`, role: 'assistant', content: `ℹ️ Skipped duplicate file: "${file.name}".`, error: false }]); continue; }
+                if (file.size > 20 * 1024 * 1024) { setChatHistory(prev => [...prev, { id: `file-err-size-${Date.now()}`, role: 'assistant', content: `❌ File "${file.name}" is too large (max 20MB).`, error: true }]); continue; }
+                if (!file.type.startsWith('image/') && file.type !== 'application/pdf') { setChatHistory(prev => [...prev, { id: `file-err-type-${Date.now()}`, role: 'assistant', content: `❌ File type for "${file.name}" is not supported (only images and PDFs).`, error: true }]); continue; }
+                filePromises.push(readFileAsBase64(file)); existingFileNames.add(file.name);
+             }
+             try { const results = await Promise.all(filePromises); setSelectedFiles(prev => [...prev, ...results]); }
+             catch (error) { console.error("Error reading files:", error); setChatHistory(prev => [...prev, { id: `file-err-read-${Date.now()}`, role: 'assistant', content: `❌ Error processing selected file(s). Please try again.`, error: true }]); }
+             finally { setIsChatLoading(false); if (fileInputRef.current) { fileInputRef.current.value = ''; } }
         };
 
-        const handleRemoveFile = (fileName: string) => {
-            // (Implementation unchanged)
-            setSelectedFiles(prev => prev.filter(f => f.name !== fileName));
-        };
+        const handleRemoveFile = (fileName: string) => setSelectedFiles(prev => prev.filter(f => f.name !== fileName));
+        const triggerFileSelect = () => fileInputRef.current?.click();
 
-         const triggerFileSelect = () => {
-            // (Implementation unchanged)
-            fileInputRef.current?.click();
-        };
 
-        // --- Core Chat Submit Logic - UPDATED ---
+        // --- Core Chat Submit Logic - UPDATED (System Prompt & JSON Parsing) ---
         const submitMessageToAI = async (messageContent: string, filesToSend?: SelectedFile[]) => {
-            const currentFiles = filesToSend || selectedFiles; // Use passed files or state
+            const currentFiles = filesToSend || selectedFiles;
             if ((!messageContent && currentFiles.length === 0) || isChatLoading || !geminiApiKey || !note) return;
 
             const timerDuration = parseTimerRequest(messageContent);
 
-            // --- MODIFIED: Prepare user message, potentially adding image data ---
+            // Prepare user message (including image preview if applicable)
             let userMsgContent = messageContent;
             let userMsgImageData: ImageData | undefined = undefined;
             const imageFiles = currentFiles.filter(f => f.type.startsWith('image/'));
             const nonImageFiles = currentFiles.filter(f => !f.type.startsWith('image/'));
-
-            // Create attachment text only for non-image files or if there are image files AND text content
             const attachmentTextParts: string[] = [];
+
             if (imageFiles.length > 0) {
-                // Use the first image's data for rendering in the chat bubble
-                userMsgImageData = {
-                    base64: imageFiles[0].base64Data,
-                    type: imageFiles[0].type,
-                    name: imageFiles[0].name
-                };
-                 // Always add image names to attachment text for AI context
+                userMsgImageData = { base64: imageFiles[0].base64Data, type: imageFiles[0].type, name: imageFiles[0].name };
                 imageFiles.forEach(img => attachmentTextParts.push(img.name));
             }
-             nonImageFiles.forEach(file => attachmentTextParts.push(file.name));
+            nonImageFiles.forEach(file => attachmentTextParts.push(file.name));
 
-             // Construct final message content including attachment text
             if (attachmentTextParts.length > 0) {
-                // Add a newline if there's existing message content
-                const prefix = userMsgContent ? '\n\n' : '';
-                 userMsgContent += `${prefix}`;
+                 const prefix = userMsgContent ? '\n\n' : '';
+                 userMsgContent += `${prefix}`; // Only add prefix if there's content
             }
-             // If there's *only* an image and no text, set default content
+             // If only an image and no text, set default content
              if (!messageContent && imageFiles.length > 0 && nonImageFiles.length === 0) {
-                  userMsgContent = ``; // Or simply keep it as generated above
+                 // User message content can remain empty, or you could add a default like "[Image attached]"
+                 // userMsgContent = `[Image attached: ${imageFiles[0].name}]`;
              }
 
 
-            // Create the user message object WITH potential image data
-            const userMsg: ChatMessage = {
-                id: `user-${Date.now()}`,
-                role: 'user',
-                content: userMsgContent,
-                imageData: userMsgImageData // <-- ADDED imageData
-            };
-            // --- END MODIFICATION ---
-
-
-            // Update chat history and immediately clear suggestions
+            const userMsg: ChatMessage = { id: `user-${Date.now()}`, role: 'user', content: userMsgContent, imageData: userMsgImageData };
             setChatHistory(prev => [...prev, userMsg]);
-            setSuggestedPrompts([]); // Clear suggestions as soon as user sends anything
+            setSuggestedPrompts([]); // Clear suggestions
 
-             // Clear files from state *after* they are captured for the request
-            if (!filesToSend) { // Don't clear if files were explicitly passed (e.g., for retry or specific submit)
-                 setSelectedFiles([]);
-            }
+            if (!filesToSend) { setSelectedFiles([]); } // Clear files if they weren't passed explicitly
 
             if (timerDuration) {
                 const tId = `t-${Date.now()}`; const dTxt = timerDuration >= 3600 ? `${Math.round(timerDuration / 3600)}h` : timerDuration >= 60 ? `${Math.round(timerDuration / 60)}m` : `${timerDuration}s`;
                 setChatHistory(prev => [ ...prev, { id: `tstart-${tId}`, role: 'assistant', content: `Timer set: ${dTxt}.`, timer: { type: 'timer', duration: timerDuration, id: tId } } ]);
-                if (messageContent.toLowerCase().startsWith('set timer') || messageContent.toLowerCase().startsWith('timer for')) {
-                     setChatMessage('');
-                }
+                if (messageContent.toLowerCase().startsWith('set timer') || messageContent.toLowerCase().startsWith('timer for')) { setChatMessage(''); }
                 return; // Stop if it was ONLY a timer command
             }
 
             setIsChatLoading(true); const loadingMsgId = `load-${Date.now()}`; setChatHistory(prev => [...prev, { id: loadingMsgId, role: 'assistant', content: '...' }]);
 
-            const recentHistory = chatHistory.slice(-8);
+            const recentHistory = chatHistory.slice(-8); // Keep history length reasonable
 
-            // --- System Prompt - Unchanged ---
-             const systemInstruction = `You are TaskMaster, a helpful AI agent integrated into Notes. You are chatting with "${userName}" about their note titled "${note.title}".
+            // --- MODIFIED: System Prompt to include SEQUENTIAL EDITS ---
+            const systemInstruction = `You are TaskMaster, a helpful AI agent integrated into Notes. You are chatting with "${userName}" about their note titled "${note.title}".
 
 Your primary goal is to be helpful and accurate based on the user's request and the provided note content. Follow these functions in order of priority:
 
 1.  **Answer Questions Directly:**
-    *   **PRIORITY:** If the user asks a question about the note's content (e.g., "What does it say about X?", "Can you find Y?", "Do you see the 'War and Society' section?", "Summarize this part"), provide a direct textual answer based on the "Current Note Content".
-    *   **DO NOT propose an edit (JSON response) if the user is just asking a question.** Use your knowledge of the note content to respond informatively.
-    *   Even if some of the information isn't in the note, you can still answer the question based on your knowledge. However, please avoid making up information.
+    *   **PRIORITY:** If the user asks a question about the note's content (e.g., "What does it say about X?", "Summarize this part"), provide a direct textual answer based on the "Current Note Content".
+    *   **DO NOT propose an edit (JSON response) if the user is just asking a question.** Respond informatively.
+    *   If the note doesn't contain the answer, use your general knowledge to answer helpfully and accurately, avoiding fabrication. Do not say "The note doesn't mention X".
 
 2.  **Modify Note (ONLY if EXPLICITLY asked):**
     *   Propose an edit **ONLY** if the user explicitly uses action verbs asking to *change* the note (e.g., "add...", "remove...", "delete...", "change...", "rewrite...", "update...", "replace...", "insert...").
     *   **Choose the RIGHT Method:**
-        *   **Method A: Targeted Edits (PREFERRED for SPECIFIC changes):** For localized changes, use \`propose_targeted_edit\`. Provide:
+        *   **Method A: Single Targeted Edit (PREFERRED for ONE specific change):** For a single, localized change, use \`propose_targeted_edit\`. Provide:
             \`\`\`json
             {
               "action": "propose_targeted_edit",
@@ -409,7 +409,28 @@ Your primary goal is to be helpful and accurate based on the user's request and 
               "content_fragment": "[EXACT markdown fragment for the change. Empty string "" for delete.]"
             }
             \`\`\`
-        *   **Method B: Full Content Replacement (ONLY for MAJOR changes):** For deleting all content, replacing the entire note, or major holistic rewrites, use \`propose_full_content_replacement\`. Provide:
+        *   **Method B: Sequential Edits (Use for MULTIPLE specific changes requested in ONE message):** If the user asks for *multiple* distinct changes (e.g., "Delete sentence A and add paragraph B"), use \`propose_sequential_edits\`. Provide:
+            \`\`\`json
+            {
+              "action": "propose_sequential_edits",
+              "explanation": "[Overall explanation summarizing ALL the sequential changes.]",
+              "edits": [ // An array of edit steps, executed in order
+                { // First edit step
+                  "edit_type": "[Type: 'insert_after_context', 'replace_context', 'delete_context', 'insert_at_start', 'append_at_end']",
+                  "target_context": "[Context for *first* edit. null for start/end.]",
+                  "content_fragment": "[Fragment for *first* edit.]"
+                },
+                { // Second edit step (operates on the result of the first step)
+                  "edit_type": "[Type]",
+                  "target_context": "[Context for *second* edit, based on content *after* first edit. null for start/end.]",
+                  "content_fragment": "[Fragment for *second* edit.]"
+                }
+                // ... add more steps as needed for the user's request
+              ]
+            }
+            \`\`\`
+            **IMPORTANT FOR SEQUENTIAL:** The \`target_context\` for each step must exist in the note content *after* the previous steps have been applied. Ensure the sequence makes sense.
+        *   **Method C: Full Content Replacement (ONLY for MAJOR changes):** For deleting all content, replacing the entire note, or major holistic rewrites requested in one go, use \`propose_full_content_replacement\`. Provide:
             \`\`\`json
             {
               "action": "propose_full_content_replacement",
@@ -417,21 +438,14 @@ Your primary goal is to be helpful and accurate based on the user's request and 
               "new_full_content": "[COMPLETE new markdown content for the note. Empty string "" for delete all.]"
             }
             \`\`\`
-        *   **CRITICAL:** Use Method B sparingly. Always choose only ONE method. Ensure JSON is valid and nothing follows the JSON block.
+        *   **CRITICAL:** Choose only ONE method (A, B, or C) per response. Ensure JSON is valid and nothing follows the JSON block.
 
 3.  **Generate Suggestions:**
-    *   **ALWAYS** include 3 relevant follow-up suggestions (questions the user might ask, or edit actions they might want) based on the current note, attached files (if any), and conversation context.
-    *   Format them clearly at the END of your response, enclosed like this:
-        [SUGGESTIONS]
-        Suggestion 1 text here?
-        Add details about Y.
-        Summarize section Z.
-        [/SUGGESTIONS]
-    *   Make suggestions concise and actionable. Include a mix of questions and potential edit prompts if appropriate.
+    *   **ALWAYS** include 3 relevant follow-up suggestions (questions, edit actions) based on the note, files, and conversation.
+    *   Format them at the END: [SUGGESTIONS] Suggestion 1? Add details. Summarize Z. [/SUGGESTIONS]
+    *   Make suggestions concise and actionable.
 
-4.  **General Chat:** Engage in helpful conversation related to the note or note-taking if the request isn't a question about content or an explicit edit command. DO NOT process timer requests (e.g., "set timer 5 min"); they are handled separately.
-
-5. **IMPORTANT:** If the user's question is not answered in the note, you are still allowed—and encouraged—to answer the question using your own knowledge, as long as your answer is accurate and not fabricated. Do not refuse to answer simply because the note does not contain the requested information. Avoid saying things like: “The note doesn’t mention X, so I can’t answer.” Instead, aim to be helpful by providing a reliable, well-informed answer based on your own training or verified sources.
+4.  **General Chat:** Engage helpfully if the request isn't a question or explicit edit command. Do not process timer requests.
 
 **Current Note Content (Full):**
 """
@@ -445,58 +459,45 @@ ${note.keyPoints?.map(p => `- ${p}`).join('\n') || 'N/A'}
 **Chat History (Recent):**
 ${recentHistory
     .filter(m => !m.content?.startsWith("Timer set:") && !m.timer)
-     // Strip image data and simplify attachment text for history context sent to AI
-    .map(m => `${m.role === 'user' ? userName : 'Assistant'}: ${m.content.replace(/```json[\s\S]*?```/g, '[Edit Proposed]').replace(/\[(?:Image )?Attached:.*?\]/g, '[File Attached]')}`)
+    .map(m => `${m.role === 'user' ? userName : 'Assistant'}: ${m.content.replace(/```json[\s\S]*?```/g, '[Edit Proposed]').replace(/\[(?:Image )?Attached:.*?\]/g, '[File Attached]')}`) // Simplify history
     .join('\n')}
 ---
 
-**${userName}: ${messageContent}** (Note: Files might be attached separately in the API call, represented as '[File Attached]' in the text above if applicable)
+**${userName}: ${messageContent}** (Note: Files might be attached separately)
 **Assistant:**`;
 
 
             try {
                 const fullGeminiEndpoint = `${GEMINI_ENDPOINT}${geminiApiKey}`;
-
-                // --- API Request Construction (Unchanged - AI gets files via API parts, not rendered image) ---
                 const apiContent: any[] = [];
+                // Build API history (unchanged, simplified representation)
                 recentHistory.forEach(msg => {
                      if (msg.role === 'user') {
-                         // Remove file attachment text and image data representation for history sent to API
                          apiContent.push({ role: "user", parts: [{ text: msg.content.replace(/\[(?:Image )?Attached:.*?\]/g, '').trim() }] });
                      } else if (msg.role === 'assistant' && !msg.content?.startsWith("Timer set:") && !msg.timer) {
                          const assistantContent = msg.content?.replace(/```json[\s\S]*?```/g, msg.isEditSuggestion ? `(Proposed Edit: ${msg.editExplanation || 'Details omitted'})` : '(Response provided)');
-                         if (assistantContent?.trim()) {
-                              apiContent.push({ role: "model", parts: [{ text: assistantContent }] });
-                         }
+                         if (assistantContent?.trim()) { apiContent.push({ role: "model", parts: [{ text: assistantContent }] }); }
                      }
                  });
 
-                const currentUserParts: any[] = [];
-                currentUserParts.push({ text: systemInstruction });
-
-                if (currentFiles.length > 0) {
+                const currentUserParts: any[] = [{ text: systemInstruction }]; // Start with system prompt
+                // Add files to the *current* user turn for the API
+                 if (currentFiles.length > 0) {
                     currentFiles.forEach(file => {
                         if (file.type.startsWith('image/') || file.type === 'application/pdf') {
-                            currentUserParts.push({
-                                inline_data: { mime_type: file.type, data: file.base64Data }
-                            });
-                        } else {
-                             console.warn(`Skipping file with unsupported MIME type for API: ${file.name} (${file.type})`);
-                        }
+                            currentUserParts.push({ inline_data: { mime_type: file.type, data: file.base64Data } });
+                        } else { console.warn(`Skipping file with unsupported MIME type for API: ${file.name} (${file.type})`); }
                     });
                  }
-
-                 apiContent.push({ role: "user", parts: currentUserParts });
+                apiContent.push({ role: "user", parts: currentUserParts }); // Add the combined user turn
 
                 let requestBody = JSON.stringify({
                     contents: apiContent,
                     generationConfig: { temperature: 0.6, maxOutputTokens: 8192, topP: 0.95, responseMimeType: "text/plain" },
+                    // safetySettings: [...] // Add safety settings if needed
                 });
 
-                const geminiOptions = {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: requestBody
-                };
+                const geminiOptions = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: requestBody };
 
                 const response = await fetchWithRetry(fullGeminiEndpoint, geminiOptions);
                 const responseText = await response.text();
@@ -506,171 +507,157 @@ ${recentHistory
                 let extractedSuggestions: string[] = [];
 
                 // --- Suggestion Parsing (Unchanged) ---
-                 const suggestionRegex = /\[SUGGESTIONS\]([\s\S]*?)\[\/SUGGESTIONS\]/i;
+                const suggestionRegex = /\[SUGGESTIONS\]([\s\S]*?)\[\/SUGGESTIONS\]/i;
                 const suggestionMatch = assistantRawContent.match(suggestionRegex);
                  if (suggestionMatch && suggestionMatch[1]) {
-                     extractedSuggestions = suggestionMatch[1]
-                         .split('\n')
-                         .map(s => s.trim().replace(/^- /, '').trim())
-                         .filter(s => s.length > 1 && s.length < 120);
+                     extractedSuggestions = suggestionMatch[1].split('\n').map(s => s.trim().replace(/^- /, '').trim()).filter(s => s.length > 1 && s.length < 120);
                      finalDisplayedContent = assistantRawContent.replace(suggestionRegex, '').trim();
                      extractedSuggestions = extractedSuggestions.slice(0, 4);
                      setSuggestedPrompts(extractedSuggestions);
-                 } else {
-                     setSuggestedPrompts([]);
-                 }
+                 } else { setSuggestedPrompts([]); }
 
 
-                let assistantFinalMessage: ChatMessage = {
-                    id: loadingMsgId, role: 'assistant', content: finalDisplayedContent || "...", error: assistantRawContent.startsWith("Error:")
-                     // Assistant messages currently don't include image data from the AI
-                };
+                let assistantFinalMessage: ChatMessage = { id: loadingMsgId, role: 'assistant', content: finalDisplayedContent || "...", error: assistantRawContent.startsWith("Error:") };
 
-                // --- JSON Parsing Logic (Unchanged) ---
-                 const jsonMatch = finalDisplayedContent.match(/```json\s*([\s\S]*?)\s*```/);
+                // --- MODIFIED: JSON Parsing Logic to handle new 'propose_sequential_edits' action ---
+                const jsonMatch = finalDisplayedContent.match(/```json\s*([\s\S]*?)\s*```/);
                 let potentialJsonString: string | null = null;
                 if (jsonMatch && jsonMatch[1]) {
                     potentialJsonString = jsonMatch[1].trim();
-                     let parsedSuccessfully = false;
+                    let parsedSuccessfully = false;
                     try {
                         console.log("Attempting to parse JSON string:", potentialJsonString);
                         const parsedJson = JSON.parse(potentialJsonString);
-                        assistantFinalMessage.isEditSuggestion = false; assistantFinalMessage.error = false;
+                        assistantFinalMessage.isEditSuggestion = false; assistantFinalMessage.error = false; // Reset flags
 
+                        // 1. Check for Single Targeted Edit
                         if (parsedJson.action === "propose_targeted_edit" && typeof parsedJson.explanation === 'string' && typeof parsedJson.edit_type === 'string' && typeof parsedJson.content_fragment === 'string' && (typeof parsedJson.target_context === 'string' || parsedJson.target_context === null)) {
-                             assistantFinalMessage = { ...assistantFinalMessage, content: parsedJson.explanation, isEditSuggestion: true, editAction: "propose_targeted_edit", editExplanation: parsedJson.explanation, editType: parsedJson.edit_type as ChatMessage['editType'], targetContext: parsedJson.target_context, contentFragment: parsedJson.content_fragment, };
-                             parsedSuccessfully = true; console.log("Parsed targeted edit proposal successfully.");
-                        } else if (parsedJson.action === "propose_full_content_replacement" && typeof parsedJson.explanation === 'string' && typeof parsedJson.new_full_content === 'string') {
-                             assistantFinalMessage = { ...assistantFinalMessage, content: parsedJson.explanation, isEditSuggestion: true, editAction: "propose_full_content_replacement", editExplanation: parsedJson.explanation, newFullContent: parsedJson.new_full_content, editType: undefined, targetContext: undefined, contentFragment: undefined, };
-                              parsedSuccessfully = true; console.log("Parsed full content replacement proposal successfully.");
-                        } else {
-                            console.warn("JSON structure invalid:", parsedJson);
-                             assistantFinalMessage.content = `Warning: AI proposed an edit, but structure was invalid. Please instruct the AI to try again. \n\n---\n${finalDisplayedContent}`;
+                             assistantFinalMessage = { ...assistantFinalMessage, content: parsedJson.explanation, isEditSuggestion: true, editAction: "propose_targeted_edit", editExplanation: parsedJson.explanation, editType: parsedJson.edit_type as EditStep['editType'], targetContext: parsedJson.target_context, contentFragment: parsedJson.content_fragment, sequentialEdits: undefined, newFullContent: undefined };
+                             parsedSuccessfully = true; console.log("Parsed single targeted edit proposal successfully.");
+                        }
+                        // 2. Check for Full Content Replacement
+                        else if (parsedJson.action === "propose_full_content_replacement" && typeof parsedJson.explanation === 'string' && typeof parsedJson.new_full_content === 'string') {
+                             assistantFinalMessage = { ...assistantFinalMessage, content: parsedJson.explanation, isEditSuggestion: true, editAction: "propose_full_content_replacement", editExplanation: parsedJson.explanation, newFullContent: parsedJson.new_full_content, editType: undefined, targetContext: undefined, contentFragment: undefined, sequentialEdits: undefined };
+                             parsedSuccessfully = true; console.log("Parsed full content replacement proposal successfully.");
+                        }
+                        // 3. --- NEW: Check for Sequential Edits ---
+                        else if (parsedJson.action === "propose_sequential_edits" && typeof parsedJson.explanation === 'string' && Array.isArray(parsedJson.edits) && parsedJson.edits.length > 0) {
+                            // Validate each step in the sequence
+                            const validEdits: EditStep[] = [];
+                            let sequenceIsValid = true;
+                            for (let i = 0; i < parsedJson.edits.length; i++) {
+                                const step = parsedJson.edits[i];
+                                if (typeof step.edit_type === 'string' && typeof step.content_fragment === 'string' && (typeof step.target_context === 'string' || step.target_context === null) &&
+                                    ['insert_after_context', 'replace_context', 'delete_context', 'insert_at_start', 'append_at_end'].includes(step.edit_type) &&
+                                    // Ensure target_context is provided when required
+                                    (step.edit_type === 'insert_at_start' || step.edit_type === 'append_at_end' || step.target_context !== null)
+                                ) {
+                                    validEdits.push({
+                                        editType: step.edit_type as EditStep['editType'],
+                                        targetContext: step.target_context,
+                                        contentFragment: step.content_fragment
+                                    });
+                                } else {
+                                    console.warn(`Invalid structure in sequential edit step ${i + 1}:`, step);
+                                    sequenceIsValid = false;
+                                    break; // Stop validation on first invalid step
+                                }
+                            }
+
+                            if (sequenceIsValid) {
+                                assistantFinalMessage = { ...assistantFinalMessage, content: parsedJson.explanation, isEditSuggestion: true, editAction: "propose_sequential_edits", editExplanation: parsedJson.explanation, sequentialEdits: validEdits, editType: undefined, targetContext: undefined, contentFragment: undefined, newFullContent: undefined };
+                                parsedSuccessfully = true; console.log(`Parsed sequential edit proposal with ${validEdits.length} steps successfully.`);
+                            } else {
+                                assistantFinalMessage.content = `Warning: AI proposed sequential edits, but the structure of step(s) was invalid. Please instruct the AI to try again. \n\n---\n${finalDisplayedContent}`;
+                                assistantFinalMessage.error = true;
+                            }
+                        }
+                         // 4. Handle Invalid JSON structure
+                        else {
+                            console.warn("JSON structure invalid or unknown action:", parsedJson);
+                             assistantFinalMessage.content = `Warning: AI proposed an edit, but the JSON structure was invalid or the action unknown. Please instruct the AI to try again. \n\n---\n${finalDisplayedContent}`;
                              assistantFinalMessage.error = true;
                         }
-                        if (parsedSuccessfully) {
-                             finalDisplayedContent = finalDisplayedContent.replace(jsonMatch[0], '').trim();
-                             assistantFinalMessage.content = finalDisplayedContent || parsedJson.explanation || "(Edit proposed)";
-                             if (!assistantFinalMessage.content) assistantFinalMessage.content = "(Edit proposed without explanation)";
 
+                        // If JSON parsed and represents an edit, update displayed content
+                        if (parsedSuccessfully) {
+                             finalDisplayedContent = finalDisplayedContent.replace(jsonMatch[0], '').trim(); // Remove the JSON block
+                             // Use explanation as content, or fallback if empty
+                             assistantFinalMessage.content = finalDisplayedContent || parsedJson.explanation || "(Edit proposed)";
+                             if (!assistantFinalMessage.content.trim()) assistantFinalMessage.content = "(Edit proposed without explanation)";
                         }
 
                     } catch (parseError: any) {
                          console.error("Failed to parse JSON. Error:", parseError.message, "Raw JSON:", potentialJsonString);
-                          assistantFinalMessage.content = `Error: Failed to process edit (JSON Parse Error).\n\n---\n${finalDisplayedContent}`;
+                          assistantFinalMessage.content = `Error: Failed to process edit (JSON Parse Error: ${parseError.message}).\n\n---\n${finalDisplayedContent}`;
                           assistantFinalMessage.error = true;
                     }
                 } else if (assistantRawContent.startsWith("Error:")) {
+                    // Handle errors reported directly by extractCandidateText
                     assistantFinalMessage.error = true;
                     assistantFinalMessage.content = assistantRawContent;
                 }
+                // If it wasn't an edit suggestion, ensure content is set correctly
                 else if (!assistantFinalMessage.isEditSuggestion) {
                     assistantFinalMessage.content = finalDisplayedContent;
                 }
 
+                // Handle empty response case
                 if (!assistantFinalMessage.content?.trim() && !assistantFinalMessage.isEditSuggestion && !assistantFinalMessage.timer) {
                     assistantFinalMessage.content = "(Received empty response)";
+                    assistantFinalMessage.error = true; // Consider empty response an error/warning
                 }
 
-
+                // Update the chat history with the final assistant message
                 setChatHistory(prev => prev.map(msg => msg.id === loadingMsgId ? { ...assistantFinalMessage, id: loadingMsgId } : msg ));
 
             } catch (err: any) {
                 console.error('Chat submit fetch/process error:', err);
-                setChatHistory(prev => prev.map(msg => msg.id === loadingMsgId ? { id: loadingMsgId, role: 'assistant', content: `❌ ${err.message || 'Unknown error processing request.'}. Please check console or try again.`, error: true } : msg ));
-                 setSuggestedPrompts([]);
-            } finally { setIsChatLoading(false); }
+                // Use the specific error message if available
+                const errorMsg = err instanceof Error ? err.message : 'Unknown error processing request.';
+                setChatHistory(prev => prev.map(msg => msg.id === loadingMsgId ? { id: loadingMsgId, role: 'assistant', content: `❌ ${errorMsg}. Please check console or try again.`, error: true } : msg ));
+                 setSuggestedPrompts([]); // Clear suggestions on error
+            } finally {
+                 setIsChatLoading(false);
+             }
         };
 
         // --- Other Handlers (Unchanged) ---
         const handleChatSubmit = async (e?: React.FormEvent) => {
-            // (Implementation unchanged)
-            e?.preventDefault();
-            const currentMessage = chatMessage.trim();
-             if (!currentMessage && selectedFiles.length === 0) return;
-            const filesToSubmit = [...selectedFiles];
-            setChatMessage('');
+            e?.preventDefault(); const currentMessage = chatMessage.trim();
+            if (!currentMessage && selectedFiles.length === 0) return;
+            const filesToSubmit = [...selectedFiles]; setChatMessage('');
             await submitMessageToAI(currentMessage, filesToSubmit);
-             if (textareaRef.current) {
-                textareaRef.current.style.height = 'auto';
-             }
+            if (textareaRef.current) { textareaRef.current.style.height = 'auto'; }
         };
-
-        const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-            // (Implementation unchanged)
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleChatSubmit();
-            }
-        };
-
-         const handleTextareaInput = (e: React.FormEvent<HTMLTextAreaElement>) => {
-            // (Implementation unchanged)
-            const textarea = e.currentTarget;
-            textarea.style.height = 'auto';
-            textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
-             setChatMessage(textarea.value);
-        };
-
-        const handleSuggestionClick = (suggestion: string) => {
-            // (Implementation unchanged)
-            submitMessageToAI(suggestion);
-        };
-
+        const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleChatSubmit(); } };
+        const handleTextareaInput = (e: React.FormEvent<HTMLTextAreaElement>) => { const ta = e.currentTarget; ta.style.height = 'auto'; ta.style.height = `${Math.min(ta.scrollHeight, 200)}px`; setChatMessage(ta.value); };
+        const handleSuggestionClick = (suggestion: string) => { submitMessageToAI(suggestion); };
         const handlePaste = useCallback(async (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
-            // (Implementation unchanged)
-             const items = event.clipboardData?.items;
-            if (!items) return;
-
-            let imagePasted = false;
-            const filePromises: Promise<SelectedFile>[] = [];
-            const existingFileNames = new Set(selectedFiles.map(f => f.name));
-
-            for (let i = 0; i < items.length; i++) {
+             const items = event.clipboardData?.items; if (!items) return; let imagePasted = false; const filePromises: Promise<SelectedFile>[] = []; const existingFileNames = new Set(selectedFiles.map(f => f.name));
+             for (let i = 0; i < items.length; i++) {
                 const item = items[i];
                 if (item.kind === 'file' && item.type.startsWith('image/')) {
                     const file = item.getAsFile();
                     if (file) {
-                         if (existingFileNames.has(file.name)) {
-                             console.log(`Skipping duplicate pasted file: ${file.name}`);
-                              setChatHistory(prev => [...prev, { id: `paste-err-dup-${Date.now()}-${file.name}`, role: 'assistant', content: `ℹ️ Skipped duplicate pasted file: "${file.name}".`, error: false }]);
-                             continue;
-                         }
-                        if (file.size > 20 * 1024 * 1024) {
-                             setChatHistory(prev => [...prev, { id: `paste-err-size-${Date.now()}`, role: 'assistant', content: `❌ Pasted image "${file.name}" is too large (max 20MB).`, error: true }]);
-                            continue;
-                        }
-                         filePromises.push(readFileAsBase64(file));
-                         existingFileNames.add(file.name);
-                         imagePasted = true;
-                     }
+                        if (existingFileNames.has(file.name)) { console.log(`Skipping duplicate pasted file: ${file.name}`); setChatHistory(prev => [...prev, { id: `paste-err-dup-${Date.now()}-${file.name}`, role: 'assistant', content: `ℹ️ Skipped duplicate pasted file: "${file.name}".`, error: false }]); continue; }
+                        if (file.size > 20 * 1024 * 1024) { setChatHistory(prev => [...prev, { id: `paste-err-size-${Date.now()}`, role: 'assistant', content: `❌ Pasted image "${file.name}" is too large (max 20MB).`, error: true }]); continue; }
+                        filePromises.push(readFileAsBase64(file)); existingFileNames.add(file.name); imagePasted = true;
+                    }
                 }
-            }
-
-            if (imagePasted) {
-                event.preventDefault();
-                setIsChatLoading(true);
-                try {
-                    const results = await Promise.all(filePromises);
-                    setSelectedFiles(prev => [...prev, ...results]);
-                 } catch (error) {
-                     console.error("Error processing pasted image:", error);
-                     setChatHistory(prev => [...prev, { id: `paste-err-read-${Date.now()}`, role: 'assistant', content: `❌ Error processing pasted image. Please try again.`, error: true }]);
-                 } finally {
-                    setIsChatLoading(false);
-                 }
-            }
+             }
+             if (imagePasted) {
+                event.preventDefault(); setIsChatLoading(true);
+                try { const results = await Promise.all(filePromises); setSelectedFiles(prev => [...prev, ...results]); }
+                catch (error) { console.error("Error processing pasted image:", error); setChatHistory(prev => [...prev, { id: `paste-err-read-${Date.now()}`, role: 'assistant', content: `❌ Error processing pasted image. Please try again.`, error: true }]); }
+                finally { setIsChatLoading(false); }
+             }
         }, [selectedFiles]);
 
-
-        // Expose sendMessage method (unchanged)
         useImperativeHandle(ref, () => ({ sendMessage: (message: string) => { submitMessageToAI(message); } }));
 
-        // --- Dynamic Styles & Render Logic ---
-        const rootClasses = displayMode === 'overlay'
-            ? `fixed bottom-4 right-4 z-50 ${overlayBg} rounded-lg w-full max-w-sm flex flex-col shadow-xl transition-all duration-300 ease-in-out ${isMinimized ? 'h-12 overflow-hidden' : 'h-[75vh] max-h-[650px]'}`
-            : `h-full w-full flex flex-col ${overlayBg}`;
-
+        // --- Dynamic Styles & Render Logic (Largely Unchanged) ---
+        const rootClasses = displayMode === 'overlay' ? `fixed bottom-4 right-4 z-50 ${overlayBg} rounded-lg w-full max-w-sm flex flex-col shadow-xl transition-all duration-300 ease-in-out ${isMinimized ? 'h-12 overflow-hidden' : 'h-[75vh] max-h-[650px]'}` : `h-full w-full flex flex-col ${overlayBg}`;
         if (displayMode === 'overlay' && !isVisible) return null;
 
         return (
@@ -678,63 +665,49 @@ ${recentHistory
                 {/* Header (Unchanged) */}
                 <div className={`p-2 border-b ${headerBg} flex justify-between items-center shrink-0 sticky top-0 z-10 ${displayMode === 'overlay' ? 'cursor-pointer' : ''}`} onClick={displayMode === 'overlay' ? () => setIsMinimized(!isMinimized) : undefined} title={displayMode === 'overlay' ? (isMinimized ? "Expand" : "Minimize") : undefined}>
                     <h3 className={`text-sm font-semibold ${headingColor} flex items-center gap-1.5 truncate pr-2`}> <MessageCircle className={`w-4 h-4 shrink-0 ${isIlluminateEnabled ? 'text-blue-600' : 'text-blue-400'}`} /> <span className="truncate" title={`Chat: ${note.title}`}>Chat: {note.title}</span> </h3>
-                     {displayMode === 'overlay' && ( <div className="flex items-center"> <button onClick={(e) => { e.stopPropagation(); setIsMinimized(!isMinimized); }} className={`${iconColor} rounded-full p-1 mr-1`} title={isMinimized ? "Expand" : "Minimize"}> {isMinimized ? <Maximize className="w-3 h-3" /> : <Minimize className="w-3 h-3" />} </button> <button onClick={(e) => { e.stopPropagation(); onClose(); }} className={`${iconColor} rounded-full p-1`} title="Close"> <X className="w-4 h-4" /> </button> </div> )}
+                    {displayMode === 'overlay' && ( <div className="flex items-center"> <button onClick={(e) => { e.stopPropagation(); setIsMinimized(!isMinimized); }} className={`${iconColor} rounded-full p-1 mr-1`} title={isMinimized ? "Expand" : "Minimize"}> {isMinimized ? <Maximize className="w-3 h-3" /> : <Minimize className="w-3 h-3" />} </button> <button onClick={(e) => { e.stopPropagation(); onClose(); }} className={`${iconColor} rounded-full p-1`} title="Close"> <X className="w-4 h-4" /> </button> </div> )}
                     {displayMode === 'inline' && ( <button onClick={onClose} className={`${iconColor} rounded-full p-1`} title="Close Chat & PDF View"> <X className="w-4 h-4" /> </button> )}
                 </div>
 
-                {/* Chat Body */}
+                {/* Chat Body (Render logic unchanged, handles updated ChatMessage structure) */}
                 {(!isMinimized || displayMode === 'inline') && (
                     <>
                         <div className="flex-1 overflow-y-auto p-3 space-y-3 scrollbar-thin scrollbar-thumb-gray-400 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent">
-                            {/* Chat History - UPDATED Rendering Logic */}
-                             {chatHistory.map((message, index) => (
+                            {chatHistory.map((message, index) => (
                                 <div key={message.id || index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                                     <div className={`max-w-[85%] rounded-lg px-2.5 py-1.5 text-sm shadow-sm break-words ${ message.role === 'user' ? userBubbleClass : message.error ? errorBubbleClass : message.isEditSuggestion ? editSuggestionBubbleClass : assistantBubbleClass }`}>
                                         {/* Loading Indicator */}
                                         {message.content === "..." && isChatLoading && message.role === 'assistant' ? (
                                             <div className="flex space-x-1 p-1"><div className={`w-1.5 h-1.5 rounded-full animate-bounce ${isIlluminateEnabled ? 'bg-gray-500' : 'bg-gray-400'}`}></div><div className={`w-1.5 h-1.5 rounded-full animate-bounce delay-100 ${isIlluminateEnabled ? 'bg-gray-500' : 'bg-gray-400'}`}></div><div className={`w-1.5 h-1.5 rounded-full animate-bounce delay-200 ${isIlluminateEnabled ? 'bg-gray-500' : 'bg-gray-400'}`}></div></div>
                                         ) : message.content ? (
-                                             <ReactMarkdown
-                                                 remarkPlugins={[remarkMath, remarkGfm]}
-                                                 rehypePlugins={[rehypeKatex]}
-                                                  // Keep existing prose styles
-                                                  className={`prose prose-sm max-w-none ${ isIlluminateEnabled ? (message.isEditSuggestion ? 'prose-yellow text-yellow-900' : (message.error ? 'prose-red text-red-800' : 'prose-gray text-gray-800')) : (message.isEditSuggestion ? 'prose-invert text-yellow-200' : (message.error ? 'prose-invert text-red-300' : 'prose-invert text-gray-200')) } prose-p:text-xs prose-p:my-1 prose-ul:text-xs prose-ol:text-xs prose-li:my-0 prose-code:text-[11px] prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-pre:text-[11px] prose-pre:my-1 prose-pre:p-1.5 prose-pre:rounded`}
-                                                 components={{
-                                                     a: ({node, ...props}) => <a target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-600" {...props} />,
-                                                     code: ({node, inline, className, children, ...props}) => {
-                                                        const match = /language-(\w+)/.exec(className || '');
-                                                        const isJson = className === 'language-json';
-                                                        if (inline) {
-                                                             return <code className={`${isIlluminateEnabled ? 'bg-gray-200/70 text-gray-800' : 'bg-gray-600/70 text-gray-100'} px-1 py-0.5 rounded text-[10px]`} {...props}>{children}</code>;
-                                                        }
-                                                         return <pre className={`${isIlluminateEnabled ? '!bg-gray-200/70 !text-gray-800' : '!bg-gray-600/70 !text-gray-100'} p-1.5 rounded my-1 text-[11px] overflow-x-auto`} {...props}><code>{children}</code></pre>;
-                                                     },
+                                            <ReactMarkdown
+                                                remarkPlugins={[remarkMath, remarkGfm]} rehypePlugins={[rehypeKatex]}
+                                                className={`prose prose-sm max-w-none ${ isIlluminateEnabled ? (message.isEditSuggestion ? 'prose-yellow text-yellow-900' : (message.error ? 'prose-red text-red-800' : 'prose-gray text-gray-800')) : (message.isEditSuggestion ? 'prose-invert text-yellow-200' : (message.error ? 'prose-invert text-red-300' : 'prose-invert text-gray-200')) } prose-p:text-xs prose-p:my-1 prose-ul:text-xs prose-ol:text-xs prose-li:my-0 prose-code:text-[11px] prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-pre:text-[11px] prose-pre:my-1 prose-pre:p-1.5 prose-pre:rounded`}
+                                                components={{
+                                                    a: ({node, ...props}) => <a target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-600" {...props} />,
+                                                    code: ({node, inline, className, children, ...props}) => {
+                                                        const match = /language-(\w+)/.exec(className || ''); const isJson = className === 'language-json';
+                                                        if (inline) { return <code className={`${isIlluminateEnabled ? 'bg-gray-200/70 text-gray-800' : 'bg-gray-600/70 text-gray-100'} px-1 py-0.5 rounded text-[10px]`} {...props}>{children}</code>; }
+                                                        return <pre className={`${isIlluminateEnabled ? '!bg-gray-200/70 !text-gray-800' : '!bg-gray-600/70 !text-gray-100'} p-1.5 rounded my-1 text-[11px] overflow-x-auto`} {...props}><code>{children}</code></pre>;
+                                                    },
                                                 }}
                                             >{message.content}</ReactMarkdown>
                                         ) : null}
 
-                                         {/* --- NEW: Render Image if imageData exists --- */}
+                                        {/* Render Image if imageData exists */}
                                         {message.imageData && (
-                                          <div className={`mt-1.5 ${message.content ? 'border-t pt-1.5' : ''} ${isIlluminateEnabled ? 'border-gray-300/50' : 'border-gray-600/50'}`}> {/* Add border only if there's text content above */}
-                                            <img
-                                              src={`data:${message.imageData.type};base64,${message.imageData.base64}`}
-                                              alt={message.imageData.name}
-                                               // Adjusted styling for better fit within bubble
-                                              className="max-w-full h-auto max-h-48 object-contain rounded-md border border-gray-300 dark:border-gray-600 cursor-pointer"
-                                              onClick={() => window.open(`data:${message.imageData.type};base64,${message.imageData.base64}`, '_blank')} // Open full image on click
-                                              title={`Click to view full image: ${message.imageData.name}`}
-                                            />
+                                          <div className={`mt-1.5 ${message.content ? 'border-t pt-1.5' : ''} ${isIlluminateEnabled ? 'border-gray-300/50' : 'border-gray-600/50'}`}>
+                                            <img src={`data:${message.imageData.type};base64,${message.imageData.base64}`} alt={message.imageData.name} className="max-w-full h-auto max-h-48 object-contain rounded-md border border-gray-300 dark:border-gray-600 cursor-pointer" onClick={() => window.open(`data:${message.imageData.type};base64,${message.imageData.base64}`, '_blank')} title={`Click to view full image: ${message.imageData.name}`} />
                                           </div>
                                         )}
-                                        {/* --- END NEW --- */}
 
-                                         {/* Timer Display (Unchanged) */}
+                                        {/* Timer Display */}
                                         {message.timer && ( <div className="mt-1.5"><div className={`flex items-center space-x-2 rounded-md px-2 py-1 text-xs border ${isIlluminateEnabled ? 'bg-blue-50 border-blue-200 text-blue-800' : 'bg-gray-800/60 border-gray-600 text-blue-300'}`}><TimerIcon className="w-3.5 h-3.5"/> <Timer key={message.timer.id} initialDuration={message.timer.duration} onComplete={() => handleTimerComplete(message.timer.id)} compact={true} isIlluminateEnabled={isIlluminateEnabled}/></div></div> )}
-                                        {/* Edit Suggestion Action (Unchanged) */}
+                                        {/* Edit Suggestion Action Button */}
                                         {message.isEditSuggestion && message.editAction && !isChatLoading && !message.error && (
-                                            <div className="mt-2 border-t pt-1.5 flex justify-end">
-                                                <button onClick={() => handleAcceptEdit(message)} className={`${buttonSecondaryClass} px-2.5 py-1 rounded-md text-xs flex items-center gap-1 hover:brightness-110`} disabled={isChatLoading} >
-                                                    <Check className="w-3.5 h-3.5" /> Apply Update
+                                            <div className="mt-2 border-t pt-1.5 flex justify-end border-yellow-300/50 dark:border-yellow-700/50">
+                                                <button onClick={() => handleAcceptEdit(message)} className={`${buttonSecondaryClass} px-2.5 py-1 rounded-md text-xs flex items-center gap-1 hover:brightness-110 ${isIlluminateEnabled ? 'hover:bg-yellow-100' : 'hover:bg-yellow-700/50'} `} disabled={isChatLoading} >
+                                                    <Check className="w-3.5 h-3.5" /> Apply Update{message.editAction === 'propose_sequential_edits' && message.sequentialEdits && message.sequentialEdits.length > 1 ? ` (${message.sequentialEdits.length} steps)` : ''}
                                                 </button>
                                             </div>
                                         )}
@@ -749,16 +722,7 @@ ${recentHistory
                             <div className={`px-3 py-2 border-t ${isIlluminateEnabled ? 'border-gray-200' : 'border-gray-700'}`}>
                                  <p className={`text-xs font-medium w-full mb-2 ${isIlluminateEnabled ? 'text-gray-600' : 'text-gray-400'}`}>Suggestions:</p>
                                  <div className="flex flex-wrap gap-2">
-                                    {suggestedPrompts.map((prompt, idx) => (
-                                        <button
-                                            key={idx}
-                                            onClick={() => handleSuggestionClick(prompt)}
-                                            className={`${suggestionButtonClass} text-xs px-2.5 py-1 rounded-md hover:shadow-sm transition-all duration-150 cursor-pointer`}
-                                            title={prompt}
-                                        >
-                                            {prompt}
-                                        </button>
-                                    ))}
+                                    {suggestedPrompts.map((prompt, idx) => ( <button key={idx} onClick={() => handleSuggestionClick(prompt)} className={`${suggestionButtonClass} text-xs px-2.5 py-1 rounded-md hover:shadow-sm transition-all duration-150 cursor-pointer`} title={prompt} > {prompt} </button> ))}
                                 </div>
                             </div>
                         )}
@@ -766,58 +730,21 @@ ${recentHistory
 
                         {/* Input Form Area (Unchanged) */}
                         <form onSubmit={handleChatSubmit} className={`p-2 border-t ${headerBg} shrink-0 sticky bottom-0`}>
-                            {/* Selected Files Display */}
                             {selectedFiles.length > 0 && (
                                 <div className="mb-1.5 flex flex-wrap gap-1.5 px-1">
                                     {selectedFiles.map(file => (
                                         <div key={file.name} className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border ${filePillBg} ${filePillText}`}>
-                                            <span className="truncate max-w-[100px]">{file.name}</span>
-                                            <span className="text-[10px] opacity-70">({formatBytes(file.size)})</span>
-                                            <button type="button" onClick={() => handleRemoveFile(file.name)} className={`ml-0.5 p-0.5 rounded-full ${isIlluminateEnabled ? 'hover:bg-blue-200' : 'hover:bg-blue-700'} `} title="Remove">
-                                                <X className="w-2.5 h-2.5" />
-                                            </button>
+                                            <span className="truncate max-w-[100px]">{file.name}</span> <span className="text-[10px] opacity-70">({formatBytes(file.size)})</span>
+                                            <button type="button" onClick={() => handleRemoveFile(file.name)} className={`ml-0.5 p-0.5 rounded-full ${isIlluminateEnabled ? 'hover:bg-blue-200' : 'hover:bg-blue-700'} `} title="Remove"> <X className="w-2.5 h-2.5" /> </button>
                                         </div>
                                     ))}
                                 </div>
                             )}
-                            {/* Input Row */}
                             <div className="flex gap-1.5 items-end">
-                                 <textarea
-                                    ref={textareaRef}
-                                    rows={1}
-                                    value={chatMessage}
-                                    onChange={handleTextareaInput}
-                                    onKeyDown={handleKeyDown}
-                                    onPaste={handlePaste}
-                                    placeholder="Ask, paste an image, or attach files..."
-                                    className={`flex-1 ${inputBg} ${inputTextColor} ${placeholderColor} rounded-lg px-3 py-1.5 text-sm focus:ring-1 focus:outline-none resize-none overflow-y-auto max-h-[100px] leading-snug ${isChatLoading ? 'opacity-60' : ''}`}
-                                    disabled={isChatLoading}
-                                    style={{ height: 'auto' }}
-                                />
-                                <input
-                                    type="file"
-                                    ref={fileInputRef}
-                                    onChange={handleFileSelect}
-                                    multiple
-                                    accept="image/*,application/pdf"
-                                    className="hidden"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={triggerFileSelect}
-                                    disabled={isChatLoading}
-                                    className={`${buttonSecondaryClass} p-2 rounded-full self-end mb-[1px] transition-all duration-150 ${isChatLoading ? buttonDisabledClass : 'hover:scale-105 active:scale-100'}`}
-                                    title="Attach Files (Image/PDF)"
-                                >
-                                    <Paperclip className="w-4 h-4" />
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={isChatLoading || (!chatMessage.trim() && selectedFiles.length === 0)}
-                                    className={`${buttonPrimaryClass} p-2 rounded-full self-end mb-[1px] transition-all duration-150 ${isChatLoading || (!chatMessage.trim() && selectedFiles.length === 0) ? buttonDisabledClass : 'hover:scale-105 active:scale-100'}`}
-                                >
-                                    {isChatLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                                </button>
+                                 <textarea ref={textareaRef} rows={1} value={chatMessage} onChange={handleTextareaInput} onKeyDown={handleKeyDown} onPaste={handlePaste} placeholder="Ask, paste an image, or attach files..." className={`flex-1 ${inputBg} ${inputTextColor} ${placeholderColor} rounded-lg px-3 py-1.5 text-sm focus:ring-1 focus:outline-none resize-none overflow-y-auto max-h-[100px] leading-snug ${isChatLoading ? 'opacity-60' : ''}`} disabled={isChatLoading} style={{ height: 'auto' }} />
+                                 <input type="file" ref={fileInputRef} onChange={handleFileSelect} multiple accept="image/*,application/pdf" className="hidden" />
+                                 <button type="button" onClick={triggerFileSelect} disabled={isChatLoading} className={`${buttonSecondaryClass} p-2 rounded-full self-end mb-[1px] transition-all duration-150 ${isChatLoading ? buttonDisabledClass : 'hover:scale-105 active:scale-100'}`} title="Attach Files (Image/PDF)"> <Paperclip className="w-4 h-4" /> </button>
+                                 <button type="submit" disabled={isChatLoading || (!chatMessage.trim() && selectedFiles.length === 0)} className={`${buttonPrimaryClass} p-2 rounded-full self-end mb-[1px] transition-all duration-150 ${isChatLoading || (!chatMessage.trim() && selectedFiles.length === 0) ? buttonDisabledClass : 'hover:scale-105 active:scale-100'}`}> {isChatLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} </button>
                             </div>
                         </form>
                     </>

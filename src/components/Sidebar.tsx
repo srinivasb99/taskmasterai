@@ -15,6 +15,7 @@ import {
   Menu,
   Folders,
   X,
+  Star, // Added Star for Pro badge
 } from "lucide-react"
 import { Logo } from "./Logo"
 import { useLocation, useNavigate } from "react-router-dom"
@@ -49,13 +50,17 @@ export function Sidebar({
   // --- START OF CHANGES ---
 
   // List of developer emails
-  const DEV_EMAILS = ["bajinsrinivasr@lexington1.net", "srinibaj10@gmail.com", "fugegate@gmail.com"]
+  const DEV_EMAILS = ["bajinsrinivasr@lexington1.net", "fugegate@gmail.com"] // Removed srinibaj10@gmail.com from DEV if it's now PRO
   // List of premium user emails
   const PREMIUM_EMAILS = ["robinmyh@gmail.com", "oliverbeckett069420@gmail.com"]
+  // List of PRO user emails
+  const PRO_EMAILS = ["srinibaj10@gmail.com"]
 
   const isDev = currentUser?.email && DEV_EMAILS.includes(currentUser.email)
   // Check if the current user is a premium user
   const isPremiumUser = currentUser?.email && PREMIUM_EMAILS.includes(currentUser.email)
+  // Check if the current user is a PRO user
+  const isProUser = currentUser?.email && PRO_EMAILS.includes(currentUser.email)
 
   // --- END OF CHANGES ---
 
@@ -235,8 +240,8 @@ export function Sidebar({
           {/* Bottom Section: Premium Button and User Profile */}
           <div className="mt-auto flex flex-col gap-4">
             {/* --- START OF CHANGES --- */}
-            {/* Premium Button - Show only if not on settings page AND not a premium user */}
-            {!isSettingsPage && !isPremiumUser && (
+            {/* Upgrade Button - Show if NOT premium AND NOT pro */}
+            {!isSettingsPage && !isPremiumUser && !isProUser && (
             // --- END OF CHANGES ---
               <button
                 onClick={handleUpgradeClick}
@@ -294,10 +299,14 @@ export function Sidebar({
                   </span>
                   <div className="flex items-center gap-1.5">
                     {/* --- START OF CHANGES --- */}
-                    {/* Display Premium or Basic plan text */}
+                    {/* Display Plan */}
                     {isPremiumUser ? (
                       <span className="text-xs font-semibold bg-gradient-to-r from-amber-400 to-orange-500 text-transparent bg-clip-text">
                         Premium
+                      </span>
+                    ) : isProUser ? (
+                      <span className="text-xs font-semibold bg-gradient-to-r from-teal-400 to-cyan-500 text-transparent bg-clip-text">
+                        Pro
                       </span>
                     ) : (
                       <span className="text-xs text-gray-500">Basic Plan</span>

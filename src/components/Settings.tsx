@@ -90,22 +90,18 @@ export function Settings() {
     // Don't automatically enable blackout based on system dark mode, only from storage
     return stored ? JSON.parse(stored) : false;
   });
-  // **MODIFIED INITIALIZATION:** Initialize based on localStorage first, then potentially based on the main theme state.
   const [isSidebarIlluminateEnabled, setIsSidebarIlluminateEnabled] = useState(() => {
     const stored = localStorage.getItem('isSidebarIlluminateEnabled');
     if (stored !== null) return JSON.parse(stored);
-    // If no stored value, default to ON if the main Illuminate theme is currently ON (at initialization)
     const mainIlluminate = localStorage.getItem('isIlluminateEnabled');
-    if (mainIlluminate !== null) return JSON.parse(mainIlluminate); // Use stored main theme if available
-    // Otherwise, default based on system preference for main theme
+    if (mainIlluminate !== null) return JSON.parse(mainIlluminate);
     return window.matchMedia('(prefers-color-scheme: light)').matches;
   });
   const [isSidebarBlackoutEnabled, setIsSidebarBlackoutEnabled] = useState(() => {
     const stored = localStorage.getItem('isSidebarBlackoutEnabled');
     if (stored !== null) return JSON.parse(stored);
-    // If no stored value, default to ON if the main Blackout theme is currently ON (at initialization)
     const mainBlackout = localStorage.getItem('isBlackoutEnabled');
-    return mainBlackout ? JSON.parse(mainBlackout) : false; // Default to false if no stored blackout value
+    return mainBlackout ? JSON.parse(mainBlackout) : false;
   });
 
 
@@ -221,17 +217,15 @@ export function Settings() {
 
 
   // ---------------------------
-  //    THEME TOGGLE HANDLERS (MODIFIED)
+  //    THEME TOGGLE HANDLERS (MODIFIED - Logic only)
   // ---------------------------
   const handleToggleIlluminate = (checked: boolean) => {
     setIsIlluminateEnabled(checked);
     if (checked) {
       setIsBlackoutEnabled(false);
       setIsSidebarIlluminateEnabled(true); // Activate sidebar illuminate when main illuminate is turned ON
-      // Optionally, decide if you want to deactivate sidebar blackout here too
-      // setIsSidebarBlackoutEnabled(false);
+      // setIsSidebarBlackoutEnabled(false); // Optional: Deactivate other sidebar theme
     }
-    // No 'else' needed to turn off sidebar illuminate automatically when main is turned off
   };
 
   const handleToggleBlackout = (checked: boolean) => {
@@ -239,10 +233,8 @@ export function Settings() {
     if (checked) {
       setIsIlluminateEnabled(false);
       setIsSidebarBlackoutEnabled(true); // Activate sidebar blackout when main blackout is turned ON
-      // Optionally, decide if you want to deactivate sidebar illuminate here too
-      // setIsSidebarIlluminateEnabled(false);
+      // setIsSidebarIlluminateEnabled(false); // Optional: Deactivate other sidebar theme
     }
-    // No 'else' needed to turn off sidebar blackout automatically when main is turned off
   };
 
   // ---------------------------
@@ -865,7 +857,8 @@ export function Settings() {
                     </label>
                   </div>
                   {/* Sidebar Toggles - Conditionally rendered based on main theme */}
-                  <div className="pl-8 space-y-4 pt-2 border-t border-dashed border-gray-300/50 dark:border-gray-700/50">
+                  {/* --- REVERTED VISUAL STRUCTURE --- */}
+                  <div className="pl-8 space-y-4">
                      {isIlluminateEnabled && (
                         <div className="flex items-center justify-between">
                            <label htmlFor="sidebar-illuminate-toggle" className="flex items-center cursor-pointer gap-3">
@@ -890,10 +883,7 @@ export function Settings() {
                            </label>
                         </div>
                      )}
-                     {/* Message when neither is active */}
-                     {!isIlluminateEnabled && !isBlackoutEnabled && (
-                         <p className={`text-xs italic ${subheadingClass} text-center py-2`}>Enable Illuminate or Blackout mode to customize the sidebar theme.</p>
-                     )}
+                     {/* --- Removed the border-t and the conditional text --- */}
                   </div>
                 </div>
               </div>

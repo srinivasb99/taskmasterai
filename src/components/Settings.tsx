@@ -933,23 +933,23 @@ export function Settings() {
                           <>
                               <p className={`text-sm ${subheadingClass} mb-2`}>Your premium plan includes:</p>
                               <ul className={`list-disc list-outside pl-5 space-y-1.5 text-xs sm:text-sm ${subheadingClass}`}>
-                                  <li><span className="font-medium text-amber-500 mr-1">●</span>Unlimited PDF and Text Notes</li>
-                                  <li><span className="font-medium text-amber-500 mr-1">●</span>Unlimited YouTube Notes</li>
-                                  <li><span className="font-medium text-amber-500 mr-1">●</span>Unlimited AI Chat Interactions</li>
-                                  <li><span className="font-medium text-amber-500 mr-1">●</span>Unlimited Smart Overview</li>
-                                  <li><span className="font-medium text-amber-500 mr-1">●</span>Add Unlimited Friends</li>
-                                  <li><span className="font-medium text-amber-500 mr-1">●</span>Access to all current & future features</li>
+                                  <li><span className="font-medium text-amber-500 mr-1"></span>Unlimited PDF and Text Notes</li>
+                                  <li><span className="font-medium text-amber-500 mr-1"></span>Unlimited YouTube Notes</li>
+                                  <li><span className="font-medium text-amber-500 mr-1"></span>Unlimited AI Chat Interactions</li>
+                                  <li><span className="font-medium text-amber-500 mr-1"></span>Unlimited Smart Overview</li>
+                                  <li><span className="font-medium text-amber-500 mr-1"></span>Add Unlimited Friends</li>
+                                  <li><span className="font-medium text-amber-500 mr-1"></span>Access to all current & future features</li>
                               </ul>
                           </>
                       ) : isProUser ? (
                            <>
                               <p className={`text-sm ${subheadingClass} mb-2`}>Your pro plan includes:</p>
                               <ul className={`list-disc list-outside pl-5 space-y-1.5 text-xs sm:text-sm ${subheadingClass}`}>
-                                 <li><span className="font-medium text-teal-400 mr-1">●</span>20 PDF and Text Notes per month</li>
-                                 <li><span className="font-medium text-teal-400 mr-1">●</span>10 YouTube Notes per month</li>
-                                 <li><span className="font-medium text-teal-400 mr-1">●</span>200 AI Chat Interactions per month</li>
-                                 <li><span className="font-medium text-teal-400 mr-1">●</span>Access to Smart Overview</li>
-                                 <li><span className="font-medium text-teal-400 mr-1">●</span>Add up to 10 Friends</li>
+                                 <li><span className="font-medium text-teal-400 mr-1"></span>20 PDF and Text Notes per month</li>
+                                 <li><span className="font-medium text-teal-400 mr-1"></span>10 YouTube Notes per month</li>
+                                 <li><span className="font-medium text-teal-400 mr-1"></span>200 AI Chat Interactions per month</li>
+                                 <li><span className="font-medium text-teal-400 mr-1"></span>Access to Smart Overview</li>
+                                 <li><span className="font-medium text-teal-400 mr-1"></span>Add up to 10 Friends</li>
                               </ul>
                               <Link to="/pricing" className={`block mt-4 w-full ${buttonPrimaryClass} ${buttonPrimaryHoverEffect} rounded-md shadow-lg shadow-indigo-500/10`}>
                                   <span className="flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium">

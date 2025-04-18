@@ -1,15 +1,16 @@
 // Friends.tsx code:
 
 import React, { useState, useEffect, useRef, type ChangeEvent, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom"; // Import Link
 import { motion, AnimatePresence } from "framer-motion";
 // Consolidate Lucide imports & ensure all used icons are present
 import {
-  User, Users2, MessageSquare, PlusCircle, Paperclip, Send, Users, CheckCircle, XCircle, Edit, Trash2, Search, Bell, UserPlus, Settings, ChevronRight, ChevronLeft, Image, Smile, Mic, MoreVertical, Star, Filter, X, LogOut, Clock, Check, AudioLines, FileText, Video, Link
+  User, Users2, MessageSquare, PlusCircle, Paperclip, Send, Users, CheckCircle, XCircle, Edit, Trash2, Search, Bell, UserPlus, Settings, ChevronRight, ChevronLeft, Image, Smile, Mic, MoreVertical, Star, Filter, X, LogOut, Clock, Check, AudioLines, FileText, Video, Link, Loader2, Crown // Added Loader2, Crown
 } from 'lucide-react';
 import { Sidebar } from "./Sidebar";
 import { getCurrentUser } from "../lib/settings-firebase";
 import {
+  // --- Import Chat & Friend Functions ---
   listenToChatsRealtime,
   listenToMessagesRealtime,
   listenToFriendRequests,
@@ -23,16 +24,22 @@ import {
   leaveGroupChat,
   deleteMessage,
   getUserProfile,
-  getOtherUserInDirectChat, // Keep if needed elsewhere, but redundant with getChatDisplayName/getOtherUserId
-  getChatMembersProfiles, // Keep if needed elsewhere, but redundant with getChatDisplayName/getOtherUserId
+  getChatMembersProfiles,
   setupPresenceSystem,
-  setUserOnlineStatus, // Keep if used elsewhere, setupPresenceSystem handles current user
-  listenToUserOnlineStatus, // Likely redundant with onlineFriends
   listenToFriendsOnlineStatus,
   setTypingIndicator,
   listenToTypingIndicators,
   getUserFriends
 } from "../lib/friends-firebase"; // Ensure these functions exist and work as expected
+
+// --- Import Centralized Tier/Usage Functions ---
+import {
+    getUserTier,
+    UserTier, // Import type
+    PREMIUM_EMAILS, // Import if needed for direct checks, though getUserTier is preferred
+    PRO_EMAILS,     // Import if needed for direct checks
+} from '../lib/dashboard-firebase'; // Import from CENTRALIZED file
+import { auth, db } from "../lib/firebase"; // Keep auth/db import
 
 // Interfaces (keep as they are)
 interface Chat {
@@ -84,6 +91,13 @@ const slideRight = { hidden: { opacity: 0, x: -15 }, visible: { opacity: 1, x: 0
 const slideLeft = { hidden: { opacity: 0, x: 15 }, visible: { opacity: 1, x: 0, transition: { duration: 0.3 } } };
 const fadeIn = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { duration: 0.2 } } };
 const staggerChildren = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.05 } } }; // Faster stagger
+
+// --- NEW: Friend Limits ---
+const FRIEND_LIMITS = {
+    basic: 3,
+    pro: 10,
+    premium: Infinity,
+};
 
 export function Friends() {
   const navigate = useNavigate();
@@ -166,6 +180,15 @@ export function Friends() {
   const [showChatOptions, setShowChatOptions] = useState(false);
   const [messageToDelete, setMessageToDelete] = useState<string | null>(null);
 
+  // --- NEW: Tier State ---
+  const [userTier, setUserTier] = useState<UserTier>('loading');
+
+  // --- Memoized Friend Limit ---
+  const currentFriendLimit = useMemo(() => {
+      if (userTier === 'loading') return 0; // No limit while loading
+      return FRIEND_LIMITS[userTier];
+  }, [userTier]);
+
   // --- Theme & Layout Effects (Consistent with Dashboard) ---
   useEffect(() => {
     localStorage.setItem('isSidebarCollapsed', JSON.stringify(isSidebarCollapsed));
@@ -205,6 +228,7 @@ export function Friends() {
   useEffect(() => {
     const checkMobileView = () => setIsMobileView(window.innerWidth < 768);
     window.addEventListener("resize", checkMobileView);
+    checkMobileView(); // Initial check
     return () => window.removeEventListener("resize", checkMobileView);
   }, []);
 
@@ -325,6 +349,11 @@ export function Friends() {
     }
     setUser(currentUser);
 
+    // --- NEW: Determine User Tier ---
+    const tier = getUserTier(currentUser.email);
+    setUserTier(tier);
+    // --- End Tier Determination ---
+
     let unsubscribeProfile: (() => void) | null = null;
     let unsubscribeChats: (() => void) | null = null;
     let unsubscribeRequests: (() => void) | null = null;
@@ -356,12 +385,10 @@ export function Friends() {
                                 ...(chat.memberNames || {}),
                                 [otherUserId]: otherProfile?.name || otherProfile?.displayName || 'User'
                             },
-                            // Add photoURL for the other user if available
                             photoURL: otherProfile?.photoURL
                         };
                     }
                 }
-                // Potentially fetch group member names/photos here if needed often
                 return chat;
             }));
             enhancedChats.then(resolvedChats => setChats(resolvedChats));
@@ -373,20 +400,23 @@ export function Friends() {
         });
 
         // 5. Get Friends and Listen to their Status
-        const friendsList = await getUserFriends(currentUser.uid);
-        setFriends(friendsList); // Store full friend profiles
-        const friendIds = friendsList.map((friend) => friend.id);
-        if (friendIds.length > 0) {
-            unsubscribeFriendStatus = listenToFriendsOnlineStatus(friendIds, (statuses) => {
-                 // Update the set of online friend IDs
-                 const onlineIds = new Set<string>();
-                 statuses.forEach(status => {
-                     if (status.status === 'online' || status.status === 'away') { // Consider 'away' as somewhat online for indication
-                         onlineIds.add(status.id);
-                     }
-                 });
-                 setOnlineFriendIds(onlineIds);
-            });
+        try {
+            const friendsList = await getUserFriends(currentUser.uid);
+            setFriends(friendsList); // Store full friend profiles
+            const friendIds = friendsList.map((friend) => friend.id);
+            if (friendIds.length > 0) {
+                unsubscribeFriendStatus = listenToFriendsOnlineStatus(friendIds, (statuses) => {
+                    const onlineIds = new Set<string>();
+                    statuses.forEach(status => {
+                        if (status.status === 'online' || status.status === 'away') {
+                            onlineIds.add(status.id);
+                        }
+                    });
+                    setOnlineFriendIds(onlineIds);
+                });
+            }
+        } catch (friendError) {
+            console.error("Error fetching initial friends list:", friendError);
         }
     };
 
@@ -483,8 +513,8 @@ export function Friends() {
         const otherFriend = friends.find(f => f.id === otherUserId);
         const isOnline = onlineFriendIds.has(otherUserId);
         return {
-            name: otherFriend?.name || otherFriend?.displayName || 'Friend',
-            photoURL: otherFriend?.photoURL,
+            name: otherFriend?.name || otherFriend?.displayName || chat.memberNames?.[otherUserId] || 'Friend', // Use prefetched name as fallback
+            photoURL: otherFriend?.photoURL || chat.photoURL, // Use chat photoURL as fallback for direct chat
             status: isOnline ? 'online' : (otherFriend?.lastSeen ? formatLastSeen(otherFriend.lastSeen) : 'offline')
         };
     }
@@ -569,6 +599,32 @@ export function Friends() {
     e?.preventDefault();
     if (!selectedChat || !user || (!newMessage.trim() && !attachedFile && !attachedAudioBlob)) return;
 
+    // --- Chat Usage Check (Same as Calendar) ---
+    if (userTier !== 'premium') {
+        const currentMonthYear = new Date().toISOString().slice(0, 7);
+        let currentCount = chatCount;
+        // Fetch latest count on send attempt to be safer? Or rely on state? Rely on state for now.
+        // const usageData = await getUserChatUsage(user.uid);
+        // if (usageData?.month === currentMonthYear) { currentCount = usageData.count; } else { currentCount = 0; }
+
+        if (usageMonth !== currentMonthYear) {
+            console.log(`Friends Chat: Month mismatch. Resetting count.`);
+            currentCount = 0;
+            setChatCount(0);
+            setUsageMonth(currentMonthYear);
+            setIsChatLimitReached(false);
+            updateUserChatUsage(user.uid, 0, currentMonthYear); // Update backend
+        }
+
+        const limit = currentChatLimit; // Use memoized limit
+        if (currentCount >= limit) {
+            showNotification('error', `Monthly chat message limit (${limit}) reached.`);
+            return; // Stop sending
+        }
+    }
+    // --- End Usage Check ---
+
+
     const currentMessageText = newMessage;
     const currentAttachedFile = attachedFile;
     const currentAttachedAudio = attachedAudioBlob;
@@ -580,6 +636,18 @@ export function Friends() {
     // Stop typing indicator
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     setTypingIndicator(selectedChat.id, user.uid, false);
+
+    // --- Increment Usage Count (Before Send) ---
+     if (userTier !== 'premium') {
+        const newCount = chatCount + 1;
+        setChatCount(newCount); // Optimistic update
+        setIsChatLimitReached(newCount >= currentChatLimit);
+        updateUserChatUsage(user.uid, newCount, usageMonth).catch(err => {
+            console.error("Friends Chat: Failed to update usage:", err);
+            // Optionally revert optimistic update or show warning
+        });
+    }
+    // --- End Increment Logic ---
 
     let fileURL = "";
     let fileMeta = { type: undefined as Message['fileType'], name: undefined as string | undefined };
@@ -619,6 +687,18 @@ export function Friends() {
       // setNewMessage(currentMessageText);
       // setAttachedFile(currentAttachedFile);
       // setAttachedAudioBlob(currentAttachedAudio);
+
+      // --- Revert Usage Count if Sending Failed ---
+       if (userTier !== 'premium') {
+            const revertedCount = chatCount - 1; // Revert optimistic increment
+            setChatCount(revertedCount);
+            setIsChatLimitReached(revertedCount >= currentChatLimit);
+            updateUserChatUsage(user.uid, revertedCount, usageMonth).catch(revertErr => {
+                console.error("Friends Chat: Failed to REVERT usage count after send error:", revertErr);
+            });
+       }
+      // --- End Revert Logic ---
+
     } finally {
       setFileUploading(false);
       setUploadProgress(0);
@@ -656,6 +736,14 @@ export function Friends() {
 
   const handleSendFriendRequest = async () => {
     if (!friendEmail.trim() || !user) return;
+
+    // --- NEW: Friend Limit Check ---
+    if (userTier !== 'premium' && friends.length >= currentFriendLimit) {
+        showNotification('error', `You've reached the friend limit (${currentFriendLimit}) for your ${userTier} plan.`);
+        return;
+    }
+    // --- End Friend Limit Check ---
+
     setError(null); setSuccess(null); // Clear previous notifications
 
     try {
@@ -669,9 +757,20 @@ export function Friends() {
   };
 
   const handleAcceptRequest = async (requestId: string) => {
+     if (!user) return;
+     // --- NEW: Friend Limit Check ---
+     if (userTier !== 'premium' && friends.length >= currentFriendLimit) {
+        showNotification('error', `You've reached the friend limit (${currentFriendLimit}) for your ${userTier} plan.`);
+        // Optionally, reject the request automatically or just prevent acceptance?
+        // await handleRejectRequest(requestId); // Auto-reject if limit reached?
+        return;
+     }
+     // --- End Friend Limit Check ---
+
     try {
       await acceptFriendRequest(requestId);
       showNotification('success', "Friend request accepted!");
+      // Friends list will update via listener
     } catch (err: any) {
       console.error("Error accepting request:", err);
       showNotification('error', err.message || "Failed to accept request.");
@@ -698,6 +797,13 @@ export function Friends() {
           showNotification('error', 'Please enter at least one friend email.');
           return;
       }
+      // --- Potential Group Limit Check (Optional - Not Specified) ---
+      // if (userTier === 'basic' && emails.length > 2) { // Example: Basic limit 2 members + self
+      //     showNotification('error', 'Basic plan limits groups to 3 members total.');
+      //     return;
+      // }
+      // --- End Optional Limit Check ---
+
       await createGroupChat(groupName.trim(), emails, user.uid);
       setGroupName("");
       setGroupEmails("");
@@ -909,6 +1015,9 @@ export function Friends() {
         );
     };
 
+    // Check if friend limit is reached
+    const isFriendLimitReached = userTier !== 'premium' && friends.length >= currentFriendLimit;
+
   return (
     <div className={`flex h-screen ${containerClass} overflow-hidden font-sans`}>
       {/* Navigation Sidebar (Consistent) */}
@@ -921,7 +1030,7 @@ export function Friends() {
       />
 
       {/* Main Content Area (Chat + Aside Placeholder) */}
-      <div className={`flex-1 flex overflow-hidden transition-all duration-300 ${isSidebarCollapsed ? 'ml-16 md:ml-20' : 'ml-64'}`}>
+      <div className={`flex-1 flex overflow-hidden transition-all duration-300 ${isSidebarCollapsed ? 'ml-16 md:ml-20' : 'ml-0 md:ml-64'}`}> {/* Adjust margin */}
 
         {/* Center: Chat Area */}
         <main className="flex-1 flex flex-col overflow-hidden relative">
@@ -1022,7 +1131,7 @@ export function Friends() {
 
             {/* Mobile Aside Toggle */}
             {isMobileView && !showMobileAside && (
-              <button onClick={() => setShowMobileAside(true)} className={`${iconButtonClass} ml-2`} aria-label="Open friends panel">
+              <button onClick={() => setShowMobileAside(true)} className={`${iconButtonClass} ml-2 relative`} aria-label="Open friends panel"> {/* Added relative */}
                 <Users className="w-5 h-5" />
                  {pendingRequestsCount > 0 && (
                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] rounded-full w-3.5 h-3.5 flex items-center justify-center border border-white dark:border-gray-800">
@@ -1043,7 +1152,7 @@ export function Friends() {
                     initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }}
                     >
                         <MessageSquare className={`w-12 h-12 ${subtleTextColor} mb-2`} />
-                        <p className={`${subheadingClass} text-sm`}>Start the conversation!</p>
+                        <p className={`${headingClass} text-sm`}>Start the conversation!</p>
                         <p className={`${subtleTextColor} text-xs mt-1`}>Send a message or attachment below.</p>
                     </motion.div>
                 )}
@@ -1137,7 +1246,7 @@ export function Friends() {
                 {fileUploading && (
                     <motion.div
                         initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
-                        className="mb-1 px-2 text-xs text-blue-400 flex justify-between items-center"
+                        className="mb-1 px-2 text-xs text-blue-400 flex justify-between items-center relative" // Added relative
                     >
                         <span>Uploading...</span>
                         <span>{Math.round(uploadProgress)}%</span>
@@ -1146,15 +1255,27 @@ export function Friends() {
                         </div>
                     </motion.div>
                 )}
+                {/* --- NEW: Chat Usage Display --- */}
+                 {userTier !== 'premium' && userTier !== 'loading' && (
+                    <div className="pt-0 pb-1.5 text-xs text-center">
+                        <span className={isIlluminateEnabled ? 'text-gray-600' : 'text-gray-400'}>
+                            Messages this month: {isLoadingUsage ? '...' : chatCount} / {currentChatLimit === Infinity ? '∞' : currentChatLimit}
+                        </span>
+                        {isChatLimitReached && !isLoadingUsage && (
+                            <span className="text-red-500 ml-1 font-medium">(Limit Reached)</span>
+                        )}
+                    </div>
+                 )}
+                {/* --- End Usage Display --- */}
 
               <form onSubmit={handleSendMessage} className="flex items-center gap-1.5">
                  {/* Attachment Buttons */}
-                  <button type="button" onClick={() => fileInputRef.current?.click()} className={`${iconButtonClass} ${attachedFile ? (isIlluminateEnabled ? '!bg-blue-100 !text-blue-600':'!bg-blue-900/50 !text-blue-400') : ''}`} title="Attach file" disabled={isRecording}>
+                  <button type="button" onClick={() => fileInputRef.current?.click()} className={`${iconButtonClass} ${attachedFile ? (isIlluminateEnabled ? '!bg-blue-100 !text-blue-600':'!bg-blue-900/50 !text-blue-400') : ''}`} title="Attach file" disabled={isRecording || fileUploading}>
                       <Paperclip className="w-4 h-4 sm:w-5 sm:h-5" />
                   </button>
                   <input ref={fileInputRef} type="file" accept="*/*" className="hidden" onChange={handleFileChange} disabled={fileUploading || isRecording}/>
 
-                  <button type="button" onClick={isRecording ? stopRecording : startRecording} className={`${iconButtonClass} ${ (isRecording || attachedAudioBlob) ? (isIlluminateEnabled ? '!bg-purple-100 !text-purple-600':'!bg-purple-900/50 !text-purple-400') : ''} ${isRecording ? 'animate-pulse' : ''}`} title={isRecording ? "Stop recording" : "Record audio"} disabled={!!attachedFile}>
+                  <button type="button" onClick={isRecording ? stopRecording : startRecording} className={`${iconButtonClass} ${ (isRecording || attachedAudioBlob) ? (isIlluminateEnabled ? '!bg-purple-100 !text-purple-600':'!bg-purple-900/50 !text-purple-400') : ''} ${isRecording ? 'animate-pulse' : ''}`} title={isRecording ? "Stop recording" : "Record audio"} disabled={!!attachedFile || fileUploading}>
                      <Mic className="w-4 h-4 sm:w-5 sm:h-5" />
                   </button>
 
@@ -1164,9 +1285,9 @@ export function Friends() {
                     type="text"
                     value={newMessage}
                     onChange={handleTyping}
-                    placeholder="Type a message..."
-                    className={`w-full ${inputBg} rounded-full pl-3 pr-8 py-1.5 text-sm focus:outline-none focus:ring-1 shadow-sm disabled:opacity-60`}
-                    disabled={fileUploading || isRecording} // Disable text input while uploading/recording
+                    placeholder={isChatLimitReached ? "Monthly chat limit reached..." : "Type a message..."}
+                    className={`w-full ${inputBg} rounded-full pl-3 pr-8 py-1.5 text-sm focus:outline-none focus:ring-1 shadow-sm disabled:opacity-60 ${isChatLimitReached || isLoadingUsage ? 'cursor-not-allowed' : ''}`}
+                    disabled={fileUploading || isRecording || isChatLimitReached || isLoadingUsage} // Disable if limit reached/loading
                     onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { handleSendMessage(e); } }}
                   />
                   <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
@@ -1193,7 +1314,7 @@ export function Friends() {
                 </div>
 
                 {/* Send Button */}
-                <button type="submit" className={`${primaryButtonClass} p-2 !rounded-full flex-shrink-0`} disabled={(!newMessage.trim() && !attachedFile && !attachedAudioBlob) || fileUploading || isRecording} title="Send Message">
+                <button type="submit" className={`${primaryButtonClass} p-2 !rounded-full flex-shrink-0`} disabled={(!newMessage.trim() && !attachedFile && !attachedAudioBlob) || fileUploading || isRecording || isChatLimitReached || isLoadingUsage} title="Send Message">
                   <Send className="w-4 h-4" />
                 </button>
               </form>
@@ -1303,10 +1424,16 @@ export function Friends() {
                              <div className={`p-2 rounded-md border ${illuminateBorder} ${isIlluminateEnabled ? 'bg-gray-50/50' : 'bg-gray-700/20'} mb-2`}>
                                 <label className={`block text-xs font-medium mb-1 ${subheadingClass}`}>Add Friend</label>
                                 <div className="flex gap-1">
-                                <input type="email" value={friendEmail} onChange={e => setFriendEmail(e.target.value)} placeholder="Enter friend's email" className={`flex-1 ${inputBg} !text-xs !py-1 !px-2 rounded-md focus:ring-1`} />
-                                <button onClick={handleSendFriendRequest} className={`${primaryButtonClass} !text-xs !px-2.5`} disabled={!friendEmail.trim()}>Send</button>
+                                <input type="email" value={friendEmail} onChange={e => setFriendEmail(e.target.value)} placeholder="Enter friend's email" className={`flex-1 ${inputBg} !text-xs !py-1 !px-2 rounded-md focus:ring-1`} disabled={isFriendLimitReached} />
+                                <button onClick={handleSendFriendRequest} className={`${primaryButtonClass} !text-xs !px-2.5`} disabled={!friendEmail.trim() || isFriendLimitReached} title={isFriendLimitReached ? `Friend limit (${currentFriendLimit}) reached for your plan` : "Send friend request"}>Send</button>
                                 </div>
-                            </div>
+                                {/* --- NEW: Limit Reached Warning --- */}
+                                {isFriendLimitReached && userTier !== 'loading' && (
+                                    <p className={`text-[10px] mt-1.5 text-center ${isIlluminateEnabled ? 'text-yellow-700' : 'text-yellow-400'}`}>
+                                        Friend limit reached ({currentFriendLimit}). <Link to="/pricing" className="underline font-medium">Upgrade?</Link>
+                                    </p>
+                                )}
+                             </div>
                              {filteredFriends.length === 0 && <p className={`text-xs ${subtleTextColor} text-center py-4`}>No friends found.</p>}
                              {filteredFriends.map(friend => (
                                 <motion.div key={friend.id} variants={fadeIn} className={`w-full text-left p-1.5 flex items-center gap-2 ${chatListItemClass}`}>
@@ -1344,14 +1471,18 @@ export function Friends() {
                                 <motion.div key={req.id} variants={fadeIn} className={`p-2 rounded-md flex items-center gap-2 border ${illuminateBorder} ${isIlluminateEnabled ? 'bg-gray-50/50' : 'bg-gray-700/20'}`}>
                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center overflow-hidden ${isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-600'}`}>
                                        {/* <User className={`w-4 h-4 ${subtleTextColor}`} /> Potential: Add req.fromUserPhotoURL */}
-                                       <User className={`w-4 h-4 ${subtleTextColor}`} />
+                                       {/* Display photo if available */}
+                                       {req.fromUserPhotoURL ? ( <img src={req.fromUserPhotoURL} alt="" className="w-full h-full object-cover" /> ) : ( <User className={`w-4 h-4 ${subtleTextColor}`} /> )}
                                    </div>
                                    <div className="flex-1 min-w-0">
                                         <p className="text-xs font-medium truncate">{req.fromUserName}</p>
                                         <p className={`text-[10px] ${subtleTextColor}`}>Wants to connect</p>
                                    </div>
                                     <div className="flex gap-0.5">
-                                        <button onClick={() => handleAcceptRequest(req.id)} className={acceptButtonClass} title="Accept"> <Check className="w-4 h-4"/> </button>
+                                        {/* Disable accept if friend limit reached */}
+                                        <button onClick={() => handleAcceptRequest(req.id)} className={acceptButtonClass} title="Accept" disabled={isFriendLimitReached}>
+                                           <Check className={`w-4 h-4 ${isFriendLimitReached ? 'opacity-50' : ''}`}/>
+                                        </button>
                                         <button onClick={() => handleRejectRequest(req.id)} className={rejectButtonClass} title="Reject"> <X className="w-4 h-4"/> </button>
                                     </div>
                                 </motion.div>

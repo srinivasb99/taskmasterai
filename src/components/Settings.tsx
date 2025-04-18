@@ -119,9 +119,11 @@ export function Settings() {
   const [isGoogleUser, setIsGoogleUser] = useState<boolean>(false);
 
   // --- START OF CHANGES ---
-  // Identify Premium Users
+  // Identify Premium & Pro Users
   const PREMIUM_EMAILS = ["robinmyh@gmail.com", "oliverbeckett069420@gmail.com"];
+  const PRO_EMAILS = ["srinibaj10@gmail.com"];
   const [isPremiumUser, setIsPremiumUser] = useState<boolean>(false);
+  const [isProUser, setIsProUser] = useState<boolean>(false);
   // --- END OF CHANGES ---
 
   // ---------------------------
@@ -165,9 +167,11 @@ export function Settings() {
       setUser(currentUser);
 
       // --- START OF CHANGES ---
-      // Check if current user is premium AFTER getting currentUser
+      // Check if current user is premium or pro AFTER getting currentUser
       const premiumCheck = currentUser?.email && PREMIUM_EMAILS.includes(currentUser.email);
+      const proCheck = currentUser?.email && PRO_EMAILS.includes(currentUser.email);
       setIsPremiumUser(premiumCheck);
+      setIsProUser(proCheck);
       // --- END OF CHANGES ---
 
       const googleFlag = currentUser.providerData?.some((p: any) => p.providerId === 'google.com');
@@ -215,7 +219,7 @@ export function Settings() {
     };
 
     loadData();
-  }, [navigate]); // PREMIUM_EMAILS is constant, no need to add
+  }, [navigate]); // PREMIUM_EMAILS/PRO_EMAILS are constant, no need to add
 
   // ---------------------------
   //    SIDEBAR COLLAPSE
@@ -908,10 +912,14 @@ export function Settings() {
                       <h2 className={`text-base sm:text-lg font-semibold flex items-center gap-1.5 ${headingClass}`}>
                         Subscription
                       </h2>
-                      {/* Conditionally render badge based on premium status */}
+                      {/* Conditionally render badge based on user tier */}
                       {isPremiumUser ? (
                           <span className={`px-2.5 py-1 rounded-full text-xs font-semibold uppercase tracking-wider bg-gradient-to-r from-amber-400 to-orange-500 text-white shadow-sm`}>
                               Premium
+                          </span>
+                      ) : isProUser ? (
+                          <span className={`px-2.5 py-1 rounded-full text-xs font-semibold uppercase tracking-wider bg-gradient-to-r from-teal-400 to-cyan-500 text-white shadow-sm`}>
+                              Pro
                           </span>
                       ) : (
                           <span className={`px-2.5 py-1 rounded-full text-xs font-semibold uppercase tracking-wider ${isIlluminateEnabled ? 'bg-blue-100 text-blue-800' : 'bg-blue-900/70 text-blue-200'}`}>
@@ -925,29 +933,37 @@ export function Settings() {
                           <>
                               <p className={`text-sm ${subheadingClass} mb-2`}>Your premium plan includes:</p>
                               <ul className={`list-disc list-outside pl-5 space-y-1.5 text-xs sm:text-sm ${subheadingClass}`}>
-                                  <li><span className="font-medium text-amber-500 mr-1"></span>Unlimited PDF and Text Notes</li>
-                                  <li><span className="font-medium text-amber-500 mr-1"></span>Unlimited YouTube Notes</li>
-                                  <li><span className="font-medium text-amber-500 mr-1"></span>Unlimited AI Chat Interactions</li>
-                                  <li><span className="font-medium text-amber-500 mr-1"></span>2,500 Tokens Included</li>
-                                  <li><span className="font-medium text-amber-500 mr-1"></span>Add Unlimited Friends</li>
-                                  <li><span className="font-medium text-amber-500 mr-1"></span>Unlimited Access to Smart Overview</li>
-
-
-                                  {/* Add more premium features */}
+                                  <li><span className="font-medium text-amber-500 mr-1">●</span>Unlimited PDF and Text Notes</li>
+                                  <li><span className="font-medium text-amber-500 mr-1">●</span>Unlimited YouTube Notes</li>
+                                  <li><span className="font-medium text-amber-500 mr-1">●</span>Unlimited AI Chat Interactions</li>
+                                  <li><span className="font-medium text-amber-500 mr-1">●</span>Unlimited Smart Overview</li>
+                                  <li><span className="font-medium text-amber-500 mr-1">●</span>Add Unlimited Friends</li>
+                                  <li><span className="font-medium text-amber-500 mr-1">●</span>Access to all current & future features</li>
                               </ul>
-                              {/* Optional: Link to manage subscription (if applicable) */}
-                              {/* <Link to="/manage-subscription" className={`block mt-4 w-full ${buttonSecondaryClass} rounded-md text-center py-2 text-sm font-medium`}>
-                                  Manage Subscription
-                              </Link> */}
                           </>
+                      ) : isProUser ? (
+                           <>
+                              <p className={`text-sm ${subheadingClass} mb-2`}>Your pro plan includes:</p>
+                              <ul className={`list-disc list-outside pl-5 space-y-1.5 text-xs sm:text-sm ${subheadingClass}`}>
+                                 <li><span className="font-medium text-teal-400 mr-1">●</span>20 PDF and Text Notes per month</li>
+                                 <li><span className="font-medium text-teal-400 mr-1">●</span>10 YouTube Notes per month</li>
+                                 <li><span className="font-medium text-teal-400 mr-1">●</span>200 AI Chat Interactions per month</li>
+                                 <li><span className="font-medium text-teal-400 mr-1">●</span>Access to Smart Overview</li>
+                                 <li><span className="font-medium text-teal-400 mr-1">●</span>Add up to 10 Friends</li>
+                              </ul>
+                              <Link to="/pricing" className={`block mt-4 w-full ${buttonPrimaryClass} ${buttonPrimaryHoverEffect} rounded-md shadow-lg shadow-indigo-500/10`}>
+                                  <span className="flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium">
+                                      <Crown className="w-4 h-4" strokeWidth={2.5} /> Upgrade to Premium
+                                  </span>
+                              </Link>
+                           </>
                       ) : (
                           <>
                               <p className={`text-sm ${subheadingClass} mb-2`}>Your free plan includes:</p>
                               <ul className={`list-disc list-outside pl-5 space-y-1.5 text-xs sm:text-sm ${subheadingClass}`}>
                                   <li>2 PDF and Text Notes per month</li>
-                                  <li>1 Youtube Notes per month</li>
+                                  <li>1 Youtube Note per month</li>
                                   <li>10 AI Chat Interactions per month</li>
-                                  <li>500 Tokens Included</li>
                                   <li>Add Up to 3 Friends</li>
                               </ul>
                               <Link to="/pricing" className={`block mt-4 w-full ${buttonPrimaryClass} ${buttonPrimaryHoverEffect} rounded-md shadow-lg shadow-indigo-500/10`}>

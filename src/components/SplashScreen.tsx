@@ -22,7 +22,7 @@ function SplashScreen() {
 
   // --- Features Array (Unchanged) ---
   const features = [
-    {
+     {
       icon: LayoutDashboard,
       title: 'Dashboard',
       description: 'Your command center for peak productivity. Seamlessly manage tasks, set goals, and track projects with intelligent due dates that automatically sync to your calendar. The dashboard includes customizable timers, including our signature Pomodoro timer with adjustable work/break intervals. Monitor your productivity trends, set daily/weekly targets, and celebrate your achievements with our built-in progress tracking.',
@@ -186,12 +186,12 @@ function SplashScreen() {
               </p>
             </div>
 
-            {/* Image Column */}
+            {/* --- MODIFIED IMAGE COLUMN CONTAINER --- */}
             {currentFeature.image && (
               <div
                 key={currentFeature.image}
-                // Adding group class to this container
-                className="md:w-1/2 mt-4 md:mt-0 group relative rounded-xl overflow-hidden"
+                // REMOVED overflow-hidden from here
+                className="md:w-1/2 mt-4 md:mt-0 group relative rounded-xl"
               >
                  {/* Background gradient placeholder (Unchanged) */}
                  <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 via-purple-500/10 to-gray-800/10"></div>
@@ -204,17 +204,19 @@ function SplashScreen() {
                   src={currentFeature.image}
                   alt={`${currentFeature.title} Preview`}
                   className={`
-                    relative w-full h-auto md:h-full md:object-cover /* Base layout/sizing */
-                    rounded-xl shadow-lg /* Base appearance */
+                    w-full h-auto                 /* Basic responsive sizing */
+                    rounded-xl shadow-lg           /* Styling */
                     transform transition-all duration-500 ease-out /* Enable transform, match old duration */
                     ${ isImageLoaded ? 'opacity-100 scale-100 blur-0' : 'opacity-0 scale-105 blur-sm' } /* Loading state */
                     /* --- Hover Effect (from old code) --- */
                     group-hover:scale-[1.02]
+                    /* REMOVED: relative, md:h-full, md:object-cover */
                   `}
                  />
                  {/* --- END MODIFIED IMAGE --- */}
               </div>
             )}
+            {/* --- END MODIFIED IMAGE COLUMN CONTAINER --- */}
           </div>
 
           {/* Navigation and Progress (Unchanged) */}

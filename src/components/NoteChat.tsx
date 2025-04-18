@@ -537,7 +537,7 @@ ${recentHistory
                 recentHistory.forEach(msg => {
                      if (msg.role === 'user') {
                          apiContent.push({ role: "user", parts: [{ text: msg.content.replace(/\[(?:Image )?Attached:.*?\]/g, '').trim() }] });
-                     } else if (msg.role === 'assistant' && !msg.content?.startsWith("Timer set:") && !msg.timer && !msg.content?.startsWith("✅ Note updated!") && !m.content?.startsWith("🔄 Change reverted.") && msg.content !== '...' && !msg.isUpdateConfirmation) { // Added more filters
+                     } else if (msg.role === 'assistant' && !msg.content?.startsWith("Timer set:") && !msg.timer && !msg.content?.startsWith("✅ Note updated!") && !msg.content?.startsWith("🔄 Change reverted.") && msg.content !== '...' && !msg.isUpdateConfirmation) { // Added more filters
                          const assistantContent = msg.content?.replace(/```json[\s\S]*?```/g, msg.isEditSuggestion ? `(Proposed Edit: ${msg.editExplanation || 'Details omitted'})` : '(Response provided)');
                          if (assistantContent?.trim()) { apiContent.push({ role: "model", parts: [{ text: assistantContent }] }); }
                      }

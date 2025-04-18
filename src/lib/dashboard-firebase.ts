@@ -33,405 +33,270 @@ import {
    2. AUTH LISTENERS
    ------------------------------------------------------------------ */
 
-export const getUserUsageData = async (userId) => {
-  if (!userId) return null;
-  try {
-    const usageRef = doc(db, `users/${userId}/usage/chat`); // Store usage in a subcollection doc
-    const docSnap = await getDoc(usageRef);
-    if (docSnap.exists()) {
-      const data = docSnap.data();
-      // Ensure both count and month exist
-      if (typeof data.count === 'number' && typeof data.month === 'string') {
-        return { count: data.count, month: data.month };
-      }
+// --- TIER DEFINITIONS & LIMITS (Centralized) ---
+export const PREMIUM_EMAILS = ["robinmyh@gmail.com", "oliverbeckett069420@gmail.com"];
+export const PRO_EMAILS = ["srinibaj10@gmail.com"];
+export type UserTier = 'basic' | 'pro' | 'premium' | 'loading';
+
+export const BASIC_CHAT_LIMIT = 10;
+export const PRO_CHAT_LIMIT = 200;
+
+// --- Interfaces (Centralized where appropriate) ---
+interface ChatUsageData {
+    count: number;
+    month: string; // YYYY-MM
+}
+// Keep NoteUsageData potentially separate if only used by Notes features, or move here if needed globally
+interface NoteUsageData {
+    pdfAi: number;
+    youtube: number;
+    month: string; // YYYY-MM
+}
+
+// --- Tier Determination Function (Centralized) ---
+export const getUserTier = (email: string | null | undefined): UserTier => {
+    if (!email) return 'basic';
+    if (PREMIUM_EMAILS.includes(email)) return 'premium';
+    if (PRO_EMAILS.includes(email)) return 'pro';
+    return 'basic';
+};
+
+// --- User Data Functions (Centralized) ---
+/** Fetches general user data (like name preference) from Firestore. */
+export async function getUserData(userId: string): Promise<any | null> {
+    if (!userId) return null;
+    try {
+        const userRef = doc(db, 'users', userId);
+        const docSnap = await getDoc(userRef);
+        return docSnap.exists() ? docSnap.data() : null;
+    } catch (error) {
+        console.error("Error fetching user data:", error);
+        return null; // Return null on error to avoid breaking UI
     }
-    return null; // No valid data found
-  } catch (error) {
-    console.error("Error getting user chat usage:", error);
-    return null; // Return null on error
-  }
-};
+}
 
-/**
- * Updates or sets the user's chat usage count for a specific month.
- * @param {string} userId - The user's Firebase UID.
- * @param {number} newCount - The new chat count.
- * @param {string} currentMonth - The current month in "YYYY-MM" format.
- * @returns {Promise<void>}
- */
-export const updateUserChatUsage = async (userId, newCount, currentMonth) => {
-  if (!userId || typeof newCount !== 'number' || !currentMonth) return;
-  try {
-    const usageRef = doc(db, `users/${userId}/usage/chat`);
-    // Use setDoc with merge: true to create or update the document safely
-    await setDoc(usageRef, {
-      count: newCount,
-      month: currentMonth,
-      lastUpdated: serverTimestamp() // Track last update time
-    }, { merge: true });
-  } catch (error) {
-    console.error("Error updating user chat usage:", error);
-    // Optionally re-throw or handle more gracefully
-  }
-};
-
-// --- Ensure other necessary functions like updateDashboardLastSeen are also exported ---
-export const updateDashboardLastSeen = async (userId) => {
+/** Updates the last seen timestamp for the dashboard. */
+export async function updateDashboardLastSeen(userId: string): Promise<void> {
     if (!userId) return;
     try {
-        const userRef = doc(db, "users", userId);
-        // Use updateDoc to only update the lastSeen field
-        await updateDoc(userRef, {
-            lastSeen: serverTimestamp()
-        });
-        // console.log("Updated lastSeen for user:", userId);
+        const userRef = doc(db, 'users', userId);
+        await setDoc(userRef, { dashboardLastSeen: Timestamp.now() }, { merge: true });
     } catch (error) {
-         // If the user document doesn't exist, setDoc might be better,
-         // but for just 'lastSeen', failing gracefully might be okay.
-        console.warn("Could not update lastSeen (user doc might not exist or other error):", error);
-        // Optionally try setDoc if update fails?
-        // try {
-        //     await setDoc(userRef, { lastSeen: serverTimestamp() }, { merge: true });
-        // } catch (setErr) {
-        //     console.error("Failed to set lastSeen either:", setErr);
-        // }
+        console.warn("Failed to update dashboard last seen:", error);
     }
+}
+
+// --- Chat Usage Functions (Centralized) ---
+/** Fetches chat usage data for a given user and the current month. */
+export async function getUserChatUsage(userId: string): Promise<ChatUsageData | null> {
+    if (!userId) throw new Error("User ID is required to fetch chat usage.");
+    try {
+        const userRef = doc(db, 'users', userId);
+        const docSnap = await getDoc(userRef);
+        if (docSnap.exists()) {
+            const userData = docSnap.data();
+            const currentMonthYear = new Date().toISOString().slice(0, 7); // YYYY-MM
+            const usageFieldName = `chatCount_${currentMonthYear}`;
+            // Check if field exists and is a number
+            if (userData.hasOwnProperty(usageFieldName) && typeof userData[usageFieldName] === 'number') {
+                return {
+                    count: userData[usageFieldName],
+                    month: currentMonthYear
+                };
+            }
+        }
+        return null; // No valid data found for the current month
+    } catch (error) {
+        console.error('Error fetching chat usage:', error);
+        throw new Error(`Failed to fetch chat usage: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+}
+
+/** Updates or sets chat usage data for a user in Firestore for a specific month. */
+export async function updateUserChatUsage(userId: string, count: number, month: string): Promise<void> {
+    if (!userId) throw new Error("User ID is required to update chat usage.");
+    if (!month || !/^\d{4}-\d{2}$/.test(month)) throw new Error("Invalid month format (YYYY-MM) required.");
+    if (typeof count !== 'number' || count < 0) throw new Error("Invalid chat count.");
+    try {
+        const userRef = doc(db, 'users', userId);
+        const usageFieldName = `chatCount_${month}`;
+        // Use setDoc with merge:true to create/update only this field
+        await setDoc(userRef, {
+            [usageFieldName]: count
+        }, { merge: true });
+        // console.log(`Chat usage updated for user ${userId} for month ${month}: ${count}`); // Optional log
+    } catch (error) {
+        console.error('Error updating chat usage:', error);
+        throw new Error(`Failed to update chat usage: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+}
+
+
+// --- Other Dashboard Specific Functions (Tasks, Goals, etc.) ---
+
+/** Sets up a Firestore snapshot listener for a specific collection type. */
+export const onCollectionSnapshot = (
+    collectionName: 'tasks' | 'goals' | 'projects' | 'plans',
+    userId: string,
+    callback: (items: Array<{ id: string; data: any }>) => void
+): (() => void) => { // Returns an unsubscribe function
+    if (!userId) {
+        console.warn(`No user ID provided for ${collectionName} listener.`);
+        return () => {}; // Return a no-op unsubscribe function
+    }
+    const q = query(collection(db, collectionName), where('userId', '==', userId), orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        const items = querySnapshot.docs.map(doc => ({
+            id: doc.id,
+            data: doc.data()
+        }));
+        callback(items);
+    }, (error) => {
+        console.error(`Error fetching ${collectionName}: `, error);
+        // Optionally call callback with empty array or handle error state
+        callback([]);
+    });
+    return unsubscribe; // Return the unsubscribe function
 };
 
-export function onFirebaseAuthStateChanged(callback: (user: User | null) => void) {
-  return onAuthStateChanged(auth, (user) => {
-    callback(user)
-  })
-}
+/** Creates a new task document. */
+export const createTask = async (userId: string, task: string, dueDate: Date | null, priority: 'high' | 'medium' | 'low') => {
+    if (!userId || !task) throw new Error("User ID and task text are required.");
+    await addDoc(collection(db, 'tasks'), {
+        userId,
+        task: task.trim(),
+        dueDate: dueDate ? Timestamp.fromDate(dueDate) : null,
+        priority,
+        completed: false,
+        createdAt: Timestamp.now()
+    });
+};
 
-export async function signUp(email: string, password: string) {
-  const userCredential = await createUserWithEmailAndPassword(auth, email, password)
-  const user = userCredential.user
-  await setDoc(doc(db, "users", user.uid), {
-    splashScreenShown: false,
-    createdAt: serverTimestamp(),
-  })
-}
+/** Creates a new goal document. */
+export const createGoal = async (userId: string, goal: string, dueDate: Date | null, priority: 'high' | 'medium' | 'low') => {
+    if (!userId || !goal) throw new Error("User ID and goal text are required.");
+    await addDoc(collection(db, 'goals'), {
+        userId,
+        goal: goal.trim(),
+        dueDate: dueDate ? Timestamp.fromDate(dueDate) : null,
+        priority,
+        completed: false,
+        createdAt: Timestamp.now()
+    });
+};
 
-export async function updateUserDisplayName(newDisplayName: string) {
-  if (!auth.currentUser) return
-  await updateProfile(auth.currentUser, { displayName: newDisplayName })
-  await updateDoc(doc(db, "users", auth.currentUser.uid), {
-    displayName: newDisplayName,
-  })
-}
+/** Creates a new project document. */
+export const createProject = async (userId: string, project: string, dueDate: Date | null, priority: 'high' | 'medium' | 'low') => {
+     if (!userId || !project) throw new Error("User ID and project text are required.");
+    await addDoc(collection(db, 'projects'), {
+        userId,
+        project: project.trim(),
+        dueDate: dueDate ? Timestamp.fromDate(dueDate) : null,
+        priority,
+        completed: false,
+        createdAt: Timestamp.now()
+    });
+};
 
-/* ------------------------------------------------------------------
-   3. USER STATUS (ONLINE/OFFLINE) + LAST SEEN
-   ------------------------------------------------------------------ */
+/** Creates a new plan document. */
+export const createPlan = async (userId: string, plan: string, dueDate: Date | null, priority: 'high' | 'medium' | 'low') => {
+     if (!userId || !plan) throw new Error("User ID and plan text are required.");
+    await addDoc(collection(db, 'plans'), {
+        userId,
+        plan: plan.trim(),
+        dueDate: dueDate ? Timestamp.fromDate(dueDate) : null,
+        priority,
+        completed: false,
+        createdAt: Timestamp.now()
+    });
+};
 
-export async function setUserOnline(userId: string) {
-  await setDoc(
-    doc(db, "users", userId),
-    {
-      online: true,
-      lastSeen: serverTimestamp(),
-    },
-    { merge: true },
-  )
-}
+/** Updates fields in a specific item document. */
+export const updateItem = async (collectionName: 'tasks' | 'goals' | 'projects' | 'plans' | 'customTimers', itemId: string, updates: any) => {
+    if (!itemId || !collectionName) throw new Error("Collection name and item ID required.");
+    // Basic validation to prevent updating userId or createdAt
+    if ('userId' in updates || 'createdAt' in updates) {
+        throw new Error("Cannot update userId or createdAt fields.");
+    }
+    const itemRef = doc(db, collectionName, itemId);
+    // Ensure dueDate is a Timestamp if present and valid
+    if (updates.dueDate && !(updates.dueDate instanceof Timestamp)) {
+        if (updates.dueDate instanceof Date && !isNaN(updates.dueDate.getTime())) {
+            updates.dueDate = Timestamp.fromDate(updates.dueDate);
+        } else {
+            console.warn(`Invalid date provided for update, setting dueDate to null for item ${itemId}`);
+            updates.dueDate = null; // Set to null if invalid date object/string
+        }
+    }
+    // Add updatedAt timestamp
+    updates.updatedAt = Timestamp.now();
+    await updateDoc(itemRef, updates);
+};
 
-export async function handleVisibilityChange(userId: string, excludedPages: string[] = []) {
-  if (document.visibilityState === "visible") {
-    await setUserOnline(userId)
-  }
-}
+/** Deletes a specific item document. */
+export const deleteItem = async (collectionName: 'tasks' | 'goals' | 'projects' | 'plans' | 'customTimers', itemId: string) => {
+     if (!itemId || !collectionName) throw new Error("Collection name and item ID required.");
+    await deleteDoc(doc(db, collectionName, itemId));
+};
 
-/* ------------------------------------------------------------------
-   4. CUSTOM TIMERS (CRUD)
-   ------------------------------------------------------------------ */
+/** Marks an item as complete or incomplete. */
+export const markItemComplete = async (collectionName: 'tasks' | 'goals' | 'projects' | 'plans', itemId: string) => {
+    if (!itemId || !collectionName) throw new Error("Collection name and item ID required.");
+    const itemRef = doc(db, collectionName, itemId);
+    const itemSnap = await getDoc(itemRef);
+    if (!itemSnap.exists()) throw new Error("Item not found.");
+    const currentStatus = itemSnap.data().completed || false;
+    await updateDoc(itemRef, {
+        completed: !currentStatus,
+        updatedAt: Timestamp.now() // Also update timestamp on status change
+    });
+};
 
-export async function addCustomTimer(name: string, timeInSeconds: number, userId: string) {
-  const docRef = await addDoc(collection(db, "timers"), {
-    name,
-    time: timeInSeconds,
-    userId,
-    createdAt: serverTimestamp(),
-  })
-  return docRef.id
-}
+// --- Custom Timer Functions ---
+/** Creates a new custom timer document. */
+export const addCustomTimer = async (name: string, time: number, userId: string) => {
+     if (!userId || !name || typeof time !== 'number' || time <= 0) throw new Error("Valid user ID, name, and positive time required.");
+    await addDoc(collection(db, 'customTimers'), {
+        userId,
+        name: name.trim(),
+        time, // Store original time in seconds
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now()
+    });
+};
 
-export async function updateCustomTimer(timerId: string, newName?: string, newTimeInSeconds?: number) {
-  const updates: any = { updatedAt: serverTimestamp() }
-  if (newName !== undefined) {
-    updates.name = newName
-  }
-  if (newTimeInSeconds !== undefined) {
-    updates.time = newTimeInSeconds
-  }
-  await updateDoc(doc(db, "timers", timerId), updates)
-}
+/** Sets up a Firestore snapshot listener for custom timers. */
+export const onCustomTimersSnapshot = (
+    userId: string,
+    callback: (items: Array<{ id: string; data: any }>) => void
+): (() => void) => { // Returns an unsubscribe function
+     if (!userId) {
+        console.warn(`No user ID provided for customTimers listener.`);
+        return () => {}; // Return a no-op unsubscribe function
+    }
+    const q = query(collection(db, 'customTimers'), where('userId', '==', userId), orderBy('createdAt', 'asc')); // Usually older timers first? Or 'desc'
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        const items = querySnapshot.docs.map(doc => ({
+            id: doc.id,
+            data: doc.data()
+        }));
+        callback(items);
+    }, (error) => {
+        console.error(`Error fetching customTimers: `, error);
+        callback([]);
+    });
+    return unsubscribe; // Return the unsubscribe function
+};
 
-export async function deleteCustomTimer(timerId: string) {
-  await deleteDoc(doc(db, "timers", timerId))
-}
+/** Updates a specific custom timer. */
+export const updateCustomTimer = async (timerId: string, name: string, time: number) => {
+    await updateItem('customTimers', timerId, { name: name.trim(), time });
+};
 
-export function onCustomTimersSnapshot(
-  userId: string,
-  callback: (timers: Array<{ id: string; data: DocumentData }>) => void,
-) {
-  const q = query(collection(db, "timers"), where("userId", "==", userId), orderBy("createdAt", "asc"))
-  return onSnapshot(
-    q,
-    (snapshot) => {
-      const results: Array<{ id: string; data: DocumentData }> = []
-      snapshot.forEach((docSnap) => {
-        results.push({ id: docSnap.id, data: docSnap.data() })
-      })
-      callback(results)
-    },
-    (error) => {
-      console.error("Error listening to custom timers:", error)
-    },
-  )
-}
+/** Deletes a specific custom timer. */
+export const deleteCustomTimer = async (timerId: string) => {
+    await deleteItem('customTimers', timerId);
+};
 
-/* ------------------------------------------------------------------
-   5. TASKS / GOALS / PROJECTS / PLANS (CRUD + LISTENERS)
-   ------------------------------------------------------------------ */
-
-// Modified version of createTask in dashboard-firebase.ts
-export async function createTask(userId: string, taskText: string, dueDate?: Date | null, sectionId?: string | null) {
-  // Generate a unique ID for the task
-  const taskId = `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-
-  await addDoc(collection(db, "tasks"), {
-    task: taskText,
-    userId,
-    dueDate: dueDate || null,
-    createdAt: serverTimestamp(),
-    taskId: taskId, // Store this unique ID with the task
-    sectionId: sectionId || null, // Add section ID
-    completed: false,
-    priority: "medium",
-  })
-}
-
-export async function createGoal(userId: string, goalText: string, dueDate?: Date | null) {
-  const goalId = `goal_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-  await addDoc(collection(db, "goals"), {
-    goal: goalText,
-    userId,
-    dueDate: dueDate || null,
-    createdAt: serverTimestamp(),
-    goalId: goalId,
-  })
-}
-
-export async function createProject(userId: string, projectText: string, dueDate?: Date | null) {
-  const projectId = `project_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-  await addDoc(collection(db, "projects"), {
-    project: projectText,
-    userId,
-    dueDate: dueDate || null,
-    createdAt: serverTimestamp(),
-    projectId: projectId,
-  })
-}
-
-export async function createPlan(userId: string, planText: string, dueDate?: Date | null) {
-  const planId = `plan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-  await addDoc(collection(db, "plans"), {
-    plan: planText,
-    userId,
-    dueDate: dueDate || null,
-    createdAt: serverTimestamp(),
-    planId: planId,
-  })
-}
-
-export async function markItemComplete(collectionName: string, docId: string) {
-  await updateDoc(doc(db, collectionName, docId), {
-    completed: true,
-  })
-}
-
-export async function updateItem(collectionName: string, docId: string, updates: Record<string, any>) {
-  updates.updatedAt = serverTimestamp()
-  await updateDoc(doc(db, collectionName, docId), updates)
-}
-
-export async function deleteItem(collectionName: string, docId: string) {
-  await deleteDoc(doc(db, collectionName, docId))
-}
-
-export function onCollectionSnapshot(
-  collectionName: string,
-  userId: string,
-  callback: (items: Array<{ id: string; data: DocumentData }>) => void,
-) {
-  const q = query(
-    collection(db, collectionName),
-    where("userId", "==", userId),
-    orderBy("dueDate", "asc"),
-    orderBy("createdAt", "asc"),
-  )
-  return onSnapshot(q, (snapshot) => {
-    const results: Array<{ id: string; data: DocumentData }> = []
-    snapshot.forEach((docSnap) => {
-      results.push({ id: docSnap.id, data: docSnap.data() })
-    })
-    callback(results)
-  })
-}
-
-/* ------------------------------------------------------------------
-   6. EVENTS (LINKED TO TASKS, GOALS, PROJECTS, PLANS)
-   ------------------------------------------------------------------ */
-
-export async function createLinkedEvent(
-  userId: string,
-  linkedId: string,
-  linkedFieldName: string,
-  title: string,
-  dueDate: Date,
-) {
-  const eventData = {
-    title,
-    description: `${linkedFieldName.replace("linked", "").toLowerCase()} converted to event`,
-    day: dueDate.getDate(),
-    month: dueDate.getMonth(),
-    year: dueDate.getFullYear(),
-    uid: userId,
-    [linkedFieldName]: linkedId,
-    startTime: "",
-    endTime: "",
-  }
-  await addDoc(collection(db, "events"), eventData)
-}
-
-export function onEventsSnapshot(
-  userId: string,
-  callback: (events: Array<{ id: string; data: DocumentData }>) => void,
-) {
-  const q = query(collection(db, "events"), where("uid", "==", userId))
-  return onSnapshot(q, (snapshot) => {
-    const results: Array<{ id: string; data: DocumentData }> = []
-    snapshot.forEach((docSnap) => {
-      results.push({ id: docSnap.id, data: docSnap.data() })
-    })
-    callback(results)
-  })
-}
-
-/* ------------------------------------------------------------------
-   7. NIGHT MODE & THEME PREFERENCES
-   ------------------------------------------------------------------ */
-
-export async function setNightMode(userId: string, isEnabled: boolean) {
-  await setDoc(doc(db, "users", userId), { nightMode: isEnabled ? "enabled" : "disabled" }, { merge: true })
-}
-
-/* ------------------------------------------------------------------
-   8. SPLASH SCREEN CHECK
-   ------------------------------------------------------------------ */
-
-export async function checkSplashScreen(userId: string) {
-  const userRef = doc(db, "users", userId)
-  const snapshot = await getDoc(userRef)
-  if (!snapshot.exists()) {
-    await setDoc(userRef, { splashScreenShown: false })
-    return false
-  }
-  const userData = snapshot.data()
-  if (!userData.splashScreenShown) {
-    await updateDoc(userRef, { splashScreenShown: true })
-    return false
-  }
-  return true
-}
-
-/* ------------------------------------------------------------------
-   9. SECTIONS (CRUD + LISTENERS)
-   ------------------------------------------------------------------ */
-
-// Create a new section
-export async function createSection(userId: string, name: string, order: number) {
-  const sectionData = {
-    name,
-    userId,
-    order,
-    createdAt: serverTimestamp(),
-  }
-
-  const docRef = await addDoc(collection(db, "sections"), sectionData)
-  return docRef.id
-}
-
-// Get all sections for a user
-export async function getSections(userId: string) {
-  const q = query(collection(db, "sections"), where("userId", "==", userId), orderBy("order", "asc"))
-
-  const snapshot = await getDocs(q)
-  const sections: Array<{ id: string; name: string; order: number }> = []
-
-  snapshot.forEach((doc) => {
-    const data = doc.data()
-    sections.push({
-      id: doc.id,
-      name: data.name,
-      order: data.order,
-    })
-  })
-
-  return sections
-}
-
-// Update a section
-export async function updateSection(userId: string, sectionId: string, updates: { name?: string; order?: number }) {
-  const sectionRef = doc(db, "sections", sectionId)
-  const sectionSnap = await getDoc(sectionRef)
-
-  if (!sectionSnap.exists()) {
-    throw new Error("Section not found")
-  }
-
-  const sectionData = sectionSnap.data()
-  if (sectionData.userId !== userId) {
-    throw new Error("Unauthorized to update this section")
-  }
-
-  await updateDoc(sectionRef, {
-    ...updates,
-    updatedAt: serverTimestamp(),
-  })
-}
-
-// Delete a section
-export async function deleteSection(userId: string, sectionId: string) {
-  const sectionRef = doc(db, "sections", sectionId)
-  const sectionSnap = await getDoc(sectionRef)
-
-  if (!sectionSnap.exists()) {
-    throw new Error("Section not found")
-  }
-
-  const sectionData = sectionSnap.data()
-  if (sectionData.userId !== userId) {
-    throw new Error("Unauthorized to delete this section")
-  }
-
-  await deleteDoc(sectionRef)
-}
-
-// Listen to sections changes
-export function onSectionsSnapshot(
-  userId: string,
-  callback: (sections: Array<{ id: string; data: DocumentData }>) => void,
-) {
-  const q = query(collection(db, "sections"), where("userId", "==", userId), orderBy("order", "asc"))
-
-  return onSnapshot(q, (snapshot) => {
-    const results: Array<{ id: string; data: DocumentData }> = []
-    snapshot.forEach((docSnap) => {
-      results.push({ id: docSnap.id, data: docSnap.data() })
-    })
-    callback(results)
-  })
-}
-
+// --- Firebase Auth Listener Wrapper (Centralized) ---
+export { onFirebaseAuthStateChanged };

@@ -1,12 +1,12 @@
 // Notes.tsx
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'; // Added useMemo
 import { useNavigate } from 'react-router-dom';
 import {
     FileText, Upload, Youtube, Mic, Plus, Search, Filter as FilterIcon,
     AlertTriangle, X, ChevronRight, ChevronLeft, Bot, FileQuestion, BookOpen,
     Sparkles, Loader2, Save, Tag, Edit2, Check, Pencil, MessageCircle, Globe,
     Lock, Trash2, Copy, RefreshCw, SplitSquareVertical, Menu, List, Briefcase,
-    Share2, ClipboardCopy, Eye, ZoomIn, ZoomOut, RotateCcw // Added icons for PDF controls
+    Share2, ClipboardCopy, Eye, ZoomIn, ZoomOut, RotateCcw, ShieldAlert // Added icons
 } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { auth, db } from '../lib/firebase';
@@ -21,13 +21,15 @@ import { processPDF } from '../lib/pdf-processor';
 import { processYouTube } from '../lib/youtube-processor';
 import {
     saveNote, savePersonalNote, updateNote, processTextToAINoteData,
-    deleteNote, toggleNotePublicStatus, regenerateStudyQuestions
+    deleteNote, toggleNotePublicStatus, regenerateStudyQuestions,
+    // --- Import Usage Functions ---
+    getUserNoteUsageData, updateUserNoteUsage, // Assuming these exist in notes-firebase
 } from '../lib/notes-firebase';
 import { NewNoteModal } from './NewNoteModal';
 import { SplitView } from './SplitView';
 import { NoteChat, NoteChatHandle } from './NoteChat'; // Import NoteChatHandle
-import { getCurrentUser } from '../lib/settings-firebase';
-import { geminiApiKey } from '../lib/dashboard-firebase';
+import { getCurrentUser, getUserData } from '../lib/settings-firebase'; // Import getUserData
+import { geminiApiKey } from '../lib/dashboard-firebase'; // Keep for AI features
 
 // --- PDF Viewer Imports ---
 import { pdfjs, Document, Page } from 'react-pdf';
@@ -47,7 +49,23 @@ interface Note {
     keyPoints?: string[]; questions?: { question: string; options: string[]; correctAnswer: number; explanation: string; }[];
     isPublic: boolean; tags: string[];
 }
-interface UploadProgressState { progress: number; status: string; error: string | null; }
+interface UploadProgressState { progress: number; status: string; error: string | null; isLimitError?: boolean; } // Added isLimitError
+
+// --- START Tier Definitions & Limits ---
+const PREMIUM_EMAILS = ["robinmyh@gmail.com", "oliverbeckett069420@gmail.com"];
+const PRO_EMAILS = ["srinibaj10@gmail.com"];
+
+const PRO_PDF_AI_LIMIT = 10;
+const PRO_YOUTUBE_LIMIT = 5;
+const PRO_CHAT_LIMIT = 200; // Assuming chat limit applies here too if NoteChat uses API
+
+const BASIC_PDF_AI_LIMIT = 2;
+const BASIC_YOUTUBE_LIMIT = 1;
+const BASIC_CHAT_LIMIT = 10; // Assuming chat limit applies here too
+
+type UserTier = 'basic' | 'pro' | 'premium' | 'loading';
+// --- END Tier Definitions & Limits ---
+
 
 // --- Main Component ---
 export function Notes() {
@@ -61,6 +79,15 @@ export function Notes() {
     const [uploadProgress, setUploadProgress] = useState<UploadProgressState>({ progress: 0, status: '', error: null });
     const [searchQuery, setSearchQuery] = useState('');
     const [filterType, setFilterType] = useState<'all' | 'personal' | 'pdf' | 'youtube' | 'audio'>('all');
+
+    // --- START Usage and Tier State ---
+    const [userTier, setUserTier] = useState<UserTier>('loading');
+    const [pdfAiNoteCount, setPdfAiNoteCount] = useState(0);
+    const [youtubeNoteCount, setYoutubeNoteCount] = useState(0);
+    const [usageMonth, setUsageMonth] = useState(''); // Store "YYYY-MM"
+    // Chat usage state - assumes NoteChat will need this passed down eventually
+    const [chatCount, setChatCount] = useState(0);
+    // --- END Usage and Tier State ---
 
     // Theme State
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => JSON.parse(localStorage.getItem('isSidebarCollapsed') || 'false'));
@@ -142,16 +169,67 @@ export function Notes() {
     useEffect(() => { localStorage.setItem('isSidebarBlackoutEnabled', JSON.stringify(isSidebarBlackoutEnabled)); }, [isSidebarBlackoutEnabled]);
     useEffect(() => { localStorage.setItem('isSidebarIlluminateEnabled', JSON.stringify(isSidebarIlluminateEnabled)); }, [isSidebarIlluminateEnabled]);
 
-    // Auth listener
+    // --- Auth listener & Tier/Usage Loading ---
     useEffect(() => {
         setLoading(true);
-        const unsubscribe = auth.onAuthStateChanged((firebaseUser) => {
+        setUserTier('loading'); // Set loading state for tier
+        const unsubscribeAuth = auth.onAuthStateChanged(async (firebaseUser) => { // Make async
             if (firebaseUser) {
                 setUser(firebaseUser);
                 setUserName(firebaseUser.displayName || firebaseUser.email?.split('@')[0] || "User");
+
+                // Determine Tier
+                let tier: UserTier = 'basic';
+                if (firebaseUser.email && PREMIUM_EMAILS.includes(firebaseUser.email)) {
+                    tier = 'premium';
+                } else if (firebaseUser.email && PRO_EMAILS.includes(firebaseUser.email)) {
+                    tier = 'pro';
+                }
+                setUserTier(tier);
+
+                // Load Usage Data (if not premium)
+                if (tier !== 'premium') {
+                    try {
+                        const currentMonthYear = new Date().toISOString().slice(0, 7); // "YYYY-MM"
+                        const usageData = await getUserNoteUsageData(firebaseUser.uid); // Fetch note usage
+
+                        if (usageData && usageData.month === currentMonthYear) {
+                            setPdfAiNoteCount(usageData.pdfAiCount || 0);
+                            setYoutubeNoteCount(usageData.youtubeCount || 0);
+                            setUsageMonth(usageData.month);
+                        } else {
+                            // No data OR data from previous month - reset
+                            setPdfAiNoteCount(0);
+                            setYoutubeNoteCount(0);
+                            setUsageMonth(currentMonthYear);
+                            // Update Firestore with reset counts (fire-and-forget)
+                            await updateUserNoteUsage(firebaseUser.uid, { pdfAiCount: 0, youtubeCount: 0 }, currentMonthYear);
+                        }
+                        // TODO: Load chat usage separately if needed by NoteChat, or get from Dashboard context
+                        // For now, initialize chatCount to 0
+                        setChatCount(0);
+
+                    } catch (err) {
+                        console.error("Error loading/updating note usage data:", err);
+                        // Default to 0 counts on error
+                        setPdfAiNoteCount(0);
+                        setYoutubeNoteCount(0);
+                        setUsageMonth(new Date().toISOString().slice(0, 7));
+                        setChatCount(0);
+                        setUploadProgress(prev => ({ ...prev, error: 'Failed to load usage data.' }));
+                    }
+                } else {
+                     // Premium users don't need tracking
+                    setPdfAiNoteCount(0); // Reset local count for clarity
+                    setYoutubeNoteCount(0);
+                    setUsageMonth(''); // Reset local month
+                    setChatCount(0); // Reset chat count too
+                }
+
             } else {
                 // Reset all state on logout
                 setUser(null);
+                setUserName("User");
                 setNotes([]);
                 setSelectedNote(null);
                 setShowPdfViewer(false);
@@ -160,23 +238,29 @@ export function Notes() {
                 setShowSplitView(false);
                 setIsChatOverlayVisible(false);
                 setChatNoteForOverlay(null);
+                // Reset usage and tier
+                setUserTier('loading');
+                setPdfAiNoteCount(0);
+                setYoutubeNoteCount(0);
+                setUsageMonth('');
+                setChatCount(0);
                 navigate('/login');
             }
-            setLoading(false);
+            setLoading(false); // Combined loading state finished
         });
-        return () => unsubscribe();
+        return () => unsubscribeAuth();
     }, [navigate]);
 
     // Notes listener
     useEffect(() => {
         if (!user?.uid) {
             setNotes([]);
-            setLoading(false);
+            setLoading(false); // Ensure loading is off if no user
             return;
         };
-        setLoading(true);
+        // setLoading(true); // Maybe remove setLoading here as it's handled by auth listener?
         const q = query(collection(db, 'notes'), where('userId', '==', user.uid), orderBy('updatedAt', 'desc'));
-        const unsubscribe = onSnapshot(q, (snapshot) => {
+        const unsubscribeNotes = onSnapshot(q, (snapshot) => {
             const notesList: Note[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Note));
             setNotes(notesList);
 
@@ -214,13 +298,13 @@ export function Notes() {
                  setShowPdfViewer(false);
             }
 
-            setLoading(false);
+            // setLoading(false); // Handled by auth listener now
         }, (error) => {
             console.error("Error fetching notes:", error);
-            setLoading(false);
+            // setLoading(false);
             setUploadProgress({ progress: 0, status: '', error: 'Could not load notes.' });
         });
-        return () => unsubscribe();
+        return () => unsubscribeNotes();
     }, [user, selectedNote?.id, showSplitView, splitViewNotes.left?.id, splitViewNotes.right?.id, chatNoteForOverlay?.id, showPdfViewer]); // Added showPdfViewer
 
     // Scroll non-PDF content area to top when note changes or editing starts/ends
@@ -247,6 +331,41 @@ export function Notes() {
             // Handled by the togglePdfViewer function instead.
         }
     }, [selectedNote?.id, selectedNote?.type, selectedNote?.sourceUrl, showPdfViewer]); // Key dependency is showPdfViewer now
+
+    // Click outside handler for highlight buttons
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            // Hide buttons if shown and click is outside the button container
+            if (showHighlightButtons && highlightButtonPosition) {
+                const target = event.target as Element;
+                if (!target.closest('.highlight-buttons-container')) {
+                    setShowHighlightButtons(false);
+                    setSelectedPdfText(null);
+                    setHighlightButtonPosition(null);
+                    window.getSelection()?.removeAllRanges(); // Clear selection visually
+                }
+            }
+        };
+        // Add listener only when buttons *might* be visible (i.e., PDF viewer is on)
+        if (showPdfViewer) {
+             document.addEventListener('mousedown', handleClickOutside);
+        }
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [showHighlightButtons, highlightButtonPosition, showPdfViewer]); // Re-run if buttons/viewer state changes
+
+
+    // --- Memoized Limit Calculation ---
+    const limits = useMemo(() => {
+        if (userTier === 'premium') return { pdfAi: Infinity, youtube: Infinity, chat: Infinity };
+        if (userTier === 'pro') return { pdfAi: PRO_PDF_AI_LIMIT, youtube: PRO_YOUTUBE_LIMIT, chat: PRO_CHAT_LIMIT };
+        return { pdfAi: BASIC_PDF_AI_LIMIT, youtube: BASIC_YOUTUBE_LIMIT, chat: BASIC_CHAT_LIMIT }; // Basic or loading defaults to basic limits for checks
+    }, [userTier]);
+
+    const isPdfAiLimitReached = useMemo(() => userTier !== 'premium' && pdfAiNoteCount >= limits.pdfAi, [userTier, pdfAiNoteCount, limits.pdfAi]);
+    const isYoutubeLimitReached = useMemo(() => userTier !== 'premium' && youtubeNoteCount >= limits.youtube, [userTier, youtubeNoteCount, limits.youtube]);
+    // const isChatLimitReached = useMemo(() => userTier !== 'premium' && chatCount >= limits.chat, [userTier, chatCount, limits.chat]); // If chat limit is managed here
 
 
     // --- Handlers ---
@@ -314,6 +433,12 @@ export function Notes() {
              setTimeout(() => setUploadProgress({ progress: 0, status: '', error: null }), 3000);
              return;
          }
+
+         // --- TODO: Add Chat Limit Check Here ---
+         // if (isChatLimitReached) {
+         //    setUploadProgress({ progress: 0, status: '', error: 'Monthly chat limit reached.', isLimitError: true });
+         //    return;
+         // }
 
         // Determine if we should show side-by-side chat
         const shouldShowSideBySide = note.type === 'pdf' && showPdfViewer && note.sourceUrl && !isMobile;
@@ -403,6 +528,7 @@ export function Notes() {
             }
             setUploadProgress({ progress: 100, status: 'Deleted!', error: null });
             setTimeout(() => setUploadProgress({ progress: 0, status: '', error: null }), 2000);
+            // Note: We don't decrement usage counts on delete. Limits are usually on creation.
         } catch (error) {
             console.error('Error deleting note:', error);
             setUploadProgress({ progress: 0, status: '', error: 'Failed to delete note' });
@@ -434,9 +560,111 @@ export function Notes() {
     const handleAddTag = () => { const trimmedTag = newTag.trim().toLowerCase().replace(/\s+/g, '-'); if (trimmedTag && !editTags.includes(trimmedTag) && editTags.length < 5) { setEditTags([...editTags, trimmedTag]); setNewTag(''); } else if (editTags.length >= 5) { alert("Maximum 5 tags allowed."); } else if (!trimmedTag) { alert("Tag cannot be empty."); } };
     const handleRemoveTag = (tagToRemove: string) => setEditTags(editTags.filter(tag => tag !== tagToRemove));
     const handleRegenerateQuestions = async () => { if (!selectedNote || !geminiApiKey || isRegeneratingQuestions) return; setIsRegeneratingQuestions(true); setUploadProgress({ progress: 0, status: 'Regenerating questions...', error: null }); try { const updatedQuestions = await regenerateStudyQuestions(selectedNote.id, selectedNote.content, geminiApiKey); setSelectedNote(prev => prev ? { ...prev, questions: updatedQuestions } : null); setQuestionAnswers({}); setUploadProgress({ progress: 100, status: 'Questions regenerated!', error: null }); setTimeout(() => setUploadProgress({ progress: 0, status: '', error: null }), 2000); } catch (error) { console.error('Error regenerating questions:', error); setUploadProgress({ progress: 0, status: '', error: error instanceof Error ? error.message : 'Failed to regenerate questions' }); } finally { setIsRegeneratingQuestions(false); } };
-    const handleCreateAINote = async (text: string) => { if (!user || !geminiApiKey) return; setUploadProgress({ progress: 0, status: 'Processing text...', error: null }); try { setUploadProgress(prev => ({ ...prev, progress: 20 })); const processedText = await processTextToAINoteData(text, user.uid, geminiApiKey); setUploadProgress(prev => ({ ...prev, progress: 80, status: 'Saving note...' })); await saveNote({ ...processedText, userId: user.uid, isPublic: false, tags: ['ai-processed'], type: 'personal' }); setUploadProgress({ progress: 100, status: 'AI Note Created!', error: null }); setShowNewNoteModal(false); setTimeout(() => setUploadProgress({ progress: 0, status: '', error: null }), 2000); } catch (error) { console.error('Error creating AI note:', error); setUploadProgress({ progress: 0, status: '', error: error instanceof Error ? error.message : 'Failed to create AI note' }); } };
-    const handlePDFUpload = async (file: File) => { if (!user || !geminiApiKey) return; setUploadProgress({ progress: 0, status: 'Uploading PDF...', error: null }); try { const processedPDF = await processPDF( file, user.uid, geminiApiKey, (progress, status, error) => setUploadProgress({ progress, status, error }) ); setUploadProgress({ progress: 95, status: 'Saving note...', error: null }); await saveNote({ title: processedPDF.title, content: processedPDF.content, type: 'pdf', keyPoints: processedPDF.keyPoints, questions: processedPDF.questions, sourceUrl: processedPDF.sourceUrl, userId: user.uid, isPublic: false, tags: ['pdf', file.name.split('.').pop() || 'file'] }); setUploadProgress({ progress: 100, status: 'PDF Note Created!', error: null }); setShowNewNoteModal(false); setTimeout(() => setUploadProgress({ progress: 0, status: '', error: null }), 2000); } catch (error) { console.error('Error processing PDF:', error); setUploadProgress({ progress: 0, status: '', error: error instanceof Error ? error.message : 'Failed to process PDF' }); } };
-    const handleYoutubeLink = async (url: string) => { if (!user || !geminiApiKey) return; setUploadProgress({ progress: 0, status: 'Processing YouTube...', error: null }); try { const processedYouTube = await processYouTube( url, user.uid, geminiApiKey, (progress, status, error) => setUploadProgress({ progress, status, error }) ); setUploadProgress({ progress: 95, status: 'Saving note...', error: null }); await saveNote({ title: processedYouTube.title, content: processedYouTube.content, type: 'youtube', keyPoints: processedYouTube.keyPoints, questions: processedYouTube.questions, sourceUrl: processedYouTube.sourceUrl, userId: user.uid, isPublic: false, tags: ['youtube', 'video'] }); setUploadProgress({ progress: 100, status: 'YouTube Note Created!', error: null }); setShowNewNoteModal(false); setTimeout(() => setUploadProgress({ progress: 0, status: '', error: null }), 2000); } catch (error) { console.error('Error processing YouTube:', error); setUploadProgress({ progress: 0, status: '', error: error instanceof Error ? error.message : 'Failed to process YouTube' }); } };
+
+    // --- UPDATED Note Creation Handlers with Limit Checks ---
+
+    // Helper to show limit error
+    const showLimitError = (message: string) => {
+        setUploadProgress({ progress: 0, status: '', error: message, isLimitError: true });
+        // Keep error message visible longer for limits
+        setTimeout(() => setUploadProgress({ progress: 0, status: '', error: null, isLimitError: false }), 5000);
+    };
+
+    // Helper to increment usage count
+    const incrementUsage = async (type: 'pdfAi' | 'youtube') => {
+        if (!user || userTier === 'premium') return;
+        const currentMonthYear = new Date().toISOString().slice(0, 7);
+        let newPdfCount = pdfAiNoteCount;
+        let newYoutubeCount = youtubeNoteCount;
+
+        if (type === 'pdfAi') {
+            newPdfCount++;
+            setPdfAiNoteCount(newPdfCount);
+        } else if (type === 'youtube') {
+            newYoutubeCount++;
+            setYoutubeNoteCount(newYoutubeCount);
+        }
+        // Update state month if needed (should be handled by initial load mostly)
+        if (usageMonth !== currentMonthYear) {
+            setUsageMonth(currentMonthYear);
+        }
+        // Update Firestore
+        try {
+            await updateUserNoteUsage(user.uid, { pdfAiCount: newPdfCount, youtubeCount: newYoutubeCount }, currentMonthYear);
+        } catch (err) {
+            console.error("Failed to update note usage in Firestore:", err);
+            // Optional: Revert optimistic UI update or show warning?
+        }
+    };
+
+    const handleCreateAINote = async (text: string) => {
+        if (!user || !geminiApiKey) return;
+        // --- Limit Check ---
+        if (isPdfAiLimitReached) {
+            showLimitError(`Monthly limit of ${limits.pdfAi} PDF/AI notes reached.`);
+            return;
+        }
+        // --- End Limit Check ---
+        setUploadProgress({ progress: 0, status: 'Processing text...', error: null });
+        try {
+            setUploadProgress(prev => ({ ...prev, progress: 20 }));
+            const processedText = await processTextToAINoteData(text, user.uid, geminiApiKey);
+            setUploadProgress(prev => ({ ...prev, progress: 80, status: 'Saving note...' }));
+            await saveNote({ ...processedText, userId: user.uid, isPublic: false, tags: ['ai-processed'], type: 'personal' }); // Counts as PDF/AI
+            setUploadProgress({ progress: 100, status: 'AI Note Created!', error: null });
+            setShowNewNoteModal(false);
+            setTimeout(() => setUploadProgress({ progress: 0, status: '', error: null }), 2000);
+            // --- Increment Usage ---
+            await incrementUsage('pdfAi');
+            // --- End Increment Usage ---
+        } catch (error) { console.error('Error creating AI note:', error); setUploadProgress({ progress: 0, status: '', error: error instanceof Error ? error.message : 'Failed to create AI note' }); }
+    };
+
+    const handlePDFUpload = async (file: File) => {
+        if (!user || !geminiApiKey) return;
+        // --- Limit Check ---
+        if (isPdfAiLimitReached) {
+            showLimitError(`Monthly limit of ${limits.pdfAi} PDF/AI notes reached.`);
+            return;
+        }
+        // --- End Limit Check ---
+        setUploadProgress({ progress: 0, status: 'Uploading PDF...', error: null });
+        try {
+            const processedPDF = await processPDF( file, user.uid, geminiApiKey, (progress, status, error) => setUploadProgress({ progress, status, error }) );
+            setUploadProgress({ progress: 95, status: 'Saving note...', error: null });
+            await saveNote({ title: processedPDF.title, content: processedPDF.content, type: 'pdf', keyPoints: processedPDF.keyPoints, questions: processedPDF.questions, sourceUrl: processedPDF.sourceUrl, userId: user.uid, isPublic: false, tags: ['pdf', file.name.split('.').pop() || 'file'] });
+            setUploadProgress({ progress: 100, status: 'PDF Note Created!', error: null });
+            setShowNewNoteModal(false);
+            setTimeout(() => setUploadProgress({ progress: 0, status: '', error: null }), 2000);
+             // --- Increment Usage ---
+            await incrementUsage('pdfAi');
+            // --- End Increment Usage ---
+        } catch (error) { console.error('Error processing PDF:', error); setUploadProgress({ progress: 0, status: '', error: error instanceof Error ? error.message : 'Failed to process PDF' }); }
+    };
+
+    const handleYoutubeLink = async (url: string) => {
+        if (!user || !geminiApiKey) return;
+        // --- Limit Check ---
+        if (isYoutubeLimitReached) {
+            showLimitError(`Monthly limit of ${limits.youtube} YouTube notes reached.`);
+            return;
+        }
+        // --- End Limit Check ---
+        setUploadProgress({ progress: 0, status: 'Processing YouTube...', error: null });
+        try {
+            const processedYouTube = await processYouTube( url, user.uid, geminiApiKey, (progress, status, error) => setUploadProgress({ progress, status, error }) );
+            setUploadProgress({ progress: 95, status: 'Saving note...', error: null });
+            await saveNote({ title: processedYouTube.title, content: processedYouTube.content, type: 'youtube', keyPoints: processedYouTube.keyPoints, questions: processedYouTube.questions, sourceUrl: processedYouTube.sourceUrl, userId: user.uid, isPublic: false, tags: ['youtube', 'video'] });
+            setUploadProgress({ progress: 100, status: 'YouTube Note Created!', error: null });
+            setShowNewNoteModal(false);
+            setTimeout(() => setUploadProgress({ progress: 0, status: '', error: null }), 2000);
+            // --- Increment Usage ---
+            await incrementUsage('youtube');
+            // --- End Increment Usage ---
+        } catch (error) { console.error('Error processing YouTube:', error); setUploadProgress({ progress: 0, status: '', error: error instanceof Error ? error.message : 'Failed to process YouTube' }); }
+    };
+    // --- END UPDATED Handlers ---
+
     const handleAnswerSelect = (questionKey: string, selectedOption: number) => setQuestionAnswers(prev => ({ ...prev, [questionKey]: selectedOption }));
 
     // PDF Viewer Handlers
@@ -518,29 +746,6 @@ export function Notes() {
         }
     }, [showPdfViewer, showHighlightButtons]); // Depend on viewer visibility
 
-    // Click outside handler for highlight buttons
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            // Hide buttons if shown and click is outside the button container
-            if (showHighlightButtons && highlightButtonPosition) {
-                const target = event.target as Element;
-                if (!target.closest('.highlight-buttons-container')) {
-                    setShowHighlightButtons(false);
-                    setSelectedPdfText(null);
-                    setHighlightButtonPosition(null);
-                    window.getSelection()?.removeAllRanges(); // Clear selection visually
-                }
-            }
-        };
-        // Add listener only when buttons *might* be visible (i.e., PDF viewer is on)
-        if (showPdfViewer) {
-             document.addEventListener('mousedown', handleClickOutside);
-        }
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-        };
-    }, [showHighlightButtons, highlightButtonPosition, showPdfViewer]); // Re-run if buttons/viewer state changes
-
     // Highlight Button Actions
     const handleExplainHighlight = () => {
         if (selectedPdfText && noteChatRef.current) { // Use noteChatRef (side-by-side instance)
@@ -606,7 +811,7 @@ export function Notes() {
             <Sidebar isCollapsed={isSidebarCollapsed} onToggle={handleToggleSidebar} userName={userName} isBlackoutEnabled={isBlackoutEnabled && isSidebarBlackoutEnabled} isIlluminateEnabled={isIlluminateEnabled && isSidebarIlluminateEnabled} />
 
             {/* Main Area */}
-            <main className={`flex-1 flex overflow-hidden transition-all duration-300 ${ isSidebarCollapsed ? 'ml-16 md:ml-20' : 'ml-64' }`}>
+            <main className={`flex-1 flex overflow-hidden transition-all duration-300 ${ isSidebarCollapsed ? 'md:ml-20' : 'md:ml-64' }`}> {/* Adjusted margin for collapsed */}
 
                 {/* === 1. Main Content Area === */}
                 {/* Conditional overflow based on side-by-side view */}
@@ -729,6 +934,12 @@ export function Notes() {
                                      isVisible={true} // Always visible in this layout
                                      onUpdateNoteContent={handleUpdateNoteContentFromChat}
                                      displayMode="inline" // Use inline styling
+                                     // --- TODO: Pass chat usage/limit state ---
+                                     // userTier={userTier}
+                                     // chatCount={chatCount}
+                                     // currentChatLimit={limits.chat}
+                                     // isChatLimitReached={isChatLimitReached}
+                                     // incrementChatUsage={incrementChatUsage} // Need to implement this function
                                  />
                              </div>
                          </div>
@@ -757,7 +968,7 @@ export function Notes() {
                                                 value={editContent}
                                                 onChange={setEditContent}
                                                 height="100%" // Fill available space
-                                                preview="edit" // Or "edit" for side-by-side editing
+                                                preview="live" // Or "edit" for side-by-side editing
                                                 textareaProps={{
                                                     placeholder: "Start writing your note in Markdown...",
                                                     className: `${inputBg} ${inputTextColor} ${placeholderColor}`
@@ -813,15 +1024,37 @@ export function Notes() {
                 {/* === 2. Notes List Sidebar === */}
                 <div className={`w-full md:w-72 lg:w-80 xl:w-96 border-l ${borderColor} flex-shrink-0 flex flex-col ${notesListBg} transition-transform duration-300 ease-in-out ${ isMobile ? (showNotesListOnMobile ? 'translate-x-0 absolute top-0 right-0 h-full z-20 shadow-xl' : 'translate-x-full absolute top-0 right-0 h-full z-10') : 'translate-x-0 relative' }`}>
                     {/* Header */} <div className={`p-3 border-b ${borderColor} flex items-center justify-between flex-shrink-0`}> <h2 className={`text-lg font-semibold ${headingClass} flex items-center gap-2`}> <FileText className={`w-5 h-5 ${iconActionColor}`} /> Notes </h2> <div className="flex items-center gap-2"> {!isMobile && notes.length >= 2 && ( <button onClick={showSplitView ? closeSplitView : startSplitView} className={`${buttonSecondaryClass} p-1.5 rounded-full ${iconHoverColor}`} title={showSplitView ? "Close Comparison" : "Compare Notes"}> <SplitSquareVertical className={`w-4 h-4 ${showSplitView ? iconActionColor: ''}`} /> </button> )} <button onClick={() => setShowNewNoteModal(true)} className={`${buttonPrimaryClass} p-2 rounded-full hover:shadow-md transition-all duration-150`} title="New Note"> <Plus className="w-4 h-4" /> </button> {isMobile && ( <button onClick={() => setShowNotesListOnMobile(false)} className={`p-1.5 rounded-md ${buttonSecondaryClass} ${iconHoverColor}`} title="Hide List"> <X className="w-4 h-4" /> </button> )} </div> </div>
+                    {/* Usage Info */}
+                    {userTier !== 'premium' && userTier !== 'loading' && (
+                         <div className={`p-2 text-center border-b ${borderColor} text-[10px] ${subheadingClass}`}>
+                             PDF/AI: {pdfAiNoteCount}/{limits.pdfAi} | YouTube: {youtubeNoteCount}/{limits.youtube} (monthly)
+                         </div>
+                    )}
                     {/* Search/Filter */} <div className={`p-3 border-b ${borderColor} flex-shrink-0`}> <div className="relative mb-2"> <Search className={`absolute left-2.5 top-1/2 transform -translate-y-1/2 w-4 h-4 ${iconColor}`} /> <input type="text" placeholder="Search notes..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className={`w-full ${inputBg} ${inputTextColor} pl-8 pr-3 py-1.5 rounded-full text-sm focus:outline-none focus:ring-1 ${placeholderColor}`} /> </div> <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar"> {(['all', 'personal', 'pdf', 'youtube'] as const).map(type => ( <button key={type} onClick={() => setFilterType(type)} className={`px-2.5 py-1 text-[11px] rounded-full transition-colors whitespace-nowrap ${filterType === type ? `${buttonPrimaryClass} shadow-sm` : `${buttonSecondaryClass}`}`}> {type === 'all' ? 'All' : type.charAt(0).toUpperCase() + type.slice(1)} </button> ))} </div> </div>
-                    {/* Notes List */} <div className="flex-1 overflow-y-auto"> {loading && notes.length === 0 ? ( <div className="flex justify-center items-center h-full p-6"> <Loader2 className={`w-6 h-6 animate-spin ${iconColor}`} /> </div> ) : !loading && notes.length === 0 ? ( <div className="flex flex-col items-center justify-center h-full text-center p-6"> <FileQuestion className={`w-12 h-12 ${iconColor} mb-3`} /> <p className={`${subheadingClass} mb-4 text-sm`}>No notes yet.</p> <button onClick={() => setShowNewNoteModal(true)} className={`${buttonPrimaryClass} px-3 py-1.5 rounded-md text-sm flex items-center gap-1.5`}> <Plus className="w-4 h-4" /> Create Note </button> </div> ) : ( <div className={`divide-y ${divideColor}`}> {notes.filter((note) => { if (filterType !== 'all' && note.type !== filterType) return false; if (searchQuery) { const search = searchQuery.toLowerCase(); return (note.title.toLowerCase().includes(search) || note.content.toLowerCase().includes(search) || note.tags?.some((tag) => tag.toLowerCase().includes(search))); } return true; }).map((note) => { const isSel = (!showSplitView && selectedNote?.id === note.id); // Selected in single view
+                    {/* Notes List */} <div className="flex-1 overflow-y-auto"> {loading && userTier === 'loading' ? ( <div className="flex justify-center items-center h-full p-6"> <Loader2 className={`w-6 h-6 animate-spin ${iconColor}`} /> </div> ) : !loading && notes.length === 0 ? ( <div className="flex flex-col items-center justify-center h-full text-center p-6"> <FileQuestion className={`w-12 h-12 ${iconColor} mb-3`} /> <p className={`${subheadingClass} mb-4 text-sm`}>No notes yet.</p> <button onClick={() => setShowNewNoteModal(true)} className={`${buttonPrimaryClass} px-3 py-1.5 rounded-md text-sm flex items-center gap-1.5`}> <Plus className="w-4 h-4" /> Create Note </button> </div> ) : ( <div className={`divide-y ${divideColor}`}> {notes.filter((note) => { if (filterType !== 'all' && note.type !== filterType) return false; if (searchQuery) { const search = searchQuery.toLowerCase(); return (note.title.toLowerCase().includes(search) || note.content.toLowerCase().includes(search) || note.tags?.some((tag) => tag.toLowerCase().includes(search))); } return true; }).map((note) => { const isSel = (!showSplitView && selectedNote?.id === note.id); // Selected in single view
                                 const isSplitL = showSplitView && splitViewNotes.left?.id === note.id; const isSplitR = showSplitView && splitViewNotes.right?.id === note.id; const isSelectedAny = isSel || isSplitL || isSplitR; let typeIcon; switch (note.type) { case 'personal': typeIcon = <Briefcase className="w-3 h-3"/>; break; case 'pdf': typeIcon = <FileText className="w-3 h-3"/>; break; case 'youtube': typeIcon = <Youtube className="w-3 h-3"/>; break; default: typeIcon = null; } return ( <div key={note.id} className={`p-3 cursor-pointer transition-colors duration-150 ${listItemHoverBg} ${listItemBaseClass} ${isSelectedAny ? listItemSelectedBg : ''}`} onClick={() => handleSelectNote(note)}> <div className="flex justify-between items-start gap-2"> <h3 className={`text-sm font-medium mb-0.5 line-clamp-1 ${headingClass}`}>{note.title || "Untitled"}</h3> {isSplitL && <span className={`px-1.5 py-0.5 text-[9px] rounded font-medium shrink-0 bg-blue-500/20 text-blue-300`}>Left</span>} {isSplitR && <span className={`px-1.5 py-0.5 text-[9px] rounded font-medium shrink-0 bg-purple-500/20 text-purple-300`}>Right</span>} </div> <p className={`${subheadingClass} text-xs line-clamp-2 mb-1.5`}>{note.content.substring(0, 100)}</p> <div className="flex flex-wrap items-center gap-1 text-[10px]"> <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded ${tagColors[note.type]} ${tagBaseBg} ${tagTextBase}`}> {typeIcon} {note.type.charAt(0).toUpperCase() + note.type.slice(1)} </span> {note.isPublic && <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded ${tagColors.public} ${tagBaseBg} ${tagTextBase}`}><Globe className="w-3 h-3"/> Public</span>} {note.tags?.slice(0, 2).map((tag) => <span key={tag} className={`px-1.5 py-0.5 rounded ${tagColors.custom} ${tagBaseBg} ${tagTextBase} truncate max-w-[60px]`} title={tag}>#{tag}</span>)} {note.tags && note.tags.length > 2 && <span className={`px-1.5 py-0.5 rounded ${tagColors.custom} ${tagBaseBg} ${tagTextBase}`}>+{note.tags.length - 2}</span>} <span className={`ml-auto text-gray-500 dark:text-gray-500`}>{note.updatedAt?.toDate().toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span> </div> </div> ); })} </div> )} </div>
                 </div>
 
             </main>
 
             {/* Modals & Overlays */}
-            {showNewNoteModal && ( <NewNoteModal onClose={() => { setShowNewNoteModal(false); setUploadProgress({ progress: 0, status: '', error: null }); }} onCreatePersonalNote={handleCreatePersonalNote} onCreateAINote={handleCreateAINote} onUploadPDF={handlePDFUpload} onYoutubeLink={handleYoutubeLink} uploadProgress={uploadProgress} isIlluminateEnabled={isIlluminateEnabled} isBlackoutEnabled={isBlackoutEnabled} /> )}
+            {showNewNoteModal && (
+                <NewNoteModal
+                    onClose={() => { setShowNewNoteModal(false); setUploadProgress({ progress: 0, status: '', error: null }); }}
+                    onCreatePersonalNote={handleCreatePersonalNote}
+                    onCreateAINote={handleCreateAINote}
+                    onUploadPDF={handlePDFUpload}
+                    onYoutubeLink={handleYoutubeLink}
+                    uploadProgress={uploadProgress}
+                    isIlluminateEnabled={isIlluminateEnabled}
+                    isBlackoutEnabled={isBlackoutEnabled}
+                    // Pass limit info to modal
+                    limits={limits}
+                    pdfAiNoteCount={pdfAiNoteCount}
+                    youtubeNoteCount={youtubeNoteCount}
+                    userTier={userTier}
+                />
+            )}
 
             {/* Chat Overlay (Rendered conditionally based on state, not tied directly to PDF view) */}
             {chatNoteForOverlay && user && geminiApiKey && (
@@ -836,13 +1069,33 @@ export function Notes() {
                      isVisible={isChatOverlayVisible} // Controlled by overlay state
                      onUpdateNoteContent={handleUpdateNoteContentFromChat}
                      displayMode="overlay" // Use overlay styling
+                     // --- TODO: Pass chat usage/limit state ---
+                     // userTier={userTier}
+                     // chatCount={chatCount}
+                     // currentChatLimit={limits.chat}
+                     // isChatLimitReached={isChatLimitReached}
+                     // incrementChatUsage={incrementChatUsage} // Need to implement this function
                  />
             )}
 
             {/* Mobile Floating Button */}
             {isMobile && !showNotesListOnMobile && ( <button onClick={() => setShowNotesListOnMobile(true)} className={`fixed bottom-4 right-4 z-30 p-3 rounded-full shadow-lg transition-all duration-300 ${buttonPrimaryClass} transform hover:scale-110 active:scale-100 ${isChatOverlayVisible ? 'bottom-16 md:bottom-4' : 'bottom-4'}`} title="Show Notes"> <List className="w-5 h-5" /> </button> )}
+
             {/* Upload Progress Indicator */}
-            {uploadProgress.status && ( <div className={`fixed bottom-4 left-4 z-[60] p-3 rounded-lg shadow-lg text-xs font-medium transition-opacity duration-300 ${isIlluminateEnabled ? 'bg-white border border-gray-200 text-gray-800' : 'bg-gray-800 border border-gray-700 text-gray-200'} ${uploadProgress.error ? (isIlluminateEnabled ? '!bg-red-100 !border-red-300 !text-red-700' : '!bg-red-900/50 !border-red-700 !text-red-300') : (uploadProgress.progress === 100 ? (isIlluminateEnabled ? '!bg-green-100 !border-green-300 !text-green-700' : '!bg-green-900/50 !border-green-700 !text-green-300') : '')}`}> <div className="flex items-center gap-2"> {uploadProgress.error ? <AlertTriangle className="w-4 h-4 text-red-500" /> : uploadProgress.progress === 100 ? <Check className="w-4 h-4 text-green-500" /> : <Loader2 className="w-4 h-4 animate-spin text-blue-500" />} <span>{uploadProgress.error || uploadProgress.status}</span> {uploadProgress.progress > 0 && uploadProgress.progress < 100 && !uploadProgress.error && (<span className="text-gray-500">({uploadProgress.progress}%)</span>)} </div> {!uploadProgress.error && uploadProgress.progress < 100 && ( <div className={`w-full h-1 mt-1 rounded-full overflow-hidden ${isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-600'}`}> <div className="h-full bg-blue-500 rounded-full transition-all duration-300" style={{ width: `${uploadProgress.progress}%` }}></div> </div> )} </div> )}
+            {uploadProgress.status && (
+                <div className={`fixed bottom-4 left-4 z-[60] p-3 rounded-lg shadow-lg text-xs font-medium transition-opacity duration-300 max-w-[calc(100%-4rem)] sm:max-w-xs ${isIlluminateEnabled ? 'bg-white border border-gray-200 text-gray-800' : 'bg-gray-800 border border-gray-700 text-gray-200'} ${uploadProgress.error ? (isIlluminateEnabled ? '!bg-red-100 !border-red-300 !text-red-700' : '!bg-red-900/50 !border-red-700 !text-red-300') : (uploadProgress.progress === 100 ? (isIlluminateEnabled ? '!bg-green-100 !border-green-300 !text-green-700' : '!bg-green-900/50 !border-green-700 !text-green-300') : '')}`}>
+                    <div className="flex items-center gap-2">
+                        {uploadProgress.error ? (uploadProgress.isLimitError ? <ShieldAlert className="w-4 h-4 text-orange-500" /> : <AlertTriangle className="w-4 h-4 text-red-500" />) : uploadProgress.progress === 100 ? <Check className="w-4 h-4 text-green-500" /> : <Loader2 className="w-4 h-4 animate-spin text-blue-500" />}
+                        <span className="truncate">{uploadProgress.error || uploadProgress.status}</span>
+                        {uploadProgress.progress > 0 && uploadProgress.progress < 100 && !uploadProgress.error && (<span className="text-gray-500 flex-shrink-0">({uploadProgress.progress}%)</span>)}
+                    </div>
+                    {!uploadProgress.error && uploadProgress.progress < 100 && (
+                        <div className={`w-full h-1 mt-1 rounded-full overflow-hidden ${isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-600'}`}>
+                            <div className="h-full bg-blue-500 rounded-full transition-all duration-300" style={{ width: `${uploadProgress.progress}%` }}></div>
+                        </div>
+                    )}
+                </div>
+            )}
 
         </div> // End Root Flex Container
     );

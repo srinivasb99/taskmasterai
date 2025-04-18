@@ -20,7 +20,7 @@ function SplashScreen() {
   const [currentFeatureIndex, setCurrentFeatureIndex] = useState(0);
   const [isImageLoaded, setIsImageLoaded] = useState(false);
 
-  // --- Features Array (Complete and Unchanged from previous full version) ---
+  // --- Features Array (Focus Mode description updated slightly if needed, but structure unchanged) ---
   const features = [
     {
       icon: LayoutDashboard,
@@ -80,14 +80,15 @@ function SplashScreen() {
     },
     {
       icon: Focus,
-      title: 'Focus Mode',
+      title: 'Focus Mode', // This is the feature to target for "Coming Soon"
       description: 'Take command of your focus with our comprehensive distraction management system. Block distracting websites and apps with customizable schedules, create focus profiles for different activities, and use our smart notification management to filter only essential alerts. Enhance your concentration with our curated collection of ambient sounds, including nature sounds, white noise, and focus-optimized music. Track your focus sessions and receive insights to improve your productivity patterns.',
       isNew: false,
-      link: '/focus'
+      link: '/focus', // Link might be irrelevant if it's "Coming Soon" but keep for structure
+      // No image provided for Focus Mode in the original code
     }
   ];
 
-  // --- Image Preloading Effect ---
+  // --- Image Preloading Effect (Unchanged) ---
   useEffect(() => {
     const currentImage = features[currentFeatureIndex].image;
     if (currentImage) {
@@ -102,7 +103,7 @@ function SplashScreen() {
     } else {
       setIsImageLoaded(true); // No image, treat as loaded
     }
-  }, [currentFeatureIndex]); // Dependency on index ensures this runs when feature changes
+  }, [currentFeatureIndex]);
 
   const handleNext = () => {
     setCurrentFeatureIndex((prev) => Math.min(prev + 1, features.length - 1));
@@ -117,25 +118,23 @@ function SplashScreen() {
   return (
     <div className="min-h-screen bg-gray-900 font-poppins p-4 md:p-6 overflow-hidden flex flex-col justify-center items-center relative">
 
-      {/* Legal Links - Fixed top right */}
+      {/* Legal Links - Fixed top right (Unchanged) */}
       <div className="fixed top-4 right-4 md:top-6 md:right-6 flex justify-end gap-3 z-50">
         <a href="/privacy-policy" target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 text-xs text-gray-400 bg-gray-800/80 rounded-full hover:bg-indigo-500/20 hover:text-indigo-400 transition-all duration-300 flex items-center gap-1.5 backdrop-blur-sm"> Privacy Policy <ExternalLink className="h-3 w-3" /> </a>
         <a href="/terms" target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 text-xs text-gray-400 bg-gray-800/80 rounded-full hover:bg-indigo-500/20 hover:text-indigo-400 transition-all duration-300 flex items-center gap-1.5 backdrop-blur-sm"> Terms & Conditions <ExternalLink className="h-3 w-3" /> </a>
       </div>
 
-      {/* Centered Content Area - Added top padding for mobile to avoid overlap */}
+      {/* Centered Content Area (Unchanged structure) */}
       <div className="w-full max-w-6xl px-4 flex flex-col items-center pt-16 sm:pt-12 md:pt-0">
 
-        {/* Logo and Title Section */}
+        {/* Logo and Title Section (Unchanged) */}
         <div className="text-center relative z-10 mb-8 md:mb-10 w-full">
-          {/* Logo SVG */}
           <div className="relative inline-block animate-float mb-4">
             <div className="absolute inset-0 bg-indigo-500 blur-2xl opacity-20 rounded-full transform scale-150"></div>
             <svg className="relative w-12 h-12 md:w-16 md:h-16 mx-auto text-indigo-400" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M16.19 2H7.81C4.17 2 2 4.17 2 7.81V16.19C2 19.83 4.17 22 7.81 22H16.19C19.83 22 22 19.83 22 16.19V7.81C22 4.17 19.83 2 16.19 2ZM9.97 14.9L7.72 17.15C7.57 17.3 7.38 17.37 7.19 17.37C7 17.37 6.8 17.3 6.66 17.15L5.91 16.4C5.61 16.11 5.61 15.63 5.91 15.34C6.2 15.05 6.67 15.05 6.97 15.34L7.19 15.56L8.91 13.84C9.2 13.55 9.67 13.55 9.97 13.84C10.26 14.13 10.26 14.61 9.97 14.9ZM9.97 7.9L7.72 10.15C7.57 10.3 7.38 10.37 7.19 10.37C7 10.37 6.8 10.3 6.66 10.15L5.91 9.4C5.61 9.11 5.61 8.63 5.91 8.34C6.2 8.05 6.67 8.05 6.97 8.34L7.19 8.56L8.91 6.84C9.2 6.55 9.67 6.55 9.97 6.84C10.26 7.13 10.26 7.61 9.97 7.9ZM17.56 16.62H12.31C11.9 16.62 11.56 16.28 11.56 15.87C11.56 15.46 11.9 15.12 12.31 15.12H17.56C17.98 15.12 18.31 15.46 18.31 15.87C18.31 16.28 17.98 16.62 17.56 16.62ZM17.56 9.62H12.31C11.9 9.62 11.56 9.28 11.56 8.87C11.56 8.46 11.9 8.12 12.31 8.12H17.56C17.98 8.12 18.31 8.46 18.31 8.87C18.31 9.28 17.98 9.62 17.56 9.62Z" fill="currentColor" />
             </svg>
           </div>
-          {/* Title H1 */}
           <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-3 animate-slide-up">
             Welcome to{' '}
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-indigo-400 animate-gradient relative inline-block">
@@ -143,22 +142,21 @@ function SplashScreen() {
               <span className="absolute inset-0 bg-gradient-to-r from-indigo-400/20 via-purple-400/20 to-indigo-400/20 blur-xl -z-10 animate-pulse"></span>
             </span>
           </h1>
-          {/* Subtitle P */}
           <p className="text-base md:text-lg text-gray-300 animate-fade-in-delay max-w-2xl mx-auto">
             Here's what I can do to <span className="font-semibold text-indigo-300">supercharge</span> your productivity
           </p>
         </div>
 
-        {/* Feature Display Card */}
+        {/* Feature Display Card (Unchanged structure) */}
         <div className="relative bg-gray-800/80 backdrop-blur-xl rounded-2xl p-6 md:p-8 lg:p-10 animate-slide-up shadow-2xl border border-gray-700/50 w-full">
           <div className="absolute inset-0 bg-gradient-to-b from-indigo-500/5 via-purple-500/5 to-gray-900/5 blur-3xl -z-10 animate-pulse-slow rounded-2xl pointer-events-none"></div>
 
-          {/* Flex container for Content + Image */}
+          {/* Flex container for Content + Image (Unchanged structure) */}
           <div className={`flex flex-col ${currentFeature.image ? 'md:flex-row' : ''} gap-6 md:gap-8 lg:gap-12`}>
 
-            {/* Content Column */}
+            {/* Content Column (Unchanged structure) */}
             <div className={`${currentFeature.image ? 'md:w-1/2' : 'w-full'} flex flex-col`}>
-              {/* Top Block: Icon, Title, Button - Using items-center for vertical alignment */}
+              {/* Top Block: Icon, Title, Button */}
               <div className="flex items-center gap-4 mb-6"> {/* Vertically center items, added bottom margin */}
                   <div className="p-2.5 bg-indigo-500/10 rounded-lg animate-pulse-subtle flex-shrink-0">
                       {React.createElement(currentFeature.icon, {
@@ -171,18 +169,26 @@ function SplashScreen() {
                       <h2 className="text-xl sm:text-2xl md:text-3xl font-semibold text-white inline">
                           {currentFeature.title}
                       </h2>
-                      {/* Try Now Button */}
-                      <button
-                          onClick={() => navigate(currentFeature.link)}
-                          className="group px-3.5 py-1.5 text-sm font-medium text-white bg-indigo-600 rounded-full hover:bg-indigo-700 transition-all duration-300 flex items-center gap-1 shadow hover:shadow-md whitespace-nowrap"
-                      >
-                          Try Now
-                          <ChevronRight className="w-4 h-4 transform group-hover:translate-x-0.5 transition-transform" />
-                      </button>
+                      {/* --- MODIFIED BUTTON --- */}
+                      {/* Conditionally render "Coming Soon" or "Try Now" */}
+                      {currentFeature.title === 'Focus Mode' ? (
+                        <span className="px-3.5 py-1.5 text-sm font-medium text-gray-400 bg-gray-700/50 rounded-full cursor-default whitespace-nowrap">
+                          Coming Soon
+                        </span>
+                      ) : (
+                        <button
+                            onClick={() => navigate(currentFeature.link)}
+                            className="group px-3.5 py-1.5 text-sm font-medium text-white bg-indigo-600 rounded-full hover:bg-indigo-700 transition-all duration-300 flex items-center gap-1 shadow hover:shadow-md whitespace-nowrap"
+                        >
+                            Try Now
+                            <ChevronRight className="w-4 h-4 transform group-hover:translate-x-0.5 transition-transform" />
+                        </button>
+                      )}
+                      {/* --- END MODIFIED BUTTON --- */}
                   </div>
               </div>
 
-              {/* Description Block */}
+              {/* Description Block (Unchanged) */}
               <p className="text-gray-300 text-sm md:text-base leading-relaxed">
                 {currentFeature.description}
               </p>
@@ -193,29 +199,30 @@ function SplashScreen() {
               // Use key on container to force remount for consistent animation
               <div
                 key={currentFeature.image}
-                className="md:w-1/2 mt-4 md:mt-0 group relative rounded-xl overflow-hidden"
+                className="md:w-1/2 mt-4 md:mt-0 group relative rounded-xl overflow-hidden" // Group class is needed for group-hover
               >
-                 {/* Background gradient placeholder */}
+                 {/* Background gradient placeholder (Unchanged) */}
                  <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 via-purple-500/10 to-gray-800/10"></div>
-                 {/* Loading Skeleton */}
+                 {/* Loading Skeleton (Unchanged) */}
                  {!isImageLoaded && (
                     <div className="absolute inset-0 bg-gray-700/50 animate-pulse"></div>
                  )}
-                 {/* The Image */}
+                 {/* --- MODIFIED IMAGE --- */}
                  <img
                   src={currentFeature.image}
                   alt={`${currentFeature.title} Preview`}
-                  className={`relative w-full h-auto md:h-full md:object-cover transition-all duration-700 ease-in-out rounded-xl shadow-lg transform group-hover:scale-[1.03] ${
-                    isImageLoaded ? 'opacity-100 blur-0 scale-100' : 'opacity-0 blur-sm scale-105' // Animation classes
-                  }`}
+                  className={`relative w-full h-auto md:h-full md:object-cover rounded-xl shadow-lg transform transition-all duration-500 ease-out ${ // Adjusted duration, kept transform for base state
+                    isImageLoaded ? 'opacity-100 blur-0 scale-100' : 'opacity-0 blur-sm scale-105' // Image load animation
+                  } group-hover:-translate-y-2 group-hover:shadow-xl`} // Pop-up effect on hover: translate up, increase shadow
                  />
+                 {/* --- END MODIFIED IMAGE --- */}
               </div>
             )}
           </div>
 
-          {/* Navigation and Progress */}
+          {/* Navigation and Progress (Unchanged structure) */}
           <div className="mt-8 md:mt-10">
-             {/* Navigation Buttons and Progress Dots */}
+             {/* Navigation Buttons and Progress Dots (Unchanged) */}
              <div className="flex justify-between items-center gap-4">
               {/* Previous Button */}
               <button
@@ -279,7 +286,7 @@ function SplashScreen() {
       </div>
 
 
-      {/* Styles */}
+      {/* Styles (Unchanged) */}
       <style jsx>{`
         /* Keyframes */
         @keyframes slide-up { from { opacity: 0; transform: translateY(25px); } to { opacity: 1; transform: translateY(0); } }

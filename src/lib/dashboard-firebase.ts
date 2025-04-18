@@ -32,6 +32,7 @@ import {
 /* ------------------------------------------------------------------
    2. AUTH LISTENERS
    ------------------------------------------------------------------ */
+export { onAuthStateChanged as onFirebaseAuthStateChanged };
 
 // --- TIER DEFINITIONS & LIMITS (Centralized) ---
 export const PREMIUM_EMAILS = ["robinmyh@gmail.com", "oliverbeckett069420@gmail.com"];

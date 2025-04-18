@@ -1,17 +1,22 @@
-import React, { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect, useRef, useMemo } from "react"; // Added useMemo
+import { useNavigate, Link } from "react-router-dom"; // Added Link
 import {
     Folder, Folders as FoldersIcon, FolderPlus, Edit, Bot, Trash, Search, X, MessageSquare, ChevronRight, ChevronDown,
     FileText, Brain, Star, MoreHorizontal, Plus, Clock, Calendar, CheckCircle, AlertCircle,
     Sparkles, MessageCircle, Play, BookOpen, Tag, Download, Upload, Copy, Printer, Share2,
     Settings, Filter, SortAsc, Bookmark, Layers, LayoutGrid, List, Zap, Award, Repeat, Shuffle,
     ArrowLeft, ArrowRight, Eye, EyeOff, RefreshCw, Lightbulb, Flame, Target, PenTool, Gamepad2,
-    FolderTree, BarChart, Send, Home, LogOut, HelpCircle, User, Sun, Moon, Check
+    FolderTree, BarChart, Send, Home, LogOut, HelpCircle, User, Sun, Moon, Check, Crown // Added Crown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sidebar } from "./Sidebar"; // Assuming Sidebar component is correctly imported
 import { auth } from "../lib/firebase";
-import { geminiApiKey } from "../lib/dashboard-firebase"; // Reusing dashboard-firebase for API key
+// Reusing dashboard-firebase for API key AND usage/tier functions
+import {
+    geminiApiKey,
+    getUserUsageData,
+    updateUserChatUsage
+} from "../lib/dashboard-firebase";
 import {
     FolderData,
     FolderWithItems,
@@ -37,17 +42,31 @@ import {
     getSubFolders, // Make sure this fetches FolderData[], not FolderWithItems[] initially
     deleteSubFolder
 } from "../lib/folders-firebase"; // Ensure this file exports all used functions
+// Import AI Context functions
+import {
+    getUserContext,
+    UserContext
+} from '../lib/ai-context-firebase'; // Adjusted path for AI Context
 import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
 import remarkGfm from "remark-gfm";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 
+
+// ---------------------
+// Constants for Tiers & Limits (Reusing from Dashboard)
+// ---------------------
+const PREMIUM_EMAILS = ["robinmyh@gmail.com", "oliverbeckett069420@gmail.com"];
+const PRO_EMAILS = ["srinibaj10@gmail.com"];
+const BASIC_CHAT_LIMIT = 10; // Chat limit for Basic users (in Folders AI)
+const PRO_CHAT_LIMIT = 200; // Chat limit for Pro users (in Folders AI)
+
 // ---------------------
 // Gemini Integration (Reusing from Dashboard.tsx with minor tweaks)
 // ---------------------
 // Use 1.5 flash and enable SSE - Adjust model if needed
-const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}&alt=sse`; // Updated model
+const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}&alt=sse`; // Updated model
 
 const fetchWithTimeout = async (url: string, options: RequestInit, timeout = 30000) => {
     const controller = new AbortController();
@@ -150,6 +169,10 @@ const extractCandidateText = (rawResponseText: string): string => {
                         console.error("Gemini API Error in response chunk:", parsedJson.error.message);
                         // Return error immediately? Or accumulate? Let's accumulate text and show final error later.
                         // return `Error: ${parsedJson.error.message}`;
+                    } else if (parsedJson.candidates?.[0]?.finishReason && parsedJson.candidates?.[0]?.finishReason !== 'STOP') {
+                         console.error("Gemini API finishReason error:", parsedJson.candidates[0].finishReason);
+                         // Append error to existing text? Or replace? Let's make it the primary message if an error occurs.
+                         return `Error: Generation stopped (${parsedJson.candidates[0].finishReason})`;
                     }
                 } catch (e) {
                     // Incomplete JSON chunk, ignore for now, wait for more data
@@ -231,19 +254,36 @@ const chatPanelVariants = {
   exit: { x: "100%", opacity: 0, transition: { type: "tween", duration: 0.3 } },
 };
 
-// Helper to create context for AI
-const createPrompt = (userMessage: string, folder?: FolderWithItems | null, items?: FolderItem[]): string => {
+// Helper to create context for AI - NOW INCLUDES UNIVERSAL CONTEXT
+const createPrompt = (
+    userMessage: string,
+    folder?: FolderWithItems | null,
+    items?: FolderItem[],
+    universalContext?: UserContext | null // Added universal context parameter
+): string => {
   let context = `You are a variant of TaskMaster AI, an agent specifically designed to help the user study. You are integrated into a Folders page with access to flashcards/notes. The user is currently interacting with the folder system.\n`;
 
+   // --- Add Universal Context ---
+   if (universalContext) {
+       context += "\n[USER'S UNIVERSAL CONTEXT]\n";
+       if (universalContext.workDescription) context += `- Role/Work: ${universalContext.workDescription}\n`;
+       if (universalContext.shortTermFocus) context += `- Current Focus: ${universalContext.shortTermFocus}\n`;
+       if (universalContext.longTermGoals) context += `- Long-Term Goals: ${universalContext.longTermGoals}\n`;
+       if (universalContext.otherContext) context += `- Other Notes: ${universalContext.otherContext}\n`;
+       context += "--- End of Universal Context ---\n";
+   }
+
+  // --- Add Folder Context ---
   if (folder) {
-    context += `\nThe user has the folder "${folder.name}" selected.`;
+    context += `\n[CURRENT FOLDER CONTEXT]\n`;
+    context += `Folder Name: "${folder.name}".`;
     if (folder.description) {
       context += ` Description: "${folder.description}".`;
     }
     context += ` Folder type: ${folder.type}.`;
 
     if (items && items.length > 0) {
-      context += `\n\nHere are some items currently in the folder (up to 10 for context):\n`;
+      context += `\nFolder Items (sample):\n`;
       items.slice(0, 10).forEach((item, index) => {
         context += `${index + 1}. `;
         if ('definition' in item) { // Flashcard
@@ -261,6 +301,7 @@ const createPrompt = (userMessage: string, folder?: FolderWithItems | null, item
     } else {
       context += `\nThe folder "${folder.name}" is currently empty or items haven't been loaded for context.\n`;
     }
+    context += "--- End of Folder Context ---\n";
   } else {
     context += "\nNo specific folder is currently selected by the user.\n";
   }
@@ -268,7 +309,7 @@ const createPrompt = (userMessage: string, folder?: FolderWithItems | null, item
   context += `\nUser query: "${userMessage}"\n`;
   context += `\nAssistant Response:`; // Gemini expects this structure
   context += `\nInstructions for Assistant:
-  - Respond helpfully and concisely to the user's query based on the provided context.
+  - Respond helpfully and concisely to the user's query based on the provided universal and folder context.
   - If asked to create flashcards or questions, format the response ONLY as a valid JSON object within a markdown code block like this:
     \`\`\`json
     {
@@ -281,7 +322,7 @@ const createPrompt = (userMessage: string, folder?: FolderWithItems | null, item
     }
     \`\`\`
   - Do NOT include any conversational text before or after the JSON block if you are generating items.
-  - If the query is conversational (e.g., explaining something, summarizing), respond in natural language markdown.
+  - If the query is conversational (e.g., explaining something, summarizing), respond in natural language markdown, leveraging context.
   - Be specific to the folder content if provided.
   - If no folder is selected and the query requires one, politely ask the user to select a folder.`;
 
@@ -300,6 +341,15 @@ export function Folders() {
   const navigate = useNavigate();
   const [user, setUser] = useState<any>(null); // Use firebase.User | null ideally
   const [userName, setUserName] = useState<string>("User");
+
+  // --- START: User Tier & Usage State ---
+  const [userTier, setUserTier] = useState<'basic' | 'pro' | 'premium' | 'loading'>('loading');
+  const [chatCount, setChatCount] = useState(0);
+  const [chatMonth, setChatMonth] = useState(''); // Store YYYY-MM
+  const [isChatLimitReached, setIsChatLimitReached] = useState(false);
+  const [loadedAiContext, setLoadedAiContext] = useState<UserContext | null>(null); // Store fetched universal context
+  const [isLoadingAiContext, setIsLoadingAiContext] = useState(true); // Loading state for universal context
+  // --- END: User Tier & Usage State ---
 
   // Folder & Item State
   const [folders, setFolders] = useState<FolderWithItems[]>([]);
@@ -511,14 +561,62 @@ export function Folders() {
     }
   }, [isIlluminateEnabled, isBlackoutEnabled]); // Depend on both
 
-  // Auth listener
+  // Auth listener & Initial Data Fetch (User, Tier, Usage, Context, Tags)
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
       setUser(firebaseUser);
       if (firebaseUser) {
         setUserName(firebaseUser.displayName || firebaseUser.email?.split('@')[0] || "User");
         await fetchAllTags(firebaseUser.uid); // Fetch global tags on login
-      } else {
+
+        // --- Determine Tier ---
+        let tier: 'basic' | 'pro' | 'premium' = 'basic'; // Default to basic
+        if (firebaseUser.email && PREMIUM_EMAILS.includes(firebaseUser.email)) {
+            tier = 'premium';
+        } else if (firebaseUser.email && PRO_EMAILS.includes(firebaseUser.email)) {
+            tier = 'pro';
+        }
+        setUserTier(tier);
+
+        // --- Load Usage Data (if not premium) ---
+        if (tier !== 'premium') {
+            try {
+                const currentMonthYear = new Date().toISOString().slice(0, 7); // "YYYY-MM"
+                const usageData = await getUserUsageData(firebaseUser.uid);
+                if (usageData && usageData.month === currentMonthYear) {
+                    setChatCount(usageData.count);
+                    setChatMonth(usageData.month);
+                    const limit = tier === 'pro' ? PRO_CHAT_LIMIT : BASIC_CHAT_LIMIT;
+                    setIsChatLimitReached(usageData.count >= limit);
+                } else {
+                    setChatCount(0);
+                    setChatMonth(currentMonthYear);
+                    setIsChatLimitReached(false);
+                    await updateUserChatUsage(firebaseUser.uid, 0, currentMonthYear).catch(err => console.error("Failed initial chat usage reset:", err));
+                }
+            } catch (err) {
+                console.error("Error loading/updating usage data:", err);
+                setChatCount(0);
+                setChatMonth(new Date().toISOString().slice(0, 7));
+                setIsChatLimitReached(false);
+            }
+        } else { // Premium user
+            setChatCount(0); setChatMonth(''); setIsChatLimitReached(false);
+        }
+
+        // --- Load Universal AI Context ---
+        setIsLoadingAiContext(true);
+        try {
+            const context = await getUserContext(firebaseUser.uid);
+            setLoadedAiContext(context);
+        } catch (err) {
+            console.error("Error loading AI context:", err);
+            setLoadedAiContext(null); // Set to null on error
+        } finally {
+            setIsLoadingAiContext(false);
+        }
+
+      } else { // User signed out
         navigate("/login");
         // Clear state on logout
         setFolders([]);
@@ -528,7 +626,10 @@ export function Folders() {
         setTags([]);
         setFolderTagsMap({});
         setChatHistory([]);
-        // Reset UI state? Optional.
+        setUserTier('loading'); // Reset tier state
+        setChatCount(0); setChatMonth(''); setIsChatLimitReached(false); // Reset usage
+        setLoadedAiContext(null); // Reset context
+        setIsLoadingAiContext(true); // Reset context loading state
       }
     });
     return () => unsubscribe();
@@ -837,6 +938,21 @@ export function Folders() {
       setEditingFolderId(null);
       // Move focus to the form? Optional.
   };
+
+  const handleEditSubFolder = (parentId: string, subFolderId: string) => {
+    const subFolder = subFolders[parentId]?.find(sub => sub.id === subFolderId);
+    if (!subFolder) return;
+    resetFolderForm();
+    setEditingFolderId(subFolderId);
+    setNewFolderName(subFolder.name);
+    setNewFolderDescription(subFolder.description || "");
+    setNewFolderType(subFolder.type);
+    setNewFolderTags(folderTagsMap[subFolderId] || []);
+    setIsCreatingSubFolder(true); // Use the subfolder form for editing
+    setSubFolderParent(folders.find(f => f.id === parentId) || null); // Set parent context for display/logic
+    setActiveDropdownId(null);
+    // Optionally scroll the form into view if it's in the right pane
+};
 
   const handleUpdateFolder = async () => {
     if (!user || !editingFolderId || !newFolderName.trim()) return;
@@ -1551,18 +1667,57 @@ export function Folders() {
     const handleChatSubmit = async (e?: React.FormEvent) => {
         if (e) e.preventDefault();
         const messageContent = chatMessage.trim();
-        if (!messageContent || !user || !selectedFolder || isChatLoading) return;
+        if (!messageContent || !user || !selectedFolder || isChatLoading || userTier === 'loading') return;
+
+        // --- START: Usage Check ---
+        const currentMonthYear = new Date().toISOString().slice(0, 7);
+        let limitReached = false;
+        let currentLimit = Infinity; // Default for premium
+
+        if (userTier !== 'premium') {
+            currentLimit = userTier === 'pro' ? PRO_CHAT_LIMIT : BASIC_CHAT_LIMIT;
+            let currentCount = chatCount; // Use state value
+
+            // Check if the stored month matches the current month
+            if (chatMonth !== currentMonthYear) {
+                currentCount = 0; // Reset count locally
+                setChatCount(0); setChatMonth(currentMonthYear); setIsChatLimitReached(false);
+                limitReached = false;
+                updateUserChatUsage(user.uid, 0, currentMonthYear).catch(err => console.error("Failed to reset chat usage:", err));
+            } else {
+                limitReached = currentCount >= currentLimit;
+                setIsChatLimitReached(limitReached); // Sync state just in case
+            }
+        }
+
+        if (limitReached) {
+            setChatHistory(prev => [...prev, {
+                role: 'assistant', content: `You've reached your ${currentLimit} chat message limit for this month. Upgrade for more interactions!`, error: true, id: `limit-${Date.now()}`
+            }]);
+            setChatMessage(''); // Clear input
+            return; // Stop submission
+        }
+        // --- END: Usage Check ---
 
         const userMsg: ChatMessage = { role: 'user', content: messageContent, id: `user-${Date.now()}` };
-        // Add user message and placeholder for assistant reply
         const assistantMsgId = `assistant-${Date.now()}`;
         const assistantPlaceholder: ChatMessage = { role: 'assistant', content: "...", id: assistantMsgId };
+
         setChatHistory(prev => [...prev, userMsg, assistantPlaceholder]);
         setChatMessage(""); // Clear input immediately
         setIsChatLoading(true);
 
-        // Generate the prompt with context
-        const prompt = createPrompt(userMsg.content, selectedFolder, folderItems);
+        // --- Increment Usage Count (Before API Call) ---
+        if (userTier !== 'premium') {
+            const newCount = chatCount + 1;
+            setChatCount(newCount); // Optimistic UI update
+            setIsChatLimitReached(newCount >= currentLimit); // Update limit state
+            updateUserChatUsage(user.uid, newCount, currentMonthYear).catch(err => console.error("Failed to update chat usage:", err));
+        }
+        // --- End Increment Logic ---
+
+        // Generate the prompt with context (folder items and universal context)
+        const prompt = createPrompt(userMsg.content, selectedFolder, folderItems, loadedAiContext);
         // console.log("Gemini Prompt:", prompt); // Debug: Log the prompt
 
         const geminiOptions = {
@@ -1571,7 +1726,12 @@ export function Folders() {
             body: JSON.stringify({
                  contents: [{ parts: [{ text: prompt }] }],
                  // Optional: Add safety settings, generation config if needed
-                 // generationConfig: { temperature: 0.7, topP: 0.9, topK: 40 }
+                 safetySettings: [ // Standard safety settings
+                      { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+                      { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+                      { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+                      { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+                  ],
             }),
         };
 
@@ -1601,62 +1761,41 @@ export function Folders() {
              let replyContent = finalExtractedText.trim() || "Sorry, I couldn't generate a response."; // Use final text
              let itemsAdded = false;
 
-            // Process JSON blocks from the *final* extracted text or raw response?
-            // Using finalExtractedText might be cleaner if JSON is within the main text.
-            // Using finalRawResponse might be better if JSON block detection needs the raw SSE structure. Let's try finalExtractedText first.
-             const jsonBlocks = extractJsonBlocks(finalExtractedText);
+             const jsonBlocks = extractJsonBlocks(finalExtractedText); // Extract JSON from final text
 
             if (jsonBlocks.length > 0) {
-                 // Assume the *first valid* JSON block is the intended item data
                  const blockToProcess = jsonBlocks[0];
                  try {
                      const parsed = JSON.parse(blockToProcess);
                      let addedCount = 0;
                      if (parsed.type === "flashcard" && Array.isArray(parsed.data)) {
-                         if (selectedFolder.type !== 'question') { // Can add to mixed or flashcard folders
+                         if (selectedFolder.type !== 'question') {
                              for (const card of parsed.data) {
                                  if (card.term && card.definition) {
                                      await addFlashcard(user.uid, selectedFolder.id, { term: card.term, definition: card.definition, topic: card.topic || null });
-                                     itemsAdded = true;
-                                     addedCount++;
+                                     itemsAdded = true; addedCount++;
                                  }
                              }
-                         } else {
-                             replyContent = "Sorry, I can only add flashcards to 'flashcard' or 'mixed' type folders.";
-                         }
+                         } else { replyContent = "Sorry, I can only add flashcards to 'flashcard' or 'mixed' type folders."; }
                      } else if (parsed.type === "question" && Array.isArray(parsed.data)) {
-                          if (selectedFolder.type !== 'flashcard') { // Can add to mixed or question folders
+                          if (selectedFolder.type !== 'flashcard') {
                               for (const q of parsed.data) {
                                   if (q.question && Array.isArray(q.options) && q.options.length > 1 && typeof q.correctAnswer === 'number' && q.correctAnswer >= 0 && q.correctAnswer < q.options.length) {
                                       await addQuestion(user.uid, selectedFolder.id, { question: q.question, options: q.options, correctAnswer: q.correctAnswer, explanation: q.explanation || null });
-                                      itemsAdded = true;
-                                      addedCount++;
+                                      itemsAdded = true; addedCount++;
                                   }
                               }
-                          } else {
-                              replyContent = "Sorry, I can only add questions to 'question' or 'mixed' type folders.";
-                          }
+                          } else { replyContent = "Sorry, I can only add questions to 'question' or 'mixed' type folders."; }
                      }
 
-                     // If JSON was processed, replace the placeholder reply or provide confirmation
                      if (itemsAdded) {
                          replyContent = `Okay, I've added ${addedCount} ${parsed.type === 'flashcard' ? 'flashcard(s)' : 'question(s)'} to the "${selectedFolder.name}" folder.`;
-                     } else if (replyContent.startsWith("Sorry,")) {
-                        // Use the error message generated above
-                     } else {
-                        // If JSON was found but didn't match expected structure or wasn't added
-                        replyContent = "I found some structured data, but couldn't add items. Please check the format if you intended to create items.";
-                     }
+                     } else if (replyContent.startsWith("Sorry,")) { /* Use generated error */ }
+                     else { replyContent = "I found some structured data, but couldn't add items. Please check the format if you intended to create items."; }
 
-                     // Remove the JSON block from the displayed text if the main response was just the block
-                     // This check helps avoid showing the raw JSON if the AI *only* returned that.
-                     if (finalExtractedText.trim().startsWith('```json') && finalExtractedText.trim().endsWith('```')) {
-                        // Reply content is already set to the confirmation/error message.
-                     } else {
-                         // Otherwise, try to remove the code block from the conversational text (if present)
-                         // This might leave artifacts if the JSON wasn't perfectly formatted in the block.
-                         replyContent = replyContent.replace(/```json\s*([\s\S]*?)\s*```/g, '').trim();
-                     }
+                      // Clean up display text if needed
+                      if (finalExtractedText.trim().startsWith('```json') && finalExtractedText.trim().endsWith('```')) { /* Content is already set */ }
+                      else { replyContent = replyContent.replace(/```json\s*([\s\S]*?)\s*```/g, '').trim(); }
 
 
                  } catch (err) {
@@ -1685,6 +1824,14 @@ export function Folders() {
             setIsChatLoading(false);
         }
     };
+
+    // --- Use Memo for Chat Limit ---
+    const currentChatLimit = useMemo(() => {
+        if (userTier === 'premium') return Infinity;
+        if (userTier === 'pro') return PRO_CHAT_LIMIT;
+        return BASIC_CHAT_LIMIT;
+    }, [userTier]);
+
 
   // --- Filtering & Sorting ---
 
@@ -2399,17 +2546,7 @@ export function Folders() {
                                                                       <span className={`text-[9px] font-medium px-1 py-0 rounded-full whitespace-nowrap mr-1 ${folderTypeColors[sub.type]}`}>
                                                                          {sub.itemCount || 0}
                                                                       </span>
-<button
-  onClick={(e) => {
-    e.stopPropagation();
-    handleEditSubFolder(folder.id, sub.id);
-  }}
-  className={`p-0.5 rounded ${iconColor}`}
-  title="Edit Subfolder"
->
-  <Edit className="w-2.5 h-2.5" />
-</button>
-
+                                                                      <button onClick={(e) => { e.stopPropagation(); handleEditSubFolder(folder.id, sub.id); }} className={`p-0.5 rounded ${iconColor}`} title="Edit Subfolder"><Edit className="w-2.5 h-2.5" /></button>
                                                                       <button onClick={(e) => { e.stopPropagation(); handleDeleteSubFolder(folder.id, sub.id); }} className={`p-0.5 rounded ${isIlluminateEnabled ? 'text-red-500 hover:bg-red-100' : 'text-red-500 hover:bg-red-900/50'}`} title="Delete Subfolder"><Trash className="w-2.5 h-2.5" /></button>
                                                                   </div>
                                                              </div>
@@ -2592,7 +2729,7 @@ export function Folders() {
                                                    </div>
                                                   <div className="flex justify-end space-x-1.5 pt-1">
                                                       <button type="button" onClick={resetFolderForm} className={`${buttonSecondaryClass} px-3 py-1 rounded-full text-xs`}>Cancel</button>
-                                                      <button type="button" onClick={handleCreateSubFolder} className={`${buttonPrimaryClass} px-3 py-1 rounded-full text-xs`}>Create Subfolder</button>
+                                                      <button type="button" onClick={editingFolderId ? handleUpdateFolder : handleCreateSubFolder} className={`${buttonPrimaryClass} px-3 py-1 rounded-full text-xs`}>{editingFolderId ? "Update Subfolder" : "Create Subfolder"}</button>
                                                   </div>
                                               </div>
                                           </motion.div>
@@ -2822,32 +2959,54 @@ export function Folders() {
              )}
 
              {/* Chat Input Form */}
-             <form onSubmit={handleChatSubmit} className={`p-2 sm:p-3 border-t ${illuminateBorder} ${isIlluminateEnabled ? 'bg-gray-100' : 'bg-gray-800/90 backdrop-blur-sm'} flex-shrink-0`}>
-               <div className="flex gap-1.5 items-center">
-                 <input
-                   type="text"
-                   value={chatMessage}
-                   onChange={(e) => setChatMessage(e.target.value)}
-                   placeholder={selectedFolder ? "Ask about this folder..." : "Select a folder first"}
-                    className={`flex-1 ${inputBg} rounded-full px-4 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-150 shadow-sm placeholder-gray-400 dark:placeholder-gray-500 disabled:opacity-60`}
-                   disabled={isChatLoading || !selectedFolder}
-                   aria-label="Chat input"
-                 />
-                 <button
-                   type="submit"
-                   disabled={isChatLoading || !chatMessage.trim() || !selectedFolder}
-                   className={`${buttonPrimaryClass} p-2 rounded-full transition-colors flex-shrink-0`} // Removed extra hover/active styles handled by class
-                   title="Send Message"
-                   aria-label="Send chat message"
-                 >
-                   {isChatLoading ? (
-                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                   ) : (
-                       <Send className="w-4 h-4" />
-                   )}
-                 </button>
-               </div>
-             </form>
+             <div className={`px-2 sm:px-3 pt-1 border-t ${illuminateBorder} ${isIlluminateEnabled ? 'bg-gray-100' : 'bg-gray-800/90 backdrop-blur-sm'} flex-shrink-0 sticky bottom-0`}> {/* Changed structure */}
+                 {/* Usage Display */}
+                 {userTier !== 'premium' && userTier !== 'loading' && (
+                     <div className="pb-1 text-xs text-center">
+                         <span className={isIlluminateEnabled ? 'text-gray-600' : 'text-gray-400'}>
+                             Messages this month: {chatCount} / {currentChatLimit}
+                         </span>
+                         {isChatLimitReached && (
+                             <span className="text-red-500 ml-1 font-medium">(Limit Reached)</span>
+                         )}
+                         {!isChatLimitReached && userTier === 'basic' && (
+                              <Link to="/pricing" className={`ml-2 font-medium ${isIlluminateEnabled ? 'text-blue-600 hover:text-blue-700' : 'text-blue-400 hover:text-blue-300'} hover:underline`}>
+                                 <Crown className="w-2.5 h-2.5 inline mr-0.5"/>Upgrade
+                             </Link>
+                         )}
+                     </div>
+                 )}
+                 {/* Input Form */}
+                 <form onSubmit={handleChatSubmit} className="flex gap-1.5 items-center pb-2">
+                     <input
+                       type="text"
+                       value={chatMessage}
+                       onChange={(e) => setChatMessage(e.target.value)}
+                       placeholder={
+                            !selectedFolder ? "Select a folder first" :
+                            isChatLimitReached ? "Monthly limit reached..." :
+                            isLoadingAiContext ? "Loading AI context..." :
+                            "Ask about this folder..."
+                        }
+                       className={`flex-1 ${inputBg} rounded-full px-4 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-150 shadow-sm placeholder-gray-400 dark:placeholder-gray-500 disabled:opacity-60 ${isChatLimitReached ? 'cursor-not-allowed' : ''}`}
+                       disabled={isChatLoading || !selectedFolder || isChatLimitReached || userTier === 'loading' || isLoadingAiContext}
+                       aria-label="Chat input"
+                     />
+                     <button
+                       type="submit"
+                       disabled={isChatLoading || !chatMessage.trim() || !selectedFolder || isChatLimitReached || userTier === 'loading' || isLoadingAiContext}
+                       className={`${buttonPrimaryClass} p-2 rounded-full transition-colors flex-shrink-0 ${isChatLimitReached ? 'cursor-not-allowed' : ''}`} // Removed extra hover/active styles handled by class
+                       title="Send Message"
+                       aria-label="Send chat message"
+                     >
+                       {isChatLoading ? (
+                           <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                       ) : (
+                           <Send className="w-4 h-4" />
+                       )}
+                     </button>
+                 </form>
+             </div>
            </motion.div>
          )}
        </AnimatePresence>

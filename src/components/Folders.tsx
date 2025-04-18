@@ -66,7 +66,7 @@ const PRO_CHAT_LIMIT = 200; // Chat limit for Pro users (in Folders AI)
 // Gemini Integration (Reusing from Dashboard.tsx with minor tweaks)
 // ---------------------
 // Use 1.5 flash and enable SSE - Adjust model if needed
-const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}&alt=sse`; // Updated model
+const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}&alt=sse`; // Updated model
 
 const fetchWithTimeout = async (url: string, options: RequestInit, timeout = 30000) => {
     const controller = new AbortController();

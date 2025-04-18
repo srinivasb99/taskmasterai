@@ -20,7 +20,7 @@ function SplashScreen() {
   const [currentFeatureIndex, setCurrentFeatureIndex] = useState(0);
   const [isImageLoaded, setIsImageLoaded] = useState(false);
 
-  // --- Features Array (Focus Mode description updated slightly if needed, but structure unchanged) ---
+  // --- Features Array (Unchanged) ---
   const features = [
     {
       icon: LayoutDashboard,
@@ -80,11 +80,11 @@ function SplashScreen() {
     },
     {
       icon: Focus,
-      title: 'Focus Mode', // This is the feature to target for "Coming Soon"
+      title: 'Focus Mode',
       description: 'Take command of your focus with our comprehensive distraction management system. Block distracting websites and apps with customizable schedules, create focus profiles for different activities, and use our smart notification management to filter only essential alerts. Enhance your concentration with our curated collection of ambient sounds, including nature sounds, white noise, and focus-optimized music. Track your focus sessions and receive insights to improve your productivity patterns.',
       isNew: false,
-      link: '/focus', // Link might be irrelevant if it's "Coming Soon" but keep for structure
-      // No image provided for Focus Mode in the original code
+      link: '/focus',
+      // No image
     }
   ];
 
@@ -92,16 +92,16 @@ function SplashScreen() {
   useEffect(() => {
     const currentImage = features[currentFeatureIndex].image;
     if (currentImage) {
-      setIsImageLoaded(false); // Reset on index change
+      setIsImageLoaded(false);
       const img = new Image();
       img.src = currentImage;
       img.onload = () => setIsImageLoaded(true);
       img.onerror = () => {
         console.error(`Failed to load image: ${currentImage}`);
-        setIsImageLoaded(true); // Mark as loaded even on error to remove loading state
+        setIsImageLoaded(true);
       }
     } else {
-      setIsImageLoaded(true); // No image, treat as loaded
+      setIsImageLoaded(true);
     }
   }, [currentFeatureIndex]);
 
@@ -118,13 +118,13 @@ function SplashScreen() {
   return (
     <div className="min-h-screen bg-gray-900 font-poppins p-4 md:p-6 overflow-hidden flex flex-col justify-center items-center relative">
 
-      {/* Legal Links - Fixed top right (Unchanged) */}
+      {/* Legal Links (Unchanged) */}
       <div className="fixed top-4 right-4 md:top-6 md:right-6 flex justify-end gap-3 z-50">
         <a href="/privacy-policy" target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 text-xs text-gray-400 bg-gray-800/80 rounded-full hover:bg-indigo-500/20 hover:text-indigo-400 transition-all duration-300 flex items-center gap-1.5 backdrop-blur-sm"> Privacy Policy <ExternalLink className="h-3 w-3" /> </a>
         <a href="/terms" target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 text-xs text-gray-400 bg-gray-800/80 rounded-full hover:bg-indigo-500/20 hover:text-indigo-400 transition-all duration-300 flex items-center gap-1.5 backdrop-blur-sm"> Terms & Conditions <ExternalLink className="h-3 w-3" /> </a>
       </div>
 
-      {/* Centered Content Area (Unchanged structure) */}
+      {/* Centered Content Area (Unchanged) */}
       <div className="w-full max-w-6xl px-4 flex flex-col items-center pt-16 sm:pt-12 md:pt-0">
 
         {/* Logo and Title Section (Unchanged) */}
@@ -147,29 +147,25 @@ function SplashScreen() {
           </p>
         </div>
 
-        {/* Feature Display Card (Unchanged structure) */}
+        {/* Feature Display Card (Unchanged) */}
         <div className="relative bg-gray-800/80 backdrop-blur-xl rounded-2xl p-6 md:p-8 lg:p-10 animate-slide-up shadow-2xl border border-gray-700/50 w-full">
           <div className="absolute inset-0 bg-gradient-to-b from-indigo-500/5 via-purple-500/5 to-gray-900/5 blur-3xl -z-10 animate-pulse-slow rounded-2xl pointer-events-none"></div>
 
-          {/* Flex container for Content + Image (Unchanged structure) */}
+          {/* Flex container (Unchanged) */}
           <div className={`flex flex-col ${currentFeature.image ? 'md:flex-row' : ''} gap-6 md:gap-8 lg:gap-12`}>
 
-            {/* Content Column (Unchanged structure) */}
+            {/* Content Column (Includes "Coming Soon" logic - Unchanged from previous correct version) */}
             <div className={`${currentFeature.image ? 'md:w-1/2' : 'w-full'} flex flex-col`}>
-              {/* Top Block: Icon, Title, Button */}
-              <div className="flex items-center gap-4 mb-6"> {/* Vertically center items, added bottom margin */}
+              <div className="flex items-center gap-4 mb-6">
                   <div className="p-2.5 bg-indigo-500/10 rounded-lg animate-pulse-subtle flex-shrink-0">
                       {React.createElement(currentFeature.icon, {
-                        // Adjusted icon size for better presence
                         className: "h-7 w-7 md:h-8 md:w-8 text-indigo-400"
                       })}
                   </div>
                   <div className="flex-grow flex flex-wrap items-center gap-x-3 gap-y-1">
-                      {/* Feature Title */}
                       <h2 className="text-xl sm:text-2xl md:text-3xl font-semibold text-white inline">
                           {currentFeature.title}
                       </h2>
-                      {/* --- MODIFIED BUTTON --- */}
                       {/* Conditionally render "Coming Soon" or "Try Now" */}
                       {currentFeature.title === 'Focus Mode' ? (
                         <span className="px-3.5 py-1.5 text-sm font-medium text-gray-400 bg-gray-700/50 rounded-full cursor-default whitespace-nowrap">
@@ -184,22 +180,18 @@ function SplashScreen() {
                             <ChevronRight className="w-4 h-4 transform group-hover:translate-x-0.5 transition-transform" />
                         </button>
                       )}
-                      {/* --- END MODIFIED BUTTON --- */}
                   </div>
               </div>
-
-              {/* Description Block (Unchanged) */}
               <p className="text-gray-300 text-sm md:text-base leading-relaxed">
                 {currentFeature.description}
               </p>
             </div>
 
-            {/* Image Column (Right on Desktop) - Conditional */}
+            {/* Image Column */}
             {currentFeature.image && (
-              // Use key on container to force remount for consistent animation
               <div
                 key={currentFeature.image}
-                className="md:w-1/2 mt-4 md:mt-0 group relative rounded-xl overflow-hidden" // Group class is needed for group-hover
+                className="md:w-1/2 mt-4 md:mt-0 group relative rounded-xl overflow-hidden" // Keep group class
               >
                  {/* Background gradient placeholder (Unchanged) */}
                  <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 via-purple-500/10 to-gray-800/10"></div>
@@ -211,18 +203,17 @@ function SplashScreen() {
                  <img
                   src={currentFeature.image}
                   alt={`${currentFeature.title} Preview`}
-                  className={`relative w-full h-auto md:h-full md:object-cover rounded-xl shadow-lg transform transition-all duration-500 ease-out ${ // Adjusted duration, kept transform for base state
-                    isImageLoaded ? 'opacity-100 blur-0 scale-100' : 'opacity-0 blur-sm scale-105' // Image load animation
-                  } group-hover:-translate-y-2 group-hover:shadow-xl`} // Pop-up effect on hover: translate up, increase shadow
+                  className={`relative w-full h-auto md:h-full md:object-cover rounded-xl shadow-lg transform transition-all duration-500 ease-out ${ // Use transform for base state, adjust duration/easing
+                    isImageLoaded ? 'opacity-100 blur-0 scale-100' : 'opacity-0 blur-sm scale-105' // Loading animation
+                  } group-hover:scale-[1.03] group-hover:shadow-xl`} // Subtle scale up and enhance shadow on hover
                  />
                  {/* --- END MODIFIED IMAGE --- */}
               </div>
             )}
           </div>
 
-          {/* Navigation and Progress (Unchanged structure) */}
+          {/* Navigation and Progress (Unchanged) */}
           <div className="mt-8 md:mt-10">
-             {/* Navigation Buttons and Progress Dots (Unchanged) */}
              <div className="flex justify-between items-center gap-4">
               {/* Previous Button */}
               <button

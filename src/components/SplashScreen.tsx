@@ -20,13 +20,13 @@ function SplashScreen() {
   const [currentFeatureIndex, setCurrentFeatureIndex] = useState(0);
   const [isImageLoaded, setIsImageLoaded] = useState(false);
 
-  // --- Features Array (Images Added, Folders Added, isNew flag kept for potential future use but tag removed) ---
+  // --- Features Array (Unchanged) ---
   const features = [
     {
       icon: LayoutDashboard,
       title: 'Dashboard',
       description: 'Your command center for peak productivity. Seamlessly manage tasks, set goals, and track projects with intelligent due dates that automatically sync to your calendar. The dashboard includes customizable timers, including our signature Pomodoro timer with adjustable work/break intervals. Monitor your productivity trends, set daily/weekly targets, and celebrate your achievements with our built-in progress tracking.',
-      isNew: true, // Kept data, removed visual tag
+      isNew: true,
       link: '/dashboard',
       image: 'https://firebasestorage.googleapis.com/v0/b/deepworkai-c3419.appspot.com/o/Screenshot%202025-02-17%20at%202.41.40%E2%80%AFPM.png?alt=media&token=cb886770-2359-46e2-8469-e2447d13dba4'
     },
@@ -87,26 +87,22 @@ function SplashScreen() {
     }
   ];
 
-  // --- Image Preloading Effect ---
+  // --- Image Preloading Effect (Unchanged logic, ensure optimization of source images) ---
   useEffect(() => {
     const currentImage = features[currentFeatureIndex].image;
     if (currentImage) {
-      setIsImageLoaded(false); // Reset loading state
+      setIsImageLoaded(false);
       const img = new Image();
       img.src = currentImage;
-      img.onload = () => {
-        // Optional small delay to ensure transition is visible if needed
-        // setTimeout(() => setIsImageLoaded(true), 50);
-        setIsImageLoaded(true);
-      };
+      img.onload = () => setIsImageLoaded(true);
       img.onerror = () => {
         console.error(`Failed to load image: ${currentImage}`);
-        setIsImageLoaded(true); // Set to true even on error to remove loading state
+        setIsImageLoaded(true); // Still mark as 'loaded' to remove spinner/blur
       }
     } else {
-      setIsImageLoaded(true); // No image for this feature, treat as loaded
+      setIsImageLoaded(true);
     }
-  }, [currentFeatureIndex]); // Rerun when index changes
+  }, [currentFeatureIndex]);
 
   const handleNext = () => {
     setCurrentFeatureIndex((prev) => Math.min(prev + 1, features.length - 1));
@@ -119,168 +115,149 @@ function SplashScreen() {
   const currentFeature = features[currentFeatureIndex];
 
   return (
-    // Main container: centers content vertically and horizontally
+    // Main container: Full height, flex column, centering content
     <div className="min-h-screen bg-gray-900 font-poppins p-4 md:p-6 overflow-hidden flex flex-col justify-center items-center relative">
 
-      {/* Legal Links - Fixed top right */}
+      {/* Legal Links - Top right */}
       <div className="fixed top-4 right-4 md:top-6 md:right-6 flex justify-end gap-3 z-50">
-        <a
-          href="/privacy-policy"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="px-3 py-1.5 text-xs text-gray-400 bg-gray-800/80 rounded-full hover:bg-indigo-500/20 hover:text-indigo-400 transition-all duration-300 flex items-center gap-1.5 backdrop-blur-sm"
-        >
-          Privacy Policy
-          <ExternalLink className="h-3 w-3" />
-        </a>
-        <a
-          href="/terms"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="px-3 py-1.5 text-xs text-gray-400 bg-gray-800/80 rounded-full hover:bg-indigo-500/20 hover:text-indigo-400 transition-all duration-300 flex items-center gap-1.5 backdrop-blur-sm"
-        >
-          Terms & Conditions
-          <ExternalLink className="h-3 w-3" />
-        </a>
+        {/* Links remain the same */}
+        <a href="/privacy-policy" target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 text-xs text-gray-400 bg-gray-800/80 rounded-full hover:bg-indigo-500/20 hover:text-indigo-400 transition-all duration-300 flex items-center gap-1.5 backdrop-blur-sm"> Privacy Policy <ExternalLink className="h-3 w-3" /> </a>
+        <a href="/terms" target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 text-xs text-gray-400 bg-gray-800/80 rounded-full hover:bg-indigo-500/20 hover:text-indigo-400 transition-all duration-300 flex items-center gap-1.5 backdrop-blur-sm"> Terms & Conditions <ExternalLink className="h-3 w-3" /> </a>
       </div>
 
-      {/* Centered Content Block */}
+      {/* Centered Content Area */}
       <div className="w-full max-w-6xl px-4 flex flex-col items-center">
 
-        {/* Logo and Title Section - Centered horizontally, with bottom margin */}
-        <div className="text-center relative z-10 mb-8 w-full"> {/* Added bottom margin */}
+        {/* Logo and Title Section */}
+        <div className="text-center relative z-10 mb-8 md:mb-10 w-full"> {/* Adjusted margin */}
           <div className="relative inline-block animate-float mb-4">
+            {/* SVG and gradient background */}
             <div className="absolute inset-0 bg-indigo-500 blur-2xl opacity-20 rounded-full transform scale-150"></div>
-            <svg className="relative w-12 h-12 md:w-16 md:h-16 mx-auto text-indigo-400" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M16.19 2H7.81C4.17 2 2 4.17 2 7.81V16.19C2 19.83 4.17 22 7.81 22H16.19C19.83 22 22 19.83 22 16.19V7.81C22 4.17 19.83 2 16.19 2ZM9.97 14.9L7.72 17.15C7.57 17.3 7.38 17.37 7.19 17.37C7 17.37 6.8 17.3 6.66 17.15L5.91 16.4C5.61 16.11 5.61 15.63 5.91 15.34C6.2 15.05 6.67 15.05 6.97 15.34L7.19 15.56L8.91 13.84C9.2 13.55 9.67 13.55 9.97 13.84C10.26 14.13 10.26 14.61 9.97 14.9ZM9.97 7.9L7.72 10.15C7.57 10.3 7.38 10.37 7.19 10.37C7 10.37 6.8 10.3 6.66 10.15L5.91 9.4C5.61 9.11 5.61 8.63 5.91 8.34C6.2 8.05 6.67 8.05 6.97 8.34L7.19 8.56L8.91 6.84C9.2 6.55 9.67 6.55 9.97 6.84C10.26 7.13 10.26 7.61 9.97 7.9ZM17.56 16.62H12.31C11.9 16.62 11.56 16.28 11.56 15.87C11.56 15.46 11.9 15.12 12.31 15.12H17.56C17.98 15.12 18.31 15.46 18.31 15.87C18.31 16.28 17.98 16.62 17.56 16.62ZM17.56 9.62H12.31C11.9 9.62 11.56 9.28 11.56 8.87C11.56 8.46 11.9 8.12 12.31 8.12H17.56C17.98 8.12 18.31 8.46 18.31 8.87C18.31 9.28 17.98 9.62 17.56 9.62Z" fill="currentColor" />
-            </svg>
+            <svg className="relative w-12 h-12 md:w-16 md:h-16 mx-auto text-indigo-400" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"> <path d="M16.19 2H7.81C4.17 2 2 4.17 2 7.81V16.19C2 19.83 4.17 22 7.81 22H16.19C19.83 22 22 19.83 22 16.19V7.81C22 4.17 19.83 2 16.19 2ZM9.97 14.9L7.72 17.15C7.57 17.3 7.38 17.37 7.19 17.37C7 17.37 6.8 17.3 6.66 17.15L5.91 16.4C5.61 16.11 5.61 15.63 5.91 15.34C6.2 15.05 6.67 15.05 6.97 15.34L7.19 15.56L8.91 13.84C9.2 13.55 9.67 13.55 9.97 13.84C10.26 14.13 10.26 14.61 9.97 14.9ZM9.97 7.9L7.72 10.15C7.57 10.3 7.38 10.37 7.19 10.37C7 10.37 6.8 10.3 6.66 10.15L5.91 9.4C5.61 9.11 5.61 8.63 5.91 8.34C6.2 8.05 6.67 8.05 6.97 8.34L7.19 8.56L8.91 6.84C9.2 6.55 9.67 6.55 9.97 6.84C10.26 7.13 10.26 7.61 9.97 7.9ZM17.56 16.62H12.31C11.9 16.62 11.56 16.28 11.56 15.87C11.56 15.46 11.9 15.12 12.31 15.12H17.56C17.98 15.12 18.31 15.46 18.31 15.87C18.31 16.28 17.98 16.62 17.56 16.62ZM17.56 9.62H12.31C11.9 9.62 11.56 9.28 11.56 8.87C11.56 8.46 11.9 8.12 12.31 8.12H17.56C17.98 8.12 18.31 8.46 18.31 8.87C18.31 9.28 17.98 9.62 17.56 9.62Z" fill="currentColor" /> </svg>
           </div>
-          <h1 className="text-3xl md:text-5xl font-bold text-white mb-3 animate-slide-up">
-            Welcome to{' '}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-indigo-400 animate-gradient relative inline-block">
-              TaskMaster AI
-              <span className="absolute inset-0 bg-gradient-to-r from-indigo-400/20 via-purple-400/20 to-indigo-400/20 blur-xl -z-10 animate-pulse"></span>
-            </span>
-          </h1>
-          <p className="text-base md:text-lg text-gray-300 animate-fade-in-delay max-w-2xl mx-auto">
-            Here's what I can do to <span className="font-semibold text-indigo-300">supercharge</span> your productivity
-          </p>
+          <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-3 animate-slide-up"> Welcome to <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-indigo-400 animate-gradient relative inline-block"> TaskMaster AI <span className="absolute inset-0 bg-gradient-to-r from-indigo-400/20 via-purple-400/20 to-indigo-400/20 blur-xl -z-10 animate-pulse"></span> </span> </h1>
+          <p className="text-base md:text-lg text-gray-300 animate-fade-in-delay max-w-2xl mx-auto"> Here's what I can do to <span className="font-semibold text-indigo-300">supercharge</span> your productivity </p>
         </div>
 
         {/* Feature Display Card */}
-        {/* Removed flex-grow from this wrapper */}
-        <div className="relative bg-gray-800/80 backdrop-blur-xl rounded-2xl p-6 md:p-10 animate-slide-up shadow-2xl border border-gray-700/50 w-full">
+        <div className="relative bg-gray-800/80 backdrop-blur-xl rounded-2xl p-6 md:p-8 lg:p-10 animate-slide-up shadow-2xl border border-gray-700/50 w-full">
           <div className="absolute inset-0 bg-gradient-to-b from-indigo-500/5 via-purple-500/5 to-gray-900/5 blur-3xl -z-10 animate-pulse-slow rounded-2xl pointer-events-none"></div>
 
-          <div className={`flex flex-col ${currentFeature.image ? 'md:flex-row' : ''} gap-8 md:gap-12`}>
-            {/* Feature Content */}
-            <div className={`${currentFeature.image ? 'md:w-1/2' : 'w-full'}`}>
-              {/* Icon, Title, and Try Now Button Line */}
-              <div className="flex items-start gap-4 mb-4 md:mb-6"> {/* Added bottom margin */}
-                  <div className="p-2.5 bg-indigo-500/10 rounded-lg animate-pulse-subtle flex-shrink-0 mt-1">
+          {/* Flex container for Content + Image */}
+          {/* Stacks vertically on mobile (default), row on medium screens and up */}
+          <div className={`flex flex-col ${currentFeature.image ? 'md:flex-row' : ''} gap-6 md:gap-8 lg:gap-12`}>
+
+            {/* Content Column (Left on Desktop) */}
+            <div className={`${currentFeature.image ? 'md:w-1/2' : 'w-full'} flex flex-col`}>
+              {/* Top Block: Icon, Title, Button */}
+              <div className="flex items-start gap-4 mb-4"> {/* Reduced bottom margin */}
+                  <div className="p-2.5 bg-indigo-500/10 rounded-lg animate-pulse-subtle flex-shrink-0 mt-0.5 md:mt-1"> {/* Adjusted icon alignment */}
                       {React.createElement(currentFeature.icon, {
                       className: "h-6 w-6 md:h-7 md:h-7 text-indigo-400"
                       })}
                   </div>
-                  {/* Container for Title and Button */}
-                  <div className="flex-grow flex flex-wrap items-center gap-x-3 gap-y-1">
-                      <h3 className="text-xl md:text-2xl font-semibold text-white inline-block">
+                  <div className="flex-grow flex flex-wrap items-baseline gap-x-3 gap-y-1"> {/* Use items-baseline for better alignment if wraps */}
+                      <h2 className="text-xl md:text-2xl font-semibold text-white inline"> {/* Changed to h2 */}
                           {currentFeature.title}
-                      </h3>
+                      </h2>
                       <button
                           onClick={() => navigate(currentFeature.link)}
-                          className="group px-3 py-1 text-xs font-medium text-white bg-indigo-600 rounded-full hover:bg-indigo-700 transition-all duration-300 flex items-center gap-1 shadow hover:shadow-md"
-                          style={{ height: 'fit-content' }} // Ensure button height aligns well
+                          className="group px-3 py-1 text-xs font-medium text-white bg-indigo-600 rounded-full hover:bg-indigo-700 transition-all duration-300 flex items-center gap-1 shadow hover:shadow-md whitespace-nowrap" // Added whitespace-nowrap
                       >
                           Try Now
                           <ChevronRight className="w-3.5 h-3.5 transform group-hover:translate-x-0.5 transition-transform" />
                       </button>
-                      {/* BETA TAG REMOVED FROM HERE */}
                   </div>
               </div>
 
-              <p className="text-gray-300 text-sm md:text-base leading-relaxed pl-[calc(2.5rem+1rem)] md:pl-[calc(2.75rem+1rem)]"> {/* Indent description to align with title */}
+              {/* Description Block - Placed below the title block */}
+              <p className="text-gray-300 text-sm md:text-base leading-relaxed mt-2"> {/* Added margin-top */}
                 {currentFeature.description}
               </p>
             </div>
 
-            {/* Feature Image - show if the current feature has an image */}
+            {/* Image Column (Right on Desktop) - Conditional rendering */}
             {currentFeature.image && (
-              <div className="md:w-1/2 relative group mt-4 md:mt-0 aspect-video md:aspect-auto"> {/* Added aspect-video for mobile consistency */}
-                {/* Background blur effect */}
-                <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/15 via-purple-500/15 to-transparent rounded-xl blur-xl transition-all duration-500 group-hover:blur-2xl opacity-75 group-hover:opacity-100"></div>
-                 {/* Loading Skeleton / Background */}
+              // Added group class here for hover effect on container
+              <div className="md:w-1/2 mt-4 md:mt-0 group relative rounded-xl overflow-hidden">
+                 {/* Background gradient for placeholder effect */}
+                 <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 via-purple-500/10 to-gray-800/10"></div>
+                 {/* Loading Skeleton (Optional but good UX) */}
                  {!isImageLoaded && (
-                    <div className="absolute inset-0 bg-gray-700/30 rounded-xl animate-pulse"></div>
+                    <div className="absolute inset-0 bg-gray-700/50 animate-pulse"></div>
                  )}
-                 {/* The Image */}
-                <img
+                 {/* The Image - w-full, h-auto for mobile, controlled height/aspect on desktop */}
+                 <img
                   src={currentFeature.image}
                   alt={`${currentFeature.title} Preview`}
-                  key={currentFeature.image} // Add key to help React differentiate images if src changes rapidly
-                  className={`relative rounded-xl shadow-2xl w-full h-full object-cover transition-all duration-500 ease-in-out transform group-hover:scale-[1.02] ${
-                    isImageLoaded ? 'opacity-100 blur-0' : 'opacity-0 blur-sm' // Fade-in and blur effect
+                  key={currentFeature.image} // Helps react detect changes
+                  className={`relative w-full h-auto md:h-full md:object-cover transition-all duration-700 ease-in-out rounded-xl shadow-lg transform group-hover:scale-[1.03] ${ // Restored scale animation
+                    isImageLoaded ? 'opacity-100 blur-0 scale-100' : 'opacity-0 blur-sm scale-105' // Added initial scale for smoother zoom-in
                   }`}
-                  // Preloading handled by useEffect
-                />
+                  // No explicit height on mobile (h-auto), full height + object-cover on desktop
+                  // The container needs a defined height/aspect ratio on desktop for h-full to work well.
+                  // Let's rely on flexbox balancing for now, or consider adding md:aspect-video if needed.
+                 />
               </div>
             )}
           </div>
 
           {/* Navigation and Progress */}
-          <div className="mt-10">
-            <div className="flex justify-between items-center">
+          <div className="mt-8 md:mt-10"> {/* Adjusted margin */}
+            <div className="flex justify-between items-center gap-4"> {/* Added gap for spacing */}
+              {/* Previous Button */}
               <button
                 onClick={handlePrev}
                 disabled={currentFeatureIndex === 0}
                 aria-label="Previous Feature"
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
+                className={`flex items-center gap-1.5 px-3 md:px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
                   currentFeatureIndex === 0
                     ? 'text-gray-600 cursor-not-allowed opacity-50'
                     : 'text-indigo-300 hover:text-indigo-200 hover:bg-indigo-500/10 active:bg-indigo-500/20'
                 }`}
               >
                 <ArrowLeft className="w-4 h-4" />
-                Previous
+                <span className="hidden sm:inline">Previous</span> {/* Hide text on very small screens */}
               </button>
 
               {/* Progress Indicator */}
-              <div className="flex justify-center gap-2">
-                  {features.map((_, index) => (
+              <div className="flex justify-center items-center gap-1.5 md:gap-2 flex-wrap"> {/* Added flex-wrap */}
+                  {features.map((feat, index) => (
                     <button
                       key={index}
                       onClick={() => setCurrentFeatureIndex(index)}
-                      aria-label={`Go to feature ${index + 1}: ${features[index].title}`}
+                      aria-label={`Go to feature ${index + 1}: ${feat.title}`}
                       className={`h-1.5 rounded-full transition-all duration-500 ease-out focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-gray-800 ${
                         index === currentFeatureIndex
-                          ? 'w-8 bg-gradient-to-r from-indigo-400 to-purple-400'
+                          ? 'w-6 md:w-8 bg-gradient-to-r from-indigo-400 to-purple-400'
                           : 'w-2 bg-gray-600 hover:bg-gray-500'
                       }`}
                     />
                   ))}
               </div>
 
+              {/* Next / Go to Dashboard Button */}
               {currentFeatureIndex === features.length - 1 ? (
                 <button
                   onClick={() => navigate('/dashboard')}
                   aria-label="Go to Dashboard"
-                  className="flex items-center gap-1.5 px-5 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-sm font-medium rounded-full hover:from-indigo-600 hover:to-purple-600 transition-all duration-300 group shadow-lg hover:shadow-indigo-500/30"
+                  className="flex items-center gap-1.5 px-3 md:px-5 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-sm font-medium rounded-full hover:from-indigo-600 hover:to-purple-600 transition-all duration-300 group shadow-lg hover:shadow-indigo-500/30 whitespace-nowrap" // Added whitespace-nowrap
                 >
-                  Go to Dashboard
-                  <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform duration-300" />
+                  <span className="hidden sm:inline">Dashboard</span> {/* Hide text on very small screens */}
+                  <ArrowRight className="w-4 h-4 transform sm:group-hover:translate-x-1 transition-transform duration-300" />
                 </button>
               ) : (
                 <button
                   onClick={handleNext}
                   disabled={currentFeatureIndex === features.length - 1}
                   aria-label="Next Feature"
-                  className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-full transition-all duration-300 ${
+                  className={`flex items-center gap-1.5 px-3 md:px-4 py-2 text-sm font-medium rounded-full transition-all duration-300 ${
                     currentFeatureIndex === features.length - 1
                       ? 'text-gray-600 cursor-not-allowed opacity-50'
                       : 'text-indigo-300 hover:text-indigo-200 hover:bg-indigo-500/10 active:bg-indigo-500/20'
                   }`}
                 >
-                  Next
+                   <span className="hidden sm:inline">Next</span> {/* Hide text on very small screens */}
                   <ArrowRight className="w-4 h-4" />
                 </button>
               )}
@@ -290,32 +267,14 @@ function SplashScreen() {
       </div>
 
 
-      {/* Styles */}
+      {/* Styles (Keyframes remain the same) */}
       <style jsx>{`
-        /* Keep existing keyframes */
-        @keyframes slide-up {
-          from { opacity: 0; transform: translateY(25px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes fade-in {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        @keyframes gradient {
-          0% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
-          100% { background-position: 0% 50%; }
-        }
-        @keyframes float {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-8px); }
-        }
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: .5; }
-        }
+        @keyframes slide-up { from { opacity: 0; transform: translateY(25px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes gradient { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
 
-        /* Apply animations */
         .animate-slide-up { animation: slide-up 0.7s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards; }
         .animate-fade-in { animation: fade-in 0.7s ease-out forwards; }
         .animate-fade-in-delay { animation: fade-in 0.7s ease-out 0.3s forwards; opacity: 0; }

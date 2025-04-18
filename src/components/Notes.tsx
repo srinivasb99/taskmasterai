@@ -1,16 +1,3 @@
-Okay, here is the updated code for `Notes.tsx` and `NoteChat.tsx` incorporating tier-based limits for note creation and chat interactions.
-
-**Assumptions:**
-
-1.  Firebase utility functions (`getUserNoteUsage`, `updateUserNoteUsage`, `getUserChatUsage`, `updateUserChatUsage`, `getUserTier`) exist in your Firebase library (`notes-firebase.ts` or `dashboard-firebase.ts`). You might need to create or adjust these based on your Firestore structure.
-2.  The `noteCounts_YYYY-MM` field in Firestore stores counts like `{ pdfAi: number, youtube: number }`.
-3.  The `chatCount_YYYY-MM` field stores the chat count for the month.
-
----
-
-**1. `Notes.tsx` (Updated Code)**
-
-```typescript
 // Notes.tsx
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';

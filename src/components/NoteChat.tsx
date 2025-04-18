@@ -442,7 +442,7 @@ export const NoteChat = forwardRef<NoteChatHandle, NoteChatProps>(
 
             const recentHistory = chatHistory.slice(-8);
 
-            // System Prompt (Unchanged)
+            // --- MODIFIED: System Prompt to include SEQUENTIAL EDITS ---
             const systemInstruction = `You are TaskMaster, a helpful AI agent integrated into Notes. You are chatting with "${userName}" about their note titled "${note.title}".
 
 Your primary goal is to be helpful and accurate based on the user's request and the provided note content. Follow these functions in order of priority:
@@ -504,7 +504,7 @@ Your primary goal is to be helpful and accurate based on the user's request and 
         Add details about Y.
         Summarize section Z.
         [/SUGGESTIONS]
-    *   Make suggestions concise and actionable. Include a mix of questions and potential edit prompts if appropriate.
+    *   Make suggestions concise and actionable. Include a mix of questions and potential edit prompts if appropriate. 
 
 4.  **General Chat:** Engage in helpful conversation related to the note or note-taking if the request isn't a question about content or an explicit edit command. DO NOT process timer requests (e.g., "set timer 5 min"); they are handled separately.
 
@@ -521,8 +521,8 @@ ${note.keyPoints?.map(p => `- ${p}`).join('\n') || 'N/A'}
 ---
 **Chat History (Recent):**
 ${recentHistory
-    .filter(m => !m.content?.startsWith("Timer set:") && !m.timer && !m.content?.startsWith("✅ Note updated!") && !m.content?.startsWith("🔄 Change reverted.") && m.content !== '...' && !m.isUpdateConfirmation) // Exclude confirmation/revert/loading messages
-    .map(m => `${m.role === 'user' ? userName : 'Assistant'}: ${m.content.replace(/```json[\s\S]*?```/g, '[Edit Proposed]').replace(/\[(?:Image )?Attached:.*?\]/g, '[File Attached]')}`)
+    .filter(m => !m.content?.startsWith("Timer set:") && !m.timer)
+    .map(m => `${m.role === 'user' ? userName : 'Assistant'}: ${m.content.replace(/```json[\s\S]*?```/g, '[Edit Proposed]').replace(/\[(?:Image )?Attached:.*?\]/g, '[File Attached]')}`) // Simplify history
     .join('\n')}
 ---
 

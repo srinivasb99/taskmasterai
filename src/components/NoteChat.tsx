@@ -156,7 +156,7 @@ const extractCandidateText = (responseText: string): string => {
 };
 
 // --- MODIFIED: Use correct Gemini 1.5 Flash endpoint ---
-const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=`; // Corrected model name
+const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=`; // Corrected model name
 
 const parseTimerRequest = (message: string): number | null => {
     const cleanedMessage = message.trim().toLowerCase();
@@ -647,12 +647,7 @@ ${recentHistory
                 let requestBody = JSON.stringify({
                     contents: apiContent,
                     generationConfig: { temperature: 0.6, maxOutputTokens: 8192, topP: 0.95, responseMimeType: "text/plain" },
-                    safetySettings: [ // Standard safety settings
-                        { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-                        { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-                        { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-                        { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-                    ]
+                    // safetySettings: [...]
                 });
 
                 const geminiOptions = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: requestBody };

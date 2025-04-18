@@ -1,9 +1,41 @@
-import { addDoc, collection, Timestamp, updateDoc, doc, deleteDoc, getDoc } from 'firebase/firestore';
+import { addDoc, collection, Timestamp, updateDoc, doc, deleteDoc, getDoc, setDoc } from 'firebase/firestore'; // Added setDoc
 import { db } from './firebase';
 import { geminiApiKey } from './dashboard-firebase'; // Use the shared API key config
 
-// Types (NoteData remains the same)
-interface NoteData { title: string; content: string; type: 'personal' | 'pdf' | 'youtube' | 'audio'; keyPoints?: string[]; questions?: { question: string; options: string[]; correctAnswer: number; explanation: string; }[]; sourceUrl?: string; userId: string; isPublic: boolean; tags: string[]; createdAt?: Timestamp; updatedAt?: Timestamp; }
+// --- Tier Definitions ---
+export const PREMIUM_EMAILS = ["robinmyh@gmail.com", "oliverbeckett069420@gmail.com"];
+export const PRO_EMAILS = ["srinibaj10@gmail.com"];
+export type UserTier = 'basic' | 'pro' | 'premium' | 'loading';
+
+// --- Usage Limits ---
+export const BASIC_CHAT_LIMIT = 10;
+export const PRO_CHAT_LIMIT = 200;
+// Note limits are handled within Notes.tsx for now, but could be centralized here if needed.
+
+// Types
+interface NoteData {
+    id?: string; // Added optional id for consistency after fetching
+    title: string;
+    content: string;
+    type: 'personal' | 'pdf' | 'youtube' | 'audio';
+    keyPoints?: string[];
+    questions?: { question: string; options: string[]; correctAnswer: number; explanation: string; }[];
+    sourceUrl?: string;
+    userId: string;
+    isPublic: boolean;
+    tags: string[];
+    createdAt?: Timestamp;
+    updatedAt?: Timestamp;
+}
+interface NoteUsageData {
+    pdfAi: number;
+    youtube: number;
+    month: string; // YYYY-MM
+}
+interface ChatUsageData {
+    count: number;
+    month: string; // YYYY-MM
+}
 
 // --- Helper Functions ---
 function removeUndefinedFields(obj: any): any { const newObj: any = {}; Object.keys(obj).forEach(key => { if (obj[key] !== undefined) { newObj[key] = obj[key]; } }); return newObj; }
@@ -11,13 +43,22 @@ async function fetchWithRetry(url: string, options: RequestInit, retries = 3, de
 const extractCandidateText = (responseText: string): string => { try { const jsonResponse = JSON.parse(responseText); if (jsonResponse?.candidates?.[0]?.content?.parts?.[0]?.text) { return jsonResponse.candidates[0].content.parts[0].text; } if (jsonResponse?.error?.message) { console.error("Gemini API Error:", jsonResponse.error.message); return `Error: ${jsonResponse.error.message}`; } if (jsonResponse?.candidates?.[0]?.finishReason && jsonResponse.candidates[0].finishReason !== 'STOP') { console.warn(`Gemini finish reason: ${jsonResponse.candidates[0].finishReason}`, jsonResponse); return `Error: Generation stopped due to ${jsonResponse.candidates[0].finishReason}`; } console.warn("No candidate text found:", jsonResponse); return "Error: No text content found in AI response."; } catch (err) { console.error('Error parsing Gemini response:', err); return "Error: Could not parse AI response."; } };
 
 // Use 1.5 Flash by default - Ensure the key is loaded correctly via dashboard-firebase
-const GEMINI_DEFAULT_MODEL = 'gemini-2.0-flash';
+const GEMINI_DEFAULT_MODEL = 'gemini-2.0-flash'; // Corrected model name
 const getGeminiEndpoint = (apiKey: string | undefined, model = GEMINI_DEFAULT_MODEL) => {
     if (!apiKey) throw new Error("Gemini API Key is missing in getGeminiEndpoint.");
     return `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 };
 
-// --- Firestore Operations (getNoteById, saveNote, savePersonalNote, updateNote, deleteNote, toggleNotePublicStatus remain the same) ---
+// --- Tier Determination Function ---
+export const getUserTier = (email: string | null | undefined): UserTier => {
+    if (!email) return 'basic'; // Default to basic if email is not available
+    if (PREMIUM_EMAILS.includes(email)) return 'premium';
+    if (PRO_EMAILS.includes(email)) return 'pro';
+    return 'basic';
+};
+
+
+// --- Firestore Operations ---
 export async function getNoteById(noteId: string): Promise<NoteData | null> { if (!noteId) throw new Error("Note ID is required."); try { const noteRef = doc(db, 'notes', noteId); const docSnap = await getDoc(noteRef); return docSnap.exists() ? { id: docSnap.id, ...docSnap.data() } as NoteData : null; } catch (error) { console.error('Error fetching note by ID:', error); throw new Error(`Failed to fetch note ${noteId}: ${error instanceof Error ? error.message : 'Unknown error'}`); } }
 export async function saveNote(noteData: Omit<NoteData, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> { if (!geminiApiKey) throw new Error("Gemini API Key not configured."); try { const dataToSave = removeUndefinedFields(noteData); if (!dataToSave.title || !dataToSave.content || !dataToSave.userId || !dataToSave.type) { console.error("Missing required fields:", dataToSave); throw new Error("Cannot save note: Missing required fields."); } const docRef = await addDoc(collection(db, 'notes'), { ...dataToSave, createdAt: Timestamp.now(), updatedAt: Timestamp.now() }); console.log("Note saved:", docRef.id); return docRef.id; } catch (error) { console.error('Error saving note:', error); if (error instanceof Error && error.message.includes('invalid data')) { console.error('Invalid data details:', noteData); throw new Error(`Firestore rejected data. Original Error: ${error.message}`); } throw new Error(`Failed to save note: ${error instanceof Error ? error.message : 'Unknown error'}`); } }
 export async function savePersonalNote(userId: string, title: string, content: string, tags: string[] = []): Promise<string> { if (!geminiApiKey) throw new Error("Gemini API Key not configured."); try { const noteData: Omit<NoteData, 'id'|'createdAt'|'updatedAt'|'keyPoints'|'questions'|'sourceUrl'> = { title: title.trim() || 'Untitled', content: content.trim(), type: 'personal', userId, isPublic: false, tags, }; const docRef = await addDoc(collection(db, 'notes'), { ...noteData, createdAt: Timestamp.now(), updatedAt: Timestamp.now() }); console.log("Personal note saved:", docRef.id); return docRef.id; } catch (error) { console.error('Error saving personal note:', error); throw new Error(`Failed to save personal note: ${error instanceof Error ? error.message : 'Unknown error'}`); } }
@@ -25,7 +66,98 @@ export async function updateNote(noteId: string, updates: Partial<Omit<NoteData,
 export async function deleteNote(noteId: string) { if (!noteId) throw new Error("Note ID required."); if (!geminiApiKey) throw new Error("Gemini API Key not configured."); try { await deleteDoc(doc(db, 'notes', noteId)); console.log("Note deleted:", noteId); } catch (error) { console.error('Error deleting note:', error); throw new Error(`Failed to delete note ${noteId}: ${error instanceof Error ? error.message : 'Unknown error'}`); } }
 export async function toggleNotePublicStatus(noteId: string, makePublic: boolean) { if (!noteId) throw new Error("Note ID required."); if (!geminiApiKey) throw new Error("Gemini API Key not configured."); try { await updateDoc(doc(db, 'notes', noteId), { isPublic: makePublic, updatedAt: Timestamp.now() }); console.log(`Note ${noteId} public status set to:`, makePublic); } catch (error) { console.error('Error toggling public status:', error); throw new Error(`Failed to toggle public status for note ${noteId}: ${error instanceof Error ? error.message : 'Unknown error'}`); } }
 
-// --- AI Processing Functions ---
+// --- NEW: Usage Tracking Functions ---
+
+/** Fetches note usage data for a given user and the current month. */
+export async function getUserNoteUsage(userId: string): Promise<NoteUsageData | null> {
+    if (!userId) throw new Error("User ID is required to fetch note usage.");
+    try {
+        const userRef = doc(db, 'users', userId);
+        const docSnap = await getDoc(userRef);
+        if (docSnap.exists()) {
+            const userData = docSnap.data();
+            const currentMonthYear = new Date().toISOString().slice(0, 7); // YYYY-MM
+            const usageFieldName = `noteCounts_${currentMonthYear}`;
+            if (userData[usageFieldName]) {
+                return {
+                    pdfAi: userData[usageFieldName].pdfAi || 0,
+                    youtube: userData[usageFieldName].youtube || 0,
+                    month: currentMonthYear
+                };
+            }
+        }
+        // If document or field doesn't exist, return null or default
+        return null; // Indicates no usage data found for the current month
+    } catch (error) {
+        console.error('Error fetching note usage:', error);
+        throw new Error(`Failed to fetch note usage: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+}
+
+/** Updates or sets note usage data for a user in Firestore for a specific month. */
+export async function updateUserNoteUsage(userId: string, usage: { pdfAi: number; youtube: number }, month: string): Promise<void> {
+    if (!userId) throw new Error("User ID is required to update note usage.");
+    if (!month || !/^\d{4}-\d{2}$/.test(month)) throw new Error("Invalid month format (YYYY-MM) required.");
+    try {
+        const userRef = doc(db, 'users', userId);
+        const usageFieldName = `noteCounts_${month}`;
+        await setDoc(userRef, {
+            [usageFieldName]: {
+                pdfAi: usage.pdfAi,
+                youtube: usage.youtube
+            }
+        }, { merge: true }); // Use set with merge to create/update the specific field
+        console.log(`Note usage updated for user ${userId} for month ${month}:`, usage);
+    } catch (error) {
+        console.error('Error updating note usage:', error);
+        throw new Error(`Failed to update note usage: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+}
+
+/** Fetches chat usage data for a given user and the current month. */
+export async function getUserChatUsage(userId: string): Promise<ChatUsageData | null> {
+    if (!userId) throw new Error("User ID is required to fetch chat usage.");
+    try {
+        const userRef = doc(db, 'users', userId);
+        const docSnap = await getDoc(userRef);
+        if (docSnap.exists()) {
+            const userData = docSnap.data();
+            const currentMonthYear = new Date().toISOString().slice(0, 7); // YYYY-MM
+            const usageFieldName = `chatCount_${currentMonthYear}`;
+            if (typeof userData[usageFieldName] === 'number') {
+                return {
+                    count: userData[usageFieldName],
+                    month: currentMonthYear
+                };
+            }
+        }
+        // If document or field doesn't exist/is wrong type, return null
+        return null; // Indicates no usage data found for the current month
+    } catch (error) {
+        console.error('Error fetching chat usage:', error);
+        throw new Error(`Failed to fetch chat usage: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+}
+
+/** Updates or sets chat usage data for a user in Firestore for a specific month. */
+export async function updateUserChatUsage(userId: string, count: number, month: string): Promise<void> {
+    if (!userId) throw new Error("User ID is required to update chat usage.");
+    if (!month || !/^\d{4}-\d{2}$/.test(month)) throw new Error("Invalid month format (YYYY-MM) required.");
+    if (typeof count !== 'number' || count < 0) throw new Error("Invalid chat count.");
+    try {
+        const userRef = doc(db, 'users', userId);
+        const usageFieldName = `chatCount_${month}`;
+        await setDoc(userRef, {
+            [usageFieldName]: count
+        }, { merge: true }); // Use set with merge to create/update the specific field
+        console.log(`Chat usage updated for user ${userId} for month ${month}: ${count}`);
+    } catch (error) {
+        console.error('Error updating chat usage:', error);
+        throw new Error(`Failed to update chat usage: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+}
+
+// --- AI Processing Functions (Unchanged - remain below) ---
 
 /** Processes text for detailed note, key points, questions. */
 export async function processTextToAINoteData( text: string, userId: string, apiKey: string ): Promise<Omit<NoteData, 'id' | 'createdAt' | 'updatedAt'>> {

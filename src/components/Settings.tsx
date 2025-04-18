@@ -80,29 +80,52 @@ export function Settings() {
   });
 
   // --- Theme States ---
-  // Initialize based on localStorage OR system preference
-  const [isIlluminateEnabled, setIsIlluminateEnabled] = useState(() => {
-    const stored = localStorage.getItem('isIlluminateEnabled');
-    if (stored !== null) return JSON.parse(stored);
-    // Only check system preference if no localStorage value exists
-    return window.matchMedia('(prefers-color-scheme: light)').matches;
+  // Function to safely parse JSON from localStorage
+  const getStoredBoolean = (key: string): boolean | null => {
+    const stored = localStorage.getItem(key);
+    if (stored === null) return null;
+    try {
+      return JSON.parse(stored);
+    } catch (e) {
+      console.error(`Error parsing localStorage key "${key}":`, e);
+      return null; // Treat parse error as if the value doesn't exist
+    }
+  };
+
+  // Determine initial theme based on storage and system preference
+  const initialStoredIlluminate = getStoredBoolean('isIlluminateEnabled');
+  const initialStoredBlackout = getStoredBoolean('isBlackoutEnabled');
+  const prefersLight = window.matchMedia('(prefers-color-scheme: light)').matches;
+
+  // Calculate initial states based on priority
+  const initialIlluminateEnabled =
+    initialStoredIlluminate === true ? true // Explicitly stored Illuminate ON
+    : initialStoredBlackout === true ? false // Explicitly stored Blackout ON overrides Illuminate
+    : initialStoredIlluminate === false ? false // Explicitly stored Illuminate OFF
+    : prefersLight; // Default to system preference if nothing stored
+
+  const initialBlackoutEnabled =
+    initialStoredBlackout === true ? true // Explicitly stored Blackout ON
+    : false; // Default to OFF otherwise
+
+  // Main theme states
+  const [isIlluminateEnabled, setIsIlluminateEnabled] = useState<boolean>(initialIlluminateEnabled);
+  const [isBlackoutEnabled, setIsBlackoutEnabled] = useState<boolean>(initialBlackoutEnabled);
+
+  // Sidebar theme states - default based on the *calculated initial* main theme, unless explicitly stored
+  const [isSidebarIlluminateEnabled, setIsSidebarIlluminateEnabled] = useState<boolean>(() => {
+    const stored = getStoredBoolean('isSidebarIlluminateEnabled');
+    // Priority 1: Explicit sidebar setting
+    if (stored !== null) return stored;
+    // Priority 2: Default based on initial main illuminate state
+    return initialIlluminateEnabled;
   });
-  const [isBlackoutEnabled, setIsBlackoutEnabled] = useState(() => {
-    const stored = localStorage.getItem('isBlackoutEnabled');
-    // Don't automatically enable blackout based on system dark mode, only from storage
-    return stored ? JSON.parse(stored) : false;
-  });
-  const [isSidebarBlackoutEnabled, setIsSidebarBlackoutEnabled] = useState(() => {
-    const stored = localStorage.getItem('isSidebarBlackoutEnabled');
-    return stored ? JSON.parse(stored) : false;
-  });
-  const [isSidebarIlluminateEnabled, setIsSidebarIlluminateEnabled] = useState(() => {
-    const stored = localStorage.getItem('isSidebarIlluminateEnabled');
-    if (stored !== null) return JSON.parse(stored);
-    // Default sidebar illuminate based on main illuminate state *if* main was auto-set
-    const storedIlluminate = localStorage.getItem('isIlluminateEnabled');
-    const autoEnabled = storedIlluminate === null && window.matchMedia('(prefers-color-scheme: light)').matches;
-    return autoEnabled; // Enable sidebar light only if main light was auto-enabled by system preference
+  const [isSidebarBlackoutEnabled, setIsSidebarBlackoutEnabled] = useState<boolean>(() => {
+    const stored = getStoredBoolean('isSidebarBlackoutEnabled');
+    // Priority 1: Explicit sidebar setting
+    if (stored !== null) return stored;
+    // Priority 2: Default based on initial main blackout state
+    return initialBlackoutEnabled;
   });
 
 
@@ -123,16 +146,13 @@ export function Settings() {
   // ---------------------------
   useEffect(() => {
     // Apply body classes based on the current state
+    document.body.classList.remove('illuminate-mode', 'blackout-mode'); // Clear previous
     if (isIlluminateEnabled) {
       document.body.classList.add('illuminate-mode');
-      document.body.classList.remove('blackout-mode');
     } else if (isBlackoutEnabled) {
       document.body.classList.add('blackout-mode');
-      document.body.classList.remove('illuminate-mode');
-    } else {
-      document.body.classList.remove('illuminate-mode');
-      document.body.classList.remove('blackout-mode');
     }
+    // If neither is true, the default dark mode styles apply (no extra class needed)
 
     // Persist changes to localStorage
     localStorage.setItem('isIlluminateEnabled', JSON.stringify(isIlluminateEnabled));
@@ -218,21 +238,40 @@ export function Settings() {
 
 
   // ---------------------------
-  //    THEME TOGGLE HANDLERS (FIXED)
+  //    THEME TOGGLE HANDLERS (Ensure mutual exclusivity)
   // ---------------------------
   const handleToggleIlluminate = (checked: boolean) => {
     setIsIlluminateEnabled(checked);
     if (checked) {
-      setIsBlackoutEnabled(false);
+      setIsBlackoutEnabled(false); // Turn off blackout if illuminate is turned on
+      // Optionally sync sidebar if needed, based on user preference or logic
+      // For now, let sidebar toggles be independent after initial load
+      // setIsSidebarIlluminateEnabled(true);
+      // setIsSidebarBlackoutEnabled(false);
     }
   };
 
   const handleToggleBlackout = (checked: boolean) => {
     setIsBlackoutEnabled(checked);
     if (checked) {
-      setIsIlluminateEnabled(false);
+      setIsIlluminateEnabled(false); // Turn off illuminate if blackout is turned on
+      // Optionally sync sidebar
+      // setIsSidebarBlackoutEnabled(true);
+      // setIsSidebarIlluminateEnabled(false);
     }
   };
+
+  // Sidebar toggles can remain simple state setters
+  const handleToggleSidebarIlluminate = (checked: boolean) => {
+      setIsSidebarIlluminateEnabled(checked);
+      // No need to affect main theme or other sidebar theme here
+  };
+
+  const handleToggleSidebarBlackout = (checked: boolean) => {
+      setIsSidebarBlackoutEnabled(checked);
+      // No need to affect main theme or other sidebar theme here
+  };
+
 
   // ---------------------------
   //    DYNAMIC TAILWIND CLASSES (Adopted from Dashboard)
@@ -241,13 +280,13 @@ export function Settings() {
     ? "bg-gray-50 text-gray-900"
     : isBlackoutEnabled
       ? "bg-black text-gray-200"
-      : "bg-gray-900 text-gray-200";
+      : "bg-gray-900 text-gray-200"; // Default dark
 
   const cardClass = isIlluminateEnabled
     ? "bg-white text-gray-900 border border-gray-200/70 shadow-sm"
     : isBlackoutEnabled
       ? "bg-gray-900 text-gray-300 border border-gray-700/50 shadow-md shadow-black/20"
-      : "bg-gray-800 text-gray-300 border border-gray-700/50 shadow-lg shadow-black/20";
+      : "bg-gray-800 text-gray-300 border border-gray-700/50 shadow-lg shadow-black/20"; // Default dark
 
   const headingClass = isIlluminateEnabled ? "text-gray-800" : "text-gray-100";
   const subheadingClass = isIlluminateEnabled ? "text-gray-600" : "text-gray-400";
@@ -316,10 +355,15 @@ export function Settings() {
       const updatedProfile = await updateUserProfile({ photoFile: file }, user.uid);
       if (updatedProfile?.photoURL) {
         setUserData(prev => ({ ...prev, photoURL: updatedProfile.photoURL }));
+        // Ensure user object potentially has updated photoURL too for next reload?
+        // Maybe not strictly necessary here if only displaying userData.photoURL
       } else {
-         await user.reload();
-         setUser(getCurrentUser());
-         setUserData(prev => ({ ...prev, photoURL: getCurrentUser()?.photoURL || '' }));
+         // Fallback: reload user data from Firebase Auth if URL not returned
+         const updatedUser = getCurrentUser(); // Get potentially updated user object
+         await updatedUser?.reload(); // Force reload auth state
+         const freshUser = getCurrentUser(); // Get the truly fresh user object
+         setUser(freshUser); // Update state
+         setUserData(prev => ({ ...prev, photoURL: freshUser?.photoURL || '' }));
          console.warn("Profile picture updated, but URL not returned directly. User reloaded.");
       }
     } catch (err) {
@@ -343,6 +387,11 @@ export function Settings() {
     try {
       await deleteProfilePicture(user.uid);
       setUserData(prev => ({ ...prev, photoURL: '' }));
+      // Update the user object in state as well
+      const updatedUser = getCurrentUser();
+      await updatedUser?.reload();
+      setUser(getCurrentUser());
+
     } catch (err) {
       console.error("Remove Picture Error:", err);
       setError(err instanceof AuthError ? err.message : 'Failed to remove profile picture.');
@@ -365,15 +414,19 @@ export function Settings() {
       const updateData: { name?: string; email?: string; currentPassword?: string; newPassword?: string } = {};
       let requiresPassword = false;
 
-      if (formData.name.trim() !== userData.name) {
-        if (!formData.name.trim()) throw new AuthError('Name cannot be empty.');
-        updateData.name = formData.name.trim();
+      // Trim name before comparison and saving
+      const trimmedName = formData.name.trim();
+      if (trimmedName !== userData.name) {
+        if (!trimmedName) throw new AuthError('Name cannot be empty.');
+        updateData.name = trimmedName;
       }
 
+      // Trim email before comparison and saving
+      const trimmedEmail = formData.email.trim();
       if (!isGoogleUser) {
-        if (formData.email.trim() !== userData.email) {
-          if (!formData.email.trim()) throw new AuthError('Email cannot be empty.');
-          updateData.email = formData.email.trim();
+        if (trimmedEmail !== userData.email) {
+          if (!trimmedEmail) throw new AuthError('Email cannot be empty.');
+          updateData.email = trimmedEmail;
           requiresPassword = true;
         }
         if (formData.newPassword) {
@@ -391,16 +444,33 @@ export function Settings() {
       }
 
       if (Object.keys(updateData).length > 0) {
+        // Pass user.uid to the update function
         const updatedProfile = await updateUserProfile(updateData, user.uid);
-        setUserData(prev => ({
-          ...prev,
-          name: updatedProfile?.name || prev.name,
-          email: updatedProfile?.email || prev.email,
+
+        // Update local state with confirmed data (either returned or re-fetched if needed)
+        const freshUser = getCurrentUser(); // Get potentially updated user object
+        await freshUser?.reload(); // Ensure auth state is fresh
+        const finalUser = getCurrentUser();
+        const finalUserData = await getUserData(user.uid); // Re-fetch Firestore data
+
+        setUser(finalUser); // Update user auth object state
+        setUserData({ // Update display data state
+          name: finalUserData?.name || finalUser?.displayName || '',
+          email: finalUser?.email || '',
+          photoURL: finalUserData?.photoURL || finalUser?.photoURL || '',
+        });
+        // Update form data to reflect saved state ONLY for displayed fields
+        setFormData(prev => ({
+            ...prev,
+            name: finalUserData?.name || finalUser?.displayName || '',
+            email: finalUser?.email || '',
+            currentPassword: '', // Clear password fields always
+            newPassword: '',
+            confirmPassword: '',
         }));
-        setFormData(prev => ({ ...prev, currentPassword: '', newPassword: '', confirmPassword: '' }));
         setIsEditing(false);
       } else {
-        setIsEditing(false);
+        setIsEditing(false); // No changes were made
       }
 
     } catch (err) {
@@ -472,16 +542,23 @@ export function Settings() {
       if (!user) throw new AuthError('Authentication session expired.');
 
       if (!isGoogleUser && !formData.currentPassword) {
-        throw new AuthError('Current password is required to delete account.');
+        // Add error directly in the modal if possible, or rely on the main error display
+        setError('Current password is required to delete account.');
+        setIsDeleting(false); // Stop processing
+        return;
       }
 
       await deleteUserAccount(isGoogleUser ? undefined : formData.currentPassword);
-      navigate('/login');
+      navigate('/login'); // Navigate on success
 
     } catch (err) {
       console.error("Delete Account Error:", err);
+      // Keep the modal open and display the error
       setError(err instanceof AuthError ? err.message : 'Failed to delete account.');
     } finally {
+      // Only set isDeleting to false here if the operation failed and we want to allow retry
+      // If successful, navigation happens, so state doesn't matter.
+      // If failed, we want the modal to remain and show the error.
       setIsDeleting(false);
     }
   };
@@ -489,7 +566,7 @@ export function Settings() {
   // ---------------------------
   //    RENDER
   // ---------------------------
-  if (isLoading && !user) { // Still show loader if profile is loading, even if AI context isn't finished
+  if (isLoading && !user) { // Show loader until user object is available
     return (
       <div className={`flex items-center justify-center min-h-screen ${containerClass}`}>
         <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
@@ -497,12 +574,28 @@ export function Settings() {
     );
   }
 
+  // Prevent rendering main content if user is null after loading attempt
+  if (!user) {
+      // This case might happen if loading finishes but user is still null (e.g., auth issue)
+      // Optionally show an error message or redirect more explicitly
+      return (
+        <div className={`flex flex-col items-center justify-center min-h-screen ${containerClass}`}>
+          <AlertCircle className={`w-10 h-10 mb-4 ${errorTextColor}`} />
+          <p className={`${errorTextColor}`}>Could not load user session. Please try logging in again.</p>
+          <Link to="/login" className={`mt-4 px-4 py-2 rounded-md ${buttonSecondaryClass}`}>Go to Login</Link>
+        </div>
+      );
+  }
+
+
   return (
     <div className={`flex flex-col min-h-screen ${containerClass}`}>
       <Sidebar
         isCollapsed={isSidebarCollapsed}
         onToggle={handleToggleSidebar}
+        // Use the actual user name from the state, which is updated after loading
         userName={userData.name}
+        // Pass the resolved theme states to the Sidebar
         isBlackoutEnabled={isBlackoutEnabled && isSidebarBlackoutEnabled}
         isIlluminateEnabled={isIlluminateEnabled && isSidebarIlluminateEnabled}
       />
@@ -524,12 +617,13 @@ export function Settings() {
                   id="deleteConfirmPassword" type="password" name="currentPassword"
                   value={formData.currentPassword} onChange={handleInputChange}
                   placeholder="Required to delete"
-                  className={`w-full ${inputBg} rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-red-500 border ${isIlluminateEnabled ? 'border-gray-300' : 'border-gray-600'}`}
+                  className={`w-full ${inputBg} rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 ${error && !isGoogleUser && !formData.currentPassword ? 'ring-red-500 border-red-500' : `focus:ring-red-500 border ${isIlluminateEnabled ? 'border-gray-300' : 'border-gray-600'}`}`} // Highlight if error and empty
                   disabled={isDeleting}
                 />
               </div>
             )}
-            {error && showDeleteConfirm && ( // Only show general errors in this modal if they occur during delete
+            {/* Specific error display inside the modal */}
+            {error && showDeleteConfirm && (
               <div className={`mb-4 p-2 rounded-md flex items-start gap-2 text-xs ${errorBoxBg} ${errorTextColor}`}>
                 <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-px" />
                 <span>{error}</span>
@@ -537,7 +631,7 @@ export function Settings() {
             )}
             <div className="flex gap-2 sm:gap-3 justify-end">
               <button
-                onClick={() => { setShowDeleteConfirm(false); setError(null); }}
+                onClick={() => { setShowDeleteConfirm(false); setError(null); setFormData(prev => ({...prev, currentPassword: ''})); }} // Clear password on cancel
                 className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md ${buttonSecondaryClass}`}
                 disabled={isDeleting}
               >
@@ -546,6 +640,7 @@ export function Settings() {
               <button
                 onClick={handleDeleteAccount}
                 className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md ${buttonDangerConfirmClass} flex items-center justify-center min-w-[100px]`}
+                // Disable if deleting OR if it's an email/pass user and password field is empty
                 disabled={isDeleting || (!isGoogleUser && !formData.currentPassword)}
               >
                 {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Yes, Delete'}
@@ -567,7 +662,7 @@ export function Settings() {
             </p>
           </div>
 
-          {/* Main Error Message Area (for general profile/delete errors) */}
+          {/* Main Error Message Area (for general profile errors, NOT delete errors shown in modal) */}
           {error && !showDeleteConfirm && (
             <div className={`mb-4 p-3 rounded-lg flex items-start gap-2 ${errorBoxBg}`}>
               <AlertCircle className={`w-4 h-4 flex-shrink-0 mt-px ${errorTextColor}`} />
@@ -624,7 +719,19 @@ export function Settings() {
                 <div className="flex items-center justify-between mb-4">
                   <h2 className={`text-base sm:text-lg font-semibold ${headingClass}`}>Profile Details</h2>
                   {!isEditing && (
-                    <button type="button" onClick={() => setIsEditing(true)} disabled={isLoading} className={`px-3 py-1 text-xs sm:text-sm font-medium rounded-md ${buttonSecondaryClass}`}> Edit </button>
+                    <button type="button" onClick={() => {
+                        // Reset form to current user data when entering edit mode
+                        setFormData({
+                            name: userData.name,
+                            email: userData.email,
+                            currentPassword: '',
+                            newPassword: '',
+                            confirmPassword: '',
+                        });
+                        setError(null); // Clear any previous save errors
+                        setIsEditing(true);
+                    }}
+                    disabled={isLoading} className={`px-3 py-1 text-xs sm:text-sm font-medium rounded-md ${buttonSecondaryClass}`}> Edit </button>
                   )}
                 </div>
                 <form onSubmit={handleSave}>
@@ -662,7 +769,7 @@ export function Settings() {
                   {/* Action Buttons */}
                   {isEditing && (
                     <div className="flex justify-end gap-2 mt-5">
-                      <button type="button" onClick={() => { setIsEditing(false); setError(null); setFormData({ name: userData.name, email: userData.email, currentPassword: '', newPassword: '', confirmPassword: '' }); }} disabled={isSaving} className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md ${buttonSecondaryClass}`}> Cancel </button>
+                      <button type="button" onClick={() => { setIsEditing(false); setError(null); /* No need to reset form, handled by edit button */ }} disabled={isSaving} className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md ${buttonSecondaryClass}`}> Cancel </button>
                       <button type="submit" disabled={isSaving} className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md ${buttonPrimaryClass} ${buttonPrimaryHoverEffect} flex items-center justify-center min-w-[80px]`}>
                         {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Save className="w-4 h-4 mr-1.5" /> Save</>}
                       </button>
@@ -680,7 +787,7 @@ export function Settings() {
                 </div>
               </div>
 
-              {/* Universal AI Context Card -- MOVED HERE */}
+              {/* Universal AI Context Card */}
               <div className={`${cardClass} rounded-xl p-4 sm:p-5`}>
                  <div className="flex items-center justify-between mb-3">
                     <h2 className={`text-base sm:text-lg font-semibold flex items-center gap-2 ${headingClass}`}>
@@ -688,7 +795,11 @@ export function Settings() {
                        Universal AI Context
                     </h2>
                     {!isEditingAiContext && (
-                       <button type="button" onClick={() => setIsEditingAiContext(true)} disabled={isLoadingAiContext || isSavingAiContext} className={`px-3 py-1 text-xs sm:text-sm font-medium rounded-md ${buttonSecondaryClass}`}> Edit </button>
+                       <button type="button" onClick={() => {
+                            setIsEditingAiContext(true);
+                            setAiContextError(null); // Clear errors when starting edit
+                       }}
+                       disabled={isLoadingAiContext || isSavingAiContext} className={`px-3 py-1 text-xs sm:text-sm font-medium rounded-md ${buttonSecondaryClass}`}> Edit </button>
                     )}
                  </div>
                  <p className={`${subheadingClass} text-xs sm:text-sm mb-4`}>
@@ -789,7 +900,12 @@ export function Settings() {
                     </label>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input id="illuminate-toggle" type="checkbox" checked={isIlluminateEnabled} onChange={(e) => handleToggleIlluminate(e.target.checked)} className="sr-only peer" />
-                      <div className={`w-9 h-5 rounded-full peer transition-colors ${isIlluminateEnabled ? 'bg-blue-600' : (isIlluminateEnabled ? 'bg-gray-300' : 'bg-gray-600')} peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all`}></div>
+                      {/* Updated toggle styles */}
+                      <div className={`w-9 h-5 rounded-full peer transition-colors ${
+                          isIlluminateEnabled
+                            ? 'bg-blue-600 peer-checked:after:translate-x-full' // Illuminate ON style
+                            : (isIlluminateEnabled ? 'bg-gray-300' : 'bg-gray-600') // Default OFF style (light/dark dependent)
+                        } after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all`}></div>
                     </label>
                   </div>
                   {/* Blackout Toggle */}
@@ -803,36 +919,48 @@ export function Settings() {
                     </label>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input id="blackout-toggle" type="checkbox" checked={isBlackoutEnabled} onChange={(e) => handleToggleBlackout(e.target.checked)} className="sr-only peer" />
-                      <div className={`w-9 h-5 rounded-full peer transition-colors ${isBlackoutEnabled ? 'bg-indigo-600' : (isIlluminateEnabled ? 'bg-gray-300' : 'bg-gray-600')} peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all`}></div>
+                      {/* Updated toggle styles */}
+                      <div className={`w-9 h-5 rounded-full peer transition-colors ${
+                          isBlackoutEnabled
+                            ? 'bg-indigo-600 peer-checked:after:translate-x-full' // Blackout ON style
+                            : (isIlluminateEnabled ? 'bg-gray-300' : 'bg-gray-600') // Default OFF style (light/dark dependent)
+                        } after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all`}></div>
                     </label>
                   </div>
-                  {/* Sidebar Toggles */}
-                  <div className="pl-8 space-y-4">
-                     {isIlluminateEnabled && (
-                        <div className="flex items-center justify-between">
-                           <label htmlFor="sidebar-illuminate-toggle" className="flex items-center cursor-pointer gap-3">
-                               <PanelLeftDashed className={`w-5 h-5 flex-shrink-0 ${placeholderIconColor}`} />
-                               <div> <span className={`font-medium text-sm ${headingClass}`}>Sidebar Illuminate</span> <p className={`${subheadingClass} text-xs mt-0.5`}>Apply light mode to sidebar.</p> </div>
-                           </label>
-                           <label className="relative inline-flex items-center cursor-pointer">
-                           <input id="sidebar-illuminate-toggle" type="checkbox" checked={isSidebarIlluminateEnabled} onChange={(e) => setIsSidebarIlluminateEnabled(e.target.checked)} className="sr-only peer" />
-                           <div className={`w-9 h-5 rounded-full peer transition-colors bg-gray-300 peer-checked:bg-blue-600 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all`}></div>
-                           </label>
+
+                   {/* --- Conditional Sidebar Toggles --- */}
+                   {/* Show sidebar light toggle ONLY if main light mode is active */}
+                   {isIlluminateEnabled && (
+                        <div className="pl-8 space-y-4 mt-4 border-l border-gray-200/50 dark:border-gray-700/50 ml-2">
+                            <div className="flex items-center justify-between pt-2">
+                               <label htmlFor="sidebar-illuminate-toggle" className="flex items-center cursor-pointer gap-3">
+                                   <PanelLeftDashed className={`w-5 h-5 flex-shrink-0 ${isSidebarIlluminateEnabled ? 'text-blue-500' : placeholderIconColor}`} />
+                                   <div> <span className={`font-medium text-sm ${headingClass}`}>Sidebar Illuminate</span> <p className={`${subheadingClass} text-xs mt-0.5`}>Apply light mode to sidebar.</p> </div>
+                               </label>
+                               <label className="relative inline-flex items-center cursor-pointer">
+                               <input id="sidebar-illuminate-toggle" type="checkbox" checked={isSidebarIlluminateEnabled} onChange={(e) => handleToggleSidebarIlluminate(e.target.checked)} className="sr-only peer" />
+                               <div className={`w-9 h-5 rounded-full peer transition-colors ${isSidebarIlluminateEnabled ? 'bg-blue-600' : 'bg-gray-300'} peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all`}></div>
+                               </label>
+                            </div>
                         </div>
-                     )}
-                     {isBlackoutEnabled && (
-                        <div className="flex items-center justify-between">
-                           <label htmlFor="sidebar-blackout-toggle" className="flex items-center cursor-pointer gap-3">
-                               <PanelLeftDashed className={`w-5 h-5 flex-shrink-0 ${placeholderIconColor}`} />
-                               <div> <span className={`font-medium text-sm ${headingClass}`}>Sidebar Blackout</span> <p className={`${subheadingClass} text-xs mt-0.5`}>Apply dark mode to sidebar.</p> </div>
-                           </label>
-                           <label className="relative inline-flex items-center cursor-pointer">
-                           <input id="sidebar-blackout-toggle" type="checkbox" checked={isSidebarBlackoutEnabled} onChange={(e) => setIsSidebarBlackoutEnabled(e.target.checked)} className="sr-only peer" />
-                           <div className={`w-9 h-5 rounded-full peer transition-colors bg-gray-600 peer-checked:bg-indigo-600 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all`}></div>
-                           </label>
+                   )}
+
+                   {/* Show sidebar dark toggle ONLY if main dark mode (default or blackout) is active */}
+                   {!isIlluminateEnabled && ( // Covers both default dark and blackout
+                        <div className="pl-8 space-y-4 mt-4 border-l border-gray-200/50 dark:border-gray-700/50 ml-2">
+                             <div className="flex items-center justify-between pt-2">
+                               <label htmlFor="sidebar-blackout-toggle" className="flex items-center cursor-pointer gap-3">
+                                   <PanelLeftDashed className={`w-5 h-5 flex-shrink-0 ${isSidebarBlackoutEnabled ? 'text-indigo-400' : placeholderIconColor}`} />
+                                   <div> <span className={`font-medium text-sm ${headingClass}`}>Sidebar Blackout</span> <p className={`${subheadingClass} text-xs mt-0.5`}>Apply dark mode to sidebar.</p> </div>
+                               </label>
+                               <label className="relative inline-flex items-center cursor-pointer">
+                               <input id="sidebar-blackout-toggle" type="checkbox" checked={isSidebarBlackoutEnabled} onChange={(e) => handleToggleSidebarBlackout(e.target.checked)} className="sr-only peer" />
+                               <div className={`w-9 h-5 rounded-full peer transition-colors ${isSidebarBlackoutEnabled ? 'bg-indigo-600' : 'bg-gray-600'} peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all`}></div>
+                               </label>
+                            </div>
                         </div>
-                     )}
-                  </div>
+                   )}
+                  {/* End Sidebar Toggles */}
                 </div>
               </div>
 

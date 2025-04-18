@@ -613,11 +613,11 @@ ${recentHistory
                                 assistantFinalMessage = { ...assistantFinalMessage, content: parsedJson.explanation, isEditSuggestion: true, editAction: "propose_sequential_edits", editExplanation: parsedJson.explanation, sequentialEdits: validEdits };
                                 parsedSuccessfully = true;
                             } else {
-                                assistantFinalMessage.content = `Warning: AI proposed sequential edits, but the structure of step(s) was invalid. \n\n---\n${finalDisplayedContent}`; assistantFinalMessage.error = true;
+                                assistantFinalMessage.content = `Warning: AI proposed sequential edits, but failed. Please ask the AI to try again. \n\n---\n${finalDisplayedContent}`; assistantFinalMessage.error = true;
                             }
                         }
                         else {
-                             assistantFinalMessage.content = `Warning: AI proposed an edit, but the JSON structure was invalid or action unknown. \n\n---\n${finalDisplayedContent}`; assistantFinalMessage.error = true;
+                             assistantFinalMessage.content = `Warning: AI proposed an edit, but failed. Please ask the AI to try again. \n\n---\n${finalDisplayedContent}`; assistantFinalMessage.error = true;
                         }
                         if (parsedSuccessfully) {
                              finalDisplayedContent = finalDisplayedContent.replace(jsonMatch[0], '').trim();

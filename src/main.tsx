@@ -39,6 +39,7 @@ import './index.css';
 import NotesOutage from './outage-pages/NotesOutage';
 import Status from './status/Status'; // Import the new Status page
 import { PublicNoteView } from './components/PublicNoteView'; // Adjust path if needed
+import ComingSoon from './components/ComingSoon'; // Import the component
 
 // Global Helmet component to include favicon and related tags
 const DefaultHelmet = () => (
@@ -210,6 +211,7 @@ createRoot(document.getElementById('root')!).render(
             <Route path="/community" element={<PageTitle title="Community"><Community /></PageTitle>} />
             <Route path="/" element={<RootTitle><App /></RootTitle>} />
             <Route path="/status" element={<PageTitle title="Status"><Status /></PageTitle>} />
+            <Route path="/focus-mode" element={<PageTitle title="Focus Mode"><ComingSoon /></PageTitle>} />
             <Route path="/api/*" element={null} />
             <Route path="/public-note/:noteId" element={<PageTitle title="Public Note"><PublicNoteView /></PageTitle>} />
             

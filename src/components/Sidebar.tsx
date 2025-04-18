@@ -58,7 +58,7 @@ export function Sidebar({
     { label: "Calendar", icon: CalendarDays, path: "/calendar" },
     { label: "Friends", icon: Users2, path: "/friends" },
     { label: "Community", icon: Globe2, path: "/community" },
-    { label: "Focus Mode", icon: ZapOff, path: "/distraction-control" },
+    { label: "Focus Mode", icon: ZapOff, path: "/focus-mode" },
     { label: "AI Assistant", icon: Bot, path: "/ai" },
     { label: "Settings", icon: Settings, path: "/settings" },
   ]

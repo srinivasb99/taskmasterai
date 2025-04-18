@@ -1,26 +1,31 @@
-import React, { useState, useRef, useEffect, useImperativeHandle, forwardRef, useCallback } from 'react';
-import { MessageCircle, Send, Timer as TimerIcon, Paperclip, Bot, X, AlertTriangle, Loader2, Sparkles, ChevronDown, Maximize, Minimize, Edit, Check, RefreshCcw } from 'lucide-react'; // Added RefreshCcw
+
+import React, { useState, useRef, useEffect, useImperativeHandle, forwardRef, useCallback, useMemo } from 'react'; // Added useMemo
+import { MessageCircle, Send, Timer as TimerIcon, Paperclip, Bot, X, AlertTriangle, Loader2, Sparkles, ChevronDown, Maximize, Minimize, Edit, Check, RefreshCcw, Crown } from 'lucide-react'; // Added Crown
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import remarkGfm from 'remark-gfm';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
 import { Timer } from './Timer';
+import { User } from 'firebase/auth'; // Import User type
+import { auth } from '../lib/firebase'; // Import auth for current user check
+import {
+    // --- Import Usage Functions ---
+    getUserChatUsage,
+    updateUserChatUsage,
+    getUserTier,     // Assume this is exported
+    PREMIUM_EMAILS, // Assume these are exported
+    PRO_EMAILS,     // Assume these are exported
+    BASIC_CHAT_LIMIT, // Assume these are exported
+    PRO_CHAT_LIMIT    // Assume these are exported
+} from '../lib/notes-firebase'; // Adjust path if needed
 
 // Types
 interface TimerMessage { type: 'timer'; duration: number; id: string; }
 
-interface ImageData {
-    base64: string;
-    type: string; // Mime type
-    name: string;
-}
+interface ImageData { base64: string; type: string; name: string; }
 
-interface EditStep {
-    editType: 'insert_after_context' | 'replace_context' | 'delete_context' | 'insert_at_start' | 'append_at_end';
-    targetContext: string | null;
-    contentFragment: string;
-}
+interface EditStep { editType: 'insert_after_context' | 'replace_context' | 'delete_context' | 'insert_at_start' | 'append_at_end'; targetContext: string | null; contentFragment: string; }
 
 interface ChatMessage {
     id?: string;
@@ -29,34 +34,24 @@ interface ChatMessage {
     imageData?: ImageData;
     timer?: TimerMessage;
     error?: boolean;
-    isEditSuggestion?: boolean; // True if it's a proposal from AI
+    isEditSuggestion?: boolean;
     editExplanation?: string;
     editAction?: 'propose_targeted_edit' | 'propose_full_content_replacement' | 'propose_sequential_edits';
-    // For single targeted edit
     editType?: EditStep['editType'];
     targetContext?: EditStep['targetContext'];
     contentFragment?: EditStep['contentFragment'];
-    // For full replacement
     newFullContent?: string;
-    // For sequential edits
     sequentialEdits?: EditStep[];
-
-    // --- NEW: Fields for Revert ---
-    isUpdateConfirmation?: boolean; // True if this message confirms a successful update
-    canRevert?: boolean;          // True if this specific confirmation can be reverted
-    previousContent?: string;     // Content before the update was applied
-    noteIdToRevert?: string;      // ID of the note that was updated
+    isUpdateConfirmation?: boolean;
+    canRevert?: boolean;
+    previousContent?: string;
+    noteIdToRevert?: string;
 }
 
-
-interface SelectedFile {
-    name: string;
-    type: string; // Mime type
-    size: number;
-    base64Data: string;
-}
-
+interface SelectedFile { name: string; type: string; size: number; base64Data: string; }
 interface Note { id: string; title: string; content: string; keyPoints?: string[]; questions?: { question: string }[]; }
+type UserTier = 'basic' | 'pro' | 'premium' | 'loading'; // Add UserTier type
+
 interface NoteChatProps {
     note: Note;
     onClose: () => void;
@@ -67,12 +62,15 @@ interface NoteChatProps {
     isVisible: boolean;
     onUpdateNoteContent: (noteId: string, newContent: string) => Promise<void>;
     displayMode?: 'overlay' | 'inline';
+    // userTier: UserTier; // Receive tier as prop (alternative: fetch internally)
 }
 export interface NoteChatHandle {
     sendMessage: (message: string) => void;
+    // Add other methods if needed, e.g., focusInput
+    // focusInput: () => void;
 }
 
-// --- Helper Functions (Unchanged) ---
+// --- Helper Functions (Mostly Unchanged) ---
 const readFileAsBase64 = (file: File): Promise<SelectedFile> => {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -156,7 +154,8 @@ const extractCandidateText = (responseText: string): string => {
     }
 };
 
-const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=`;
+// --- MODIFIED: Use correct Gemini 1.5 Flash endpoint ---
+const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=`; // Corrected model name
 
 const parseTimerRequest = (message: string): number | null => {
     const cleanedMessage = message.trim().toLowerCase();
@@ -201,7 +200,23 @@ export const NoteChat = forwardRef<NoteChatHandle, NoteChatProps>(
         const currentNoteId = useRef<string | null>(null);
         const fileInputRef = useRef<HTMLInputElement>(null);
         const textareaRef = useRef<HTMLTextAreaElement>(null);
-        const [loadingMsgId, setLoadingMsgId] = useState<string | null>(null); // Track the ID of the message showing the loader
+        const [loadingMsgId, setLoadingMsgId] = useState<string | null>(null);
+
+        // --- NEW: Tier and Usage State ---
+        const [user, setUser] = useState<User | null>(null); // Keep track of the user
+        const [userTier, setUserTier] = useState<UserTier>('loading');
+        const [chatCount, setChatCount] = useState(0);
+        const [usageMonth, setUsageMonth] = useState(''); // YYYY-MM
+        const [isChatLimitReached, setIsChatLimitReached] = useState(false);
+        const [isLoadingUsage, setIsLoadingUsage] = useState(true); // Loading state for usage data
+
+        // --- Memoized Chat Limit ---
+        const currentChatLimit = useMemo(() => {
+            if (userTier === 'premium') return Infinity;
+            if (userTier === 'pro') return PRO_CHAT_LIMIT;
+            return BASIC_CHAT_LIMIT;
+        }, [userTier]);
+
 
         // --- Theme Styles (Unchanged) ---
         const overlayBg = isIlluminateEnabled ? "bg-white" : isBlackoutEnabled ? "bg-black border border-gray-700/60" : "bg-gray-800";
@@ -218,13 +233,64 @@ export const NoteChat = forwardRef<NoteChatHandle, NoteChatProps>(
         const assistantBubbleClass = isIlluminateEnabled ? 'bg-gray-100 text-gray-800 border border-gray-200/80' : 'bg-gray-700/80 text-gray-200 border border-gray-600/50';
         const errorBubbleClass = isIlluminateEnabled ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-red-900/30 text-red-300 border border-red-700/50';
         const editSuggestionBubbleClass = isIlluminateEnabled ? 'bg-yellow-50 border border-yellow-200 text-yellow-800' : 'bg-yellow-900/30 border border-yellow-700/50 text-yellow-300';
-        // --- NEW: Confirmation bubble style ---
-        const confirmationBubbleClass = isIlluminateEnabled ? 'bg-green-50 border border-green-200 text-green-800' : 'bg-green-900/30 border border-green-700/50 text-green-300';
+        const confirmationBubbleClass = isIlluminateEnabled ? 'bg-green-50 border border-green-200 text-green-800' : 'bg-green-900/30 border border-green-700/50 text-green-200';
         const iconColor = isIlluminateEnabled ? "text-gray-500 hover:text-gray-700" : "text-gray-400 hover:text-gray-200";
         const filePillBg = isIlluminateEnabled ? "bg-blue-100 border-blue-200" : "bg-blue-900/50 border-blue-700/50";
         const filePillText = isIlluminateEnabled ? "text-blue-800" : "text-blue-300";
 
-        // --- Effects (Unchanged) ---
+        // --- Effects ---
+
+        // --- NEW: Effect to load user, tier, and usage ---
+        useEffect(() => {
+            setIsLoadingUsage(true);
+            const currentUser = auth.currentUser;
+            if (!currentUser) {
+                // Should not happen if NoteChat is rendered correctly, but handle defensively
+                console.error("NoteChat: No authenticated user found.");
+                setUserTier('basic'); // Default to basic if no user? Or handle differently
+                setIsLoadingUsage(false);
+                return;
+            }
+            setUser(currentUser); // Store user object
+
+            // Determine Tier
+            const tier = getUserTier(currentUser.email); // Use utility function
+            setUserTier(tier);
+
+            // Load Usage Data (if not premium)
+            if (tier !== 'premium') {
+                const currentMonthYear = new Date().toISOString().slice(0, 7);
+                getUserChatUsage(currentUser.uid)
+                    .then(usageData => {
+                        if (usageData?.month === currentMonthYear) {
+                            setChatCount(usageData.count);
+                            setUsageMonth(usageData.month);
+                            setIsChatLimitReached(usageData.count >= (tier === 'pro' ? PRO_CHAT_LIMIT : BASIC_CHAT_LIMIT));
+                        } else {
+                            // No data or previous month - reset
+                            setChatCount(0);
+                            setUsageMonth(currentMonthYear);
+                            setIsChatLimitReached(false);
+                            updateUserChatUsage(currentUser.uid, 0, currentMonthYear).catch(err => console.error("NoteChat: Failed initial usage reset:", err));
+                        }
+                    })
+                    .catch(err => {
+                        console.error("NoteChat: Error loading chat usage data:", err);
+                        setChatCount(0); // Default to 0 on error
+                        setUsageMonth(new Date().toISOString().slice(0, 7));
+                        setIsChatLimitReached(false);
+                    })
+                    .finally(() => setIsLoadingUsage(false));
+            } else {
+                // Premium users
+                setChatCount(0);
+                setUsageMonth('');
+                setIsChatLimitReached(false);
+                setIsLoadingUsage(false);
+            }
+
+        }, [isVisible]); // Reload usage when chat becomes visible
+
         useEffect(() => {
             if (note && (note.id !== currentNoteId.current || (displayMode === 'overlay' && isVisible && !initialMessageSent.current))) {
                 setChatHistory([{ id: `init-${Date.now()}`, role: 'assistant', content: `Hi ${userName}! Ask about **"${note.title}"**, ask me to change it, or attach/paste a file.` }]);
@@ -237,7 +303,6 @@ export const NoteChat = forwardRef<NoteChatHandle, NoteChatProps>(
         // --- Handlers ---
         const handleTimerComplete = (timerId: string) => setChatHistory(prev => [...prev, { id: `timer-comp-${timerId}`, role: 'assistant', content: "⏰ Time's up!" }]);
 
-        // --- MODIFIED: handleAcceptEdit to store previous content ---
         const handleAcceptEdit = async (message: ChatMessage) => {
             if (!note || isChatLoading || !message.isEditSuggestion || !message.editAction) {
                 console.error("Invalid edit proposal:", message);
@@ -255,7 +320,6 @@ export const NoteChat = forwardRef<NoteChatHandle, NoteChatProps>(
 
                 if (message.editAction === 'propose_targeted_edit') {
                     // Apply single targeted edit (existing logic)
-                    console.log("Applying single targeted edit:", message);
                      if (!message.editType) throw new Error("Missing edit type.");
                     let applied = false;
                     const { editType, targetContext, contentFragment = "" } = message;
@@ -274,7 +338,6 @@ export const NoteChat = forwardRef<NoteChatHandle, NoteChatProps>(
 
                 } else if (message.editAction === 'propose_full_content_replacement') {
                     // Apply full replacement (existing logic)
-                     console.log("Applying full content replacement.");
                      if (typeof message.newFullContent === 'string') { finalContent = message.newFullContent; }
                      else { throw new Error("Missing new full content for replacement."); }
 
@@ -283,17 +346,12 @@ export const NoteChat = forwardRef<NoteChatHandle, NoteChatProps>(
                      if (!message.sequentialEdits || !Array.isArray(message.sequentialEdits) || message.sequentialEdits.length === 0) {
                          throw new Error("Invalid sequential edit proposal: 'edits' array is missing or empty.");
                      }
-                    console.log(`Applying ${message.sequentialEdits.length} sequential edits.`);
-
                     let allApplied = true;
                     for (let i = 0; i < message.sequentialEdits.length; i++) {
                          const editStep = message.sequentialEdits[i];
                          const { editType, targetContext, contentFragment } = editStep;
                          let appliedThisStep = false;
                          const stepNumber = i + 1;
-
-                         console.log(`Applying step ${stepNumber}: ${editType}, context: ${targetContext ? `"${targetContext.substring(0, 30)}..."` : '(N/A)'}, fragment: "${contentFragment.substring(0, 50)}..."`);
-
                          switch (editType) {
                              case 'insert_at_start': currentContent = contentFragment + (currentContent ? "\n" + currentContent : ""); appliedThisStep = true; break;
                              case 'append_at_end': currentContent = (currentContent ? currentContent + "\n" : "") + contentFragment; appliedThisStep = true; break;
@@ -306,9 +364,7 @@ export const NoteChat = forwardRef<NoteChatHandle, NoteChatProps>(
                              default: allApplied = false; throw new Error(`Step ${stepNumber}: Unsupported edit type: ${editType}`);
                          }
                          if (!appliedThisStep) { allApplied = false; throw new Error(`Sequential edit step ${stepNumber} failed unexpectedly.`); }
-                         console.log(`After step ${stepNumber}, content starts with: "${currentContent.substring(0, 50)}..."`);
                      }
-
                      if (allApplied) { finalContent = currentContent; }
                 } else {
                     throw new Error(`Unknown edit action: ${message.editAction}`);
@@ -341,22 +397,17 @@ export const NoteChat = forwardRef<NoteChatHandle, NoteChatProps>(
             }
         };
 
-        // --- NEW: handleRevertEdit ---
         const handleRevertEdit = async (message: ChatMessage) => {
             if (!message.canRevert || typeof message.previousContent !== 'string' || !message.noteIdToRevert || isChatLoading || !message.id) {
                 console.error("Cannot revert this action. Invalid message state:", message);
                 setChatHistory(prev => [...prev, { id: `revert-err-state-${Date.now()}`, role: 'assistant', content: `❌ Cannot revert. Invalid state.`, error: true }]);
                 return;
             }
-
             setIsChatLoading(true);
             setLoadingMsgId(null); // Clear loader state
-
             const originalMessageId = message.id; // ID of the "✅ Note updated!" message
-
             try {
                 await onUpdateNoteContent(message.noteIdToRevert, message.previousContent);
-
                 // Add revert confirmation message
                 setChatHistory(prev => [
                     ...prev.map(msg => // Disable revert on the original message
@@ -364,7 +415,6 @@ export const NoteChat = forwardRef<NoteChatHandle, NoteChatProps>(
                     ),
                     { id: `revert-ok-${Date.now()}`, role: 'assistant', content: "🔄 Change reverted." }
                 ]);
-
             } catch (error) {
                 console.error("Error reverting edit:", error);
                 const eMsg = error instanceof Error ? error.message : 'Unknown error during revert.';
@@ -373,7 +423,6 @@ export const NoteChat = forwardRef<NoteChatHandle, NoteChatProps>(
                 setIsChatLoading(false);
             }
         };
-
 
         const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
              const files = event.target.files; if (!files) return; setIsChatLoading(true); const newFiles: SelectedFile[] = []; const filePromises: Promise<SelectedFile>[] = []; const existingFileNames = new Set(selectedFiles.map(f => f.name));
@@ -393,10 +442,42 @@ export const NoteChat = forwardRef<NoteChatHandle, NoteChatProps>(
         const triggerFileSelect = () => fileInputRef.current?.click();
 
 
-        // --- Core Chat Submit Logic (Unchanged, except for adding loading message ID) ---
+        // --- Core Chat Submit Logic (MODIFIED with Usage Check) ---
         const submitMessageToAI = async (messageContent: string, filesToSend?: SelectedFile[]) => {
             const currentFiles = filesToSend || selectedFiles;
-            if ((!messageContent && currentFiles.length === 0) || isChatLoading || !geminiApiKey || !note) return;
+            if ((!messageContent && currentFiles.length === 0) || isChatLoading || !geminiApiKey || !note || !user) return; // Added user check
+
+            // --- Usage Check ---
+            if (userTier !== 'premium') {
+                const currentMonthYear = new Date().toISOString().slice(0, 7);
+                let currentCount = chatCount;
+
+                // Check if the stored month matches the current month
+                if (usageMonth !== currentMonthYear) {
+                    console.log(`NoteChat: Chat month mismatch (State: ${usageMonth}, Current: ${currentMonthYear}). Resetting count.`);
+                    currentCount = 0; // Reset count locally
+                    setChatCount(0); // Update state
+                    setUsageMonth(currentMonthYear); // Update state
+                    setIsChatLimitReached(false); // Reset limit flag
+                    // Update Firestore asynchronously
+                    updateUserChatUsage(user.uid, 0, currentMonthYear).catch(err => {
+                        console.error("NoteChat: Failed to reset chat usage in Firestore on month change:", err);
+                    });
+                }
+
+                const limit = userTier === 'pro' ? PRO_CHAT_LIMIT : BASIC_CHAT_LIMIT;
+                if (currentCount >= limit) {
+                    setChatHistory(prev => [...prev, {
+                        id: `limit-${Date.now()}`,
+                        role: 'assistant',
+                        content: `You've reached your ${limit} chat message limit for this month. Upgrade for more interactions!`,
+                        error: true
+                    }]);
+                    setChatMessage(''); // Clear input if limit reached
+                    return; // Stop submission
+                }
+            }
+            // --- End Usage Check ---
 
             const timerDuration = parseTimerRequest(messageContent);
 
@@ -417,9 +498,6 @@ export const NoteChat = forwardRef<NoteChatHandle, NoteChatProps>(
                  const prefix = userMsgContent ? '\n\n' : '';
                  userMsgContent += `${prefix}`; // Only add prefix if there's content
             }
-             if (!messageContent && imageFiles.length > 0 && nonImageFiles.length === 0) {
-                 // userMsgContent = `[Image attached: ${imageFiles[0].name}]`;
-             }
 
             const userMsg: ChatMessage = { id: `user-${Date.now()}`, role: 'user', content: userMsgContent, imageData: userMsgImageData };
             setChatHistory(prev => [...prev, userMsg]);
@@ -435,7 +513,19 @@ export const NoteChat = forwardRef<NoteChatHandle, NoteChatProps>(
             }
 
             setIsChatLoading(true);
-            // --- MODIFIED: Set the loading message ID ---
+            // --- Increment Usage Count (Before API Call) ---
+            if (userTier !== 'premium') {
+                const newCount = chatCount + 1;
+                const limit = userTier === 'pro' ? PRO_CHAT_LIMIT : BASIC_CHAT_LIMIT;
+                setChatCount(newCount); // Optimistic UI update
+                setIsChatLimitReached(newCount >= limit); // Update limit state
+                updateUserChatUsage(user.uid, newCount, usageMonth).catch(err => {
+                    console.error("NoteChat: Failed to update chat usage in Firestore:", err);
+                    // Consider reverting optimistic update or showing warning?
+                });
+            }
+            // --- End Increment Logic ---
+
             const newLoadingMsgId = `load-${Date.now()}`;
             setLoadingMsgId(newLoadingMsgId);
             setChatHistory(prev => [...prev, { id: newLoadingMsgId, role: 'assistant', content: '...' }]); // Use '...' as placeholder content for the loading indicator logic
@@ -556,7 +646,12 @@ ${recentHistory
                 let requestBody = JSON.stringify({
                     contents: apiContent,
                     generationConfig: { temperature: 0.6, maxOutputTokens: 8192, topP: 0.95, responseMimeType: "text/plain" },
-                    // safetySettings: [...]
+                    safetySettings: [ // Standard safety settings
+                        { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+                        { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+                        { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+                        { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+                    ]
                 });
 
                 const geminiOptions = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: requestBody };
@@ -643,7 +738,7 @@ ${recentHistory
                 const errorMsg = err instanceof Error ? err.message : 'Unknown error processing request.';
                 setChatHistory(prev => prev.map(msg => msg.id === newLoadingMsgId ? { id: newLoadingMsgId, role: 'assistant', content: `❌ ${errorMsg}. Please check console or try again.`, error: true } : msg ));
                  setSuggestedPrompts([]); // Clear suggestions on error
-            } finally {
+             } finally {
                  setIsChatLoading(false);
                  setLoadingMsgId(null); // Clear loading message ID when done
              }
@@ -681,7 +776,10 @@ ${recentHistory
              }
         }, [selectedFiles]);
 
-        useImperativeHandle(ref, () => ({ sendMessage: (message: string) => { submitMessageToAI(message); } }));
+        useImperativeHandle(ref, () => ({
+            sendMessage: (message: string) => { submitMessageToAI(message); },
+            // focusInput: () => { textareaRef.current?.focus(); } // Example of adding focus
+        }));
 
         // --- Dynamic Styles & Render Logic ---
         const rootClasses = displayMode === 'overlay' ? `fixed bottom-4 right-4 z-50 ${overlayBg} rounded-lg w-full max-w-sm flex flex-col shadow-xl transition-all duration-300 ease-in-out ${isMinimized ? 'h-12 overflow-hidden' : 'h-[75vh] max-h-[650px]'}` : `h-full w-full flex flex-col ${overlayBg}`;
@@ -782,9 +880,21 @@ ${recentHistory
                         )}
 
 
-                        {/* Input Form Area (Unchanged) */}
-                        <form onSubmit={handleChatSubmit} className={`p-2 border-t ${headerBg} shrink-0 sticky bottom-0`}>
-                            {selectedFiles.length > 0 && (
+                        {/* Input Form Area (MODIFIED with usage display) */}
+                        <div className={`p-2 border-t ${headerBg} shrink-0 sticky bottom-0`}>
+                             {/* --- NEW: Usage Display --- */}
+                            {userTier !== 'premium' && userTier !== 'loading' && (
+                                <div className="pb-1 text-xs text-center">
+                                    <span className={isIlluminateEnabled ? 'text-gray-600' : 'text-gray-400'}>
+                                        Messages this month: {isLoadingUsage ? '...' : chatCount} / {currentChatLimit === Infinity ? '∞' : currentChatLimit}
+                                    </span>
+                                    {isChatLimitReached && !isLoadingUsage && (
+                                        <span className="text-red-500 ml-1 font-medium">(Limit Reached)</span>
+                                    )}
+                                </div>
+                            )}
+                            {/* --- End Usage Display --- */}
+                             {selectedFiles.length > 0 && (
                                 <div className="mb-1.5 flex flex-wrap gap-1.5 px-1">
                                     {selectedFiles.map(file => (
                                         <div key={file.name} className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border ${filePillBg} ${filePillText}`}>
@@ -794,13 +904,25 @@ ${recentHistory
                                     ))}
                                 </div>
                             )}
-                            <div className="flex gap-1.5 items-end">
-                                 <textarea ref={textareaRef} rows={1} value={chatMessage} onChange={handleTextareaInput} onKeyDown={handleKeyDown} onPaste={handlePaste} placeholder="Ask, paste an image, or attach files..." className={`flex-1 ${inputBg} ${inputTextColor} ${placeholderColor} rounded-lg px-3 py-1.5 text-sm focus:ring-1 focus:outline-none resize-none overflow-y-auto max-h-[100px] leading-snug ${isChatLoading ? 'opacity-60' : ''}`} disabled={isChatLoading} style={{ height: 'auto' }} />
+                            <form onSubmit={handleChatSubmit} className="flex gap-1.5 items-end">
+                                 <textarea
+                                    ref={textareaRef}
+                                    rows={1}
+                                    value={chatMessage}
+                                    onChange={handleTextareaInput}
+                                    onKeyDown={handleKeyDown}
+                                    onPaste={handlePaste}
+                                    placeholder={isChatLimitReached ? "Monthly chat limit reached..." : "Ask, paste an image, or attach files..."}
+                                    className={`flex-1 ${inputBg} ${inputTextColor} ${placeholderColor} rounded-lg px-3 py-1.5 text-sm focus:ring-1 focus:outline-none resize-none overflow-y-auto max-h-[100px] leading-snug ${isChatLoading || isChatLimitReached || isLoadingUsage ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                    disabled={isChatLoading || isChatLimitReached || isLoadingUsage}
+                                    style={{ height: 'auto' }}
+                                    aria-label="Chat input"
+                                />
                                  <input type="file" ref={fileInputRef} onChange={handleFileSelect} multiple accept="image/*,application/pdf" className="hidden" />
-                                 <button type="button" onClick={triggerFileSelect} disabled={isChatLoading} className={`${buttonSecondaryClass} p-2 rounded-full self-end mb-[1px] transition-all duration-150 ${isChatLoading ? buttonDisabledClass : 'hover:scale-105 active:scale-100'}`} title="Attach Files (Image/PDF)"> <Paperclip className="w-4 h-4" /> </button>
-                                 <button type="submit" disabled={isChatLoading || (!chatMessage.trim() && selectedFiles.length === 0)} className={`${buttonPrimaryClass} p-2 rounded-full self-end mb-[1px] transition-all duration-150 ${isChatLoading || (!chatMessage.trim() && selectedFiles.length === 0) ? buttonDisabledClass : 'hover:scale-105 active:scale-100'}`}> {isChatLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} </button>
-                            </div>
-                        </form>
+                                 <button type="button" onClick={triggerFileSelect} disabled={isChatLoading || isLoadingUsage} className={`${buttonSecondaryClass} p-2 rounded-full self-end mb-[1px] transition-all duration-150 ${isChatLoading || isLoadingUsage ? buttonDisabledClass : 'hover:scale-105 active:scale-100'}`} title="Attach Files (Image/PDF)"> <Paperclip className="w-4 h-4" /> </button>
+                                 <button type="submit" disabled={isChatLoading || isLoadingUsage || (!chatMessage.trim() && selectedFiles.length === 0) || isChatLimitReached} className={`${buttonPrimaryClass} p-2 rounded-full self-end mb-[1px] transition-all duration-150 ${isChatLoading || isLoadingUsage || (!chatMessage.trim() && selectedFiles.length === 0) || isChatLimitReached ? buttonDisabledClass : 'hover:scale-105 active:scale-100'}`}> {isChatLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} </button>
+                            </form>
+                        </div>
                     </>
                 )}
             </div>

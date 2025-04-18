@@ -2346,7 +2346,7 @@ Another Example: Looks clear for today. Consider planning your next project step
               </div>
           ) : userTier === 'basic' ? (
               // --- Render Upgrade Message using React components ---
-              <div className={`text-xs italic flex items-left justify-center gap-1.5 py-2 ${isIlluminateEnabled ? 'text-gray-600' : 'text-gray-400'}`}>
+ <div className={`text-xs italic flex items-center justify-start gap-1.5 py-2 ${isIlluminateEnabled ? 'text-gray-600' : 'text-gray-400'}`}>
                   <Star className="w-3.5 h-3.5 text-yellow-500 flex-shrink-0" />
                   <span>Smart Overview is a Pro/Premium feature.</span>
                   <Link // Use Link component

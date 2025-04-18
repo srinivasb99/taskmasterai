@@ -75,7 +75,7 @@ import {
   geminiApiKey,
   // --- Import Centralized Tier/Usage ---
   getUserTier,
-  getUserChatUsage,
+  getUserUsageData,
   updateUserChatUsage,
   UserTier, // Import type
   BASIC_CHAT_LIMIT,
@@ -503,7 +503,7 @@ export function Calendar() {
                 if (tier !== 'premium') {
                     try {
                         const currentMonthYear = new Date().toISOString().slice(0, 7); // "YYYY-MM"
-                        const usageData = await getUserChatUsage(firebaseUser.uid); // Use central chat usage function
+                        const usageData = await getUserUsageData(firebaseUser.uid); // Use central chat usage function
 
                         if (usageData?.month === currentMonthYear) {
                             setChatCount(usageData.count);

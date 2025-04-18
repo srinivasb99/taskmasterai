@@ -1,13 +1,13 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react'; // Added useMemo
 import { useNavigate, Link } from 'react-router-dom'; // Import Link
 // Ensure all used icons are imported
-import { Play, Pause, PlusCircle, Edit, Trash, Sparkles, CheckCircle, MessageCircle, RotateCcw, Square, X, TimerIcon, Send, ChevronLeft, ChevronRight, Moon, Sun, Star, Wind, Droplets, Zap, Calendar, Clock, MoreHorizontal, ArrowUpRight, Bookmark, BookOpen, Lightbulb, Flame, Award, TrendingUp, Rocket, Target, Layers, Clipboard, AlertCircle, ThumbsUp, ThumbsDown, BrainCircuit, ArrowRight, Flag, Bell, Filter, Tag, BarChart, PieChart } from 'lucide-react';
+import { Play, Pause, PlusCircle, Edit, Trash, Sparkles, CheckCircle, MessageCircle, RotateCcw, Square, X, TimerIcon, Send, ChevronLeft, ChevronRight, Moon, Sun, Star, Wind, Droplets, Zap, Calendar, Clock, MoreHorizontal, ArrowUpRight, Bookmark, BookOpen, Lightbulb, Flame, Award, TrendingUp, Rocket, Target, Layers, Clipboard, AlertCircle, ThumbsUp, ThumbsDown, BrainCircuit, ArrowRight, Flag, Bell, Filter, Tag, BarChart, PieChart, ChevronDown } from 'lucide-react'; // Added ChevronDown here as it was missed in original imports but used later
 import { Sidebar } from './Sidebar';
 import { Timer } from './Timer'; // Ensure this component exists and accepts props like initialDuration, onComplete, compact
 import { FlashcardsQuestions } from './FlashcardsQuestions'; // Ensure this component exists and accepts props like type, data, onComplete, isIlluminateEnabled
 import { getTimeBasedGreeting, getRandomQuote } from '../lib/greetings';
 import ReactMarkdown from 'react-markdown';
-import { ChevronDown } from 'lucide-react';
+// Removed duplicate ChevronDown import
 import remarkMath from 'remark-math';
 import remarkGfm from 'remark-gfm';
 import rehypeKatex from 'rehype-katex';
@@ -165,7 +165,12 @@ const extractCandidateText = (rawResponseText: string): string => {
                     console.error("Gemini API Error in response:", parsedJson.error.message);
                     return `Error: ${parsedJson.error.message}`; // Return formatted error
                 }
-                // 3. If parsed but no text/error found (e.g., only safety ratings in chunk)
+                 // 3. Check for top-level candidate errors (e.g., safety blocks)
+                 else if (parsedJson.candidates?.[0]?.finishReason && parsedJson.candidates?.[0]?.finishReason !== 'STOP') {
+                      console.error("Gemini API finishReason error:", parsedJson.candidates[0].finishReason);
+                      return `Error: Generation stopped (${parsedJson.candidates[0].finishReason})`;
+                 }
+                // 4. If parsed but no text/error found (e.g., only safety ratings in chunk)
                 // Return empty string for this chunk, wait for next chunk with text.
                 else {
                     // console.warn("Parsed JSON chunk lacks text/error:", parsedJson);
@@ -770,7 +775,13 @@ Follow these instructions strictly.`;
                                     if (parsedFallback?.error?.message) {
                                         finalExtractedAssistantText = `Error: ${parsedFallback.error.message}`;
                                     } else {
-                                        finalExtractedAssistantText = "Error: Unexpected response format.";
+                                        // Attempt to extract candidate text even from non-SSE JSON
+                                        const fallbackExtracted = extractCandidateText(finalExtractedAssistantText);
+                                        if (fallbackExtracted && !fallbackExtracted.startsWith('Error:')) {
+                                            finalExtractedAssistantText = fallbackExtracted;
+                                        } else {
+                                            finalExtractedAssistantText = "Error: Unexpected response format.";
+                                        }
                                     }
                                 } catch {
                                     finalExtractedAssistantText = "Error: Could not process response.";
@@ -1276,7 +1287,7 @@ Follow these instructions strictly.`;
               let geoErrorMsg = "Geolocation Error";
               switch(error.code) {
                   case error.PERMISSION_DENIED:
-                      geoErrorMsg = "Geolocation permission denied.";
+                      geoErrorMsg = "Location permission denied.";
                       break;
                   case error.POSITION_UNAVAILABLE:
                       geoErrorMsg = "Location information is unavailable.";
@@ -1305,7 +1316,7 @@ Follow these instructions strictly.`;
   // ---------------------
   // 10. SMART OVERVIEW GENERATION (TIER-BASED)
   // ---------------------
-    const [smartOverview, setSmartOverview] = useState<string>("");
+    const [smartOverview, setSmartOverview] = useState<string>(""); // Holds AI generated text (plain text) or error messages
     const [overviewLoading, setOverviewLoading] = useState(false);
     const [lastGeneratedDataSig, setLastGeneratedDataSig] = useState<string>("");
     const [lastResponse, setLastResponse] = useState<string>(""); // Stores the actual text content of the last overview
@@ -1345,52 +1356,16 @@ Follow these instructions strictly.`;
      // Effect to generate overview based on debounced signature and user tier
     useEffect(() => {
         // Exit if no user, key, signature, or tier is still loading
-        if (!user || !geminiApiKey || !debouncedItemsSigForOverview || userTier === 'loading') {
-            // Set a generic loading/prompt state if tier isn't determined yet
-            if (userTier === 'loading') {
-                 setSmartOverview(`<div class="text-gray-400 text-xs italic">Loading user status...</div>`);
-                 setOverviewLoading(true); // Indicate loading while checking tier
-            } else {
-                 setSmartOverview(`<div class="text-gray-400 text-xs italic">Add items for an AI overview.</div>`);
-                 setOverviewLoading(false);
-            }
+        // Also exit if tier is 'basic' - rendering handled directly in JSX now
+        if (!user || !geminiApiKey || !debouncedItemsSigForOverview || userTier === 'loading' || userTier === 'basic') {
+            setSmartOverview(""); // Clear AI text
+            setOverviewLoading(userTier === 'loading'); // Show loading only if tier is loading
             setLastGeneratedDataSig("");
             setLastResponse("");
             return;
         }
 
-// --- TIER CHECK ---
-if (userTier === 'basic') {
-    // Construct the message using JSX
-    const basicTierMessage = (
-        <div className={`text-xs italic flex items-center justify-center gap-1.5 py-2 ${
-            isIlluminateEnabled ? 'text-gray-600' : 'text-gray-400'
-        }`}>
-            {/* Render the Star component directly */}
-            <Star className="w-3.5 h-3.5 text-yellow-500 flex-shrink-0" />
-
-            {/* Text content */}
-            <span>Smart Overview is a Pro/Premium feature.</span>
-
-            {/* Use the Link component for internal navigation */}
-            <Link to="/pricing" className="text-blue-500 hover:underline font-medium ml-1">
-                Upgrade now
-            </Link>
-        </div>
-    );
-
-    // Set the state variable with the JSX element
-    // Ensure your smartOverview state is typed correctly, e.g., useState<React.ReactNode | null>(null);
-    setSmartOverview(basicTierMessage);
-
-    // Keep the rest of the logic as it was
-    setOverviewLoading(false);
-    setLastGeneratedDataSig(""); // Clear signature to prevent attempts
-    setLastResponse("");
-    return; // Exit early for basic users
-}
-// --- END TIER CHECK ---
-
+        // --- TIER CHECK ALREADY DONE (Exits if basic/loading) ---
 
         // Only regenerate if the signature has changed or if we are not currently loading
         // And if the tier allows generation (pro or premium)
@@ -1403,6 +1378,7 @@ if (userTier === 'basic') {
             if (overviewLoading) return;
 
             setOverviewLoading(true);
+            setSmartOverview(""); // Clear previous text while loading new one
             setLastGeneratedDataSig(debouncedItemsSigForOverview); // Set signature *before* async call
 
             const formatItem = (item: any, type: string) => {
@@ -1432,7 +1408,7 @@ if (userTier === 'basic') {
 
 
             if (formattedData === "No pending items.") {
-                setSmartOverview(`<div class="text-gray-400 text-xs italic">No pending items to generate overview from.</div>`);
+                setSmartOverview(`No pending items to generate overview from.`); // Set plain text message
                 setOverviewLoading(false);
                 setLastResponse(""); // Clear last response
                 return;
@@ -1489,7 +1465,7 @@ Another Example: Looks clear for today. Consider planning your next project step
                 const cleanText = rawText.trim(); // Extractor already trims
 
                 // Check if the response is valid and different from the last one
-                if (!cleanText || cleanText.toLowerCase().includes("error") || cleanText.length < 5) {
+                if (!cleanText || cleanText.toLowerCase().startsWith("error:") || cleanText.length < 5) {
                      // Treat very short, empty, or error-like responses as errors for overview
                      console.warn("Received invalid overview response:", cleanText);
                      throw new Error("Received invalid overview response.");
@@ -1498,10 +1474,12 @@ Another Example: Looks clear for today. Consider planning your next project step
                 // Only update state if the actual text content has changed
                 if (cleanText !== lastResponse) {
                     setLastResponse(cleanText);
-                    setSmartOverview(
-                        `<div class="${isIlluminateEnabled ? 'text-gray-700' : 'text-gray-300'} text-sm">${cleanText}</div>`
-                    );
+                    setSmartOverview(cleanText); // Set the plain text
+                } else {
+                    // If response is same as last time, keep the current state (prevents flicker)
+                    setSmartOverview(lastResponse);
                 }
+
 
             } catch (error: any) {
                 console.error("Overview generation error:", error);
@@ -1518,7 +1496,7 @@ Another Example: Looks clear for today. Consider planning your next project step
                  } else if (error.message.includes("API Error")) {
                       errorMsg = "Overview generation failed (API).";
                  }
-                setSmartOverview(`<div class="text-yellow-500 text-xs italic">${errorMsg}</div>`);
+                setSmartOverview(errorMsg); // Set error message as plain text
                  setLastResponse(""); // Clear last response text on error to allow retry
                  setLastGeneratedDataSig(""); // Also clear signature on error to force retry next time
             } finally {
@@ -1528,7 +1506,7 @@ Another Example: Looks clear for today. Consider planning your next project step
 
         generateOverview();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [user, userTier, debouncedItemsSigForOverview, userName, geminiApiKey, isIlluminateEnabled, lastResponse]); // Added userTier and lastResponse
+    }, [user, userTier, debouncedItemsSigForOverview, userName, geminiApiKey, lastResponse]); // Removed isIlluminateEnabled dependency, added userTier and lastResponse
 
 
   // ---------------------
@@ -2169,7 +2147,7 @@ Another Example: Looks clear for today. Consider planning your next project step
               className={`text-xl md:text-2xl lg:text-3xl font-bold mb-0.5 ${headingClass} break-words`}
             >
               {React.cloneElement(greeting.icon, {
-                className: `w-5 h-5 lg:w-6 lg:h-6 inline-block align-middle mr-1.5 -translate-y-0.5 text-${greeting.color}-500`, // Use greeting color if available
+                className: `w-5 h-5 lg:w-6 lg:h-6 inline-block align-middle mr-1.5 -translate-y-0.5 ${greeting.color ? `text-${greeting.color}-500` : illuminateIconColor}`, // Use greeting color if available, fallback
               })}
               {greeting.greeting},{' '}
               <span className="font-semibold">
@@ -2195,7 +2173,7 @@ Another Example: Looks clear for today. Consider planning your next project step
                   prevWeek.setDate(prevWeek.getDate() - 7);
                   setCurrentWeek(getWeekDates(prevWeek));
                 }}
-                className={`w-5 sm:w-6 h-full flex items-center justify-center ${iconColor} hover:text-white transition-colors ${illuminateHoverGray} hover:bg-gray-700/30 rounded-lg`}
+                className={`w-5 sm:w-6 h-full flex items-center justify-center ${iconColor} ${illuminateHoverGray} rounded-lg transition-colors`}
                 title="Previous Week"
               >
                 <ChevronLeft className="w-4 h-4" />
@@ -2233,7 +2211,7 @@ Another Example: Looks clear for today. Consider planning your next project step
                         key={dateStr}
                          className={`relative w-full h-5 text-center rounded transition-all duration-150 cursor-pointer flex items-center justify-center text-[10px] ${
                             isToday ? todayClass : `${subheadingClass} ${defaultHover}`
-                         } ${hasDeadline ? `${deadlineClass} font-medium` : ''} `}
+                         } ${hasDeadline && !isToday ? `${deadlineClass} font-medium` : ''} `} // Apply deadlineClass only if not today
                          title={date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
                       >
                         <span>{date.getDate()}</span>
@@ -2252,7 +2230,7 @@ Another Example: Looks clear for today. Consider planning your next project step
                   nextWeek.setDate(nextWeek.getDate() + 7);
                   setCurrentWeek(getWeekDates(nextWeek));
                 }}
-                 className={`w-5 sm:w-6 h-full flex items-center justify-center ${iconColor} hover:text-white transition-colors ${illuminateHoverGray} hover:bg-gray-700/30 rounded-lg`}
+                 className={`w-5 sm:w-6 h-full flex items-center justify-center ${iconColor} ${illuminateHoverGray} rounded-lg transition-colors`}
                  title="Next Week"
               >
                 <ChevronRight className="w-4 h-4" />
@@ -2282,7 +2260,7 @@ Another Example: Looks clear for today. Consider planning your next project step
                  className={`p-1 rounded-full transition-colors ${iconColor} ${ isIlluminateEnabled ? 'hover:bg-gray-200' : 'hover:bg-gray-700' }`}
                  title={showInsightsPanel ? "Collapse Insights" : "Expand Insights"}
               >
-                 {showInsightsPanel ? <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" /> : <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />}
+                 {showInsightsPanel ? <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5" /> : <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />} {/* Corrected icons */}
               </button>
             </div>
 
@@ -2333,7 +2311,7 @@ Another Example: Looks clear for today. Consider planning your next project step
         )}
 
 
-        {/* Smart Overview Card - Modified */}
+        {/* Smart Overview Card - Modified for Tier Rendering */}
         <div
           className={`${cardClass} rounded-xl p-3 sm:p-4 relative min-h-[80px] transition-all duration-300 ease-out animate-fadeIn mb-4 sm:mb-5 ${cardVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'} delay-300`}
         >
@@ -2361,31 +2339,46 @@ Another Example: Looks clear for today. Consider planning your next project step
               )}
           </div>
 
-          {/* Conditional Rendering based on tier */}
+          {/* --- Conditional Rendering based on tier --- */}
           {userTier === 'loading' ? (
               <div className="animate-pulse space-y-1.5 pt-1">
                   <div className={`h-3 rounded-full w-1/2 ${isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700'}`}></div>
               </div>
+          ) : userTier === 'basic' ? (
+              // --- Render Upgrade Message using React components ---
+              <div className={`text-xs italic flex items-center justify-center gap-1.5 py-2 ${isIlluminateEnabled ? 'text-gray-600' : 'text-gray-400'}`}>
+                  <Star className="w-3.5 h-3.5 text-yellow-500 flex-shrink-0" />
+                  <span>Smart Overview is a Pro/Premium feature.</span>
+                  <Link // Use Link component
+                      to="/pricing" // Correct path
+                      className={`font-medium ml-1 ${isIlluminateEnabled ? 'text-blue-600 hover:text-blue-700' : 'text-blue-400 hover:text-blue-300'} hover:underline not-italic`} // Added not-italic
+                  >
+                      Upgrade now
+                  </Link>
+              </div>
           ) : overviewLoading ? (
+             // --- Loading Skeleton for Pro/Premium ---
              <div className="space-y-1.5 animate-pulse pt-1">
               <div className={`h-3 rounded-full w-11/12 ${isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700'}`}></div>
               <div className={`h-3 rounded-full w-3/4 ${isIlluminateEnabled ? 'bg-gray-200' : 'bg-gray-700'}`}></div>
             </div>
           ) : (
+            // --- Render AI Overview for Pro/Premium ---
             <>
                <div
-                 className={`text-xs sm:text-sm prose-sm max-w-none animate-fadeIn ${isIlluminateEnabled ? 'text-gray-800' : 'text-gray-300'} leading-snug`}
-                 // SmartOverview content is set based on tier in useEffect
-                 dangerouslySetInnerHTML={{ __html: smartOverview }}
-               />
-               {/* Show AI disclaimer only if overview was actually generated */}
-               {(userTier === 'pro' || userTier === 'premium') && smartOverview && !smartOverview.includes('feature') && !smartOverview.includes('unavailable') && (
+                 className={`text-xs sm:text-sm prose-sm max-w-none animate-fadeIn ${isIlluminateEnabled ? 'text-gray-800' : 'text-gray-300'} leading-snug ${smartOverview.includes('unavailable') || smartOverview.includes('failed') || smartOverview.includes('limit') ? (isIlluminateEnabled ? 'text-yellow-700 italic' : 'text-yellow-500 italic') : ''}`} // Style error/info messages
+               >
+                 {smartOverview || "Add items or wait a moment for the overview."} {/* Show AI text or a default placeholder */}
+               </div>
+               {/* Show AI disclaimer only if overview seems valid */}
+               {smartOverview && !smartOverview.includes('unavailable') && !smartOverview.includes('failed') && !smartOverview.includes('limit') && !smartOverview.includes('No pending items') && (
                   <div className="mt-1.5 text-left text-[10px] text-gray-500/80">
                       AI responses may be inaccurate. Verify critical info.
                   </div>
                )}
             </>
           )}
+          {/* --- END CONDITIONAL RENDERING --- */}
         </div>
 
 
@@ -2940,7 +2933,7 @@ Another Example: Looks clear for today. Consider planning your next project step
                 </div>
                 <div className="flex justify-center gap-2">
                   <button
-                    className={`px-3 py-1.5 rounded-full font-medium text-white transition-all duration-150 transform hover:scale-105 active:scale-100 text-xs sm:text-sm ${pomodoroRunning || pomodoroTimeLeft === 0 ? 'bg-gray-400 cursor-not-allowed' : 'bg-gradient-to-r from-green-500 to-green-600 hover:shadow-md hover:shadow-green-500/10'}`}
+                    className={`px-3 py-1.5 rounded-full font-medium text-white transition-all duration-150 transform hover:scale-105 active:scale-100 text-xs sm:text-sm ${pomodoroRunning || pomodoroFinished ? 'bg-gray-400 cursor-not-allowed' : 'bg-gradient-to-r from-green-500 to-green-600 hover:shadow-md hover:shadow-green-500/10'}`} // Disable if running OR finished
                     onClick={handlePomodoroStart} disabled={pomodoroRunning || pomodoroFinished}
                     title="Start Timer"
                   >
@@ -3292,6 +3285,3 @@ Another Example: Looks clear for today. Consider planning your next project step
     </div> // End container
   );
 }
-
-// Default export if needed
-// export default Dashboard;

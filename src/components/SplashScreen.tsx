@@ -154,7 +154,7 @@ function SplashScreen() {
           {/* Flex container (Unchanged) */}
           <div className={`flex flex-col ${currentFeature.image ? 'md:flex-row' : ''} gap-6 md:gap-8 lg:gap-12`}>
 
-            {/* Content Column (Includes "Coming Soon" logic - Unchanged from previous correct version) */}
+            {/* Content Column (Includes "Coming Soon" logic - Unchanged) */}
             <div className={`${currentFeature.image ? 'md:w-1/2' : 'w-full'} flex flex-col`}>
               <div className="flex items-center gap-4 mb-6">
                   <div className="p-2.5 bg-indigo-500/10 rounded-lg animate-pulse-subtle flex-shrink-0">
@@ -166,7 +166,6 @@ function SplashScreen() {
                       <h2 className="text-xl sm:text-2xl md:text-3xl font-semibold text-white inline">
                           {currentFeature.title}
                       </h2>
-                      {/* Conditionally render "Coming Soon" or "Try Now" */}
                       {currentFeature.title === 'Focus Mode' ? (
                         <span className="px-3.5 py-1.5 text-sm font-medium text-gray-400 bg-gray-700/50 rounded-full cursor-default whitespace-nowrap">
                           Coming Soon
@@ -191,7 +190,8 @@ function SplashScreen() {
             {currentFeature.image && (
               <div
                 key={currentFeature.image}
-                className="md:w-1/2 mt-4 md:mt-0 group relative rounded-xl overflow-hidden" // Keep group class
+                // Added perspective here for potential 3D transforms, though not strictly needed for just shadow/translateY
+                className="md:w-1/2 mt-4 md:mt-0 group relative rounded-xl overflow-hidden [perspective:1000px]"
               >
                  {/* Background gradient placeholder (Unchanged) */}
                  <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 via-purple-500/10 to-gray-800/10"></div>
@@ -203,9 +203,15 @@ function SplashScreen() {
                  <img
                   src={currentFeature.image}
                   alt={`${currentFeature.title} Preview`}
-                  className={`relative w-full h-auto md:h-full md:object-cover rounded-xl shadow-lg transform transition-all duration-500 ease-out ${ // Use transform for base state, adjust duration/easing
-                    isImageLoaded ? 'opacity-100 blur-0 scale-100' : 'opacity-0 blur-sm scale-105' // Loading animation
-                  } group-hover:scale-[1.03] group-hover:shadow-xl`} // Subtle scale up and enhance shadow on hover
+                  className={`
+                    relative w-full h-auto md:h-full md:object-cover rounded-xl shadow-lg /* Base shadow */
+                    transform transition-all duration-300 ease-out /* Faster, smoother transition */
+                    ${ isImageLoaded ? 'opacity-100 blur-0 scale-100' : 'opacity-0 blur-sm scale-105' } /* Loading animation */
+                    /* --- Hover Effects --- */
+                    group-hover:shadow-xl /* Increase shadow significantly */
+                    group-hover:-translate-y-1 /* Lift slightly */
+                    /* Removed group-hover:scale */
+                  `}
                  />
                  {/* --- END MODIFIED IMAGE --- */}
               </div>

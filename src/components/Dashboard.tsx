@@ -1359,21 +1359,37 @@ Follow these instructions strictly.`;
             return;
         }
 
-        // --- TIER CHECK ---
-        if (userTier === 'basic') {
-            setSmartOverview(
-                `<div class="${isIlluminateEnabled ? 'text-gray-600' : 'text-gray-400'} text-xs italic flex items-center justify-center gap-1.5 py-2">` +
-                `<Star class="w-3.5 h-3.5 text-yellow-500 flex-shrink-0" />` +
-                `<span>Smart Overview is a Pro/Premium feature.</span>` +
-                `<a href="/pricing" class="text-blue-500 hover:underline font-medium ml-1">Upgrade now</a>` +
-                `</div>`
-            );
-            setOverviewLoading(false);
-            setLastGeneratedDataSig(""); // Clear signature to prevent attempts
-            setLastResponse("");
-            return; // Exit early for basic users
-        }
-        // --- END TIER CHECK ---
+// --- TIER CHECK ---
+if (userTier === 'basic') {
+    // Construct the message using JSX
+    const basicTierMessage = (
+        <div className={`text-xs italic flex items-center justify-center gap-1.5 py-2 ${
+            isIlluminateEnabled ? 'text-gray-600' : 'text-gray-400'
+        }`}>
+            {/* Render the Star component directly */}
+            <Star className="w-3.5 h-3.5 text-yellow-500 flex-shrink-0" />
+
+            {/* Text content */}
+            <span>Smart Overview is a Pro/Premium feature.</span>
+
+            {/* Use the Link component for internal navigation */}
+            <Link to="/pricing" className="text-blue-500 hover:underline font-medium ml-1">
+                Upgrade now
+            </Link>
+        </div>
+    );
+
+    // Set the state variable with the JSX element
+    // Ensure your smartOverview state is typed correctly, e.g., useState<React.ReactNode | null>(null);
+    setSmartOverview(basicTierMessage);
+
+    // Keep the rest of the logic as it was
+    setOverviewLoading(false);
+    setLastGeneratedDataSig(""); // Clear signature to prevent attempts
+    setLastResponse("");
+    return; // Exit early for basic users
+}
+// --- END TIER CHECK ---
 
 
         // Only regenerate if the signature has changed or if we are not currently loading

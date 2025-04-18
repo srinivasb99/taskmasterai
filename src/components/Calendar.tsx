@@ -1040,14 +1040,6 @@ Respond directly to the user's message following these guidelines.`;
   // ---------------------------
 
 
-  if (loading) { // Show loader until all initial data is loaded
-    return (
-      <div className={`flex h-screen ${containerClass} items-center justify-center`}>
-        <Loader2 className="w-10 h-10 animate-spin text-blue-500" />
-      </div>
-    );
-  }
-
 
   // ---------------------------
   //   Main Render

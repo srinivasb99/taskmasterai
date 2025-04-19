@@ -62,7 +62,7 @@ const FriendsOutage = () => {
         {/* Outage Message */}
         <p className="max-w-xl text-gray-300 text-lg md:text-xl leading-relaxed text-center">
           Friends is currently experiencing a major outage due to unforeseen issues. We're working
-          to restore full functionality, with service resuming by <strong>March 22</strong>.
+          to restore full functionality, with service resuming by <strong>April 30</strong>.
         </p>
 
         {/* Bold, Single-Line Reassurance with Extra Spacing and Styling */}

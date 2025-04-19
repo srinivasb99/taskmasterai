@@ -37,6 +37,7 @@ import Community from './components/Community';
 import SchoolPage from './components/SchoolPage';
 import './index.css';
 import NotesOutage from './outage-pages/NotesOutage';
+import FriendsOutage from './outage-pages/FriendsOutage';
 import Status from './status/Status'; // Import the new Status page
 import { PublicNoteView } from './components/PublicNoteView'; // Adjust path if needed
 import ComingSoon from './components/ComingSoon'; // Import the component
@@ -196,7 +197,7 @@ createRoot(document.getElementById('root')!).render(
             <Route path="/signup" element={<PageTitle title="Sign Up"><SignUp /></PageTitle>} />
             <Route path="/pricing" element={<PageTitle title="Pricing"><Pricing /></PageTitle>} />
             <Route path="/terms" element={<PageTitle title="Terms of Service"><Terms /></PageTitle>} />
-            <Route path="/friends" element={<PageTitle title="Friends"><Friends /></PageTitle>} />
+            <Route path="/friends" element={<PageTitle title="Friends"><FriendsOutage /></PageTitle>} />
             <Route path="/settings" element={<PageTitle title="Settings"><Settings /></PageTitle>} />
             <Route path="/splashscreen" element={<PageTitle title="Welcome"><SplashScreen /></PageTitle>} />
             <Route path="/privacy-policy" element={<PageTitle title="Privacy Policy"><PrivacyPolicy /></PageTitle>} />

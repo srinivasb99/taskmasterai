@@ -309,7 +309,7 @@ export function Sidebar({
                         Pro
                       </span>
                     ) : (
-                      <span className="text-xs text-gray-500">Basic Plan</span>
+                      <span className="text-xs text-gray-500">Basic</span>
                     )}
                     {isDev && (
                       <span className="ml-1 px-1 py-0.5 text-[9px] font-semibold bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-full leading-none">

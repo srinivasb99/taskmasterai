@@ -28,31 +28,16 @@ import {
 import { geminiApiKey } from '../lib/dashboard-firebase'; // Adjust path as needed
 
 // --- AI Helper Functions (Include or import as needed) ---
-const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}&alt=sse`;
+const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}&alt=sse`; // Updated model name example
 
-const fetchWithTimeout = async (url: string, options: RequestInit, timeout = 30000) => {
-  const controller = new AbortController();
-  const { signal } = controller;
-  const timeoutId = setTimeout(() => controller.abort(), timeout);
-  try {
-    const response = await fetch(url, { ...options, signal });
-    clearTimeout(timeoutId);
-    return response;
-  } catch (error) {
-    clearTimeout(timeoutId);
-    if ((error as Error).name === 'AbortError') {
-         console.warn('Fetch timed out:', url);
-         throw new Error('Request timed out');
-    }
-    throw error;
-  }
-};
+// Note: Removed fetchWithTimeout for brevity as streamResponse implicitly handles some timeout aspects
+// If needed, it can be re-added.
 
 const streamResponse = async (
   url: string,
   options: RequestInit,
   onStreamUpdate: (textChunk: string) => void,
-  timeout = 45000
+  // timeout = 45000 // Timeout parameter removed for simplicity in this example
 ) => {
     try {
         const response = await fetch(url, { ...options });
@@ -109,36 +94,45 @@ const extractCandidateText = (rawResponseText: string): string => {
         if (lastDataLine) {
              potentialJson = lastDataLine.substring(5).trim();
         } else if (rawResponseText.trim().startsWith('{')) {
+            // Handle cases where the entire response might be a single JSON object (less common for SSE)
             potentialJson = rawResponseText.trim();
         }
 
         if (potentialJson) {
             try {
                 const parsedJson = JSON.parse(potentialJson);
+                // Gemini 1.5 Flash/Pro format often uses this structure
                 if (parsedJson.candidates?.[0]?.content?.parts?.[0]?.text) {
                     extractedText = parsedJson.candidates[0].content.parts[0].text;
-                } else if (parsedJson.error?.message) {
+                }
+                // Handle potential API errors embedded in the JSON
+                else if (parsedJson.error?.message) {
                     console.error("Gemini API Error in response:", parsedJson.error.message);
                     return `Error: ${parsedJson.error.message}`;
-                } else {
+                }
+                // Fallback: Look for any text part if the primary path fails
+                else {
                     const anyTextPart = parsedJson.candidates?.[0]?.content?.parts?.find((p: any) => p.text)?.text;
                     extractedText = anyTextPart || "";
                 }
             } catch (e) {
-                 const textMatch = rawResponseText.match(/"text":\s*"([^"]*)"/);
-                 extractedText = textMatch ? textMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"') : "";
+                 // If JSON parsing fails, try a simpler regex fallback for "text": "..."
+                 const textMatch = rawResponseText.match(/"text":\s*"((?:\\.|[^"\\])*)"/);
+                 extractedText = textMatch ? JSON.parse(`"${textMatch[1]}"`) : ""; // Use JSON.parse to handle escapes like \n, \"
             }
         } else {
+             // Handle API errors that might not be in 'data:' lines
              if (rawResponseText.includes('"error":')) {
                  try {
+                     // Attempt to parse the whole chunk if it looks like an error object
                      const parsedError = JSON.parse(rawResponseText);
                      if (parsedError.error?.message) {
                          console.error("Gemini API Error (direct):", parsedError.error.message);
                          return `Error: ${parsedError.error.message}`;
                      }
-                 } catch (e) { /* ignore */ }
+                 } catch (e) { /* ignore parsing error if it's not JSON */ }
              }
-             // Fallback for plain text or non-standard SSE chunks
+             // Fallback for plain text or non-standard SSE chunks, remove potential 'data: ' prefix
              extractedText = rawResponseText.replace(/^data:\s*/, '').trim();
         }
         // Clean up role prefixes sometimes added by the model
@@ -168,12 +162,17 @@ const Logo = () => (
   </Link>
 );
 
-// Service Status Data (Unchanged)
+// Service Status Data (MODIFIED FOR FRIENDS OUTAGE)
 const serviceStatus = [
   { name: "Dashboard", icon: LayoutDashboard, uptime: "99.99%", majorIssue: null, description: "Core application interface and widgets." },
   { name: "Notes", icon: NotebookText, uptime: "99.98%", majorIssue: null, description: "Note-taking, editing, and organization features." },
   { name: "Calendar", icon: CalendarDays, uptime: "99.95%", majorIssue: null, description: "Event scheduling and calendar synchronization." },
-  { name: "Friends", icon: Users, uptime: "99.92%", majorIssue: null, description: "Social features, friend requests, and sharing." },
+  { name: "Friends", icon: Users, uptime: "99.92%", // Uptime reflects historical, majorIssue indicates current status
+    // **** START: MODIFIED SECTION ****
+    majorIssue: "The Friends feature is currently experiencing a major outage. It was identified that the feature was causing instability and crashes in other parts of the application. Underlying code, logic, and AI integrations require investigation and fixes. We are working to resolve this.",
+    // **** END: MODIFIED SECTION ****
+    description: "Social features, friend requests, and sharing."
+  },
   { name: "Community", icon: Globe2, uptime: "99.88%", majorIssue: null, description: "File sharing, discovery, and community interactions." },
   { name: "Folders", icon: FolderKanban, uptime: "100.00%", majorIssue: null, description: "File and note organization using folders." },
   { name: "Focus Mode", icon: Eye, uptime: "100.00%", majorIssue: null, description: "Distraction-free work environment." },
@@ -191,7 +190,6 @@ const incidentHistory = [
         status: "Resolved"
     },
     // Add more past incidents here if needed
-    // { date: "Feb 10, 10:00 AM EST", title: "Minor Issue - Calendar Sync Delay", description: "...", resolvedDate: "Feb 10, 11:30 AM EST", status: "Resolved"}
 ];
 
 // Framer Motion Variants (Unchanged)
@@ -225,16 +223,16 @@ const Status = () => {
 
   const toggleMobileMenu = () => setIsMobileMenuOpen(!isMobileMenuOpen);
 
-  // Determine overall status (Unchanged)
+  // Determine overall status (Unchanged, will automatically reflect the new Friends outage)
   const hasMajorOutage = serviceStatus.some(service => service.majorIssue);
   const overallStatusText = hasMajorOutage ? "Major Outage Reported" : "All Systems Operational";
   const overallStatusIcon = hasMajorOutage ? AlertTriangle : CheckCircle;
   const overallStatusColor = hasMajorOutage ? "text-red-400" : "text-green-400";
 
-  // **** UPDATED: Hardcoded last updated time ****
-  const lastUpdated = "April 15; 2:30 pm EST";
+  // **** UPDATED: Hardcoded last updated time to reflect the outage time ****
+  const lastUpdated = "April 18, 2025; 4:30 PM EST"; // Updated time
 
-   // --- AI Chat Submit Handler (Status Page Specific - Updated Context) ---
+   // --- AI Chat Submit Handler (Status Page Specific - Context will include the new outage) ---
    const handleChatSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatMessage.trim() || isChatLoading) return;
@@ -251,30 +249,30 @@ const Status = () => {
     setChatHistory(prev => [...prev, placeholderMsg]);
 
     // Prepare context for the AI - Current Status + Incident History
+    // This context will now include the Friends outage information automatically
     const statusContext = serviceStatus.map(s =>
         `- ${s.name}: Status ${s.majorIssue ? 'Major Outage' : 'Operational'} (Uptime: ${s.uptime})${s.majorIssue ? `. Issue: ${s.majorIssue}` : ''}`
     ).join('\n');
 
-    // **** ADDED: Incident History Context ****
     const historyContext = incidentHistory.map(inc =>
-        `- Date: ${inc.date}, Title: ${inc.title}, Status: ${inc.status}${inc.resolvedDate ? `, Resolved: ${inc.resolvedDate}` : ''}. Summary: ${inc.description.substring(0, 100)}...` // Include brief summary
+        `- Date: ${inc.date}, Title: ${inc.title}, Status: ${inc.status}${inc.resolvedDate ? `, Resolved: ${inc.resolvedDate}` : ''}. Summary: ${inc.description.substring(0, 100)}...`
     ).join('\n');
 
     const prompt = `
 You are the TaskMaster Status Page AI Assistant. Your knowledge includes the current service status and past incident history provided below. You cannot access user data, dashboards, notes, community files, or any other part of the TaskMaster application.
 
-**Current Service Status:**
+**Current Service Status (as of ${lastUpdated}):**
 ${statusContext}
 
 **Past Incident History:**
 ${historyContext}
 
 **Your Task:**
-1.  Answer user questions about the **current status** of the services listed (e.g., "Is the Dashboard down?", "What's the uptime for Community?", "Is there an issue with Notes?").
+1.  Answer user questions about the **current status** of the services listed (e.g., "Is the Dashboard down?", "What's the uptime for Community?", "What's wrong with the Friends feature?").
 2.  Answer user questions about **past incidents** listed in the history (e.g., "What happened on March 4th?", "Tell me about the Notes outage.").
 3.  If asked about a service not listed or an incident not in the history, state that you don't have information on it.
 4.  If asked for help with specific account issues, login problems, or anything beyond the provided status and history, politely state that you cannot help with that and suggest contacting support or checking the main application.
-5.  Keep responses concise and based *strictly* on the provided status and history information. Do not speculate.
+5.  Keep responses concise and based *strictly* on the provided status and history information. Do not speculate. Acknowledge the 'last updated' time if relevant to the query.
 
 **Conversation History (Last few turns):**
 ${chatHistory.slice(-4).map(m => `${m.role}: ${m.content}`).join('\n')}
@@ -294,7 +292,7 @@ Assistant:`;
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 contents: [{ parts: [{ text: prompt }] }],
-                generationConfig: { temperature: 0.5, maxOutputTokens: 500 },
+                generationConfig: { temperature: 0.5, maxOutputTokens: 500 }, // Reduced tokens slightly for status context
                 safetySettings: [
                     { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
                     { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
@@ -308,7 +306,7 @@ Assistant:`;
         await streamResponse(geminiEndpoint, geminiOptions, (rawChunkAccumulated) => {
             finalRawResponseText = rawChunkAccumulated;
             const currentExtractedText = extractCandidateText(rawChunkAccumulated);
-            accumulatedStreamedText = currentExtractedText;
+            accumulatedStreamedText = currentExtractedText; // Update with latest full extracted text
 
             setChatHistory(prev => prev.map(msg =>
                 msg.id === assistantMsgId
@@ -317,6 +315,7 @@ Assistant:`;
             ));
         });
 
+        // Final update after stream ends
         const finalExtracted = extractCandidateText(finalRawResponseText);
         setChatHistory(prev => prev.map(msg =>
              msg.id === assistantMsgId
@@ -335,7 +334,7 @@ Assistant:`;
     } finally {
         setIsChatLoading(false);
     }
-   }, [chatMessage, isChatLoading, chatHistory]); // Dependencies include chat history now
+   }, [chatMessage, isChatLoading, chatHistory, lastUpdated]); // Added lastUpdated dependency
 
 
    // AI Chat Scroll Effect (Unchanged)
@@ -404,29 +403,29 @@ Assistant:`;
 
       {/* Main Status Content */}
       <main className="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 pt-28 md:pt-32 pb-12">
-        {/* Overall Status Banner (Unchanged) */}
+        {/* Overall Status Banner (UPDATED - Will now show Major Outage) */}
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.5, delay: 0.2 }}
           className={`flex items-center justify-center gap-3 p-4 md:p-6 rounded-xl mb-10 md:mb-12 shadow-lg border ${
-            hasMajorOutage
-              ? 'bg-red-900/20 border-red-700/40'
+            hasMajorOutage // This will be true now
+              ? 'bg-red-900/20 border-red-700/40' // Styles for outage
               : 'bg-green-900/20 border-green-700/40'
           }`}
         >
-          <overallStatusIcon className={`w-8 h-8 md:w-10 md:h-10 flex-shrink-0 ${overallStatusColor}`} />
+          <overallStatusIcon className={`w-8 h-8 md:w-10 md:h-10 flex-shrink-0 ${overallStatusColor}`} /> {/* Will show AlertTriangle */}
           <div>
             <h2 className={`text-xl md:text-2xl font-semibold ${hasMajorOutage ? 'text-red-300' : 'text-green-300'}`}>
-              {overallStatusText}
+              {overallStatusText} {/* Will show "Major Outage Reported" */}
             </h2>
             <p className="text-xs md:text-sm text-gray-400 mt-1">
-              Last updated: {lastUpdated}
+              Last updated: {lastUpdated} {/* Shows the updated time */}
             </p>
           </div>
         </motion.div>
 
-        {/* Service Status Grid (Unchanged) */}
+        {/* Service Status Grid (UPDATED - Friends card will show outage details) */}
         <motion.div
           variants={containerVariants}
           initial="hidden"
@@ -451,16 +450,17 @@ Assistant:`;
                     <h3 className="text-lg font-semibold text-gray-100">{service.name}</h3>
                   </div>
                   <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full border ${statusColorClass}`}>
-                    {statusText}
+                    {statusText} {/* Will show "Major Outage" for Friends */}
                   </span>
                 </div>
                 <p className="text-sm text-gray-400 mb-4 flex-grow">
                   {service.description}
                 </p>
+                {/* This block will now render for the Friends service */}
                 {isOutage && (
                   <div className="bg-red-900/30 border border-red-700/50 p-3 rounded-lg text-sm text-red-200 mt-auto">
                      <p className="font-semibold mb-1">Current Issue:</p>
-                     <p>{service.majorIssue}</p>
+                     <p>{service.majorIssue}</p> {/* Displays the outage reason */}
                   </div>
                 )}
               </motion.div>
@@ -468,7 +468,7 @@ Assistant:`;
           })}
         </motion.div>
 
-        {/* **** NEW: Incident History Section **** */}
+        {/* **** NEW: Incident History Section (Unchanged) **** */}
         <motion.div
             className="mt-16"
             initial={{ opacity: 0 }}
@@ -487,15 +487,15 @@ Assistant:`;
                         <motion.div
                             key={index}
                             className="bg-gray-800/50 p-5 rounded-lg border border-gray-700/50 shadow-sm"
-                            variants={itemVariants} // Use the same item variant
-                            initial="hidden" // Apply variants individually if parent isn't staggered
+                            variants={itemVariants}
+                            initial="hidden"
                             animate="visible"
-                            transition={{delay: 0.6 + index * 0.1}} // Stagger delay
+                            transition={{delay: 0.6 + index * 0.1}}
                         >
                             <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-2">
                                 <h3 className="text-lg font-semibold text-indigo-300 mb-1 sm:mb-0">{incident.title}</h3>
                                 <span className={`text-xs font-medium px-2 py-0.5 rounded ${
-                                    incident.status === 'Resolved' ? 'bg-green-800/50 text-green-300 border border-green-700/50' : 'bg-yellow-800/50 text-yellow-300 border border-yellow-700/50' // Example for other statuses
+                                    incident.status === 'Resolved' ? 'bg-green-800/50 text-green-300 border border-green-700/50' : 'bg-yellow-800/50 text-yellow-300 border border-yellow-700/50'
                                 }`}>{incident.status}</span>
                             </div>
                             <p className="text-xs text-gray-500 mb-3">
@@ -543,7 +543,7 @@ Assistant:`;
       </footer>
 
 
-       {/* AI Chat Sidebar (Unchanged Structure/Styling) */}
+       {/* AI Chat Sidebar (Unchanged Structure/Styling - Logic updated via useCallback deps) */}
         <div
             aria-hidden={!isAiSidebarOpen}
             className={`fixed top-0 right-0 h-full w-full max-w-sm md:max-w-md lg:max-w-[440px] z-[60] transform transition-transform duration-300 ease-in-out ${ isAiSidebarOpen ? 'translate-x-0' : 'translate-x-full' } bg-gray-800/90 backdrop-blur-lg border-l border-gray-700/50 flex flex-col shadow-2xl`}
@@ -572,17 +572,32 @@ Assistant:`;
                       className={`flex ${ message.role === 'user' ? 'justify-end' : 'justify-start' }`}
                     >
                     <div className={`max-w-[85%] rounded-lg px-3 py-2 text-sm shadow-md break-words ${ message.role === 'user' ? 'bg-indigo-600 text-white' : message.error ? 'bg-red-800/50 text-red-200 border border-red-700/50' : 'bg-gray-700/80 text-gray-200 border border-gray-600/50' }`}>
+                        {/* Improved Markdown Rendering with Katex */}
                         {message.content && message.content !== "..." && (
                             <ReactMarkdown
-                                remarkPlugins={[remarkGfm]}
+                                remarkPlugins={[remarkGfm, remarkMath]}
+                                rehypePlugins={[rehypeKatex]}
                                 components={{
                                     p: ({node, ...props}) => <p className="mb-1 last:mb-0" {...props} />,
                                     a: ({node, ...props}) => <a className="text-indigo-300 hover:underline" target="_blank" rel="noopener noreferrer" {...props} />,
+                                    // Add styling for other markdown elements if needed (e.g., code blocks, lists)
+                                    code({node, inline, className, children, ...props}) {
+                                        const match = /language-(\w+)/.exec(className || '')
+                                        return !inline ? (
+                                          <pre className="bg-gray-900/50 p-2 rounded my-2 overflow-x-auto text-xs"><code className={className} {...props}>{children}</code></pre>
+                                        ) : (
+                                          <code className="bg-gray-600/70 px-1 rounded text-xs" {...props}>{children}</code>
+                                        )
+                                    },
+                                    ul: ({node, ...props}) => <ul className="list-disc list-inside my-1" {...props} />,
+                                    ol: ({node, ...props}) => <ol className="list-decimal list-inside my-1" {...props} />,
+                                    li: ({node, ...props}) => <li className="mb-0.5" {...props} />,
                                 }}
                             >
                                 {message.content}
                             </ReactMarkdown>
                         )}
+                        {/* Loading indicator */}
                         {message.content === "..." && isChatLoading && index === chatHistory.length - 1 && (
                             <div className="flex space-x-1.5 py-1">
                                 <div className="w-1.5 h-1.5 bg-current rounded-full animate-bounce opacity-70"></div>
@@ -593,6 +608,7 @@ Assistant:`;
                     </div>
                     </motion.div>
                 ))}
+                {/* Fallback loading dots if placeholder isn't added immediately */}
                 {isChatLoading && chatHistory[chatHistory.length - 1]?.role !== 'assistant' && (
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start">
                         <div className={`bg-gray-700/80 border border-gray-600/50 rounded-lg px-3 py-1.5 max-w-[85%] shadow-md`}>

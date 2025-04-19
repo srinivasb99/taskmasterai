@@ -965,6 +965,7 @@ export function Settings() {
                                   <li>2 PDF and Text Notes per month</li>
                                   <li>1 Youtube Note per month</li>
                                   <li>10 AI Chat Interactions per month</li>
+                                  <li>500 Tokens Included</li>
                                   <li>Add Up to 3 Friends</li>
                               </ul>
                               <Link to="/pricing" className={`block mt-4 w-full ${buttonPrimaryClass} ${buttonPrimaryHoverEffect} rounded-md shadow-lg shadow-indigo-500/10`}>

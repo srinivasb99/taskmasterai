@@ -33,7 +33,7 @@ const ComingSoon: React.FC = () => {
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const { currentUser } = useAuth();
-  const navigate = useNavigate();
+  const navigate = useNavigate(); // Hook for navigation
 
   // Theme detection
   const isIlluminateEnabled = JSON.parse(localStorage.getItem('isIlluminateEnabled') || 'false');
@@ -76,44 +76,36 @@ const ComingSoon: React.FC = () => {
       setSubmitSuccess(true);
       setFeatureRequest('');
 
-      // Use a timer for the redirect after success animation
       const timerId = setTimeout(() => {
-        // Ensure modal is still meant to be open before navigating away
-        // Check submitSuccess again in case it was reset by quick close/reopen
-        if (submitSuccess) {
-            setIsModalOpen(false); // Close modal first
-            navigate('/dashboard');
+        if (submitSuccess) { // Check again in case closed quickly
+            setIsModalOpen(false);
+            // --- Ensure redirect path is correct ---
+            navigate('/dashboard'); // Confirmed: redirects to /dashboard
         }
-      }, 2500);
+      }, 2500); // Keep the 2.5s delay for user to see success message
 
-      // Basic cleanup mechanism (might need more robust handling if needed)
-      // Store timer ID to potentially clear it in the effect below
       (window as any)._featureRequestTimer = timerId;
-
 
     } catch (error: any) {
       console.error('Submission error:', error);
       setSubmitError(error.message || 'An unexpected error occurred.');
-      setSubmitSuccess(false); // Reset success state on error
-      setIsSubmitting(false); // Allow retry
+      setSubmitSuccess(false);
+      setIsSubmitting(false);
     }
-  }, [featureRequest, isSubmitting, currentUser, navigate, submitSuccess]); // Added submitSuccess dependency
+  }, [featureRequest, isSubmitting, currentUser, navigate, submitSuccess]);
 
   // Effect to reset submission state when modal is closed
   useEffect(() => {
     if (!isModalOpen) {
-      // Clear any pending redirect timer if modal is closed manually
       if ((window as any)._featureRequestTimer) {
         clearTimeout((window as any)._featureRequestTimer);
         (window as any)._featureRequestTimer = null;
       }
-      // Reset all submission-related states
       setIsSubmitting(false);
       setSubmitSuccess(false);
       setSubmitError(null);
     }
-    // Cleanup function for the effect itself
-    return () => {
+    return () => { // Cleanup on unmount
         if ((window as any)._featureRequestTimer) {
           clearTimeout((window as any)._featureRequestTimer);
           (window as any)._featureRequestTimer = null;
@@ -123,18 +115,17 @@ const ComingSoon: React.FC = () => {
 
   return (
     <>
-      {/* Main Page Content */}
+      {/* Main Page Content (Unchanged) */}
       <div className={`relative flex flex-col items-center justify-center min-h-screen h-screen overflow-hidden ${containerClass} font-poppins`}>
-        {/* --- Blobs Restored Exactly As Original --- */}
+        {/* Blobs (Unchanged) */}
         <motion.div className="absolute bg-indigo-500 rounded-full opacity-30" style={{ width: 350, height: 350, top: '-100px', left: '-100px' }} animate={{ x: [0, 80, 0], y: [0, 50, 0] }} transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }} />
         <motion.div className="absolute bg-purple-500 rounded-full opacity-30" style={{ width: 300, height: 300, bottom: '-150px', right: '-150px' }} animate={{ x: [0, -80, 0], y: [0, -50, 0] }} transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }} />
         <motion.div className="absolute bg-indigo-500 rounded-full opacity-20" style={{ width: 200, height: 200, bottom: '20%', left: '-100px' }} animate={{ rotate: [0, 360] }} transition={{ duration: 25, repeat: Infinity, ease: "linear" }} />
         <motion.div className="absolute bg-purple-500 rounded-full opacity-20" style={{ width: 150, height: 150, top: '30%', right: '-70px' }} animate={{ x: [0, -40, 0], y: [0, 40, 0] }} transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }} />
 
-        {/* Icon Animation (Original) */}
+        {/* Icon Animation (Unchanged) */}
         <motion.div className="text-center mb-6 md:mb-8 relative z-10" initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 1.2, type: "spring", stiffness: 200 }}>
             <motion.div className="relative inline-block" animate={{ y: [0, -10, 0], rotate: [0, 5, -5, 0] }} transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}>
-                {/* Original inner blur div */}
                 <div className="absolute inset-0 bg-purple-500 blur-2xl opacity-20 rounded-full transform scale-150"></div>
                 <svg className="relative w-12 h-12 md:w-16 md:h-16 mx-auto text-purple-400 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -142,7 +133,7 @@ const ComingSoon: React.FC = () => {
             </motion.div>
         </motion.div>
 
-        {/* Headings (Original) */}
+        {/* Headings (Unchanged) */}
         <motion.h1 className={`text-4xl md:text-5xl lg:text-6xl font-bold relative z-10 ${primaryTextColor} text-center px-4`} initial={{ y: -100, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ type: "spring", stiffness: 180, damping: 20, delay: 0.2 }}>
             Coming Soon!
         </motion.h1>
@@ -150,7 +141,7 @@ const ComingSoon: React.FC = () => {
             This feature is under construction. Stay tuned...
         </motion.p>
 
-        {/* Buttons Container (Original structure, added focus ring offset fix) */}
+        {/* Buttons Container (Unchanged) */}
         <motion.div
           className="mt-10 relative z-10 flex flex-wrap justify-center items-center gap-4 px-4"
           initial={{ scale: 0 }}
@@ -160,32 +151,19 @@ const ComingSoon: React.FC = () => {
            <Link
             to="/dashboard"
             className={`inline-flex items-center px-5 py-2.5 ${buttonTextColor} bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-transform transform hover:scale-105 shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${isIlluminateEnabled ? 'focus:ring-offset-white' : 'focus:ring-offset-gray-900'}`}
-          >
-            Return to Dashboard
-          </Link>
+          > Return to Dashboard </Link>
           <Link
             to="/contact"
             className={`inline-flex items-center px-5 py-2.5 rounded-full transition-transform transform hover:scale-105 shadow hover:shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 ${secondaryButtonClass} ${isIlluminateEnabled ? 'focus:ring-offset-white' : 'focus:ring-offset-gray-900'}`}
-          >
-            Contact Us
-          </Link>
+          > Contact Us </Link>
           <button
-            onClick={handleOpenModal}
-            type="button"
+            onClick={handleOpenModal} type="button"
             className={`inline-flex items-center px-5 py-2.5 rounded-full transition-transform transform hover:scale-105 shadow hover:shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 ${secondaryButtonClass} ${isIlluminateEnabled ? 'focus:ring-offset-white' : 'focus:ring-offset-gray-900'}`}
-          >
-            Request Features
-          </button>
+          > Request Features </button>
           <a
-            href="https://www.instagram.com/taskmasteroneai/"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="Visit TaskMaster AI on Instagram"
+            href="https://www.instagram.com/taskmasteroneai/" target="_blank" rel="noopener noreferrer" aria-label="Visit TaskMaster AI on Instagram"
             className={`inline-flex items-center px-5 py-2.5 ${buttonTextColor} bg-gradient-to-r from-[#833ab4] via-[#fd1d1d] to-[#fcb045] rounded-full transition-transform transform hover:scale-105 shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-pink-500 ${isIlluminateEnabled ? 'focus:ring-offset-white' : 'focus:ring-offset-gray-900'}`}
-          >
-            <InstagramIcon />
-            Follow Us
-          </a>
+          > <InstagramIcon /> Follow Us </a>
         </motion.div>
       </div>
 
@@ -194,44 +172,41 @@ const ComingSoon: React.FC = () => {
         {isModalOpen && (
           <motion.div
             className="fixed inset-0 z-50 flex items-center justify-center p-4"
-            // --- Optimization: Faster backdrop fade-in ---
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }} // Make backdrop fade slightly faster
+            // --- Faster animation ---
+            transition={{ duration: 0.15 }} // Even faster backdrop fade
           >
             {/* Backdrop */}
             <motion.div
-               // --- !!!!! PERFORMANCE BOTTLENECK LIKELY HERE !!!!! ---
-               // The `backdrop-blur-sm` class is computationally expensive and very often
-               // causes lag during transitions. TEST removing it like this:
-               // className="absolute inset-0 bg-black/70"
-               // --- !!!!! --------------------------------------- !!!!! ---
-              className="absolute inset-0 bg-black/70 backdrop-blur-sm" // Original line causing potential lag
+              // --- Backdrop blur removed ---
+              className="absolute inset-0 bg-black/70" // Removed backdrop-blur-sm
               onClick={handleCloseModal}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }} // Match backdrop duration
+              // --- Faster animation ---
+              transition={{ duration: 0.15 }} // Match backdrop fade speed
             ></motion.div>
 
             {/* Modal Content */}
             <motion.div
               className={`relative ${modalBgClass} ${primaryTextColor} rounded-2xl shadow-2xl w-full max-w-lg p-6 md:p-8 mx-4 overflow-hidden flex flex-col`}
-              // --- Optimization: Slightly faster/simpler modal animation ---
-              initial={{ scale: 0.95, y: 15, opacity: 0 }} // Start slightly closer, slightly higher y
+              // --- Faster animation ---
+              initial={{ scale: 0.95, y: 10, opacity: 0 }} // Start slightly closer/higher
               animate={{ scale: 1, y: 0, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }} // Simpler exit, matches initial scale
-              transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }} // Slightly faster, custom cubic-bezier for smoothness
+              exit={{ scale: 0.95, y: 5, opacity: 0 }} // Slight y shift on exit
+              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }} // Faster duration, kept easing
               role="dialog"
               aria-modal="true"
               aria-labelledby="feature-request-title"
             >
-             {/* Content container for smooth height transition */}
+             {/* Content container (Unchanged) */}
              <div className="transition-all duration-300 ease-out">
                 {!submitSuccess ? (
                     <>
-                        {/* Header */}
+                        {/* Header (Unchanged) */}
                         <div className="flex justify-between items-start mb-4">
                             <h2 id="feature-request-title" className={`text-xl md:text-2xl font-semibold ${primaryTextColor}`}>Request a Feature</h2>
                             <button
@@ -239,68 +214,37 @@ const ComingSoon: React.FC = () => {
                                 className={`p-1.5 rounded-full ${secondaryTextColor} ${closeButtonHoverBg} transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${isIlluminateEnabled ? 'focus:ring-offset-white' : 'focus:ring-offset-gray-800'}`}
                                 aria-label="Close modal"
                                 disabled={isSubmitting}
-                            >
-                                <X className="h-5 w-5" />
-                            </button>
+                            > <X className="h-5 w-5" /> </button>
                         </div>
                         <p className={`mb-5 ${secondaryTextColor} text-sm`}>What brilliant idea should we build next?</p>
 
-                        {/* Form */}
+                        {/* Form (Unchanged) */}
                         <form onSubmit={handleSubmitRequest}>
                             <textarea
                                 value={featureRequest}
                                 onChange={(e) => setFeatureRequest(e.target.value)}
                                 placeholder="Describe the feature you'd like..."
-                                rows={5}
-                                required
-                                disabled={isSubmitting}
+                                rows={5} required disabled={isSubmitting}
                                 className={`w-full p-3 border rounded-xl ${inputBgClass} ${inputFocusRing} focus:outline-none resize-none text-base transition-colors duration-150 mb-2`}
                             />
                             <AnimatePresence>
-                                {submitError && (
-                                    <motion.p
-                                        initial={{ opacity: 0, height: 0 }}
-                                        animate={{ opacity: 1, height: 'auto' }}
-                                        exit={{ opacity: 0, height: 0 }}
-                                        className={`mt-1 text-sm ${errorTextColor} overflow-hidden`}
-                                    >
-                                        {submitError}
-                                    </motion.p>
-                                )}
+                                {submitError && ( <motion.p initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className={`mt-1 text-sm ${errorTextColor} overflow-hidden`} > {submitError} </motion.p> )}
                             </AnimatePresence>
                             <div className="mt-6 flex justify-end gap-3">
-                                <button
-                                    type="button"
-                                    onClick={handleCloseModal}
-                                    disabled={isSubmitting}
-                                    className={`px-5 py-2 rounded-full transition-all transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-60 ${secondaryButtonClass} ${isIlluminateEnabled ? 'focus:ring-offset-white' : 'focus:ring-offset-gray-800'}`}
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={isSubmitting || !featureRequest.trim()}
-                                    className={`inline-flex items-center justify-center px-5 py-2 min-w-[150px] text-center ${buttonTextColor} bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all transform hover:scale-105 shadow hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed ${isIlluminateEnabled ? 'focus:ring-offset-white' : 'focus:ring-offset-gray-800'}`}
-                                >
+                                <button type="button" onClick={handleCloseModal} disabled={isSubmitting} className={`px-5 py-2 rounded-full transition-all transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-60 ${secondaryButtonClass} ${isIlluminateEnabled ? 'focus:ring-offset-white' : 'focus:ring-offset-gray-800'}`} > Cancel </button>
+                                <button type="submit" disabled={isSubmitting || !featureRequest.trim()} className={`inline-flex items-center justify-center px-5 py-2 min-w-[150px] text-center ${buttonTextColor} bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all transform hover:scale-105 shadow hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed ${isIlluminateEnabled ? 'focus:ring-offset-white' : 'focus:ring-offset-gray-800'}`} >
                                     {isSubmitting ? ( <><Loader2 className="w-5 h-5 mr-2 animate-spin" />Sending...</> ) : ( 'Submit Request' )}
                                 </button>
                             </div>
                         </form>
                     </>
                 ) : (
-                    // Success State
+                    // Success State (Unchanged)
                     <motion.div
                         className="flex flex-col items-center justify-center text-center h-full py-8"
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1}}
-                        transition={{ duration: 0.4, delay: 0.1, type: 'spring', stiffness: 150 }}
-                    >
-                        <motion.div
-                            className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mb-4"
-                            initial={{ scale: 0 }} animate={{ scale: 1}} transition={{ duration: 0.4, delay: 0.2, type: 'spring', damping: 12}} >
-                            <motion.div
-                                className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center"
-                                initial={{ scale: 0 }} animate={{ scale: 1}} transition={{ duration: 0.4, delay: 0.3, type: 'spring', damping: 12}} >
+                        initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1}} transition={{ duration: 0.4, delay: 0.1, type: 'spring', stiffness: 150 }} >
+                        <motion.div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mb-4" initial={{ scale: 0 }} animate={{ scale: 1}} transition={{ duration: 0.4, delay: 0.2, type: 'spring', damping: 12}} >
+                            <motion.div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center" initial={{ scale: 0 }} animate={{ scale: 1}} transition={{ duration: 0.4, delay: 0.3, type: 'spring', damping: 12}} >
                                 <Check className="w-7 h-7 text-white" strokeWidth={3} />
                             </motion.div>
                         </motion.div>
@@ -318,5 +262,4 @@ const ComingSoon: React.FC = () => {
   );
 };
 
-// Wrap with React.memo for potential parent re-render optimization
 export default React.memo(ComingSoon);

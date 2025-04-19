@@ -8,18 +8,30 @@ import { saveFeatureRequest } from '../lib/comingsoon-firebase'; // Import Fireb
 import { Loader2, Check } from 'lucide-react'; // Import icons
 
 // Corrected Instagram SVG Icon
+// Corrected React component to render the OUTLINE style Instagram icon
+
 const InstagramIcon = () => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
     viewBox="0 0 24 24"
-    fill="currentColor"
-    className="w-5 h-5 mr-2" // Added margin-right
+    // Attributes for outline style (matching the first example)
+    fill="none"             // Changed from "currentColor"
+    stroke="currentColor"    // Added
+    strokeWidth="2"        // Added (camelCase for JSX)
+    strokeLinecap="round"  // Added (camelCase for JSX)
+    strokeLinejoin="round" // Added (camelCase for JSX)
+    // Keep existing classes for sizing/spacing
+    className="w-5 h-5 mr-2"
   >
-     {/* Using a simpler, more standard Instagram path */}
-     <path d="M12 2.163c3.204 0 3.584.012 4.85.07 1.17.055 1.805.248 2.227.415.562.218.96.477 1.382.896.419.42.679.819.896 1.381.168.422.36 1.057.413 2.227.058 1.266.07 1.646.07 4.85s-.012 3.584-.07 4.85c-.055 1.17-.248 1.805-.413 2.227-.218.562-.477.96-.896 1.382-.42.419-.819.679-1.381.896-.422.168-1.057.36-2.227.413-1.266.058-1.646.07-4.85.07s-3.584-.012-4.85-.07c-1.17-.055-1.805-.248-2.227-.413-.562-.218-.96-.477-1.382-.896-.419-.42-.679-.819-.896-1.381-.168.422-.36-1.057-.413-2.227-.058-1.266-.07-1.646-.07-4.85s.012-3.584.07-4.85c.055-1.17.248-1.805.413-2.227.218.562.477.96.896 1.382.42.419.819.679 1.381.896.422.168 1.057.36 2.227.413 1.266.058 1.646.07 4.85.07zm0-2.163c-3.259 0-3.667.014-4.947.072-1.356.06-2.328.248-3.168.577-1.096.438-1.973 1.04-2.834 1.897C.398 3.79 0 4.878 0 6.117c-.06 1.28-.072 1.688-.072 4.947s.013 3.667.072 4.947c.06 1.355.248 2.328.577 3.168.438 1.096 1.04 1.973 1.897 2.834.954.86 2.025 1.46 3.117 1.897.84.33 1.812.518 3.168.577 1.28.058 1.688.072 4.947.072s3.667-.014 4.947-.072c1.355-.06 2.328-.248 3.168-.577 1.096-.438 1.973-1.04 2.834-1.897.86-.954 1.46-2.025 1.897-3.117.33-.84.518-1.812.577-3.168.058-1.28.072-1.688.072-4.947s-.013-3.667-.072-4.947c-.06-1.355-.248-2.328-.577-3.168-.438-1.096-1.04-1.973-1.897-2.834-.954-.86-2.025-1.46-3.117-1.897-.84-.33-1.812-.518-3.168-.577-1.28-.058-1.688-.072-4.947-.072zM12 7.838c-2.309 0-4.162 1.854-4.162 4.162s1.854 4.163 4.162 4.163 4.162-1.854 4.162-4.163S14.309 7.838 12 7.838zm0 6.824c-1.469 0-2.662-1.194-2.662-2.662s1.194-2.662 2.662-2.662 2.662 1.194 2.662 2.662-1.193 2.662-2.662 2.662zm4.808-7.173c-.566 0-1.025.46-1.025 1.026s.459 1.026 1.025 1.026c.566 0 1.026-.46 1.026-1.026s-.46-1.026-1.026-1.026z"/>
+    {/* Elements from the first "correct" SVG example */}
+    <rect width="20" height="20" x="2" y="2" rx="5" ry="5"/>
+    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/>
+    <line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/>
   </svg>
 );
 
+// Export the component if needed (e.g., in a separate file)
+// export default InstagramIcon;
 const ComingSoon: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [featureRequest, setFeatureRequest] = useState('');

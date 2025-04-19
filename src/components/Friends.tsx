@@ -38,7 +38,7 @@ import {
     UserTier, // Import type
     PREMIUM_EMAILS, // Import if needed for direct checks, though getUserTier is preferred
     PRO_EMAILS,     // Import if needed for direct checks
-    getUserChatUsage, // <-- ADDED
+    getUserUsageData, // <-- ADDED
     updateUserChatUsage // <-- ADDED
 } from '../lib/dashboard-firebase'; // Import from CENTRALIZED file
 import { auth } from "../lib/firebase"; // Keep auth import
@@ -301,7 +301,7 @@ export function Friends() {
       setIsLoadingUsage(true);
       try {
           const currentMonthYear = new Date().toISOString().slice(0, 7);
-          const usageData = await getUserChatUsage(currentUserId);
+          const usageData = await getUserUsageData(currentUserId);
           if (usageData && usageData.month === currentMonthYear) {
               setChatCount(usageData.count);
               setUsageMonth(usageData.month);
